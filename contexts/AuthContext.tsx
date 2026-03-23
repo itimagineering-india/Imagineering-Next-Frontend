@@ -2,8 +2,6 @@
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { auth } from "@/lib/firebase";
-import { signInWithCustomToken, signOut } from "firebase/auth";
 import api, { getAuthToken, removeAuthToken } from "@/lib/api-client";
 import { disconnectChat } from "@/lib/chatService";
 
@@ -63,21 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     retry: 0,
   });
 
-  useEffect(() => {
-    if (!token || !meQuery.data || typeof window === "undefined") return;
-    const syncFirebase = async () => {
-      try {
-        const res = await api.auth.getFirebaseCustomToken();
-        if (res.success && (res.data as any)?.customToken) {
-          await signInWithCustomToken(auth, (res.data as any).customToken);
-        }
-      } catch {
-        /* non-blocking */
-      }
-    };
-    syncFirebase();
-  }, [token, meQuery.data]);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user: token ? (meQuery.data ?? null) : null,
@@ -89,7 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         disconnectChat();
         removeAuthToken();
         queryClient.removeQueries({ queryKey: AUTH_ME_QUERY_KEY });
-        signOut(auth).catch(() => {});
       },
     }),
     [token, meQuery.data, meQuery.isLoading, meQuery.error, queryClient]
