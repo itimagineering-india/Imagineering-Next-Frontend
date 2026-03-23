@@ -88,43 +88,41 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   const categoryImage = categoryImages[category.slug] || null;
 
   return (
-    <Link href={`/services?category=${category.slug}`}>
-      <div className="group relative aspect-square bg-white rounded-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-105 cursor-pointer flex flex-col items-center justify-center gap-1 px-2 pt-4 pb-4 border border-slate-200 hover:border-red-400 overflow-hidden">
-        
-        {/* Image container - replacing SVG icon with image */}
+    <Link href={`/services?category=${category.slug}`} className="block min-w-0">
+      {/* flex-col + icon area must not use h-full or it steals space from the label on narrow cards */}
+      <div className="group relative aspect-square bg-white rounded-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-105 cursor-pointer flex flex-col items-stretch min-h-0 gap-1 px-1.5 py-2 sm:px-2 sm:pt-4 sm:pb-4 border border-slate-200 hover:border-red-400 overflow-hidden">
+        {/* Image / icon — flex-1 min-h-0 keeps the title row visible */}
         {categoryImage ? (
-          <div className="relative z-10 w-full h-full flex items-center justify-center p-0.5 sm:p-1 md:p-2 transition-all duration-300 group-hover:scale-110">
-            <div className="w-full h-full max-w-[48px] max-h-[48px] sm:max-w-[56px] sm:max-h-[56px] md:max-w-[64px] md:max-h-[64px] lg:max-w-[72px] lg:max-h-[72px] xl:max-w-[80px] xl:max-h-[80px] rounded-md sm:rounded-lg overflow-hidden shadow-sm group-hover:shadow-lg transition-shadow duration-300">
-              <img 
-                src={categoryImage} 
-                alt={category.name}
+          <div className="relative z-10 flex flex-1 min-h-0 items-center justify-center p-0.5 sm:p-1 md:p-2 transition-all duration-300 group-hover:scale-110">
+            <div className="max-w-[44px] max-h-[44px] w-full aspect-square sm:max-w-[56px] sm:max-h-[56px] md:max-w-[64px] md:max-h-[64px] lg:max-w-[72px] lg:max-h-[72px] xl:max-w-[80px] xl:max-h-[80px] rounded-md sm:rounded-lg overflow-hidden shadow-sm group-hover:shadow-lg transition-shadow duration-300">
+              <img
+                src={categoryImage}
+                alt=""
                 loading="lazy"
                 decoding="async"
                 className="w-full h-full object-cover"
               />
             </div>
           </div>
-        ) : (
-          // Fallback to icon if image not available
-          useCustomIcon ? (
-            <div className="relative z-10 w-full h-full flex items-center justify-center p-0.5 sm:p-1 md:p-2 transition-all duration-300 group-hover:scale-110">
-              <div className="w-full h-full max-w-[32px] max-h-[32px] sm:max-w-[38px] sm:max-h-[38px] md:max-w-[45px] md:max-h-[45px] lg:max-w-[50px] lg:max-h-[50px] xl:max-w-[55px] xl:max-h-[55px] flex items-center justify-center">
-                <IconComponent className="w-full h-full" />
-              </div>
+        ) : useCustomIcon ? (
+          <div className="relative z-10 flex flex-1 min-h-0 items-center justify-center p-0.5 sm:p-1 md:p-2 transition-all duration-300 group-hover:scale-110">
+            <div className="max-w-[32px] max-h-[32px] w-full aspect-square sm:max-w-[38px] sm:max-h-[38px] md:max-w-[45px] md:max-h-[45px] lg:max-w-[50px] lg:max-h-[50px] xl:max-w-[55px] xl:max-h-[55px] flex items-center justify-center">
+              <IconComponent className="w-full h-full" />
             </div>
-          ) : (
-            <div className="relative z-10 p-2 rounded-lg bg-slate-100 transition-all duration-300 group-hover:bg-red-500 group-hover:scale-110 shadow-sm">
+          </div>
+        ) : (
+          <div className="relative z-10 flex flex-1 min-h-0 items-center justify-center">
+            <div className="p-2 rounded-lg bg-slate-100 transition-all duration-300 group-hover:bg-red-500 group-hover:scale-110 shadow-sm">
               <IconComponent className="h-4 w-4 md:h-5 md:w-5 text-slate-700 group-hover:text-white transition-colors duration-300" />
             </div>
-          )
+          </div>
         )}
-        
-        {/* Category name - responsive text sizing (larger on desktop for size="large") */}
+
         <span
-          className={`relative z-10 text-slate-800 font-semibold text-center leading-tight group-hover:text-red-500 transition-colors duration-300 line-clamp-2 ${
+          className={`relative z-10 shrink-0 w-full text-slate-800 font-semibold text-center leading-snug group-hover:text-red-500 transition-colors duration-300 line-clamp-2 [overflow-wrap:anywhere] ${
             size === "large"
-              ? "text-[10px] sm:text-xs md:text-sm"
-              : "text-[9px] sm:text-[10px] md:text-xs"
+              ? "text-[11px] leading-[1.25] sm:text-xs md:text-sm"
+              : "text-[10px] leading-[1.25] sm:text-[10px] md:text-xs"
           }`}
         >
           {category.name}
