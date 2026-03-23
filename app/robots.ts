@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
-import { BASE_URL } from "@/lib/constants";
+import { getSiteUrl } from "@/lib/site-url";
 
 export default function robots(): MetadataRoute.Robots {
+  const origin = getSiteUrl();
   return {
     rules: [
       {
@@ -19,11 +20,12 @@ export default function robots(): MetadataRoute.Robots {
           "/chat",
           "/notifications",
           "/cart",
+          "/checkout",
           "/profile",
         ],
       },
     ],
-    sitemap: `${BASE_URL}/sitemap.xml`,
+    sitemap: `${origin}/sitemap.xml`,
   };
 }
 
