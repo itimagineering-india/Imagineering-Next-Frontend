@@ -14,6 +14,9 @@ export function ServicesSection() {
   );
   const rest = serviceCategories.filter((c) => !FEATURED_SLUGS.includes(c.slug));
 
+  /** Mobile: single grid so the 5th featured item flows into the same grid as the rest (no extra gap between sections). */
+  const mobileOrdered = [...featured, ...rest];
+
   return (
     <section className="relative px-4 sm:px-6 md:px-6 lg:px-8 overflow-hidden">
       {/* Background decoration */}
@@ -40,50 +43,75 @@ export function ServicesSection() {
           </p>
         </div>
 
-        {/* Top row: 5 featured cards - same full width as bottom row */}
+        {/* Mobile: one continuous grid — 4 columns, no orphan row + gap before the rest */}
         <div
-          className={`grid grid-cols-5 gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3 xl:gap-4 transition-all duration-700 ${
+          className={`grid grid-cols-4 gap-1.5 sm:hidden transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
           style={{ transitionDelay: "200ms" }}
         >
-          {featured.map((cat, i) => {
+          {mobileOrdered.map((cat, i) => {
             const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
+            const isFeatured = FEATURED_SLUGS.includes(cat.slug);
             return (
               <div
                 key={cat.slug}
                 className={`transition-all duration-500 ${
                   isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
                 }`}
-                style={{ transitionDelay: `${300 + i * 50}ms` }}
+                style={{ transitionDelay: `${300 + i * 40}ms` }}
               >
-                <ServicePlaceholderCard index={idx} size="large" />
+                <ServicePlaceholderCard index={idx} size={isFeatured ? "large" : "default"} />
               </div>
             );
           })}
         </div>
 
-        {/* Bottom row: rest of categories - same responsive grid */}
-        <div
-          className={`grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3 xl:gap-4 mt-1.5 sm:mt-2 md:mt-2.5 lg:mt-3 xl:mt-4 transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
-          style={{ transitionDelay: "350ms" }}
-        >
-          {rest.map((cat, i) => {
-            const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
-            return (
-              <div
-                key={cat.slug}
-                className={`transition-all duration-500 ${
-                  isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
-                }`}
-                style={{ transitionDelay: `${400 + i * 50}ms` }}
-              >
-                <ServicePlaceholderCard index={idx} />
-              </div>
-            );
-          })}
+        {/* sm+: two rows — 5 featured, then rest (same as before) */}
+        <div className="hidden sm:block">
+          <div
+            className={`grid grid-cols-5 gap-2 md:gap-2.5 lg:gap-3 xl:gap-4 transition-all duration-700 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
+            style={{ transitionDelay: "200ms" }}
+          >
+            {featured.map((cat, i) => {
+              const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
+              return (
+                <div
+                  key={cat.slug}
+                  className={`transition-all duration-500 ${
+                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
+                  }`}
+                  style={{ transitionDelay: `${300 + i * 50}ms` }}
+                >
+                  <ServicePlaceholderCard index={idx} size="large" />
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            className={`grid grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2 md:gap-2.5 lg:gap-3 xl:gap-4 mt-2 md:mt-2.5 lg:mt-3 xl:mt-4 transition-all duration-700 ${
+              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
+            style={{ transitionDelay: "350ms" }}
+          >
+            {rest.map((cat, i) => {
+              const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
+              return (
+                <div
+                  key={cat.slug}
+                  className={`transition-all duration-500 ${
+                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-8 scale-95"
+                  }`}
+                  style={{ transitionDelay: `${400 + i * 50}ms` }}
+                >
+                  <ServicePlaceholderCard index={idx} />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
