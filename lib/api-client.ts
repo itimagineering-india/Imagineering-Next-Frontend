@@ -1776,6 +1776,135 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
   },
+ /** Bulk labour crew requests (contractors invite multiple workers). */
+  manpowerCrew: {
+    create: (data: {
+      title: string;
+      description: string;
+      headcount: number;
+      location?: { address?: string; city?: string; state?: string; zipCode?: string };
+      startDate?: string;
+      endDate?: string;
+      skillTags?: string[];
+      rateNote?: string;
+    }) =>
+      apiRequest<{ success: boolean; data: { crewRequest: Record<string, unknown> } }>('/api/manpower-crew', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    listMine: (params?: { page?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      const qs = q.toString();
+      return apiRequest<{
+        success: boolean;
+        data: { crewRequests: Record<string, unknown>[] };
+        pagination?: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/manpower-crew${qs ? `?${qs}` : ''}`);
+    },
+    listWorkerInvites: (params?: { page?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      const qs = q.toString();
+      return apiRequest<{
+        success: boolean;
+        data: { invites: Record<string, unknown>[] };
+        pagination?: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/manpower-crew/worker/invites${qs ? `?${qs}` : ''}`);
+    },
+    getById: (id: string) =>
+      apiRequest<{
+        success: boolean;
+        data: { crewRequest: Record<string, unknown>; myInvite: Record<string, unknown> | null };
+      }>(`/api/manpower-crew/${encodeURIComponent(id)}`),
+    listInvites: (id: string) =>
+      apiRequest<{
+        success: boolean;
+        data: { invites: Record<string, unknown>[] };
+      }>(`/api/manpower-crew/${encodeURIComponent(id)}/invites`),
+    inviteBatch: (id: string, workerUserIds: string[]) =>
+      apiRequest<{
+        success: boolean;
+        data: { invitesCreated: number; skipped: string[] };
+      }>(`/api/manpower-crew/${encodeURIComponent(id)}/invites`, {
+        method: 'POST',
+        body: JSON.stringify({ workerUserIds }),
+      }),
+    respondInvite: (inviteId: string, action: 'accept' | 'decline') =>
+      apiRequest<{ success: boolean; data: Record<string, unknown> }>(
+        `/api/manpower-crew/invites/${encodeURIComponent(inviteId)}/respond`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ action }),
+        }
+      ),
+    cancel: (id: string) =>
+      apiRequest<{ success: boolean; data: { crewRequest: Record<string, unknown> } }>(
+        `/api/manpower-crew/${encodeURIComponent(id)}/cancel`,
+        { method: 'PATCH' }
+      ),
+
+    browseLabour: (params?: {
+      categorySlug?: string;
+      q?: string;
+      page?: number;
+      limit?: number;
+      sort?: string;
+      addressQ?: string;
+      city?: string;
+      state?: string;
+      minRating?: number;
+      minExperience?: number;
+      maxPrice?: number;
+      subManpower?: string;
+      subTechnical?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (params?.categorySlug) q.set('categorySlug', params.categorySlug);
+      if (params?.q) q.set('q', params.q);
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.sort) q.set('sort', params.sort);
+      if (params?.addressQ) q.set('addressQ', params.addressQ);
+      if (params?.city) q.set('city', params.city);
+      if (params?.state) q.set('state', params.state);
+      if (params?.minRating != null && Number.isFinite(params.minRating)) {
+        q.set('minRating', String(params.minRating));
+      }
+      if (params?.minExperience != null && Number.isFinite(params.minExperience)) {
+        q.set('minExperience', String(params.minExperience));
+      }
+      if (params?.maxPrice != null && Number.isFinite(params.maxPrice)) {
+        q.set('maxPrice', String(params.maxPrice));
+      }
+      if (params?.subManpower) q.set('subManpower', params.subManpower);
+      if (params?.subTechnical) q.set('subTechnical', params.subTechnical);
+      const qs = q.toString();
+      return apiRequest<{
+        success: boolean;
+        data: {
+          workers: Array<{
+            userId: string;
+            displayName: string;
+            avatar?: string;
+            city?: string;
+            categoryLabel?: string;
+            address?: string;
+            experienceYears?: number | null;
+            rating?: number;
+            reviewCount?: number;
+            price?: number | null;
+            priceType?: string | null;
+            state?: string;
+          }>;
+          category?: { name?: string; slug?: string } | null;
+        };
+        pagination?: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/manpower-crew/browse-labour${qs ? `?${qs}` : ''}`);
+    },
+  },
 
   // User requirements (submit → admin quotes → approve)
   requirements: {
