@@ -22,7 +22,7 @@ import {
 const DASHBOARD_ICONS = {
   businessProfile: "https://img.icons8.com/color/96/building.png",
   services: "https://img.icons8.com/color/96/briefcase.png",
-  
+  hireLabour: "https://img.icons8.com/color/96/construction-worker.png",
   addOffer: "https://img.icons8.com/color/96/price-tag.png",
   requests: "https://img.icons8.com/color/96/document.png",
   bookings: "https://img.icons8.com/color/96/calendar.png",
@@ -426,7 +426,7 @@ export default function ProviderDashboard() {
           {[
              { label: "Business Profile", href: "/dashboard/provider/business-profile", icon: DASHBOARD_ICONS.businessProfile },
             { label: "My Services", href: "/dashboard/provider/services", icon: DASHBOARD_ICONS.services },
-           
+            { label: "Hire labour", href: "/dashboard/provider/manpower-crew", icon: DASHBOARD_ICONS.hireLabour },
             {
               label: "Add Offer",
               href: stats.subscriptionStatus !== "free" ? "/dashboard/provider/offers" : "/dashboard/provider/subscription",
