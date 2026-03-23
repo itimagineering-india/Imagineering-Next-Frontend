@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { sendPasswordResetEmailToUser } from "@/lib/firebaseAuth";
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -13,13 +15,21 @@ export default function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Enter a valid email address.");
+      return;
+    }
     setIsLoading(true);
     try {
-      const result = await sendPasswordResetEmailToUser(email);
+      const result = await sendPasswordResetEmailToUser(trimmed);
       if (result.success) {
         setSuccess(true);
+        setTimeout(() => {
+          router.push(`/reset-password?email=${encodeURIComponent(trimmed)}`);
+        }, 1200);
       } else {
-        setError(result.error || "Failed to send reset email");
+        setError(result.error || "Failed to send OTP");
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -32,10 +42,10 @@ export default function ForgotPasswordPage() {
     return (
       <div className="mx-auto max-w-md px-4 py-16">
         <div className="rounded-lg bg-green-50 p-4 text-green-800">
-          <p className="font-medium">Check your email</p>
+          <p className="font-medium">OTP sent</p>
           <p className="mt-1 text-sm">
-            We&apos;ve sent a password reset link to <strong>{email}</strong>. Please check your inbox
-            and follow the instructions.
+            We&apos;ve sent a 6-digit code to <strong>{email}</strong>. Redirecting you to enter the code and set a new
+            password…
           </p>
         </div>
         <p className="mt-6 text-center text-sm text-gray-600">
@@ -51,7 +61,7 @@ export default function ForgotPasswordPage() {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold mb-2">Forgot password?</h1>
       <p className="text-gray-600 mb-6">
-        Enter your email and we&apos;ll send you a link to reset your password.
+        Enter your email and we&apos;ll send a one-time code to reset your password.
       </p>
 
       {error && (
@@ -80,7 +90,7 @@ export default function ForgotPasswordPage() {
           disabled={isLoading}
           className="w-full rounded-lg bg-[#111827] px-4 py-2.5 font-medium text-white hover:bg-gray-800 disabled:opacity-50"
         >
-          {isLoading ? "Sending..." : "Send reset link"}
+          {isLoading ? "Sending…" : "Send OTP"}
         </button>
       </form>
 
@@ -92,4 +102,3 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
-
