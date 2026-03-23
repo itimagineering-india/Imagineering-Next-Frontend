@@ -2,8 +2,7 @@
 const API_BASE_URL = (
   (typeof process !== "undefined" &&
     process.env.NEXT_PUBLIC_API_BASE_URL &&
-    String(process.env.NEXT_PUBLIC_API_BASE_URL).trim()) ||
-  "http://localhost:5000"
+    String(process.env.NEXT_PUBLIC_API_BASE_URL).trim())
 ).replace(/\/$/, "");
 
 /**
