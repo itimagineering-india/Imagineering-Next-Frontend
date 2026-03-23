@@ -5,7 +5,7 @@ function getApiBaseUrl(): string {
       ? process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
       : undefined;
   if (raw) return raw.replace(/\/$/, "");
-  return "https://api.imagineeringindia.com";
+  return "http://localhost:5000";
 }
 
 const API_BASE_URL = getApiBaseUrl();
