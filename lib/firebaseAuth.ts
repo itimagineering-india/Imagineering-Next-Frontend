@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * Email/password and password-reset helpers backed by the API only (no Firebase Auth).
- * File name kept for minimal import churn; chat may still use Firestore via firebase.ts separately.
+ * Email/password, OTP, and password reset — backend API only (no Firebase Auth).
+ * Google (and future Facebook) social sign-in uses Firebase Auth only to obtain an ID token, then the API session (JWT).
  */
+import { signInWithPopup, signOut } from "firebase/auth";
 import api, { setAuthToken, removeAuthToken } from "./api-client";
+import { auth, googleProvider, isFirebaseAuthConfigured } from "./firebase";
 
 const API_BASE =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) || "http://localhost:5000";
@@ -83,11 +85,97 @@ export async function signInWithGoogle(
   error?: string;
   isNewUser?: boolean;
   userRole?: string;
+  /** True when backend returned tempToken — client should navigate to /signup/complete */
+  needsSignupCompletion?: boolean;
 }> {
-  return {
-    success: false,
-    error: "Google sign-in is not available. Please use email or phone.",
-  };
+  if (!isFirebaseAuthConfigured()) {
+    return {
+      success: false,
+      error: "Google sign-in is not configured. Set NEXT_PUBLIC_FIREBASE_* in your environment.",
+    };
+  }
+
+  try {
+    const credential = await signInWithPopup(auth, googleProvider);
+    const user = credential.user;
+    const email = user.email?.trim().toLowerCase();
+    if (!email) {
+      await signOut(auth).catch(() => {});
+      return {
+        success: false,
+        error: "Your Google account has no email address. Use another sign-in method.",
+      };
+    }
+
+    const firebaseToken = await user.getIdToken();
+    const res = await api.auth.googleLogin({
+      firebaseUid: user.uid,
+      email,
+      name: user.displayName || undefined,
+      photoURL: user.photoURL || undefined,
+      emailVerified: user.emailVerified,
+      firebaseToken,
+    });
+
+    await signOut(auth).catch(() => {});
+
+    if (!res.success) {
+      const msg =
+        (res as { error?: { message?: string } }).error?.message || "Google sign-in failed";
+      return { success: false, error: msg };
+    }
+
+    const data = res.data as
+      | {
+          isNewUser?: boolean;
+          token?: string;
+          tempToken?: string;
+          user?: { role?: string; email?: string };
+          profile?: { email?: string; name?: string; photoURL?: string };
+        }
+      | undefined;
+
+    if (data?.isNewUser && data.tempToken && data.profile?.email) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("googleTempToken", data.tempToken);
+        sessionStorage.setItem(
+          "googleProfile",
+          JSON.stringify({
+            email: data.profile.email,
+            name: data.profile.name || data.profile.email.split("@")[0] || "User",
+            photoURL: data.profile.photoURL,
+          })
+        );
+      }
+      return { success: true, isNewUser: true, needsSignupCompletion: true };
+    }
+
+    const token = data?.token;
+    const role = data?.user?.role;
+    if (role === "admin") {
+      removeAuthToken();
+      return { success: false, error: "ADMIN_RESTRICTED" };
+    }
+    if (token) {
+      setAuthToken(token);
+      return {
+        success: true,
+        user: { email: data?.user?.email || email },
+        userRole: role,
+      };
+    }
+
+    return { success: false, error: "Unexpected response from server" };
+  } catch (e: unknown) {
+    const err = e as { code?: string; message?: string };
+    if (err?.code === "auth/popup-closed-by-user") {
+      return { success: false, error: "Sign-in cancelled" };
+    }
+    return {
+      success: false,
+      error: err?.message || "Google sign-in failed",
+    };
+  }
 }
 
 export async function signInWithFacebook(
@@ -95,7 +183,7 @@ export async function signInWithFacebook(
 ): Promise<{ success: boolean; user?: AuthSessionUser; error?: string }> {
   return {
     success: false,
-    error: "Facebook sign-in is not available. Please use email or phone.",
+    error: "Facebook sign-in is not available yet. Use Google, email, or phone.",
   };
 }
 
