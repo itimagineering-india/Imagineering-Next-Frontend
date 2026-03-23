@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1411,8 +1411,8 @@ interface BookingsTableProps {
   onUpdateStatus?: (booking: Booking) => void;
   onRequestModification?: (booking: Booking) => void;
   actionLoading?: string | null;
-  getStatusBadge: (status: string) => JSX.Element;
-  getPaymentBadge: (status: string) => JSX.Element;
+  getStatusBadge: (status: string) => ReactElement;
+  getPaymentBadge: (status: string) => ReactElement;
 }
 
 function BookingsTable({
