@@ -1,4 +1,4 @@
-/** Auth helpers – client only. Web: HttpOnly cookie + session hint; legacy: Bearer in localStorage. */
+/** Auth helpers – client only. Prefer JWT in localStorage so `Authorization: Bearer` works cross-origin (SPA ↔ API). HttpOnly cookies with SameSite=Lax are often not sent on cross-site fetch, which broke login on Vercel + separate API domain. */
 
 const AUTH_COOKIE_SESSION_KEY = "authCookieSession";
 
@@ -6,22 +6,27 @@ const getApiBase = () =>
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) ||
   "http://localhost:5000";
 
-/** Web: returns 'cookie' when HttpOnly session is active; else JWT from localStorage (legacy/mobile-style). */
+/**
+ * Returns JWT for Bearer header, or `"cookie"` when only an HttpOnly session was indicated (legacy).
+ * Prefer `authToken` so API calls authenticate even when the browser does not attach cookies to cross-origin fetch.
+ */
 export const getAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
+  const jwt = localStorage.getItem("authToken");
+  if (jwt) return jwt;
   if (localStorage.getItem(AUTH_COOKIE_SESSION_KEY)) return "cookie";
-  return localStorage.getItem("authToken");
+  return null;
 };
 
 /**
- * After login: store session hint only (JWT stays in HttpOnly cookie when backend sets it).
- * Pass any non-empty token string from login response to mark session active.
+ * Persist the access token from the login/register response. Backend may also set an HttpOnly cookie;
+ * storing the JWT here ensures GET /api/auth/me and other calls send `Authorization: Bearer` reliably.
  */
 export const setAuthToken = (token: string): void => {
   if (typeof window === "undefined") return;
   if (token && token.length > 0) {
-    localStorage.setItem(AUTH_COOKIE_SESSION_KEY, "1");
-    localStorage.removeItem("authToken");
+    localStorage.setItem("authToken", token);
+    localStorage.removeItem(AUTH_COOKIE_SESSION_KEY);
   } else {
     localStorage.removeItem(AUTH_COOKIE_SESSION_KEY);
     localStorage.removeItem("authToken");
