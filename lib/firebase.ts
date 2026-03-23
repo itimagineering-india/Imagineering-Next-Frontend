@@ -1,8 +1,12 @@
 "use client";
 
+/**
+ * Firebase client is used only for social sign-in (Google / Facebook via Firebase Auth).
+ * Email/password, OTP, and sessions use the Imagineering India API — not Firebase Auth for those flows.
+ * Firestore is intentionally not initialized here.
+ */
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth, GoogleAuthProvider, FacebookAuthProvider } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
 
 // All values must be set via env vars. Never hardcode API keys (Google Cloud AUP / suspension risk).
 const firebaseConfig = {
@@ -15,7 +19,7 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Allow build to succeed when env is missing; runtime will fail if auth is used without config
+// Allow build to succeed when env is missing; social sign-in reports a clear error at runtime
 const hasValidConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
 let app: FirebaseApp;
@@ -32,4 +36,7 @@ if (getApps().length === 0) {
 export const auth: Auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const facebookProvider = new FacebookAuthProvider();
-export const db: Firestore = getFirestore(app);
+
+export function isFirebaseAuthConfigured(): boolean {
+  return hasValidConfig;
+}
