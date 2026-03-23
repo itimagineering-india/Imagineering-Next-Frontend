@@ -89,17 +89,38 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
-const ChartTooltipContent = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-    React.ComponentProps<"div"> & {
-      hideLabel?: boolean;
-      hideIndicator?: boolean;
-      indicator?: "line" | "dot" | "dashed";
-      nameKey?: string;
-      labelKey?: string;
-    }
->(
+/** Props Recharts passes to Tooltip `content` — not fully reflected on `Tooltip` component props in recent Recharts types. */
+type RechartsTooltipPayloadItem = {
+  name?: string;
+  value?: string | number;
+  dataKey?: string | number;
+  color?: string;
+  payload?: Record<string, unknown> & { fill?: string };
+  fill?: string;
+};
+
+type ChartTooltipContentProps = React.ComponentProps<"div"> & {
+  active?: boolean;
+  payload?: RechartsTooltipPayloadItem[];
+  label?: string | number;
+  labelFormatter?: (label: unknown, payload: RechartsTooltipPayloadItem[]) => React.ReactNode;
+  formatter?: (
+    value: string | number | undefined,
+    name: string | undefined,
+    item: RechartsTooltipPayloadItem,
+    index: number,
+    payload: Record<string, unknown>,
+  ) => React.ReactNode;
+  labelClassName?: string;
+  color?: string;
+  hideLabel?: boolean;
+  hideIndicator?: boolean;
+  indicator?: "line" | "dot" | "dashed";
+  nameKey?: string;
+  labelKey?: string;
+};
+
+const ChartTooltipContent = React.forwardRef<HTMLDivElement, ChartTooltipContentProps>(
   (
     {
       active,
@@ -163,7 +184,7 @@ const ChartTooltipContent = React.forwardRef<
           {payload.map((item, index) => {
             const key = `${nameKey || item.name || item.dataKey || "value"}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
-            const indicatorColor = color || item.payload.fill || item.color;
+            const indicatorColor = color || item.payload?.fill || item.color;
 
             return (
               <div
@@ -174,7 +195,7 @@ const ChartTooltipContent = React.forwardRef<
                 )}
               >
                 {formatter && item?.value !== undefined && item.name ? (
-                  formatter(item.value, item.name, item, index, item.payload)
+                  formatter(item.value, item.name, item, index, item.payload ?? {})
                 ) : (
                   <>
                     {itemConfig?.icon ? (
