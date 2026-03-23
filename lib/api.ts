@@ -1,4 +1,10 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
+/** Must never be undefined — invalid URL breaks `generateStaticParams` / sitemap at build time. */
+const API_BASE_URL = (
+  (typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_API_BASE_URL &&
+    String(process.env.NEXT_PUBLIC_API_BASE_URL).trim()) ||
+  "http://localhost:5000"
+).replace(/\/$/, "");
 
 /**
  * Shared API types for the Next.js app.
