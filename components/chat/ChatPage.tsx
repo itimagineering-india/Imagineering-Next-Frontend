@@ -583,7 +583,7 @@ export default function Chat() {
                     <MessageSquare className="h-16 w-16 text-destructive/60 mb-4" />
                     <p className="text-sm text-muted-foreground mb-2">{openError}</p>
                     <p className="text-xs text-muted-foreground mb-4">
-                      Make sure Firestore is enabled in Firebase Console.
+                      Check that you are logged in and the chat service is reachable.
                     </p>
                     <div className="flex gap-2">
                       <Button variant="outline" onClick={() => window.location.reload()}>
