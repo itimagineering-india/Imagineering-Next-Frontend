@@ -1,9 +1,14 @@
-/** Must never be undefined — invalid URL breaks `generateStaticParams` / sitemap at build time. */
-const API_BASE_URL = (
-  (typeof process !== "undefined" &&
-    process.env.NEXT_PUBLIC_API_BASE_URL &&
-    String(process.env.NEXT_PUBLIC_API_BASE_URL).trim())
-).replace(/\/$/, "");
+/** Must always be a valid base URL string — invalid URL breaks `generateStaticParams` / sitemap at build time. */
+function getApiBaseUrl(): string {
+  const raw =
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
+      : undefined;
+  if (raw) return raw.replace(/\/$/, "");
+  return "https://api.imagineeringindia.com";
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Shared API types for the Next.js app.
@@ -95,13 +100,16 @@ async function fetchJsonMaybe<T>(path: string, options?: RequestInit): Promise<T
 
 /** Get all active categories (for navigation, homepage, sitemaps). */
 export async function getCategories(): Promise<Category[]> {
-  const json = await fetchJson<
+  const json = await fetchJsonMaybe<
     BackendResponse<{ categories: Array<{ _id: string; name: string; slug: string }> }>
   >("/api/categories?includeSubcategories=true", {
     next: { revalidate: 60 * 60 }, // 1 hour
   });
 
-  return json.data.categories.map((c) => ({
+  const list = json?.data?.categories;
+  if (!Array.isArray(list)) return [];
+
+  return list.map((c) => ({
     id: c._id,
     name: c.name,
     slug: c.slug,
