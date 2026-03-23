@@ -56,6 +56,7 @@ const providerNavItems = [
   { label: "Business Profile", href: "/dashboard/provider/business-profile", icon: Building2 },
   { label: "KYC & Verification", href: "/dashboard/provider/kyc", icon: Shield },
   { label: "Requests", href: "/dashboard/provider/leads", icon: FileText },
+  { label: "Hire labour", href: "/dashboard/provider/manpower-crew", icon: Users },
   { label: "Bookings & Jobs", href: "/dashboard/provider/bookings", icon: Calendar },
   // { label: "Messages", href: "/dashboard/provider/messages", icon: MessageSquare },
   { label: "Notifications", href: "/dashboard/provider/notifications", icon: Bell },
