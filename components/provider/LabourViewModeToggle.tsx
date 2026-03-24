@@ -2,6 +2,7 @@
 
 import { LayoutGrid, List } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 
 export type LabourViewMode = "grid" | "list";
 
@@ -21,7 +22,7 @@ export function LabourViewModeToggle({ value, onChange, className }: Props) {
       }}
       variant="outline"
       size="sm"
-      className={className}
+      className={cn("shrink-0", className)}
       aria-label="Directory layout"
     >
       <ToggleGroupItem value="grid" aria-label="Grid view">
