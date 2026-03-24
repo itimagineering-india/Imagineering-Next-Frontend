@@ -12,7 +12,7 @@ import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 import { PaymentOptionsSelector, type PaymentOption, PAYMENT_AMOUNT_LIMIT } from "@/components/payments/PaymentOptionsSelector";
 import api from "@/lib/api-client";
 import { MapPin, Loader2, Upload, Building2, ArrowLeft, ChevronRight, ChevronDown } from "lucide-react";
-import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
+import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
@@ -162,7 +162,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useMapboxGeocoder({
+  } = useGoogleGeocoder({
     onPlaceSelect: (place) => {
       const formatted = place.formatted_address || "";
       const { addr, parsedCity, parsedState, parsedZip } = parseAddress(formatted);
