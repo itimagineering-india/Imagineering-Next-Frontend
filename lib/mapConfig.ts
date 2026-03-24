@@ -1,11 +1,10 @@
 /**
- * Google Maps JavaScript API — loader + key helpers.
- * Console: https://console.cloud.google.com/google/maps-apis
+ * Google Maps JavaScript API — single bootstrap, dynamic libraries.
  */
 
 const MAP_SCRIPT_ID = "google-maps-js";
 
-let loadPromise: Promise<void> | null = null;
+let bootstrapPromise: Promise<void> | null = null;
 
 export function getGoogleMapsApiKey(): string {
   const v =
@@ -37,50 +36,64 @@ export function getMapboxToken(): string {
   return getGoogleMapsApiKey();
 }
 
-export function loadGoogleMapsScript(): Promise<void> {
+type GoogleMapsNs = typeof google.maps & {
+  importLibrary?: (name: string) => Promise<unknown>;
+};
+
+async function importLibrary(name: "maps" | "places"): Promise<void> {
+  const g = google.maps as GoogleMapsNs;
+  if (typeof g.importLibrary === "function") {
+    await g.importLibrary(name);
+    return;
+  }
+  if (name === "maps" && !g.Map) {
+    throw new Error("Google Maps core failed to load");
+  }
+  if (name === "places" && !g.places) {
+    throw new Error("Google Maps Places library failed to load");
+  }
+}
+
+function ensureBootstrap(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   const key = getGoogleMapsApiKey();
   if (!key) return Promise.reject(new Error("Google Maps API key not configured"));
 
-  if (window.google?.maps?.Map) return Promise.resolve();
-
-  if (loadPromise) return loadPromise;
+  if (bootstrapPromise) return bootstrapPromise;
 
   const existing = document.getElementById(MAP_SCRIPT_ID) as HTMLScriptElement | null;
   if (existing?.src) {
-    loadPromise = new Promise((resolve, reject) => {
-      const done = () => {
-        if (window.google?.maps?.Map) resolve();
-        else setTimeout(done, 50);
-      };
+    bootstrapPromise = new Promise((resolve, reject) => {
       const t = setTimeout(() => reject(new Error("Google Maps SDK timeout")), 90000);
-      const finish = () => {
-        clearTimeout(t);
-        done();
+      const done = () => {
+        if (window.google?.maps) {
+          clearTimeout(t);
+          resolve();
+        } else setTimeout(done, 50);
       };
-      if (window.google?.maps?.Map) {
+      if (window.google?.maps) {
         clearTimeout(t);
         resolve();
         return;
       }
-      existing.addEventListener("load", finish);
+      existing.addEventListener("load", () => done());
       existing.addEventListener("error", () => {
         clearTimeout(t);
         reject(new Error("Google Maps script failed"));
       });
     });
-    return loadPromise;
+    return bootstrapPromise;
   }
 
-  loadPromise = new Promise((resolve, reject) => {
+  bootstrapPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.id = MAP_SCRIPT_ID;
     script.async = true;
     script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&loading=async`;
     script.onload = () => {
       const check = () => {
-        if (window.google?.maps?.Map) resolve();
+        if (window.google?.maps) resolve();
         else setTimeout(check, 50);
       };
       check();
@@ -89,7 +102,18 @@ export function loadGoogleMapsScript(): Promise<void> {
     document.head.appendChild(script);
   });
 
-  return loadPromise;
+  return bootstrapPromise;
+}
+
+export async function loadGoogleMapsMapOnly(): Promise<void> {
+  await ensureBootstrap();
+  await importLibrary("maps");
+}
+
+export async function loadGoogleMapsScript(): Promise<void> {
+  await ensureBootstrap();
+  await importLibrary("maps");
+  await importLibrary("places");
 }
 
 export function ensureMapScript(): Promise<void> {
