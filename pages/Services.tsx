@@ -20,8 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useServices } from "@/hooks/useServices";
-import { isMapboxConfigured } from "@/lib/mapConfig";
-import { MapboxMap, type ServiceMarker, type ProviderMarker } from "@/components/map/MapboxMap";
+import { isGoogleMapsConfigured } from "@/lib/mapConfig";
+import { GoogleMap, type ServiceMarker, type ProviderMarker } from "@/components/map/GoogleMap";
 
 import type { CitySeoContent } from "@/constants/citySeoContent";
 import { CitySeoSections } from "@/components/seo/CitySeoSections";
@@ -841,13 +841,13 @@ export default function Services(props: ServicesProps = {}) {
 
   const providersMapTotalPages = Math.max(1, Math.ceil(mapViewProvidersAll.length / PROVIDERS_MAP_PER_PAGE));
 
-  const mapboxReady = isMapboxConfigured();
+  const mapReady = isGoogleMapsConfigured();
 
   // Fetch user location for map center when in map view
   useEffect(() => {
-    if (!mapboxReady || viewMode !== "map" || userLocation) return;
+    if (!mapReady || viewMode !== "map" || userLocation) return;
     getUserLocation().catch(() => {});
-  }, [mapboxReady, viewMode]);
+  }, [mapReady, viewMode]);
 
   // Map center for Mappls (city → URL → user search location → map-only GPS → Delhi)
   const mapCenter = useMemo(() => {
@@ -864,8 +864,8 @@ export default function Services(props: ServicesProps = {}) {
     return { lat: 28.6139, lng: 77.209 };
   }, [fixedLat, fixedLng, latParam, lngParam, userLocation, mapOnlyUserLocation]);
 
-  // Mapbox service markers
-  const mapboxServiceMarkers = useMemo((): ServiceMarker[] => {
+  // Map service markers (Mappls)
+  const mapServiceMarkers = useMemo((): ServiceMarker[] => {
     return mapViewServicesAll.map((s: any) => {
       const coords = getServiceCoordinates(s);
       const locKey = getServiceLocationKey(s);
@@ -895,8 +895,8 @@ export default function Services(props: ServicesProps = {}) {
     });
   }, [mapViewServicesAll, categories]);
 
-  // Mapbox provider markers
-  const mapboxProviderMarkers = useMemo((): ProviderMarker[] => {
+  // Map provider markers (Mappls)
+  const mapProviderMarkers = useMemo((): ProviderMarker[] => {
     return mapViewProvidersAll.map((p: any) => {
       const coords = getProviderCoordinates(p);
       const locKey = getProviderLocationKey(p);
@@ -1223,7 +1223,7 @@ export default function Services(props: ServicesProps = {}) {
                   </div>
                   
                   <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-lg border overflow-hidden bg-muted">
-                    {mapboxReady ? (
+                    {mapReady ? (
                       <div
                         className="w-full h-full bg-muted"
                         style={{
@@ -1233,11 +1233,11 @@ export default function Services(props: ServicesProps = {}) {
                           zIndex: viewMode === "map" ? 1 : -1,
                         }}
                       >
-                        <MapboxMap
+                        <GoogleMap
                           center={mapCenter}
                           zoom={12}
-                          serviceMarkers={mapboxServiceMarkers}
-                          providerMarkers={mapboxProviderMarkers}
+                          serviceMarkers={mapServiceMarkers}
+                          providerMarkers={mapProviderMarkers}
                           userLocation={userLocation || mapOnlyUserLocation}
                           browseMode={browseMode}
                           className="rounded-lg"
@@ -1248,7 +1248,7 @@ export default function Services(props: ServicesProps = {}) {
                     ) : (
                       <div className="w-full h-full min-h-[600px] bg-muted flex items-center justify-center" />
                     )}
-                    {!mapboxReady && viewMode === "map" && (
+                    {!mapReady && viewMode === "map" && (
                       <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-20 p-4">
                         <Card className="p-4 md:p-6 max-w-md w-full">
                           <CardContent className="text-center space-y-3 md:space-y-4">
@@ -1256,43 +1256,27 @@ export default function Services(props: ServicesProps = {}) {
                             <div>
                               <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">Map access required</h3>
                               <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
-                                Add a <strong>Mappls</strong> key (primary) and/or a <strong>Mapbox</strong> public token (fallback). Mappls:{" "}
+                                Add a <strong>Google Maps</strong> API key from{" "}
                                 <a
-                                  href="https://auth.mappls.com/console/"
+                                  href="https://console.cloud.google.com/google/maps-apis"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-primary underline"
                                 >
-                                  Mappls Console
+                                  Google Cloud Console
                                 </a>
-                                . Mapbox:{" "}
-                                <a
-                                  href="https://account.mapbox.com/access-tokens/"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary underline"
-                                >
-                                  Mapbox tokens
-                                </a>
-                                .
+                                . Enable <strong>Maps JavaScript API</strong> and <strong>Places API</strong>.
                               </p>
                               <div className="text-left bg-muted p-2.5 md:p-3 rounded-lg space-y-1.5 md:space-y-2">
                                 <p className="text-[11px] md:text-xs font-medium">Steps:</p>
                                 <ol className="text-[10px] md:text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                                  <li>Preferred: Mappls static REST / map key</li>
+                                  <li>Create an API key and restrict it by HTTP referrer in Google Cloud.</li>
                                   <li>
                                     In <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs">.env.local</code>:{" "}
                                     <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs break-all">
-                                      NEXT_PUBLIC_MAPPLS_ACCESS_TOKEN=...
+                                      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
                                     </code>
                                   </li>
-                                  <li>
-                                    Fallback:{" "}
-                                    <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs break-all">
-                                      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk....
-                                    </code>
-                                  </li>
-                                  <li>Whitelist your domain (Mappls) if required</li>
                                   <li>Restart the dev server</li>
                                 </ol>
                               </div>
