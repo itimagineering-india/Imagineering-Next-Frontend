@@ -1,0 +1,16 @@
+{
+  "name": "Imagineering India",
+  "short_name": "Imagineering India",
+  "description": "Find Verified Service Providers Near You",
+  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
