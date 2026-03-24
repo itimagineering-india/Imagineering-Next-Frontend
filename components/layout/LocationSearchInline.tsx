@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Loader2 } from "lucide-react";
-import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
+import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ export function LocationSearchInline({ onClose, className = "" }: LocationSearch
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useMapboxGeocoder({
+  } = useGoogleGeocoder({
     onPlaceSelect: (place) => {
       setIsGettingLocation(false);
       if (place.geometry?.location) {
