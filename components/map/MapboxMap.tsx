@@ -63,6 +63,9 @@ type MapplsGlobal = {
     getZoom: () => number;
     remove?: () => void;
     flyTo?: (o: { center: { lat: number; lng: number }; zoom?: number }) => void;
+    loaded?: () => boolean;
+    addListener?: (event: string, listener: () => void) => void;
+    resize?: () => void;
   };
   Marker: new (opts: {
     map: unknown;
@@ -127,6 +130,9 @@ export function MapboxMap({
       const mappls = getMappls();
       if (!mappls?.Map) return;
 
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      if (cancelled || !containerRef.current) return;
+
       const map = new mappls.Map(containerRef.current, {
         center: { lat: center.lat, lng: center.lng },
         zoom,
@@ -137,9 +143,67 @@ export function MapboxMap({
       }
       mapRef.current = map;
       onMapReady?.(map);
-      setSdkReady((n) => n + 1);
+
+      const resizeMap = () => {
+        if (cancelled) return;
+        try {
+          map.resize?.();
+        } catch {
+          /* ignore */
+        }
+      };
+
+      let resizeObserver: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          resizeMap();
+        });
+        resizeObserver.observe(containerRef.current);
+      }
+
+      let clearLoadFallbackTimers: (() => void) | undefined;
+
+      let markersBumpScheduled = false;
+      const bumpMarkersReady = () => {
+        if (cancelled || markersBumpScheduled) return;
+        markersBumpScheduled = true;
+        resizeMap();
+        setSdkReady((n) => n + 1);
+      };
+      if (typeof map.loaded === "function" && map.loaded()) {
+        bumpMarkersReady();
+      } else if (typeof map.addListener === "function") {
+        map.addListener("load", bumpMarkersReady);
+        let pollId: number | null = null;
+        let fallbackTimeoutId: number | null = null;
+        pollId = window.setInterval(() => {
+          if (cancelled || markersBumpScheduled) {
+            if (pollId != null) clearInterval(pollId);
+            return;
+          }
+          if (typeof map.loaded === "function" && map.loaded()) {
+            if (pollId != null) clearInterval(pollId);
+            bumpMarkersReady();
+          }
+        }, 200);
+        fallbackTimeoutId = window.setTimeout(() => {
+          if (pollId != null) clearInterval(pollId);
+          if (!cancelled && !markersBumpScheduled) bumpMarkersReady();
+        }, 5000);
+        clearLoadFallbackTimers = () => {
+          if (pollId != null) clearInterval(pollId);
+          if (fallbackTimeoutId != null) clearTimeout(fallbackTimeoutId);
+          pollId = null;
+          fallbackTimeoutId = null;
+        };
+      } else {
+        bumpMarkersReady();
+      }
 
       destroy = () => {
+        clearLoadFallbackTimers?.();
+        resizeObserver?.disconnect();
+        resizeObserver = null;
         markersRef.current.forEach((m) => m.remove?.());
         markersRef.current = [];
         infoRef.current?.close?.();
