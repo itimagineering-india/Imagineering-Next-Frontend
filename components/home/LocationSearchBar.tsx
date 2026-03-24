@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
+import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
@@ -83,7 +83,7 @@ export function LocationSearchBar() {
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useMapboxGeocoder({
+  } = useGoogleGeocoder({
     onPlaceSelect: (place) => {
       setLocation(place.formatted_address);
       setIsGettingLocation(false);
