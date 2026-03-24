@@ -48,7 +48,7 @@ type InviteRow = {
 };
 
 export default function ManpowerCrewHub() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -286,8 +286,23 @@ export default function ManpowerCrewHub() {
     }
   };
 
-  if (!user) {
-    return <p className="p-6 text-muted-foreground">Sign in with a provider account to continue.</p>;
+  if (authLoading) {
+    return (
+      <div className="p-8 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="p-6 space-y-3 max-w-md">
+        <p className="text-muted-foreground">Sign in with a provider account to continue.</p>
+        <Button variant="default" asChild>
+          <Link href={`/login?redirect=${encodeURIComponent("/dashboard/provider/manpower-crew")}`}>Sign in</Link>
+        </Button>
+      </div>
+    );
   }
 
   return (
