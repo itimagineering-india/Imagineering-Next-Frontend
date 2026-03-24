@@ -17,6 +17,7 @@ import {
   type LabourBrowseFilters,
 } from "@/components/provider/LabourDirectoryFilters";
 import { LabourFilterDialog } from "@/components/provider/LabourFilterDialog";
+import { AuthLoadingSpinner, SignInRequiredPrompt } from "@/components/auth/DashboardAuthPrompts";
 
 type CrewRequest = {
   _id: string;
@@ -38,9 +39,9 @@ type InviteRow = {
 export default function ManpowerCrewDetail() {
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : "";
-  const { user } = useAuth();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [crew, setCrew] = useState<CrewRequest | null>(null);
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [workers, setWorkers] = useState<LabourWorkerListItem[]>([]);
@@ -128,12 +129,14 @@ export default function ManpowerCrewDetail() {
   ]);
 
   useEffect(() => {
+    if (!isAuthenticated || !user) return;
     load();
-  }, [load]);
+  }, [load, isAuthenticated, user]);
 
   useEffect(() => {
+    if (!isAuthenticated || !user) return;
     if (crew) loadWorkers();
-  }, [crew, loadWorkers]);
+  }, [crew, loadWorkers, isAuthenticated, user]);
 
   // Debounce search
   useEffect(() => {
@@ -226,6 +229,14 @@ export default function ManpowerCrewDetail() {
   };
 
   if (!id) return null;
+
+  if (authLoading) {
+    return <AuthLoadingSpinner />;
+  }
+
+  if (!isAuthenticated || !user) {
+    return <SignInRequiredPrompt />;
+  }
 
   if (loading && !crew) {
     return (
