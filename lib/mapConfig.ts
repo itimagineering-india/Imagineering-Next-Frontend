@@ -1,60 +1,64 @@
 /**
- * Mappls (MapmyIndia) — Web Maps SDK loader + token helpers.
- * Console: https://auth.mappls.com/console/
- * Web JS: https://developer.mappls.com/documentation/sdk/Web/Web%20JS/
+ * Google Maps JavaScript API — loader + key helpers.
+ * Console: https://console.cloud.google.com/google/maps-apis
  */
 
-import { getMapplsAccessToken, isMapplsTokenConfigured } from "./mapplsApi";
-import { isMapboxGlConfigured } from "./mapboxGeocode";
+const MAP_SCRIPT_ID = "google-maps-js";
 
-export { getMapplsAccessToken, isMapplsTokenConfigured };
-export { getMapboxAccessToken, isMapboxGlConfigured } from "./mapboxGeocode";
+let loadPromise: Promise<void> | null = null;
 
-/** Same static key as REST `access_token` (Mappls console “REST API” / map key). */
-export function isMapplsConfigured(): boolean {
-  return isMapplsTokenConfigured();
+export function getGoogleMapsApiKey(): string {
+  const v =
+    typeof process !== "undefined" && process.env?.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+      ? String(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY)
+      : "";
+  return v.trim();
 }
 
-/** True if Mappls or Mapbox GL can be used for the interactive map (Mappls first, Mapbox fallback). */
+export function isGoogleMapsTokenConfigured(): boolean {
+  const t = getGoogleMapsApiKey();
+  return Boolean(t && t !== "your-google-maps-api-key" && !t.startsWith('"') && !t.endsWith('"'));
+}
+
+export function isGoogleMapsConfigured(): boolean {
+  return isGoogleMapsTokenConfigured();
+}
+
 export function isMapProviderConfigured(): boolean {
-  return isMapplsConfigured() || isMapboxGlConfigured();
+  return isGoogleMapsConfigured();
 }
 
-/** @deprecated Use isMapProviderConfigured — name kept for Services page compatibility */
+/** @deprecated Use isGoogleMapsConfigured */
 export function isMapboxConfigured(): boolean {
-  return isMapProviderConfigured();
+  return isGoogleMapsConfigured();
 }
 
-/** @deprecated Use getMapplsAccessToken */
 export function getMapboxToken(): string {
-  return getMapplsAccessToken();
+  return getGoogleMapsApiKey();
 }
 
-const MAP_SCRIPT_ID = "mappls-web-sdk-script";
-
-/**
- * Load Mappls Web Maps SDK (vector). Resolves when `window.mappls` is ready.
- */
-export function loadMapplsMapScript(): Promise<void> {
+export function loadGoogleMapsScript(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
-  if ((window as unknown as { mappls?: unknown }).mappls) return Promise.resolve();
+  const key = getGoogleMapsApiKey();
+  if (!key) return Promise.reject(new Error("Google Maps API key not configured"));
 
-  const key = getMapplsAccessToken();
-  if (!key) return Promise.reject(new Error("Mappls access token not configured"));
+  if (window.google?.maps?.Map) return Promise.resolve();
+
+  if (loadPromise) return loadPromise;
 
   const existing = document.getElementById(MAP_SCRIPT_ID) as HTMLScriptElement | null;
-  if (existing) {
-    return new Promise<void>((resolve, reject) => {
+  if (existing?.src) {
+    loadPromise = new Promise((resolve, reject) => {
       const done = () => {
-        if ((window as unknown as { mappls?: unknown }).mappls) resolve();
+        if (window.google?.maps?.Map) resolve();
         else setTimeout(done, 50);
       };
-      const t = setTimeout(() => reject(new Error("Mappls SDK timeout")), 60000);
+      const t = setTimeout(() => reject(new Error("Google Maps SDK timeout")), 90000);
       const finish = () => {
         clearTimeout(t);
         done();
       };
-      if ((window as unknown as { mappls?: unknown }).mappls) {
+      if (window.google?.maps?.Map) {
         clearTimeout(t);
         resolve();
         return;
@@ -62,30 +66,32 @@ export function loadMapplsMapScript(): Promise<void> {
       existing.addEventListener("load", finish);
       existing.addEventListener("error", () => {
         clearTimeout(t);
-        reject(new Error("Mappls script failed"));
+        reject(new Error("Google Maps script failed"));
       });
     });
+    return loadPromise;
   }
 
-  return new Promise<void>((resolve, reject) => {
+  loadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.id = MAP_SCRIPT_ID;
-    script.src = `https://sdk.mappls.com/map/sdk/web?v=3.0&access_token=${encodeURIComponent(key)}`;
     script.async = true;
     script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places&loading=async`;
     script.onload = () => {
       const check = () => {
-        if ((window as unknown as { mappls?: unknown }).mappls) return resolve();
-        setTimeout(check, 50);
+        if (window.google?.maps?.Map) resolve();
+        else setTimeout(check, 50);
       };
       check();
     };
-    script.onerror = () => reject(new Error("Failed to load Mappls Maps SDK"));
+    script.onerror = () => reject(new Error("Failed to load Google Maps JavaScript API"));
     document.head.appendChild(script);
   });
+
+  return loadPromise;
 }
 
-/** @deprecated Google Maps removed — use loadMapplsMapScript */
 export function ensureMapScript(): Promise<void> {
-  return loadMapplsMapScript();
+  return loadGoogleMapsScript();
 }
