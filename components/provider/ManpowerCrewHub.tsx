@@ -28,6 +28,7 @@ import {
   type LabourBrowseFilters,
 } from "@/components/provider/LabourDirectoryFilters";
 import { LabourFilterDialog } from "@/components/provider/LabourFilterDialog";
+import { AuthLoadingSpinner, SignInRequiredPrompt } from "@/components/auth/DashboardAuthPrompts";
 
 type CrewRequest = {
   _id: string;
@@ -287,22 +288,11 @@ export default function ManpowerCrewHub() {
   };
 
   if (authLoading) {
-    return (
-      <div className="p-8 flex justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <AuthLoadingSpinner />;
   }
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="p-6 space-y-3 max-w-md">
-        <p className="text-muted-foreground">Sign in with a provider account to continue.</p>
-        <Button variant="default" asChild>
-          <Link href={`/login?redirect=${encodeURIComponent("/dashboard/provider/manpower-crew")}`}>Sign in</Link>
-        </Button>
-      </div>
-    );
+    return <SignInRequiredPrompt />;
   }
 
   return (
