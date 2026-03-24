@@ -34,9 +34,14 @@ type LabourWorkerCardProps = {
   layout?: "grid" | "list";
 };
 
-function ProfileButton({ userId }: { userId: string }) {
+function ProfileButton({ userId, fullWidth }: { userId: string; fullWidth?: boolean }) {
   return (
-    <Button variant="outline" size="sm" asChild className="shrink-0">
+    <Button
+      variant="outline"
+      size="sm"
+      asChild
+      className={cn("shrink-0 touch-manipulation", fullWidth && "w-full sm:w-auto")}
+    >
       <Link href={`/provider/${encodeURIComponent(userId)}`} onClick={(e) => e.stopPropagation()}>
         View profile
       </Link>
@@ -71,7 +76,7 @@ export function LabourWorkerCard({
     <>
       <div className="flex gap-2 text-muted-foreground">
         <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
-        <span className="leading-snug">{addressText}</span>
+        <span className="leading-snug break-words min-w-0">{addressText}</span>
       </div>
 
       <div>
@@ -122,7 +127,7 @@ export function LabourWorkerCard({
     return (
       <div
         className={cn(
-          "relative rounded-xl border bg-card text-card-foreground shadow-sm transition-colors cursor-pointer",
+          "relative rounded-xl border bg-card text-card-foreground shadow-sm transition-colors cursor-pointer touch-manipulation min-w-0",
           selected ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/25",
           className
         )}
@@ -137,7 +142,7 @@ export function LabourWorkerCard({
           <div className="min-w-0 flex-1 space-y-2 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="space-y-1 min-w-0">
-                <div className="font-semibold leading-tight text-base">{w.displayName}</div>
+                <div className="font-semibold leading-tight text-base break-words">{w.displayName}</div>
                 {w.categoryLabel ? (
                   <Badge variant="secondary" className="text-xs font-normal">
                     {w.categoryLabel}
@@ -168,7 +173,7 @@ export function LabourWorkerCard({
   return (
     <div
       className={cn(
-        "relative cursor-pointer rounded-xl border bg-card text-card-foreground shadow-sm transition-colors",
+        "relative cursor-pointer rounded-xl border bg-card text-card-foreground shadow-sm transition-colors touch-manipulation min-w-0",
         selected ? "border-primary ring-2 ring-primary/20" : "border-border hover:border-muted-foreground/25",
         className
       )}
@@ -190,7 +195,7 @@ export function LabourWorkerCard({
             <AvatarFallback className="text-sm">{initials}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1 space-y-1">
-            <div className="font-semibold leading-tight">{w.displayName}</div>
+            <div className="font-semibold leading-tight break-words">{w.displayName}</div>
             {w.categoryLabel ? (
               <Badge variant="secondary" className="text-xs font-normal">
                 {w.categoryLabel}
@@ -202,7 +207,7 @@ export function LabourWorkerCard({
         <div className="mt-3 space-y-2 text-sm">{detailsBlock}</div>
 
         <div className="mt-3 pt-3 border-t border-border/60" onClick={(e) => e.stopPropagation()}>
-          <ProfileButton userId={w.userId} />
+          <ProfileButton userId={w.userId} fullWidth />
         </div>
       </div>
     </div>
