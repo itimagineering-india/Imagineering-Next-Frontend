@@ -70,28 +70,33 @@ export async function mapplsGeocodeAddress(
 ): Promise<{ lat: number; lng: number } | null> {
   const trimmed = address.trim();
   if (!trimmed) return null;
-  const geoUrl = `${SEARCH_BASE}/search/address/geocode?address=${encodeURIComponent(trimmed)}&access_token=${encodeURIComponent(token)}`;
-  const geoRes = await fetch(geoUrl);
-  if (!geoRes.ok) return null;
-  const geoJson = await geoRes.json();
-  const list = normalizeCopResults(geoJson?.copResults);
-  const first = list[0];
-  if (!first?.eLoc) return null;
+  try {
+    const geoUrl = `${SEARCH_BASE}/search/address/geocode?address=${encodeURIComponent(trimmed)}&access_token=${encodeURIComponent(token)}`;
+    const geoRes = await fetch(geoUrl);
+    if (!geoRes.ok) return null;
+    const geoJson = await geoRes.json();
+    const list = normalizeCopResults(geoJson?.copResults);
+    const first = list[0];
+    if (!first?.eLoc) return null;
 
-  const lat0 = first.lat != null ? Number(first.lat) : NaN;
-  const lng0 = first.lng != null ? Number(first.lng) : NaN;
-  if (Number.isFinite(lat0) && Number.isFinite(lng0)) {
-    return { lat: lat0, lng: lng0 };
+    const lat0 = first.lat != null ? Number(first.lat) : NaN;
+    const lng0 = first.lng != null ? Number(first.lng) : NaN;
+    if (Number.isFinite(lat0) && Number.isFinite(lng0)) {
+      return { lat: lat0, lng: lng0 };
+    }
+
+    const detailUrl = `${PLACE_BASE}/O2O/entity/place-details/${encodeURIComponent(first.eLoc)}?access_token=${encodeURIComponent(token)}`;
+    const detRes = await fetch(detailUrl);
+    if (!detRes.ok) return null;
+    const det = await detRes.json();
+    const lat = det?.latitude != null ? Number(det.latitude) : NaN;
+    const lng = det?.longitude != null ? Number(det.longitude) : NaN;
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    return null;
+  } catch {
+    /* CORS, offline, or blocked fetch in browser */
+    return null;
   }
-
-  const detailUrl = `${PLACE_BASE}/O2O/entity/place-details/${encodeURIComponent(first.eLoc)}?access_token=${encodeURIComponent(token)}`;
-  const detRes = await fetch(detailUrl);
-  if (!detRes.ok) return null;
-  const det = await detRes.json();
-  const lat = det?.latitude != null ? Number(det.latitude) : NaN;
-  const lng = det?.longitude != null ? Number(det.longitude) : NaN;
-  if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
-  return null;
 }
 
 export type MapplsSearchHit = {
