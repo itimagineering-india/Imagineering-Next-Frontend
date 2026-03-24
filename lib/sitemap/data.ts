@@ -50,7 +50,7 @@ function toIso(d: string | Date | undefined): string {
 export async function getAllCategories(): Promise<SitemapCategory[]> {
   const base = getApiBaseUrl();
   const res = await fetch(`${base}/api/categories?includeSubcategories=true`, {
-    next: { revalidate: 3600 },
+    cache: "no-store",
   });
   if (!res.ok) return [];
   const json = (await res.json()) as CategoriesApiResponse;
@@ -90,7 +90,7 @@ export async function getAllProducts(options?: {
     url.searchParams.set("sort", "-rating");
 
     const res = await fetch(url.toString(), {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     if (!res.ok) break;
 
