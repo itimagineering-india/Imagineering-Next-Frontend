@@ -28,8 +28,8 @@ import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { DynamicBookingField, BookingFieldConfig } from "@/components/booking/DynamicBookingField";
 import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
 import api from "@/lib/api-client";
-import { getMapplsAccessToken } from "@/lib/mapConfig";
-import { mapplsReverseGeocode as mapplsRevGeocodeApi } from "@/lib/mapplsApi";
+import { getGoogleMapsApiKey } from "@/lib/mapConfig";
+import { reverseGeocodeLatLng } from "@/lib/googleMapsClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -557,9 +557,8 @@ export function DynamicBookingModal({
         async (position) => {
           try {
             const { latitude, longitude } = position.coords;
-            const token = getMapplsAccessToken();
-            const placeName = token
-              ? await mapplsRevGeocodeApi(latitude, longitude, token)
+            const placeName = getGoogleMapsApiKey()
+              ? await reverseGeocodeLatLng(latitude, longitude)
               : null;
             if (placeName) {
               const parts = placeName.split(",").map((p) => p.trim());
