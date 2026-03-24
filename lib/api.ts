@@ -164,7 +164,8 @@ export async function searchServices(
       services: any[];
     }>
   >(`/api/search?${search.toString()}`, {
-    next: { revalidate: 60 }, // 1 minute cache at Next layer
+    // Avoid Next.js data cache 2MB cap when /api/search returns very large payloads
+    cache: "no-store",
   });
 
   const { services } = json.data;
