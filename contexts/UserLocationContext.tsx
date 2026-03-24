@@ -141,7 +141,6 @@ export function UserLocationProvider({ children }: { children: React.ReactNode }
     const cached = loadFromStorage();
     if (cached) {
       setUserLocationState(cached);
-      fetchLocation();
       return;
     }
     fetchLocation();
