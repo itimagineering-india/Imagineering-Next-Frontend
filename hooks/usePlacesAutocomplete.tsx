@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { getGoogleMapsApiKey, loadGoogleMapsScript } from "../lib/mapConfig";
 
 interface PlaceResult {
   description: string;
@@ -79,72 +80,78 @@ export function usePlacesAutocomplete({
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const autocompleteRef = useRef<InstanceType<Window["google"]["maps"]["places"]["Autocomplete"]> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const scriptLoadedRef = useRef(false);
   const onPlaceSelectRef = useRef(onPlaceSelect);
   onPlaceSelectRef.current = onPlaceSelect;
 
-  // Load Google Maps API script
+  // Shared bootstrap (no libraries= in URL) + importLibrary('places'); avoid loading unused libs
   useEffect(() => {
-    // Check if already loaded
-    if (window.google && window.google.maps && window.google.maps.places) {
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (typeof window === "undefined") return;
+
+    if (window.google?.maps?.places) {
       setIsLoaded(true);
       return;
     }
 
-    // Check if script is already being loaded
-    if (scriptLoadedRef.current) {
-      return;
-    }
-
-    // Get API key from environment variable or parameter
-    const key = apiKey || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    if (!key) {
+    const envKey = getGoogleMapsApiKey();
+    const propKey = apiKey?.trim();
+    if (!envKey && !propKey) {
       console.warn(
-        "Google Maps API key not found. Please set VITE_GOOGLE_MAPS_API_KEY in your .env file or pass it as a prop."
+        "Google Maps API key not found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your .env file or pass it as a prop."
       );
       return;
     }
 
-    // Check if script already exists
+    if (envKey) {
+      loadGoogleMapsScript()
+        .then(() => {
+          if (!cancelled) setIsLoaded(true);
+        })
+        .catch((err) => {
+          console.error("Failed to load Google Maps API", err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const existingScript = document.querySelector(
       'script[src*="maps.googleapis.com"]'
     );
     if (existingScript) {
-      scriptLoadedRef.current = true;
-      // Poll for Google Maps API to load
-      const interval = setInterval(() => {
-        if (window.google && window.google.maps && window.google.maps.places) {
+      interval = setInterval(() => {
+        if (cancelled) return;
+        if (window.google?.maps?.places) {
           setIsLoaded(true);
-          clearInterval(interval);
+          if (interval) clearInterval(interval);
         }
       }, 100);
-      return () => clearInterval(interval);
+      return () => {
+        cancelled = true;
+        if (interval) clearInterval(interval);
+      };
     }
 
-    // Load the script
-    scriptLoadedRef.current = true;
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
     script.async = true;
     script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(propKey!)}&libraries=places`;
     script.onload = () => {
-      // Poll for Google Maps API to load
-      const interval = setInterval(() => {
-        if (window.google && window.google.maps && window.google.maps.places) {
+      interval = setInterval(() => {
+        if (cancelled) return;
+        if (window.google?.maps?.places) {
           setIsLoaded(true);
-          clearInterval(interval);
+          if (interval) clearInterval(interval);
         }
       }, 100);
     };
-    script.onerror = () => {
-      console.error("Failed to load Google Maps API");
-      scriptLoadedRef.current = false;
-    };
+    script.onerror = () => console.error("Failed to load Google Maps API");
     document.head.appendChild(script);
 
     return () => {
-      // Cleanup if needed
+      cancelled = true;
+      if (interval) clearInterval(interval);
     };
   }, [apiKey]);
 
