@@ -58,6 +58,8 @@ export function CategorySections() {
   const [hasEnteredView, setHasEnteredView] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const hasFetchedRef = useRef(false);
+  const fetchedWithoutCoordsRef = useRef(false);
+  const viewTriggeredRef = useRef(false);
 
   const loadData = useCallback(async () => {
     setLoadError(null);
@@ -106,7 +108,8 @@ export function CategorySections() {
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !hasFetchedRef.current) {
+        if (entries[0].isIntersecting && !viewTriggeredRef.current) {
+          viewTriggeredRef.current = true;
           setHasEnteredView(true);
         }
       },
@@ -117,16 +120,26 @@ export function CategorySections() {
   }, []);
 
   useEffect(() => {
-    if (!hasEnteredView || hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-    let mounted = true;
-    loadData().then(() => {
-      if (!mounted) return;
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [hasEnteredView, loadData]);
+    if (!hasEnteredView) return;
+
+    const hasCoords =
+      userLocation?.lat != null &&
+      userLocation?.lng != null &&
+      Number.isFinite(userLocation.lat) &&
+      Number.isFinite(userLocation.lng);
+
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      if (!hasCoords) fetchedWithoutCoordsRef.current = true;
+      void loadData();
+      return;
+    }
+
+    if (fetchedWithoutCoordsRef.current && hasCoords) {
+      fetchedWithoutCoordsRef.current = false;
+      void loadData();
+    }
+  }, [hasEnteredView, userLocation?.lat, userLocation?.lng, loadData]);
 
   if (!hasEnteredView) {
     return (
