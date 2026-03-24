@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getAllEntriesChunked } from "@/lib/sitemap/chunks";
 import { renderUrlset } from "@/lib/sitemap/xml";
 
-export const revalidate = 3600;
+/** Match /sitemap.xml — generated on request, not during `next build`. */
+export const dynamic = "force-dynamic";
 
 const XML_HEADERS = {
   "Content-Type": "application/xml; charset=utf-8",
