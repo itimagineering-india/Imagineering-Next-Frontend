@@ -5,17 +5,24 @@
  */
 
 import { getMapplsAccessToken, isMapplsTokenConfigured } from "./mapplsApi";
+import { isMapboxGlConfigured } from "./mapboxGeocode";
 
 export { getMapplsAccessToken, isMapplsTokenConfigured };
+export { getMapboxAccessToken, isMapboxGlConfigured } from "./mapboxGeocode";
 
 /** Same static key as REST `access_token` (Mappls console “REST API” / map key). */
 export function isMapplsConfigured(): boolean {
   return isMapplsTokenConfigured();
 }
 
-/** @deprecated Use isMapplsConfigured — Mapbox removed */
+/** True if Mappls or Mapbox GL can be used for the interactive map (Mappls first, Mapbox fallback). */
+export function isMapProviderConfigured(): boolean {
+  return isMapplsConfigured() || isMapboxGlConfigured();
+}
+
+/** @deprecated Use isMapProviderConfigured — name kept for Services page compatibility */
 export function isMapboxConfigured(): boolean {
-  return isMapplsConfigured();
+  return isMapProviderConfigured();
 }
 
 /** @deprecated Use getMapplsAccessToken */
