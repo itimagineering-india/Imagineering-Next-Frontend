@@ -1254,9 +1254,9 @@ export default function Services(props: ServicesProps = {}) {
                           <CardContent className="text-center space-y-3 md:space-y-4">
                             <MapIcon className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground" />
                             <div>
-                              <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">Mappls access required</h3>
+                              <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">Map access required</h3>
                               <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
-                                Add your Mappls (MapmyIndia) key from{" "}
+                                Add a <strong>Mappls</strong> key (primary) and/or a <strong>Mapbox</strong> public token (fallback). Mappls:{" "}
                                 <a
                                   href="https://auth.mappls.com/console/"
                                   target="_blank"
@@ -1265,19 +1265,34 @@ export default function Services(props: ServicesProps = {}) {
                                 >
                                   Mappls Console
                                 </a>
+                                . Mapbox:{" "}
+                                <a
+                                  href="https://account.mapbox.com/access-tokens/"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary underline"
+                                >
+                                  Mapbox tokens
+                                </a>
                                 .
                               </p>
                               <div className="text-left bg-muted p-2.5 md:p-3 rounded-lg space-y-1.5 md:space-y-2">
                                 <p className="text-[11px] md:text-xs font-medium">Steps:</p>
                                 <ol className="text-[10px] md:text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                                  <li>Copy your static REST / map key</li>
-                                  <li>In <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs">.env.local</code> add:</li>
+                                  <li>Preferred: Mappls static REST / map key</li>
                                   <li>
+                                    In <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs">.env.local</code>:{" "}
                                     <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs break-all">
-                                      NEXT_PUBLIC_MAPPLS_ACCESS_TOKEN=your_key
+                                      NEXT_PUBLIC_MAPPLS_ACCESS_TOKEN=...
                                     </code>
                                   </li>
-                                  <li>Whitelist your domain in the console</li>
+                                  <li>
+                                    Fallback:{" "}
+                                    <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs break-all">
+                                      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk....
+                                    </code>
+                                  </li>
+                                  <li>Whitelist your domain (Mappls) if required</li>
                                   <li>Restart the dev server</li>
                                 </ol>
                               </div>
