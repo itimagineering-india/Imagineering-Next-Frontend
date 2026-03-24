@@ -84,6 +84,7 @@ export function LocationSearchBar() {
     selectSuggestion,
     handleInputChange,
   } = useGoogleGeocoder({
+    deferScriptLoad: true,
     onPlaceSelect: (place) => {
       setLocation(place.formatted_address);
       setIsGettingLocation(false);
