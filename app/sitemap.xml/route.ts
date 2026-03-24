@@ -4,7 +4,8 @@ import { MAX_URLS_PER_SITEMAP_FILE } from "@/lib/sitemap/constants";
 import { getAllEntriesChunked } from "@/lib/sitemap/chunks";
 import { renderSitemapIndex, renderUrlset } from "@/lib/sitemap/xml";
 
-export const revalidate = 3600;
+/** Do not pre-render at build time — API pagination can exceed the 60s static generation limit. */
+export const dynamic = "force-dynamic";
 
 const XML_HEADERS = {
   "Content-Type": "application/xml; charset=utf-8",
