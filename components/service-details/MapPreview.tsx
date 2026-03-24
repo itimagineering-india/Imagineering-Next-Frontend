@@ -49,12 +49,29 @@ export function MapPreview({ location, serviceRadius = 10 }: MapPreviewProps) {
           center: { lat, lng },
           zoom: 13,
         });
-        new mappls.Marker({
-          map,
-          position: { lat, lng },
-          html: `<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>`,
-        });
+        let marker: { remove?: () => void } | null = null;
+        const placeMarker = () => {
+          if (cancelled) return;
+          try {
+            marker = new mappls.Marker({
+              map,
+              position: { lat, lng },
+              html: `<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>`,
+            });
+          } catch {
+            if (!cancelled) setSdkError("Map marker failed");
+          }
+        };
+        const m = map as { loaded?: () => boolean; addListener?: (ev: string, fn: () => void) => void };
+        if (typeof m.loaded === "function" && m.loaded()) {
+          placeMarker();
+        } else if (typeof m.addListener === "function") {
+          m.addListener("load", placeMarker);
+        } else {
+          placeMarker();
+        }
         teardown = () => {
+          marker?.remove?.();
           map.remove?.();
         };
       } catch {
