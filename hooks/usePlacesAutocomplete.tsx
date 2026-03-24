@@ -11,7 +11,7 @@ interface PlaceResult {
   };
 }
 
-interface PlaceDetails {
+export interface PlaceDetails {
   formatted_address: string;
   geometry: {
     location: {
@@ -21,12 +21,19 @@ interface PlaceDetails {
   };
   place_id: string;
   name?: string;
+  address_components?: Array<{
+    long_name: string;
+    short_name: string;
+    types: string[];
+  }>;
 }
 
 interface UsePlacesAutocompleteOptions {
   onPlaceSelect?: (place: PlaceDetails) => void;
   onError?: (error: string) => void;
   apiKey?: string;
+  /** Restrict suggestions, e.g. `{ country: "in" }` for India */
+  componentRestrictions?: { country: string | string[] };
 }
 
 declare global {
@@ -66,12 +73,15 @@ export function usePlacesAutocomplete({
   onPlaceSelect,
   onError,
   apiKey,
+  componentRestrictions,
 }: UsePlacesAutocompleteOptions = {}) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const autocompleteRef = useRef<InstanceType<Window["google"]["maps"]["places"]["Autocomplete"]> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scriptLoadedRef = useRef(false);
+  const onPlaceSelectRef = useRef(onPlaceSelect);
+  onPlaceSelectRef.current = onPlaceSelect;
 
   // Load Google Maps API script
   useEffect(() => {
@@ -152,6 +162,7 @@ export function usePlacesAutocomplete({
       autocomplete = new window.google.maps.places.Autocomplete(inputEl, {
         types: ["geocode", "establishment"],
         fields: ["place_id", "formatted_address", "geometry", "name"],
+        ...(componentRestrictions ? { componentRestrictions } : {}),
       });
 
       autocompleteRef.current = autocomplete;
@@ -178,16 +189,24 @@ export function usePlacesAutocomplete({
             },
             (placeDetails, status) => {
               if (status === "OK" && placeDetails) {
+                const comps = placeDetails.address_components;
                 const placeData: PlaceDetails = {
                   formatted_address: placeDetails.formatted_address || "",
                   geometry: placeDetails.geometry,
                   place_id: placeDetails.place_id || "",
                   name: placeDetails.name,
+                  address_components: comps
+                    ? comps.map((c: { long_name: string; short_name: string; types: string[] }) => ({
+                        long_name: c.long_name,
+                        short_name: c.short_name,
+                        types: c.types,
+                      }))
+                    : undefined,
                 };
 
                 setSelectedPlace(placeData);
-                if (onPlaceSelect) {
-                  onPlaceSelect(placeData);
+                if (onPlaceSelectRef.current) {
+                  onPlaceSelectRef.current(placeData);
                 }
               }
             }
@@ -276,7 +295,7 @@ export function usePlacesAutocomplete({
     } catch (error) {
       console.error("Error initializing Google Places Autocomplete:", error);
     }
-  }, [isLoaded, onPlaceSelect]);
+  }, [isLoaded, componentRestrictions]);
 
   const getCurrentLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -319,24 +338,33 @@ export function usePlacesAutocomplete({
               results &&
               results[0]
             ) {
+              const r0 = results[0];
+              const comps = r0.address_components;
               const placeData: PlaceDetails = {
-                formatted_address: results[0].formatted_address,
+                formatted_address: r0.formatted_address,
                 geometry: {
                   location: {
                     lat: () => latitude,
                     lng: () => longitude,
                   },
                 },
-                place_id: results[0].place_id || "",
-                name: results[0].formatted_address,
+                place_id: r0.place_id || "",
+                name: r0.formatted_address,
+                address_components: comps
+                  ? comps.map((c: { long_name: string; short_name: string; types: string[] }) => ({
+                      long_name: c.long_name,
+                      short_name: c.short_name,
+                      types: c.types,
+                    }))
+                  : undefined,
               };
 
               setSelectedPlace(placeData);
               if (inputRef.current) {
-                inputRef.current.value = results[0].formatted_address;
+                inputRef.current.value = r0.formatted_address;
               }
-              if (onPlaceSelect) {
-                onPlaceSelect(placeData);
+              if (onPlaceSelectRef.current) {
+                onPlaceSelectRef.current(placeData);
               }
             } else {
               console.error("Geocoding failed:", status);
@@ -397,7 +425,7 @@ export function usePlacesAutocomplete({
         maximumAge: 0,
       }
     );
-  }, [onPlaceSelect, onError, isLoaded]);
+  }, [onError, isLoaded]);
 
   return {
     inputRef,
