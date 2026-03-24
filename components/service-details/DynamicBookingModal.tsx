@@ -29,7 +29,7 @@ import { DynamicBookingField, BookingFieldConfig } from "@/components/booking/Dy
 import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
 import api from "@/lib/api-client";
 import { getGoogleMapsApiKey } from "@/lib/mapConfig";
-import { reverseGeocodeLatLng } from "@/lib/googleMapsClient";
+import { reverseGeocodeLatLng } from "../../lib/googleMapsClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
