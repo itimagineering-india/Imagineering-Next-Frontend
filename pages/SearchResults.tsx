@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
-import { isMapboxConfigured } from "@/lib/mapConfig";
-import { MapboxMap, type ServiceMarker } from "@/components/map/MapboxMap";
+import { isGoogleMapsConfigured } from "@/lib/mapConfig";
+import { GoogleMap, type ServiceMarker } from "@/components/map/GoogleMap";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -211,7 +211,7 @@ export default function SearchResults() {
 
   const resultsCount = totalCount > 0 ? totalCount : services.length;
 
-  // Services with coordinates OR address (MapboxMap geocodes address)
+  // Services with coordinates OR address (Mappls geocodes address)
   const getServiceCoords = (s: ServiceResult): { lat: number; lng: number } | null => {
     const c = s.location?.coordinates;
     if (c?.lat != null && c?.lng != null) return { lat: Number(c.lat), lng: Number(c.lng) };
@@ -407,8 +407,8 @@ export default function SearchResults() {
                         <MapIcon className="h-4 w-4 text-primary" />
                         Map view
                       </div>
-                      {isMapboxConfigured() ? (
-                        <MapboxMap
+                      {isGoogleMapsConfigured() ? (
+                        <GoogleMap
                           center={mapCenter}
                           zoom={11}
                           serviceMarkers={mapMarkers}
@@ -419,7 +419,7 @@ export default function SearchResults() {
                       ) : (
                         <div className="flex-1 rounded-xl border bg-muted flex items-center justify-center">
                           <p className="text-xs text-muted-foreground">
-                            Add <code>VITE_MAPBOX_ACCESS_TOKEN</code> in .env for map.
+                            Add <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in .env for map.
                           </p>
                         </div>
                       )}
