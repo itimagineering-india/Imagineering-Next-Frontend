@@ -82,7 +82,7 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { user, isLoading: isLoadingUser, logout } = useAuth();
+  const { user, isLoading: isLoadingUser, isAuthenticated, logout } = useAuth();
   
   const navItems = 
     type === "admin" ? adminNavItems :
@@ -125,18 +125,25 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
               <div className="h-3 w-16 bg-muted rounded animate-pulse" />
             </div>
           </div>
-        ) : (
+        ) : isAuthenticated && user ? (
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={typeof user?.avatar === "string" ? user.avatar : undefined} />
+              <AvatarImage src={typeof user.avatar === "string" ? user.avatar : undefined} />
               <AvatarFallback>
-                {(typeof user?.name === "string" ? user.name : typeof user?.email === "string" ? user.email : (user as { phone?: string })?.phone)?.charAt(0).toUpperCase() || 'U'}
+                {(typeof user.name === "string" ? user.name : typeof user.email === "string" ? user.email : (user as { phone?: string }).phone)?.charAt(0).toUpperCase() || "U"}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="text-sm font-medium">{typeof user?.name === "string" ? user.name : 'User'}</p>
-              <p className="text-xs text-muted-foreground capitalize">{typeof user?.role === "string" ? user.role : type}</p>
+              <p className="text-sm font-medium">{typeof user.name === "string" ? user.name : "User"}</p>
+              <p className="text-xs text-muted-foreground capitalize">{typeof user.role === "string" ? user.role : type}</p>
             </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">You are not signed in.</p>
+            <Button variant="default" size="sm" className="w-full" asChild>
+              <Link href={`/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`}>Sign in</Link>
+            </Button>
           </div>
         )}
       </div>
@@ -188,16 +195,18 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
       )}
 
       {/* Logout */}
-      <div className="border-t p-4">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start text-muted-foreground"
-          onClick={handleSignOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </Button>
-      </div>
+      {isAuthenticated ? (
+        <div className="border-t p-4">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 
@@ -229,26 +238,34 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
             >
               Browse jobs
             </Link>
-            {!isLoadingUser && (
-              <span className="hidden max-w-[120px] truncate text-sm text-muted-foreground md:inline">
-                {(typeof user?.name === "string" ? user.name : typeof user?.email === "string" ? user.email : "User")}
-              </span>
+            {isLoadingUser ? (
+              <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" aria-hidden />
+            ) : isAuthenticated && user ? (
+              <>
+                <span className="hidden max-w-[120px] truncate text-sm text-muted-foreground md:inline">
+                  {typeof user.name === "string" ? user.name : typeof user.email === "string" ? user.email : "Account"}
+                </span>
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage src={typeof user.avatar === "string" ? user.avatar : undefined} />
+                  <AvatarFallback>
+                    {(typeof user.name === "string" ? user.name : typeof user.email === "string" ? user.email : (user as { phone?: string }).phone)?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground shrink-0"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4 md:mr-1" />
+                  <span className="hidden md:inline">Sign out</span>
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" className="shrink-0" asChild>
+                <Link href={`/login?redirect=${encodeURIComponent(pathname || "/dashboard/provider")}`}>Sign in</Link>
+              </Button>
             )}
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={typeof user?.avatar === "string" ? user.avatar : undefined} />
-              <AvatarFallback>
-                {(typeof user?.name === "string" ? user.name : typeof user?.email === "string" ? user.email : (user as { phone?: string })?.phone)?.charAt(0).toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4 md:mr-1" />
-              <span className="hidden md:inline">Sign out</span>
-            </Button>
           </div>
         </header>
 
@@ -276,12 +293,20 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
             </Button>
           </SheetTrigger>
           <span className="font-semibold truncate px-2">{dashboardTitle}</span>
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarImage src={typeof user?.avatar === "string" ? user.avatar : undefined} />
-            <AvatarFallback>
-              {(typeof user?.name === "string" ? user.name : typeof user?.email === "string" ? user.email : (user as { phone?: string })?.phone)?.charAt(0).toUpperCase() || "U"}
-            </AvatarFallback>
-          </Avatar>
+          {isLoadingUser ? (
+            <div className="h-8 w-8 rounded-full bg-muted animate-pulse shrink-0" aria-hidden />
+          ) : isAuthenticated && user ? (
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarImage src={typeof user.avatar === "string" ? user.avatar : undefined} />
+              <AvatarFallback>
+                {(typeof user.name === "string" ? user.name : typeof user.email === "string" ? user.email : (user as { phone?: string }).phone)?.charAt(0).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <Button variant="outline" size="sm" className="shrink-0 text-xs px-2" asChild>
+              <Link href={`/login?redirect=${encodeURIComponent(pathname || "/dashboard")}`}>Sign in</Link>
+            </Button>
+          )}
         </header>
         <SheetContent side="left" className="w-64 p-0">
           <SheetTitle className="sr-only">
