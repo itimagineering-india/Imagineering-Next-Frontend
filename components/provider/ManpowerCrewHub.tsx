@@ -2,25 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Users } from "lucide-react";
+import { Loader2, ArrowLeft, Search } from "lucide-react";
 import { LabourWorkerCard, type LabourWorkerListItem } from "@/components/provider/LabourWorkerCard";
 import { LabourViewModeToggle, type LabourViewMode } from "@/components/provider/LabourViewModeToggle";
 import {
@@ -31,33 +20,33 @@ import { LabourFilterDialog } from "@/components/provider/LabourFilterDialog";
 
 type CrewRequest = {
   _id: string;
+  requesterUser?: string;
   title: string;
   description: string;
   headcount: number;
-  acceptedCount?: number;
+  acceptedCount: number;
   status: string;
   location?: { city?: string; state?: string };
-  createdAt?: string;
 };
 
 type InviteRow = {
   _id: string;
   status: string;
-  crewRequest?: CrewRequest | Record<string, unknown>;
-  createdAt?: string;
+  workerUser?: { name?: string; email?: string; phone?: string };
 };
 
-export default function ManpowerCrewHub() {
+export default function ManpowerCrewDetail() {
+  const params = useParams();
+  const id = typeof params?.id === "string" ? params.id : "";
   const { user } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
-
-  const [loadingLists, setLoadingLists] = useState(true);
-  const [mine, setMine] = useState<CrewRequest[]>([]);
-  const [incoming, setIncoming] = useState<InviteRow[]>([]);
-
+  const [loading, setLoading] = useState(true);
+  const [crew, setCrew] = useState<CrewRequest | null>(null);
+  const [invites, setInvites] = useState<InviteRow[]>([]);
   const [workers, setWorkers] = useState<LabourWorkerListItem[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [sending, setSending] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [viewMode, setViewMode] = useState<LabourViewMode>("grid");
@@ -69,36 +58,27 @@ export default function ManpowerCrewHub() {
     minExperience: "",
     maxPrice: "",
   });
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  const [sendOpen, setSendOpen] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [modalForm, setModalForm] = useState({
-    title: "Labour requirement",
-    description: "",
-    headcount: "1",
-    city: "",
-  });
 
   const myUserId = user?._id ? String(user._id) : "";
 
-  const loadLists = useCallback(async () => {
-    setLoadingLists(true);
+  const load = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
     try {
       const [r1, r2] = await Promise.all([
-        api.manpowerCrew.listMine({ limit: 50 }),
-        api.manpowerCrew.listWorkerInvites({ limit: 50 }),
+        api.manpowerCrew.getById(id),
+        api.manpowerCrew.listInvites(id),
       ]);
-      const d1 = r1 as { success?: boolean; data?: { crewRequests?: CrewRequest[] } };
-      const d2 = r2 as { success?: boolean; data?: { invites?: InviteRow[] } };
-      setMine(d1.data?.crewRequests ?? []);
-      setIncoming(d2.data?.invites ?? []);
+      const d1 = r1 as { data?: { crewRequest?: CrewRequest } };
+      const d2 = r2 as { data?: { invites?: InviteRow[] } };
+      setCrew(d1.data?.crewRequest ?? null);
+      setInvites(d2.data?.invites ?? []);
     } catch {
       toast({ title: "Failed to load", variant: "destructive" });
     } finally {
-      setLoadingLists(false);
+      setLoading(false);
     }
-  }, [toast]);
+  }, [id, toast]);
 
   const loadWorkers = useCallback(async () => {
     setLoadingWorkers(true);
@@ -126,10 +106,13 @@ export default function ManpowerCrewHub() {
         subTechnical: browseFilters.subTechnical.trim() || undefined,
         limit: 80,
         page: 1,
-      })) as { data?: { workers?: LabourWorkerListItem[] } };
+      })) as {
+        success?: boolean;
+        data?: { workers?: LabourWorkerListItem[] };
+      };
       setWorkers(res.data?.workers ?? []);
     } catch {
-      toast({ title: "Could not load labour list", variant: "destructive" });
+      toast({ title: "Could not load manpower list", variant: "destructive" });
     } finally {
       setLoadingWorkers(false);
     }
@@ -145,13 +128,14 @@ export default function ManpowerCrewHub() {
   ]);
 
   useEffect(() => {
-    loadLists();
-  }, [loadLists]);
+    load();
+  }, [load]);
 
   useEffect(() => {
-    if (user) loadWorkers();
-  }, [user, loadWorkers]);
+    if (crew) loadWorkers();
+  }, [crew, loadWorkers]);
 
+  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setSearchQ(searchInput.trim()), 350);
     return () => clearTimeout(t);
@@ -188,88 +172,28 @@ export default function ManpowerCrewHub() {
 
   const inviteIds = useMemo(() => Array.from(selected), [selected]);
 
-  const openSendModal = () => {
-    if (inviteIds.length === 0) {
+  const selectedPreview = useMemo(() => {
+    const map = new Map(workers.map((w) => [w.userId, w.displayName]));
+    return inviteIds.map((uid) => map.get(uid) || uid);
+  }, [workers, inviteIds]);
+
+  const sendInvites = async () => {
+    if (!id || inviteIds.length === 0) {
       toast({ title: "Select at least one worker first", variant: "destructive" });
       return;
     }
-    setModalForm((f) => ({
-      ...f,
-      headcount: String(Math.max(inviteIds.length, Number.parseInt(f.headcount, 10) || inviteIds.length)),
-    }));
-    setSendOpen(true);
-  };
-
-  const submitRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const headcount = Number.parseInt(modalForm.headcount, 10);
-    if (!modalForm.title.trim() || !modalForm.description.trim() || !Number.isFinite(headcount) || headcount < 1) {
-      toast({ title: "Title, details, and worker count are required", variant: "destructive" });
-      return;
-    }
-    if (inviteIds.length === 0) {
-      toast({ title: "No workers selected", variant: "destructive" });
-      return;
-    }
-
     setSending(true);
     try {
-      const createRes = await api.manpowerCrew.create({
-        title: modalForm.title.trim(),
-        description: modalForm.description.trim(),
-        headcount,
-        location: modalForm.city.trim() ? { city: modalForm.city.trim() } : undefined,
-      });
-      const ok = (createRes as { success?: boolean }).success;
-      const cr = (createRes as { data?: { crewRequest?: { _id?: string } } }).data?.crewRequest;
-      const crewId = cr?._id ? String(cr._id) : "";
-
-      if (!ok || !crewId) {
+      const res = await api.manpowerCrew.inviteBatch(id, inviteIds);
+      const ok = (res as { success?: boolean }).success;
+      const d = res as { data?: { invitesCreated?: number; skipped?: string[] } };
+      if (ok) {
         toast({
-          title: "Could not save request",
-          description: (createRes as { error?: { message?: string } }).error?.message,
-          variant: "destructive",
+          title: "Invites sent",
+          description: `Notifications sent to ${d.data?.invitesCreated ?? 0} worker${(d.data?.invitesCreated ?? 0) === 1 ? "" : "s"}${(d.data?.skipped?.length ?? 0) > 0 ? ` (${d.data?.skipped?.length} skipped)` : ""}.`,
         });
-        return;
-      }
-
-      const invRes = await api.manpowerCrew.inviteBatch(crewId, inviteIds);
-      if (!(invRes as { success?: boolean }).success) {
-        toast({
-          title: "Request created but invites failed",
-          description: (invRes as { error?: { message?: string } }).error?.message,
-          variant: "destructive",
-        });
-        router.push(`/dashboard/provider/manpower-crew/${crewId}`);
-        return;
-      }
-
-      toast({
-        title: "Request sent",
-        description: `Notifications sent to ${inviteIds.length} worker${inviteIds.length === 1 ? "" : "s"}.`,
-      });
-      setSendOpen(false);
-      setSelected(new Set());
-      setModalForm({ title: "Labour requirement", description: "", headcount: "1", city: "" });
-      await loadLists();
-      router.push(`/dashboard/provider/manpower-crew/${crewId}`);
-    } catch (err: unknown) {
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed",
-        variant: "destructive",
-      });
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const respond = async (inviteId: string, action: "accept" | "decline") => {
-    try {
-      const res = await api.manpowerCrew.respondInvite(inviteId, action);
-      if ((res as { success?: boolean }).success) {
-        toast({ title: action === "accept" ? "Accepted" : "Declined" });
-        await loadLists();
+        setSelected(new Set());
+        await load();
       } else {
         toast({
           title: "Failed",
@@ -283,256 +207,191 @@ export default function ManpowerCrewHub() {
         description: e instanceof Error ? e.message : "Failed",
         variant: "destructive",
       });
+    } finally {
+      setSending(false);
     }
   };
 
-  if (!user) {
-    return <p className="p-6 text-muted-foreground">Sign in with a provider account to continue.</p>;
+  const cancelReq = async () => {
+    if (!id || !crew) return;
+    try {
+      const res = await api.manpowerCrew.cancel(id);
+      if ((res as { success?: boolean }).success) {
+        toast({ title: "Requirement cancelled" });
+        await load();
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Could not cancel" });
+    }
+  };
+
+  if (!id) return null;
+
+  if (loading && !crew) {
+    return (
+      <div className="p-8 flex justify-center">
+        <Loader2 className="h-10 w-10 animate-spin" />
+      </div>
+    );
   }
 
-  return (
-    <div className="max-w-[1600px] mx-auto space-y-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="h-7 w-7 text-primary" />
-          Labour hire
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Browse workers below and select who you want to invite. Only selected people receive your request. You add a
-          short job summary when you send it.
-        </p>
+  if (!crew) {
+    return (
+      <div className="p-6">
+        <p>Not found.</p>
+        <Link href="/dashboard/provider/manpower-crew" className="text-primary underline">
+          Back
+        </Link>
       </div>
+    );
+  }
 
-      <Tabs defaultValue="browse" className="w-full">
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="browse">Labour directory</TabsTrigger>
-          <TabsTrigger value="mine">My requests</TabsTrigger>
-          <TabsTrigger value="incoming">Invites to me</TabsTrigger>
-        </TabsList>
+  const isOwner = Boolean(myUserId && String(crew.requesterUser ?? "") === myUserId);
 
-        <TabsContent value="browse" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Manpower / labour</CardTitle>
-              <CardDescription>
-                Search below, open the filter to choose categories, subcategories, sort, and location. Then select
-                workers and send a request.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-                <div className="relative flex-1 min-w-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    placeholder="Name, city, or address…"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <LabourFilterDialog
-                    idPrefix="hub"
-                    filters={browseFilters}
-                    onChange={setBrowseFilters}
-                    onClear={() => {
-                      setBrowseFilters(LABOUR_BROWSE_DEFAULT_FILTERS);
-                      setDebouncedLocation({
-                        addressQ: "",
-                        city: "",
-                        state: "",
-                        minExperience: "",
-                        maxPrice: "",
-                      });
-                    }}
-                  />
-                  <LabourViewModeToggle value={viewMode} onChange={setViewMode} className="shrink-0" />
-                </div>
-              </div>
+  return (
+    <div className="max-w-[1600px] mx-auto min-w-0 w-full space-y-4 sm:space-y-6 px-3 py-4 sm:px-4 md:p-6 overflow-x-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <Link
+        href="/dashboard/provider/manpower-crew"
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4 mr-1" />
+        Back to crew requests
+      </Link>
 
-              {loadingWorkers ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : workers.length === 0 ? (
-                <p className="text-sm text-muted-foreground border rounded-md p-4 bg-muted/30">
-                  No worker profiles match this filter. Try another category, or ensure workers have listed services
-                  under Manpower with the right primary category.
-                </p>
-              ) : (
-                <div className="max-h-[min(720px,70vh)] overflow-y-auto pr-1">
-                  <div
-                    className={
-                      viewMode === "grid"
-                        ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                        : "flex flex-col gap-3"
-                    }
-                  >
-                    {workers.map((w) => {
-                      const uid = w.userId;
-                      if (!uid || uid === myUserId) return null;
-                      return (
-                        <LabourWorkerCard
-                          key={uid}
-                          layout={viewMode}
-                          worker={w}
-                          selected={selected.has(uid)}
-                          onToggle={() => toggle(uid)}
-                          checkboxId={`hub-${uid}`}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="break-words">{crew.title}</CardTitle>
+          <CardDescription>
+            Progress: {crew.acceptedCount ?? 0} / {crew.headcount} accepted · Status: {crew.status}
+            {crew.location?.city ? ` · ${crew.location.city}` : ""}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm whitespace-pre-wrap">{crew.description}</p>
+          {isOwner && crew.status === "open" && (
+            <Button variant="destructive" size="sm" onClick={cancelReq}>
+              Cancel requirement
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
-              {inviteIds.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  <strong>{inviteIds.length}</strong> selected — click &quot;Send request&quot; to continue.
-                </p>
-              )}
-
-              <Button size="lg" className="w-full sm:w-auto" onClick={openSendModal} disabled={inviteIds.length === 0}>
-                Send request ({inviteIds.length})
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="mine" className="mt-4">
-          <h2 className="text-lg font-semibold mb-3">Your crew requests</h2>
-          {loadingLists ? (
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          ) : mine.length === 0 ? (
-            <p className="text-muted-foreground">
-              No requests yet. Start from the &quot;Labour directory&quot; tab to send one.
-            </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>Invites</CardTitle>
+          <CardDescription>Workers who were invited and how they responded.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {invites.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No invites yet.</p>
           ) : (
-            <ul className="space-y-3">
-              {mine.map((c) => (
-                <li key={c._id}>
-                  <Link
-                    href={`/dashboard/provider/manpower-crew/${c._id}`}
-                    className="block rounded-lg border p-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="font-medium">{c.title}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {c.acceptedCount ?? 0} / {c.headcount} accepted · {c.status}
-                      {c.location?.city ? ` · ${c.location.city}` : ""}
-                    </div>
-                  </Link>
+            <ul className="divide-y text-sm">
+              {invites.map((inv) => (
+                <li key={inv._id} className="py-2 flex justify-between gap-2 min-w-0">
+                  <span className="min-w-0 break-words pr-2">{inv.workerUser?.name ?? "Worker"}</span>
+                  <span className="text-muted-foreground shrink-0">{inv.status}</span>
                 </li>
               ))}
             </ul>
           )}
-        </TabsContent>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="incoming" className="mt-4 space-y-4">
-          {loadingLists ? (
-            <Loader2 className="h-8 w-8 animate-spin" />
-          ) : incoming.length === 0 ? (
-            <p className="text-muted-foreground">No invites yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {incoming.map((inv) => {
-                const cr = inv.crewRequest as CrewRequest | undefined;
-                const title = cr?.title ?? "Request";
-                const pending = inv.status === "pending";
-                return (
-                  <li
-                    key={inv._id}
-                    className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                  >
-                    <div>
-                      <div className="font-medium">{title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {inv.status}
-                        {cr?.headcount != null ? ` · ${cr.headcount} workers` : ""}
-                      </div>
-                    </div>
-                    {pending && (
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => respond(inv._id, "accept")}>
-                          Accept
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => respond(inv._id, "decline")}>
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
-        <DialogContent className="sm:max-w-md">
-          <form onSubmit={submitRequest}>
-            <DialogHeader>
-              <DialogTitle>Request details</DialogTitle>
-              <DialogDescription>
-                Workers will see this summary. You have selected {inviteIds.length} worker
-                {inviteIds.length === 1 ? "" : "s"}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-3 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="m-title">Short title</Label>
+      {isOwner && crew.status === "open" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Select workers to invite</CardTitle>
+            <CardDescription className="text-foreground/90">
+              Selected workers receive a notification and appear in Invites above. Use the filter for categories and
+              subcategories. You can select multiple people.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 min-w-0 overflow-hidden">
+            <div className="flex flex-col gap-3 min-w-0">
+              <div className="relative w-full min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  id="m-title"
-                  value={modalForm.title}
-                  onChange={(e) => setModalForm((f) => ({ ...f, title: e.target.value }))}
-                  required
+                  className="pl-9 h-11 sm:h-10 text-base sm:text-sm min-w-0"
+                  placeholder="Search by name, city, or address…"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  autoComplete="off"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="m-desc">Job details</Label>
-                <Textarea
-                  id="m-desc"
-                  rows={3}
-                  value={modalForm.description}
-                  onChange={(e) => setModalForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Site, schedule, duration, etc."
-                  required
+              <div className="flex items-center justify-end gap-2 w-full min-w-0 flex-wrap sm:flex-nowrap">
+                <LabourFilterDialog
+                  idPrefix="crew"
+                  filters={browseFilters}
+                  onChange={setBrowseFilters}
+                  onClear={() => {
+                    setBrowseFilters(LABOUR_BROWSE_DEFAULT_FILTERS);
+                    setDebouncedLocation({
+                      addressQ: "",
+                      city: "",
+                      state: "",
+                      minExperience: "",
+                      maxPrice: "",
+                    });
+                  }}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="m-hc">Total workers needed</Label>
-                  <Input
-                    id="m-hc"
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={modalForm.headcount}
-                    onChange={(e) => setModalForm((f) => ({ ...f, headcount: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="m-city">City (optional)</Label>
-                  <Input
-                    id="m-city"
-                    value={modalForm.city}
-                    onChange={(e) => setModalForm((f) => ({ ...f, city: e.target.value }))}
-                  />
-                </div>
+                <LabourViewModeToggle value={viewMode} onChange={setViewMode} className="shrink-0" />
               </div>
             </div>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button type="button" variant="outline" onClick={() => setSendOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={sending}>
-                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+
+            {loadingWorkers ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : workers.length === 0 ? (
+              <p className="text-sm text-muted-foreground border rounded-md p-4 bg-muted/30">
+                No worker profiles in this category yet. Providers need a service or primary category under Manpower
+                here. Try another category filter.
+              </p>
+            ) : (
+              <div className="max-h-[min(60dvh,520px)] sm:max-h-[min(720px,70vh)] overflow-y-auto overflow-x-hidden -mx-1 px-1 min-w-0 touch-pan-y">
+                <div
+                  className={
+                    viewMode === "grid"
+                      ? "grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0"
+                      : "flex flex-col gap-3 min-w-0"
+                  }
+                >
+                  {workers.map((w) => {
+                    const uid = w.userId;
+                    if (!uid || uid === myUserId) return null;
+                    return (
+                      <LabourWorkerCard
+                        key={uid}
+                        layout={viewMode}
+                        worker={w}
+                        selected={selected.has(uid)}
+                        onToggle={() => toggle(uid)}
+                        checkboxId={`w-${uid}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {inviteIds.length > 0 && (
+              <div className="rounded-md bg-muted/50 p-3 text-sm">
+                <span className="font-medium">Selected ({inviteIds.length}): </span>
+                {selectedPreview.join(", ")}
+              </div>
+            )}
+
+            <Button
+              className="w-full sm:w-auto"
+              onClick={sendInvites}
+              disabled={sending || inviteIds.length === 0}
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Send invites ({inviteIds.length})
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
