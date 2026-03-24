@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   getMapplsAccessToken,
+  MapplsAuthError,
   mapplsReverseGeocode,
   mapplsTextSearch,
   mapplsPlaceDetailsCoords,
@@ -40,6 +41,7 @@ export function useMapboxGeocoder({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const authWarnedRef = useRef(false);
 
   const token = getMapplsAccessToken();
 
@@ -68,12 +70,17 @@ export function useMapboxGeocoder({
           }));
           setSuggestions(mapped);
           setShowSuggestions(mapped.length > 0);
-        } catch {
+        } catch (err) {
           setSuggestions([]);
+          setShowSuggestions(false);
+          if (err instanceof MapplsAuthError && !authWarnedRef.current) {
+            authWarnedRef.current = true;
+            onError?.(err.message);
+          }
         }
       }, 300);
     },
-    [token]
+    [token, onError]
   );
 
   const selectSuggestion = useCallback(
@@ -157,7 +164,14 @@ export function useMapboxGeocoder({
             if (inputRef.current) inputRef.current.value = placeData.formatted_address;
             onPlaceSelect?.(placeData);
           }
-        } catch {
+        } catch (err) {
+          if (err instanceof MapplsAuthError) {
+            if (!authWarnedRef.current) {
+              authWarnedRef.current = true;
+              onError?.(err.message);
+            }
+            return;
+          }
           onError?.("Error getting your location. Please try again.");
         }
       },
