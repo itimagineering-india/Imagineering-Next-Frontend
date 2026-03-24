@@ -15,6 +15,14 @@ export function isMapplsTokenConfigured(): boolean {
   return Boolean(t && t !== "your-mappls-access-token" && !t.startsWith('"') && !t.endsWith('"'));
 }
 
+/** Thrown when Mappls rejects the access token (401/403 or invalid_token in body). */
+export class MapplsAuthError extends Error {
+  constructor(message = "Invalid or expired Mappls access token. Update NEXT_PUBLIC_MAPPLS_ACCESS_TOKEN in Mappls console.") {
+    super(message);
+    this.name = "MapplsAuthError";
+  }
+}
+
 /** Reverse geocode → single line address */
 export async function mapplsReverseGeocode(
   lat: number,
@@ -23,8 +31,20 @@ export async function mapplsReverseGeocode(
 ): Promise<string | null> {
   const url = `${SEARCH_BASE}/search/address/rev-geocode?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}&access_token=${encodeURIComponent(token)}`;
   const res = await fetch(url);
+  const text = await res.text();
+  if (res.status === 401 || res.status === 403) {
+    throw new MapplsAuthError();
+  }
   if (!res.ok) return null;
-  const data = await res.json();
+  type RevBody = { results?: Array<{ formatted_address?: string }> };
+  let data: RevBody | null = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as RevBody;
+    } catch {
+      return null;
+    }
+  }
   const row = data?.results?.[0];
   return row?.formatted_address || null;
 }
@@ -95,9 +115,29 @@ export async function mapplsTextSearch(
     url += `&location=${encodeURIComponent(`${options.lat},${options.lng}`)}`;
   }
   const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = await res.json();
-  const locs: any[] = data?.suggestedLocations || [];
+  const text = await res.text();
+  type TextSearchBody = { suggestedLocations?: unknown[]; error?: string };
+  let data: TextSearchBody | null = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as TextSearchBody;
+    } catch {
+      if (!res.ok) throw new MapplsAuthError();
+      return [];
+    }
+  }
+  if (data && typeof data === "object" && "error" in data && (data as { error?: string }).error) {
+    const err = (data as { error?: string }).error;
+    if (err === "invalid_token" || res.status === 401 || res.status === 403) {
+      throw new MapplsAuthError();
+    }
+  }
+  if (res.status === 401 || res.status === 403) {
+    throw new MapplsAuthError();
+  }
+  if (res.status === 204 || !res.ok) return [];
+  if (!data) return [];
+  const locs: any[] = Array.isArray(data.suggestedLocations) ? data.suggestedLocations : [];
   const out: MapplsSearchHit[] = [];
   for (const L of locs.slice(0, 8)) {
     const placeAddress = L.placeAddress || "";
