@@ -8,6 +8,7 @@ const LOGO_URL = "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
+  manifest: "/manifest.webmanifest",
   title: {
     default: "Imagineering India - Find Verified Service Providers Near You",
     template: "%s | Imagineering India",
