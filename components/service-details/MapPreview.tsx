@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin } from "lucide-react";
-import { loadMapplsMapScript, getMapplsAccessToken } from "@/lib/mapConfig";
+import { loadGoogleMapsScript, getGoogleMapsApiKey } from "@/lib/mapConfig";
 
 interface MapPreviewProps {
   location: {
@@ -28,51 +28,40 @@ export function MapPreview({ location, serviceRadius = 10 }: MapPreviewProps) {
 
     const lat = location.coordinates?.lat;
     const lng = location.coordinates?.lng;
-    const token = getMapplsAccessToken();
+    const token = getGoogleMapsApiKey();
     if (!token || lat == null || lng == null || !containerRef.current) return;
 
     (async () => {
       try {
-        await loadMapplsMapScript();
+        await loadGoogleMapsScript();
       } catch {
         if (!cancelled) setSdkError("Could not load map");
         return;
       }
-      if (cancelled || !containerRef.current) return;
-      const mappls = (window as unknown as { mappls?: { Map: new (el: HTMLElement, o: object) => { remove?: () => void }; Marker: new (o: object) => { remove?: () => void } } }).mappls;
-      if (!mappls?.Map || !mappls.Marker) {
-        setSdkError("Map SDK unavailable");
+      if (cancelled || !containerRef.current || !window.google?.maps?.Map) {
+        if (!cancelled) setSdkError("Map SDK unavailable");
         return;
       }
       try {
-        const map = new mappls.Map(containerRef.current, {
+        const map = new google.maps.Map(containerRef.current, {
           center: { lat, lng },
           zoom: 13,
+          mapTypeControl: false,
         });
-        let marker: { remove?: () => void } | null = null;
-        const placeMarker = () => {
-          if (cancelled) return;
-          try {
-            marker = new mappls.Marker({
-              map,
-              position: { lat, lng },
-              html: `<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>`,
-            });
-          } catch {
-            if (!cancelled) setSdkError("Map marker failed");
-          }
-        };
-        const m = map as { loaded?: () => boolean; addListener?: (ev: string, fn: () => void) => void };
-        if (typeof m.loaded === "function" && m.loaded()) {
-          placeMarker();
-        } else if (typeof m.addListener === "function") {
-          m.addListener("load", placeMarker);
-        } else {
-          placeMarker();
-        }
+        const marker = new google.maps.Marker({
+          map,
+          position: { lat, lng },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: "#3b82f6",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+          },
+        });
         teardown = () => {
-          marker?.remove?.();
-          map.remove?.();
+          marker.setMap(null);
         };
       } catch {
         setSdkError("Map init failed");
@@ -85,7 +74,7 @@ export function MapPreview({ location, serviceRadius = 10 }: MapPreviewProps) {
     };
   }, [location.coordinates?.lat, location.coordinates?.lng, serviceRadius]);
 
-  const token = getMapplsAccessToken();
+  const token = getGoogleMapsApiKey();
   const hasCoords = location.coordinates?.lat != null && location.coordinates?.lng != null;
 
   return (
@@ -99,7 +88,7 @@ export function MapPreview({ location, serviceRadius = 10 }: MapPreviewProps) {
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
               <div className="text-center space-y-2">
                 <MapPin className="h-8 w-8 text-primary mx-auto" />
-                <p className="text-sm text-muted-foreground">Set NEXT_PUBLIC_MAPPLS_ACCESS_TOKEN for map</p>
+                <p className="text-sm text-muted-foreground">Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY for map</p>
               </div>
             </div>
           )}
