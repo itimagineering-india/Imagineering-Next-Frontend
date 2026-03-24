@@ -79,7 +79,7 @@ export function LabourFilterDialog({ filters, onChange, onClear, idPrefix = "lab
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[min(90vh,720px)] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl sm:w-full max-h-[90dvh] overflow-y-auto overflow-x-hidden p-4 sm:p-6 gap-3">
           <DialogHeader>
             <DialogTitle>Filters & sort</DialogTitle>
             <DialogDescription>
