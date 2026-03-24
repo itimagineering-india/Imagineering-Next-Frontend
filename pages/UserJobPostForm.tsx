@@ -19,7 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
+import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { FileText, MapPin, Clock, Loader2 } from "lucide-react";
 
 export default function UserJobPostForm() {
@@ -70,14 +70,14 @@ export default function UserJobPostForm() {
   }, []);
 
   const {
-    isLoaded: mapboxLoaded,
+    isLoaded: mapsLoaded,
     suggestions,
     showSuggestions,
     setShowSuggestions,
     selectSuggestion,
     handleInputChange: handleAddressInputChange,
     getCurrentLocation,
-  } = useMapboxGeocoder({
+  } = useGoogleGeocoder({
     onPlaceSelect: (place) => {
       const lat =
         typeof place.geometry.location.lat === "function"
@@ -273,13 +273,13 @@ export default function UserJobPostForm() {
                 <Label htmlFor="address">Address / Location *</Label>
                 <div className="relative">
                   <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground z-10" />
-                  {!mapboxLoaded && (
+                  {!mapsLoaded && (
                     <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground animate-spin z-10" />
                   )}
                   <Input
                     id="address"
                     placeholder={
-                      mapboxLoaded
+                      mapsLoaded
                         ? "Start typing for address suggestions (street, area, city)"
                         : "Loading location services..."
                     }
@@ -296,7 +296,7 @@ export default function UserJobPostForm() {
                       } as React.ChangeEvent<HTMLInputElement>)
                     }
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                    disabled={!mapboxLoaded}
+                    disabled={!mapsLoaded}
                     required
                   />
                   {showSuggestions && suggestions.length > 0 && (
@@ -326,7 +326,7 @@ export default function UserJobPostForm() {
                     setIsGettingLocation(true);
                     getCurrentLocation();
                   }}
-                  disabled={!mapboxLoaded || isGettingLocation}
+                  disabled={!mapsLoaded || isGettingLocation}
                 >
                   {isGettingLocation ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
