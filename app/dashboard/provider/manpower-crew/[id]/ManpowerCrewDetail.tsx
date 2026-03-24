@@ -249,7 +249,7 @@ export default function ManpowerCrewDetail() {
   const isOwner = Boolean(myUserId && String(crew.requesterUser ?? "") === myUserId);
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 p-4 md:p-6">
+    <div className="max-w-[1600px] mx-auto min-w-0 w-full space-y-4 sm:space-y-6 px-3 py-4 sm:px-4 md:p-6 overflow-x-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <Link
         href="/dashboard/provider/manpower-crew"
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
@@ -260,7 +260,7 @@ export default function ManpowerCrewDetail() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{crew.title}</CardTitle>
+          <CardTitle className="break-words">{crew.title}</CardTitle>
           <CardDescription>
             Progress: {crew.acceptedCount ?? 0} / {crew.headcount} accepted · Status: {crew.status}
             {crew.location?.city ? ` · ${crew.location.city}` : ""}
@@ -287,9 +287,9 @@ export default function ManpowerCrewDetail() {
           ) : (
             <ul className="divide-y text-sm">
               {invites.map((inv) => (
-                <li key={inv._id} className="py-2 flex justify-between gap-2">
-                  <span>{inv.workerUser?.name ?? "Worker"}</span>
-                  <span className="text-muted-foreground">{inv.status}</span>
+                <li key={inv._id} className="py-2 flex justify-between gap-2 min-w-0">
+                  <span className="min-w-0 break-words pr-2">{inv.workerUser?.name ?? "Worker"}</span>
+                  <span className="text-muted-foreground shrink-0">{inv.status}</span>
                 </li>
               ))}
             </ul>
@@ -306,18 +306,19 @@ export default function ManpowerCrewDetail() {
               subcategories. You can select multiple people.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <CardContent className="space-y-4 min-w-0 overflow-hidden">
+            <div className="flex flex-col gap-3 min-w-0">
+              <div className="relative w-full min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  className="pl-9"
+                  className="pl-9 h-11 sm:h-10 text-base sm:text-sm min-w-0"
                   placeholder="Search by name, city, or address…"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
+                  autoComplete="off"
                 />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center justify-end gap-2 w-full min-w-0 flex-wrap sm:flex-nowrap">
                 <LabourFilterDialog
                   idPrefix="crew"
                   filters={browseFilters}
@@ -347,12 +348,12 @@ export default function ManpowerCrewDetail() {
                 here. Try another category filter.
               </p>
             ) : (
-              <div className="max-h-[min(640px,65vh)] overflow-y-auto pr-1">
+              <div className="max-h-[min(60dvh,520px)] sm:max-h-[min(720px,70vh)] overflow-y-auto overflow-x-hidden -mx-1 px-1 min-w-0 touch-pan-y">
                 <div
                   className={
                     viewMode === "grid"
-                      ? "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                      : "flex flex-col gap-3"
+                      ? "grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-w-0"
+                      : "flex flex-col gap-3 min-w-0"
                   }
                 >
                   {workers.map((w) => {
