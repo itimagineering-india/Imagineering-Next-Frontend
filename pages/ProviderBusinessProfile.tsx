@@ -157,11 +157,11 @@ export default function ProviderBusinessProfile() {
         address = place.formatted_address;
       }
 
-      setBusinessProfile({
-        ...businessProfile,
+      setBusinessProfile((prev) => ({
+        ...prev,
         businessAddress: { address, city, state, zipCode },
         coordinates: { lat, lng },
-      });
+      }));
       setIsGettingLocation(false);
     },
     onError: (error) => {
@@ -669,7 +669,10 @@ export default function ProviderBusinessProfile() {
                             key={s.id || i}
                             type="button"
                             className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
-                            onMouseDown={() => selectSuggestion(s)}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              void selectSuggestion(s);
+                            }}
                           >
                             {s.place_name}
                           </button>
