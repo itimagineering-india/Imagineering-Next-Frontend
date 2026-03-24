@@ -18,7 +18,7 @@ import {
 import { Plus, MapPin, Loader2, Upload, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api-client";
-import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
+import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { KycLock } from "@/components/provider/KycLock";
@@ -114,7 +114,7 @@ export default function ProviderBusinessProfile() {
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useMapboxGeocoder({
+  } = useGoogleGeocoder({
     onPlaceSelect: (place) => {
       let address = place.formatted_address || "";
       let city = "";
