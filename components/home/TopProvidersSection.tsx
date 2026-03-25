@@ -32,9 +32,6 @@ interface ProviderApiItem {
   };
 }
 
-const CACHE_KEY = "top_providers_home_cache";
-const CACHE_TTL = 5 * 60 * 1000;
-
 function getImageUrl(url: string): string {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
@@ -111,53 +108,19 @@ export function TopProvidersSection() {
 
     const fetchTopProviders = async () => {
       try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          try {
-            const { data, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp < CACHE_TTL && Array.isArray(data)) {
-              const normalizedCache = normalizeProviders(data);
-              if (normalizedCache.length > 0) {
-                setProviders(normalizedCache);
-                setLoading(false);
-                localStorage.setItem(
-                  CACHE_KEY,
-                  JSON.stringify({ data: normalizedCache, timestamp })
-                );
-                return;
-              }
-            }
-          } catch (e) {
-            localStorage.removeItem(CACHE_KEY);
-          }
-        }
-
-        let response = await api.providers.getAll({
+        const response = await api.providers.getAll({
           topRated: true,
           verified: true,
           limit: 10,
         });
 
-        let providersData: ProviderApiItem[] = response.success && response.data
+        const providersData: ProviderApiItem[] = response.success && response.data
           ? (response.data as any).providers || []
           : [];
 
-        // Fallback: if no top-rated providers, fetch general list
-        if (providersData.length === 0) {
-          response = await api.providers.getAll({ limit: 10 });
-          providersData = response.success && response.data
-            ? (response.data as any).providers || []
-            : [];
-        }
-
         const normalizedProviders = normalizeProviders(providersData).slice(0, 10);
-
         setProviders(normalizedProviders);
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({ data: normalizedProviders, timestamp: Date.now() })
-        );
-      } catch (error) {
+      } catch {
         setProviders([]);
       } finally {
         setLoading(false);
@@ -263,7 +226,7 @@ export function TopProvidersSection() {
           </div>
         ) : (
           <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
-            No providers available at the moment.
+            No Provider found
           </div>
         )}
       </div>
