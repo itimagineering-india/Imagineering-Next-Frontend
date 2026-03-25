@@ -540,7 +540,9 @@ export function Header() {
                 <DropdownMenuSeparator />
               </>
             )}
-            <LocationSearchInline onClose={() => setLocationDropdownOpen(false)} />
+            {locationDropdownOpen ? (
+              <LocationSearchInline onClose={() => setLocationDropdownOpen(false)} />
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -817,7 +819,9 @@ export function Header() {
                     </span>
                   </Link>
                 )}
-                <LocationSearchInline onClose={() => setIsOpen(false)} className="p-0" />
+                {isOpen ? (
+                  <LocationSearchInline onClose={() => setIsOpen(false)} className="p-0" />
+                ) : null}
               </div>
               <Link href="/about" className="text-lg font-medium" onClick={() => setIsOpen(false)}>
                 {t("common:about")}
