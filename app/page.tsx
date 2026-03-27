@@ -3,6 +3,7 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { SearchBarSection } from "@/components/home/SearchBarSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
 import { JobsSection } from "@/components/home/JobsSection";
+import { BulkHireLabourCta } from "@/components/home/BulkHireLabourCta";
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
 import { AppDownloadSection } from "@/components/home/AppDownloadSection";
@@ -23,6 +24,7 @@ export default function Home() {
         <SearchBarSection />
         <ServicesSection />
         <JobsSection />
+        <BulkHireLabourCta />
         <TopProvidersSection />
         <CategorySections />
         <AppDownloadSection />
