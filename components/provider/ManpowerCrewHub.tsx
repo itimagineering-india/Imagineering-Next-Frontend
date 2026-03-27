@@ -452,28 +452,36 @@ export default function ManpowerCrewHub() {
                 const cr = inv.crewRequest as CrewRequest | undefined;
                 const title = cr?.title ?? "Request";
                 const pending = inv.status === "pending";
+                const crewId = cr?._id ? String(cr._id) : "";
                 return (
                   <li
                     key={inv._id}
                     className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-medium">{title}</div>
                       <div className="text-sm text-muted-foreground">
                         {inv.status}
                         {cr?.headcount != null ? ` · ${cr.headcount} workers` : ""}
                       </div>
                     </div>
-                    {pending && (
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => respond(inv._id, "accept")}>
-                          Accept
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                      {crewId ? (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/dashboard/provider/manpower-crew/${crewId}`}>View request</Link>
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => respond(inv._id, "decline")}>
-                          Decline
-                        </Button>
-                      </div>
-                    )}
+                      ) : null}
+                      {pending ? (
+                        <>
+                          <Button size="sm" onClick={() => respond(inv._id, "accept")}>
+                            Accept
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => respond(inv._id, "decline")}>
+                            Decline
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
                   </li>
                 );
               })}
