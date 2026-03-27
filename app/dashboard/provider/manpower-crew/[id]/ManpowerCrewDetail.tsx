@@ -36,6 +36,11 @@ type InviteRow = {
   workerUser?: { name?: string; email?: string; phone?: string };
 };
 
+type MyInviteRow = {
+  _id: string;
+  status: string;
+};
+
 export default function ManpowerCrewDetail() {
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : "";
@@ -44,10 +49,12 @@ export default function ManpowerCrewDetail() {
   const [loading, setLoading] = useState(false);
   const [crew, setCrew] = useState<CrewRequest | null>(null);
   const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [myInvite, setMyInvite] = useState<MyInviteRow | null>(null);
   const [workers, setWorkers] = useState<LabourWorkerListItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [sending, setSending] = useState(false);
+  const [respondingInvite, setRespondingInvite] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQ, setSearchQ] = useState("");
   const [viewMode, setViewMode] = useState<LabourViewMode>("grid");
@@ -66,20 +73,39 @@ export default function ManpowerCrewDetail() {
     if (!id) return;
     setLoading(true);
     try {
-      const [r1, r2] = await Promise.all([
-        api.manpowerCrew.getById(id),
-        api.manpowerCrew.listInvites(id),
-      ]);
-      const d1 = r1 as { data?: { crewRequest?: CrewRequest } };
-      const d2 = r2 as { data?: { invites?: InviteRow[] } };
-      setCrew(d1.data?.crewRequest ?? null);
-      setInvites(d2.data?.invites ?? []);
+      const r1 = await api.manpowerCrew.getById(id);
+      const d1 = r1 as {
+        data?: {
+          crewRequest?: CrewRequest;
+          myInvite?: { _id?: string; status?: string } | null;
+        };
+      };
+      const cr = d1.data?.crewRequest ?? null;
+      setCrew(cr);
+      const inv = d1.data?.myInvite;
+      if (inv && typeof inv._id === "string") {
+        setMyInvite({ _id: inv._id, status: String(inv.status ?? "") });
+      } else {
+        setMyInvite(null);
+      }
+
+      const isReq = Boolean(cr && myUserId && String(cr.requesterUser ?? "") === myUserId);
+      if (isReq) {
+        const r2 = await api.manpowerCrew.listInvites(id);
+        const d2 = r2 as { data?: { invites?: InviteRow[] } };
+        setInvites(d2.data?.invites ?? []);
+      } else {
+        setInvites([]);
+      }
     } catch {
       toast({ title: "Failed to load", variant: "destructive" });
+      setCrew(null);
+      setMyInvite(null);
+      setInvites([]);
     } finally {
       setLoading(false);
     }
-  }, [id, toast]);
+  }, [id, toast, myUserId]);
 
   const loadWorkers = useCallback(async () => {
     setLoadingWorkers(true);
@@ -134,9 +160,11 @@ export default function ManpowerCrewDetail() {
   }, [load, isAuthenticated, user]);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) return;
-    if (crew) loadWorkers();
-  }, [crew, loadWorkers, isAuthenticated, user]);
+    if (!isAuthenticated || !user || !crew) return;
+    const isReq = Boolean(myUserId && String(crew.requesterUser ?? "") === myUserId);
+    if (!isReq || crew.status !== "open") return;
+    loadWorkers();
+  }, [crew, loadWorkers, isAuthenticated, user, myUserId]);
 
   // Debounce search
   useEffect(() => {
@@ -228,6 +256,32 @@ export default function ManpowerCrewDetail() {
     }
   };
 
+  const respondMyInvite = async (action: "accept" | "decline") => {
+    if (!myInvite?._id) return;
+    setRespondingInvite(true);
+    try {
+      const res = await api.manpowerCrew.respondInvite(myInvite._id, action);
+      if ((res as { success?: boolean }).success) {
+        toast({ title: action === "accept" ? "Accepted" : "Declined" });
+        await load();
+      } else {
+        toast({
+          title: "Failed",
+          description: (res as { error?: { message?: string } }).error?.message,
+          variant: "destructive",
+        });
+      }
+    } catch (e: unknown) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "Failed",
+        variant: "destructive",
+      });
+    } finally {
+      setRespondingInvite(false);
+    }
+  };
+
   if (!id) return null;
 
   if (authLoading) {
@@ -287,26 +341,66 @@ export default function ManpowerCrewDetail() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Invites</CardTitle>
-          <CardDescription>Workers who were invited and how they responded.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {invites.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No invites yet.</p>
-          ) : (
-            <ul className="divide-y text-sm">
-              {invites.map((inv) => (
-                <li key={inv._id} className="py-2 flex justify-between gap-2 min-w-0">
-                  <span className="min-w-0 break-words pr-2">{inv.workerUser?.name ?? "Worker"}</span>
-                  <span className="text-muted-foreground shrink-0">{inv.status}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {!isOwner && myInvite ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your invite</CardTitle>
+            <CardDescription>
+              Status: <span className="font-medium text-foreground capitalize">{myInvite.status}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {myInvite.status === "pending" ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => respondMyInvite("accept")}
+                  disabled={respondingInvite}
+                >
+                  {respondingInvite ? <Loader2 className="h-4 w-4 animate-spin" /> : "Accept"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => respondMyInvite("decline")}
+                  disabled={respondingInvite}
+                >
+                  Decline
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {myInvite.status === "accepted"
+                  ? "You have accepted this crew request."
+                  : "You have declined this invite."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isOwner ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invites</CardTitle>
+            <CardDescription>Workers who were invited and how they responded.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {invites.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No invites yet.</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {invites.map((inv) => (
+                  <li key={inv._id} className="py-2 flex justify-between gap-2 min-w-0">
+                    <span className="min-w-0 break-words pr-2">{inv.workerUser?.name ?? "Worker"}</span>
+                    <span className="text-muted-foreground shrink-0">{inv.status}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {isOwner && crew.status === "open" && (
         <Card>
