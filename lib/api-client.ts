@@ -553,9 +553,8 @@ export const api = {
         });
       }
       const queryString = queryParams.toString();
-      // Keep timeout reasonable to avoid very long hangs on slow endpoints
       return apiRequest(`/api/services${queryString ? `?${queryString}` : ''}`, {
-        timeoutMs: 30000,
+        timeoutMs: 180000,
       });
     },
     getById: (id: string) => apiRequest(`/api/services/${id}`),
@@ -1776,7 +1775,8 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
   },
- /** Bulk labour crew requests (contractors invite multiple workers). */
+
+  /** Bulk labour crew requests (contractors invite multiple workers). */
   manpowerCrew: {
     create: (data: {
       title: string;
@@ -1855,6 +1855,8 @@ export const api = {
       addressQ?: string;
       city?: string;
       state?: string;
+      startDate?: string;
+      endDate?: string;
       minRating?: number;
       minExperience?: number;
       maxPrice?: number;
@@ -1870,6 +1872,8 @@ export const api = {
       if (params?.addressQ) q.set('addressQ', params.addressQ);
       if (params?.city) q.set('city', params.city);
       if (params?.state) q.set('state', params.state);
+      if (params?.startDate) q.set('startDate', params.startDate);
+      if (params?.endDate) q.set('endDate', params.endDate);
       if (params?.minRating != null && Number.isFinite(params.minRating)) {
         q.set('minRating', String(params.minRating));
       }
