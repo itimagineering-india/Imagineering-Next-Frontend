@@ -1,13 +1,10 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { memo, useState, useEffect, useRef, useCallback } from "react";
-import { Heart, Star, Loader2 } from "lucide-react";
+import { memo, useState, useRef } from "react";
+import { Heart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import api from "@/lib/api-client";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { AddToCartButton } from "@/components/services/AddToCartButton";
 
 interface CategoryProviderCardProps {
   id: string;
@@ -21,6 +18,8 @@ interface CategoryProviderCardProps {
   reviewCount: number;
   className?: string;
   priority?: boolean;
+  isFavorite: boolean;
+  onToggleFavorite: (serviceId: string) => void;
 }
 
 // Card display width ~180px; request 240 for 1.3x density
@@ -77,83 +76,13 @@ function CategoryProviderCardComponent({
   reviewCount,
   className,
   priority = false,
+  isFavorite,
+  onToggleFavorite,
 }: CategoryProviderCardProps) {
   const optimizedImage = optimizeImageUrl(image, CARD_IMAGE_WIDTH);
   const fallbackImage = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=240&q=75&auto=format&fit=crop";
   const [loaded, setLoaded] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
-  const [hasCheckedFavorite, setHasCheckedFavorite] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
-  const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
-  const router = useRouter();
-
-  const checkFavoriteLazy = useCallback(async () => {
-    if (hasCheckedFavorite || isLoadingFavorite || !isAuthenticated) return;
-    setIsLoadingFavorite(true);
-    try {
-      const response = await api.favorites.check(id);
-      if (response.success && response.data) {
-        const data = response.data as { isFavorite: boolean };
-        setIsFavorite(data.isFavorite);
-        setHasCheckedFavorite(true);
-      }
-    } catch {
-      setHasCheckedFavorite(true);
-    } finally {
-      setIsLoadingFavorite(false);
-    }
-  }, [id, hasCheckedFavorite, isLoadingFavorite, isAuthenticated]);
-
-  const toggleFavorite = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isLoadingFavorite) return;
-    if (!isAuthenticated) {
-      toast({
-        title: "Login required",
-        description: "Please login to add services to favorites",
-        variant: "destructive",
-      });
-      router.push(`/login?from=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/")}`);
-      return;
-    }
-    if (!hasCheckedFavorite) {
-      await checkFavoriteLazy();
-    }
-    setIsLoadingFavorite(true);
-    try {
-      const response = await api.favorites.toggle(id);
-      if (response.success && response.data) {
-        const data = response.data as { isFavorite: boolean };
-        setIsFavorite(data.isFavorite);
-        toast({
-          title: data.isFavorite ? "Added to favorites" : "Removed from favorites",
-          description: data.isFavorite ? "Service saved to your favorites" : "Service removed from favorites",
-        });
-        setHasCheckedFavorite(true);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.error?.message || "Failed to update favorite. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingFavorite(false);
-    }
-  }, [id, isAuthenticated, hasCheckedFavorite, isLoadingFavorite, checkFavoriteLazy, toast, router]);
-
-  useEffect(() => {
-    setLoaded(false);
-    
-    // For cached images, check if image is already complete
-    const img = imgRef.current;
-    if (img?.complete && img.naturalHeight !== 0) {
-      setLoaded(true);
-    }
-  }, [optimizedImage]);
 
   return (
     <Link
@@ -162,6 +91,7 @@ function CategoryProviderCardComponent({
         "group flex-shrink-0 w-[160px] sm:w-[180px] bg-card rounded-lg md:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]",
         className
       )}
+      style={{ contentVisibility: "auto" }}
     >
       {/* Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
@@ -169,7 +99,7 @@ function CategoryProviderCardComponent({
           ref={imgRef}
           src={optimizedImage}
           alt={name}
-          loading={priority ? "eager" : "lazy"}
+          loading="lazy"
           decoding="async"
           width="180"
           height="135"
@@ -193,17 +123,15 @@ function CategoryProviderCardComponent({
               "absolute top-1.5 md:top-2 right-1.5 md:right-2 h-6 w-6 md:h-7 md:w-7 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background",
               isFavorite ? "text-destructive" : "hover:text-destructive"
             )}
-            onClick={toggleFavorite}
-            onMouseEnter={checkFavoriteLazy}
-            disabled={isLoadingFavorite}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleFavorite(id);
+            }}
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
             title={isFavorite ? "Remove from favorites" : "Add to favorites"}
           >
-            {isLoadingFavorite ? (
-              <Loader2 className="h-3 w-3 md:h-3.5 md:w-3.5 animate-spin" />
-            ) : (
-              <Heart className={cn("h-3 w-3 md:h-3.5 md:w-3.5", isFavorite && "fill-current")} />
-            )}
+            <Heart className={cn("h-3 w-3 md:h-3.5 md:w-3.5", isFavorite && "fill-current")} />
           </Button>
         )}
       </div>
@@ -232,23 +160,29 @@ function CategoryProviderCardComponent({
             <span className="font-medium text-[10px] md:text-xs">{rating}</span>
           </div>
         </div>
+
+        <div
+          className="mt-2"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          <AddToCartButton
+            serviceId={id}
+            providerName={name}
+            showQuantity={false}
+            label="Add to cart"
+            className="h-7 text-xs px-3 flex-1 min-w-0 whitespace-nowrap"
+          />
+        </div>
       </div>
     </Link>
   );
 }
 
-export const CategoryProviderCard = memo(
-  CategoryProviderCardComponent,
-  (prev, next) =>
-    prev.id === next.id &&
-    prev.name === next.name &&
-    prev.image === next.image &&
-    prev.location === next.location &&
-    prev.price === next.price &&
-    prev.mrp === next.mrp &&
-    prev.priceLabel === next.priceLabel &&
-    prev.rating === next.rating &&
-    prev.reviewCount === next.reviewCount &&
-    prev.className === next.className &&
-    prev.priority === next.priority
-);
+export const CategoryProviderCard = memo(CategoryProviderCardComponent);
