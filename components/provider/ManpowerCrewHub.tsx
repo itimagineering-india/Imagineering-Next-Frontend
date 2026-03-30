@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, Users } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { LabourWorkerCard, type LabourWorkerListItem } from "@/components/provider/LabourWorkerCard";
 import { LabourViewModeToggle, type LabourViewMode } from "@/components/provider/LabourViewModeToggle";
 import {
@@ -360,35 +360,44 @@ export default function ManpowerCrewHub() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto min-w-0 w-full space-y-4 sm:space-y-6 px-3 py-4 sm:px-4 md:p-6 overflow-x-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 min-w-0">
-          <Users className="h-6 w-6 sm:h-7 sm:w-7 text-primary shrink-0" />
-          <span className="truncate">Labour hire</span>
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm sm:text-base leading-relaxed">
-          Browse workers below and select who you want to invite. Only selected people receive your request. You add a
-          short job summary when you send it.
-        </p>
-      </div>
+    <div className="max-w-[1600px] mx-auto min-w-0 w-full space-y-0 px-3 py-4 sm:px-4 md:p-6 overflow-x-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="w-full rounded-2xl border border-border/60 bg-card/60 shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-5 bg-gradient-to-r from-gray-100 to-blue-50 dark:from-zinc-900 dark:to-blue-950/30 border-b border-border/60">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-11 w-11 rounded-xl bg-white/70 dark:bg-white/5 flex items-center justify-center shadow-sm">
+              <span aria-hidden className="text-xl">
+                👷
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight truncate">Hire Workers</h1>
+              <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+                Select workers and send job requests easily
+              </p>
+            </div>
+          </div>
+        </div>
 
-      <Tabs defaultValue="browse" className="w-full min-w-0">
-        <TabsList className="flex w-full h-auto flex-nowrap justify-start gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/60 bg-muted/40 p-1 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <TabsTrigger
-            value="browse"
-            className="shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs sm:text-sm sm:px-4 bg-transparent data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/60 hover:bg-muted/60 transition-colors"
-          >
-            Labour directory
-          </TabsTrigger>
-          <TabsTrigger
-            value="mine"
-            className="shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs sm:text-sm sm:px-4 bg-transparent data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/60 hover:bg-muted/60 transition-colors"
-          >
-            My requests
-          </TabsTrigger>
-        </TabsList>
+        {/* Body */}
+        <div className="p-6">
+          <Tabs defaultValue="browse" className="w-full min-w-0">
+            <TabsList className="flex w-full h-auto flex-nowrap justify-start gap-2 overflow-x-auto overscroll-x-contain bg-transparent p-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <TabsTrigger
+                value="browse"
+                className="shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-xs sm:text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200 ease-out data-[state=active]:bg-[#2563eb] data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:hover:bg-[#2563eb] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              >
+                Labour directory
+              </TabsTrigger>
+              <TabsTrigger
+                value="mine"
+                className="shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-xs sm:text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200 ease-out data-[state=active]:bg-[#2563eb] data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:hover:bg-[#2563eb] dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              >
+                My requests
+              </TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="browse" className="space-y-4 mt-4">
+            <TabsContent value="browse" className="space-y-4 mt-3">
           <Card>
             <CardContent className="space-y-4 min-w-0 overflow-hidden p-6">
               <div className="flex flex-col gap-3 min-w-0">
@@ -501,7 +510,7 @@ export default function ManpowerCrewHub() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="mine" className="mt-4">
+        <TabsContent value="mine" className="mt-3">
           <h2 className="text-lg font-semibold mb-3">Your crew requests</h2>
           {loadingLists ? (
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -532,6 +541,10 @@ export default function ManpowerCrewHub() {
 
         {/* Incoming invites tab removed. Use Provider Leads page instead. */}
       </Tabs>
+
+        {/* Close Tabs body + card wrapper */}
+      </div>
+    </div>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
         <DialogContent className="w-[calc(100vw-1.25rem)] max-w-md max-h-[90dvh] overflow-y-auto overflow-x-hidden p-4 sm:p-6">
