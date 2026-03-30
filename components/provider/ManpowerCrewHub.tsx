@@ -37,7 +37,9 @@ type CrewRequest = {
   headcount: number;
   acceptedCount?: number;
   status: string;
-  location?: { city?: string; state?: string };
+  location?: { city?: string; state?: string; address?: string };
+  startDate?: string | Date;
+  endDate?: string | Date;
   createdAt?: string;
 };
 
@@ -52,6 +54,8 @@ export default function ManpowerCrewHub() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const [loadingLists, setLoadingLists] = useState(true);
   const [mine, setMine] = useState<CrewRequest[]>([]);
@@ -74,14 +78,36 @@ export default function ManpowerCrewHub() {
 
   const [sendOpen, setSendOpen] = useState(false);
   const [sending, setSending] = useState(false);
+
+  // Labour directory availability filter (date range).
+  // Workers list will exclude providers who are already booked in overlapping accepted requests.
+  const [availabilityRange, setAvailabilityRange] = useState({
+    startDate: todayStr,
+    endDate: todayStr,
+  });
+
   const [modalForm, setModalForm] = useState({
     title: "Labour requirement",
     description: "",
     headcount: "1",
     city: "",
+    startTime: "09:00",
+    endTime: "17:00",
   });
 
   const myUserId = user?._id ? String(user._id) : "";
+
+  const scheduleShort = (startDate?: string | Date, endDate?: string | Date) => {
+    if (!startDate || !endDate) return "";
+    const s = startDate instanceof Date ? startDate : new Date(startDate);
+    const e = endDate instanceof Date ? endDate : new Date(endDate);
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return "";
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const durationDays = Math.max(1, Math.floor((e.getTime() - s.getTime()) / msPerDay) + 1);
+    const startT = s.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const endT = e.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return ` · ${durationDays} day${durationDays === 1 ? "" : "s"} (${startT}-${endT})`;
+  };
 
   const loadLists = useCallback(async () => {
     setLoadingLists(true);
@@ -117,6 +143,16 @@ export default function ManpowerCrewHub() {
         addressQ: debouncedLocation.addressQ || undefined,
         city: debouncedLocation.city || undefined,
         state: debouncedLocation.state || undefined,
+        startDate: (() => {
+          const [y, m, d] = availabilityRange.startDate.split("-").map((x) => Number.parseInt(x, 10));
+          const dt = new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+          return dt.toISOString();
+        })(),
+        endDate: (() => {
+          const [y, m, d] = availabilityRange.endDate.split("-").map((x) => Number.parseInt(x, 10));
+          const dt = new Date(y, (m || 1) - 1, d || 1, 23, 59, 59, 999);
+          return dt.toISOString();
+        })(),
         minRating:
           browseFilters.minRating === "" ? undefined : Number.parseFloat(browseFilters.minRating),
         minExperience:
@@ -142,6 +178,8 @@ export default function ManpowerCrewHub() {
     browseFilters.subManpower,
     browseFilters.subTechnical,
     debouncedLocation,
+    availabilityRange.startDate,
+    availabilityRange.endDate,
     toast,
   ]);
 
@@ -215,11 +253,30 @@ export default function ManpowerCrewHub() {
 
     setSending(true);
     try {
+      const startTimeStr = modalForm.startTime.trim();
+      const endTimeStr = modalForm.endTime.trim() || startTimeStr;
+
+      const parseLocalIso = (dateStr: string, timeStr: string) => {
+        // date/time inputs are local (no timezone). Convert to ISO string for backend.
+        const [y, m, d] = dateStr.split("-").map((x) => Number.parseInt(x, 10));
+        const [hh, mm] = timeStr.split(":").map((x) => Number.parseInt(x, 10));
+        const dt = new Date(y, (m || 1) - 1, d || 1, hh || 0, mm || 0, 0, 0);
+        return dt.toISOString();
+      };
+
+      const startDateISO = availabilityRange.startDate ? parseLocalIso(availabilityRange.startDate, startTimeStr) : undefined;
+      const endDateISO = availabilityRange.endDate ? parseLocalIso(availabilityRange.endDate, endTimeStr) : undefined;
+
+      const location =
+        modalForm.city.trim() ? ({ address: modalForm.city.trim() } as const) : undefined;
+
       const createRes = await api.manpowerCrew.create({
         title: modalForm.title.trim(),
         description: modalForm.description.trim(),
         headcount,
-        location: modalForm.city.trim() ? { city: modalForm.city.trim() } : undefined,
+        location,
+        startDate: startDateISO,
+        endDate: endDateISO,
       });
       const ok = (createRes as { success?: boolean }).success;
       const cr = (createRes as { data?: { crewRequest?: { _id?: string } } }).data?.crewRequest;
@@ -251,7 +308,14 @@ export default function ManpowerCrewHub() {
       });
       setSendOpen(false);
       setSelected(new Set());
-      setModalForm({ title: "Labour requirement", description: "", headcount: "1", city: "" });
+      setModalForm({
+        title: "Labour requirement",
+        description: "",
+        headcount: "1",
+        city: "",
+        startTime: "09:00",
+        endTime: "17:00",
+      });
       await loadLists();
       router.push(`/dashboard/provider/manpower-crew/${crewId}`);
     } catch (err: unknown) {
@@ -344,6 +408,35 @@ export default function ManpowerCrewHub() {
                     autoComplete="off"
                   />
                 </div>
+
+                <div className="bg-muted/30 border border-border/60 rounded-xl px-3 py-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full min-w-0">
+                  <div className="flex-1">
+                    <Label htmlFor="hub-start-date" className="sr-only">
+                      Start date
+                    </Label>
+                    <Input
+                      id="hub-start-date"
+                      type="date"
+                      className="h-9"
+                      aria-label="Start date"
+                      value={availabilityRange.startDate}
+                      onChange={(e) => setAvailabilityRange((r) => ({ ...r, startDate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="hub-end-date" className="sr-only">
+                      End date
+                    </Label>
+                    <Input
+                      id="hub-end-date"
+                      type="date"
+                      className="h-9"
+                      aria-label="End date"
+                      value={availabilityRange.endDate}
+                      onChange={(e) => setAvailabilityRange((r) => ({ ...r, endDate: e.target.value }))}
+                    />
+                  </div>
+                </div>
                 <div className="flex items-center justify-end gap-2 w-full min-w-0 flex-wrap sm:flex-nowrap">
                   <LabourFilterDialog
                     idPrefix="hub"
@@ -358,6 +451,7 @@ export default function ManpowerCrewHub() {
                         minExperience: "",
                         maxPrice: "",
                       });
+                      setAvailabilityRange({ startDate: todayStr, endDate: todayStr });
                     }}
                   />
                   <LabourViewModeToggle value={viewMode} onChange={setViewMode} className="shrink-0" />
@@ -432,7 +526,8 @@ export default function ManpowerCrewHub() {
                     <div className="font-medium">{c.title}</div>
                     <div className="text-sm text-muted-foreground">
                       {c.acceptedCount ?? 0} / {c.headcount} accepted · {c.status}
-                      {c.location?.city ? ` · ${c.location.city}` : ""}
+                      {c.location?.address ? ` · ${c.location.address}` : c.location?.city ? ` · ${c.location.city}` : ""}
+                      {scheduleShort(c.startDate, c.endDate)}
                     </div>
                   </Link>
                 </li>
@@ -535,11 +630,43 @@ export default function ManpowerCrewHub() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="m-city">City (optional)</Label>
+                  <Label htmlFor="m-days">Duration (days)</Label>
+                  <Input id="m-days" type="number" value={(() => {
+                    const [sy, sm, sd] = availabilityRange.startDate.split("-").map((x) => Number.parseInt(x, 10));
+                    const [ey, em, ed] = availabilityRange.endDate.split("-").map((x) => Number.parseInt(x, 10));
+                    const s = new Date(sy, (sm || 1) - 1, sd || 1);
+                    const e = new Date(ey, (em || 1) - 1, ed || 1);
+                    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 1;
+                    const msPerDay = 1000 * 60 * 60 * 24;
+                    const durationDays = Math.max(1, Math.floor((e.getTime() - s.getTime()) / msPerDay) + 1);
+                    return durationDays;
+                  })()} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="m-city">Address (optional)</Label>
                   <Input
                     id="m-city"
                     value={modalForm.city}
                     onChange={(e) => setModalForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="House no, locality, city, pincode"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="m-start-time">Start time</Label>
+                  <Input
+                    id="m-start-time"
+                    type="time"
+                    value={modalForm.startTime}
+                    onChange={(e) => setModalForm((f) => ({ ...f, startTime: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="m-end-time">End time</Label>
+                  <Input
+                    id="m-end-time"
+                    type="time"
+                    value={modalForm.endTime}
+                    onChange={(e) => setModalForm((f) => ({ ...f, endTime: e.target.value }))}
                   />
                 </div>
               </div>
