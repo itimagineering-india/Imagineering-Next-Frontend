@@ -28,6 +28,49 @@ type Service = {
   reviewCount: number;
 };
 
+type ServicesRowData = {
+  services: Service[];
+  prioritizeImages: boolean;
+  favoritesById: Record<string, boolean>;
+  onToggleFavorite: (serviceId: string) => void;
+  isLoading: boolean;
+  skeletonCount: number;
+  favoritesVersion: number;
+};
+
+const ServicesRow = memo(function ServicesRow({
+  index,
+  style,
+  data,
+}: {
+  index: number;
+  style: CSSProperties;
+  data: ServicesRowData;
+}) {
+  if (data.isLoading) {
+    return (
+      <div style={style} className="box-border flex pr-2">
+        <CardSkeleton className="h-full w-full max-w-[180px]" />
+      </div>
+    );
+  }
+
+  const service = data.services[index];
+  if (!service) return null;
+
+  return (
+    <div style={style} className="box-border flex h-full min-h-0 pr-2">
+      <CategoryProviderCard
+        {...service}
+        className="h-full w-full max-w-[180px] min-w-0"
+        priority={data.prioritizeImages && index < 4}
+        isFavorite={!!data.favoritesById[service.id]}
+        onToggleFavorite={data.onToggleFavorite}
+      />
+    </div>
+  );
+});
+
 export type ServicesListHandle = {
   scrollByItems: (direction: "left" | "right", step?: number) => void;
 };
@@ -36,19 +79,25 @@ type ServicesListProps = {
   services: Service[];
   prioritizeImages?: boolean;
   favoritesById: Record<string, boolean>;
+  favoritesVersion: number;
   onToggleFavorite: (serviceId: string) => void;
   isLoading?: boolean;
   skeletonCount?: number;
 };
 
 const ITEM_WIDTH = 188;
-const ITEM_HEIGHT = 260;
+const ITEM_HEIGHT = 320;
 
 function ScrollOuterElement({
   className,
   ...rest
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div {...rest} className={cn("scrollbar-hide", className)} />;
+  return (
+    <div
+      {...rest}
+      className={cn("scrollbar-hide overflow-x-auto overflow-y-hidden", className)}
+    />
+  );
 }
 
 export const ServicesList = memo(
@@ -57,27 +106,24 @@ export const ServicesList = memo(
       services,
       prioritizeImages = false,
       favoritesById,
+      favoritesVersion,
       onToggleFavorite,
       isLoading = false,
       skeletonCount = 10,
     },
     ref
   ) {
-    const VirtualList =
-      (ReactWindow as any).FixedSizeList ||
-      (ReactWindow as any).VariableSizeList ||
-      (ReactWindow as any).List ||
-      (ReactWindow as any).default?.FixedSizeList ||
-      (ReactWindow as any).default?.List ||
-      (ReactWindow as any).default;
+    const fixedList = (ReactWindow as any).FixedSizeList;
+    const variableList = (ReactWindow as any).VariableSizeList;
+    const VirtualList = fixedList || variableList;
 
-    if (!VirtualList) {
-      return null;
-    }
+    const itemSizeFn = useCallback(() => ITEM_WIDTH, []);
 
     const outerRef = useRef<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [width, setWidth] = useState(0);
+    const widthRef = useRef(0);
+    const resizeTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
       const el = containerRef.current;
@@ -85,11 +131,23 @@ export const ServicesList = memo(
 
       const ro = new ResizeObserver((entries) => {
         const next = entries[0]?.contentRect?.width ?? 0;
-        setWidth(next);
+        if (Math.abs(next - widthRef.current) < 1) return;
+        if (resizeTimeoutRef.current != null) {
+          window.clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeTimeoutRef.current = window.setTimeout(() => {
+          widthRef.current = next;
+          setWidth(next);
+        }, 100);
       });
 
       ro.observe(el);
-      return () => ro.disconnect();
+      return () => {
+        ro.disconnect();
+        if (resizeTimeoutRef.current != null) {
+          window.clearTimeout(resizeTimeoutRef.current);
+        }
+      };
     }, []);
 
     const scrollByItems = useCallback((direction: "left" | "right", step: number = 3) => {
@@ -103,73 +161,62 @@ export const ServicesList = memo(
 
     const itemCount = isLoading ? skeletonCount : services.length;
 
-    const itemData = useMemo(
+    const itemData = useMemo<ServicesRowData>(
       () => ({
         services,
         prioritizeImages,
         favoritesById,
         onToggleFavorite,
         isLoading,
+        skeletonCount,
+        favoritesVersion,
       }),
-      [services, prioritizeImages, favoritesById, onToggleFavorite, isLoading]
+      [
+        services,
+        prioritizeImages,
+        favoritesById,
+        onToggleFavorite,
+        isLoading,
+        skeletonCount,
+        favoritesVersion,
+      ]
     );
 
-    const Row = useCallback(
-      ({
-        index,
-        style,
-        data,
-      }: {
-        index: number;
-        style: CSSProperties;
-        data: typeof itemData;
-      }) => {
-        if (data.isLoading) {
-          return (
-            <div style={style}>
-              <CardSkeleton />
-            </div>
-          );
-        }
-
-        const service = data.services[index];
-        if (!service) return null;
-
-        return (
-          <div style={style}>
-            <CategoryProviderCard
-              {...service}
-              priority={data.prioritizeImages && index < 4}
-              isFavorite={!!data.favoritesById[service.id]}
-              onToggleFavorite={data.onToggleFavorite}
-            />
-          </div>
-        );
-      },
-      [itemData]
-    );
+    if (!VirtualList) return null;
 
     if (!width || width < 1) {
-      return <div ref={containerRef} className="w-full h-0" />;
+      return (
+        <div
+          ref={containerRef}
+          className="w-full h-0"
+          style={{ contentVisibility: "auto", containIntrinsicSize: "180px 135px" }}
+        />
+      );
     }
 
+    const isVariable = VirtualList === variableList;
+
     return (
-      <div ref={containerRef} className="w-full">
+      <div
+        ref={containerRef}
+        className="w-full"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "180px 135px" }}
+      >
         <VirtualList
           outerRef={outerRef}
           outerElementType={ScrollOuterElement as any}
           direction="horizontal"
+          layout="horizontal"
           height={ITEM_HEIGHT}
           width={width}
           itemCount={itemCount}
-          itemSize={ITEM_WIDTH}
+          itemSize={isVariable ? itemSizeFn : ITEM_WIDTH}
           itemData={itemData}
           overscanCount={3}
         >
-          {Row}
+          {ServicesRow}
         </VirtualList>
       </div>
     );
   })
 );
-
