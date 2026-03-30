@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import type { CSSProperties, HTMLAttributes } from "react";
-import { FixedSizeList } from "react-window";
+import * as ReactWindow from "react-window";
 import { CategoryProviderCard } from "./CategoryProviderCard";
 import { CardSkeleton } from "./CardSkeleton";
 import { cn } from "@/lib/utils";
@@ -63,6 +63,18 @@ export const ServicesList = memo(
     },
     ref
   ) {
+    const VirtualList =
+      (ReactWindow as any).FixedSizeList ||
+      (ReactWindow as any).VariableSizeList ||
+      (ReactWindow as any).List ||
+      (ReactWindow as any).default?.FixedSizeList ||
+      (ReactWindow as any).default?.List ||
+      (ReactWindow as any).default;
+
+    if (!VirtualList) {
+      return null;
+    }
+
     const outerRef = useRef<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [width, setWidth] = useState(0);
@@ -143,7 +155,7 @@ export const ServicesList = memo(
 
     return (
       <div ref={containerRef} className="w-full">
-        <FixedSizeList
+        <VirtualList
           outerRef={outerRef}
           outerElementType={ScrollOuterElement as any}
           direction="horizontal"
@@ -155,7 +167,7 @@ export const ServicesList = memo(
           overscanCount={3}
         >
           {Row}
-        </FixedSizeList>
+        </VirtualList>
       </div>
     );
   })
