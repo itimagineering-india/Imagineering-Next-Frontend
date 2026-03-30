@@ -15,7 +15,6 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
-import { KycLock } from "@/components/provider/KycLock";
 import api from "@/lib/api-client";
 import {
   LeadFilters,
@@ -108,16 +107,13 @@ export default function ProviderLeads() {
     }
   };
 
-  if (isLocked) {
-    return (
-      <div className="p-4 md:p-6 lg:p-8">
-          <KycLock status={kycStatus} title="Requests are locked" message="Complete KYC to access and respond to customer requests." />
-        </div>
-    );
-  }
-
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+      {isLocked && (
+        <div className="border border-amber-200 bg-amber-50 text-amber-900/90 px-4 py-3 rounded-lg text-sm">
+          Your KYC is not approved yet. You can still view requests.
+        </div>
+      )}
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
           <div>
