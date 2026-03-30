@@ -558,13 +558,31 @@ export const api = {
       });
     },
     getById: (id: string) => apiRequest(`/api/services/${id}`),
-    getByCategories: (params?: { limit?: number; categoryLimit?: number; lat?: number; lng?: number; radiusKm?: number }) => {
+    getByCategories: (params?: {
+      limit?: number;
+      categoryLimit?: number;
+      lat?: number;
+      lng?: number;
+      radiusKm?: number;
+      location?: string;
+      tile?: string;
+      precise?: string | number | boolean;
+    }) => {
       const queryParams = new URLSearchParams();
       if (params?.limit) {
         queryParams.append('limit', String(params.limit));
       }
       if (params?.categoryLimit) {
         queryParams.append('categoryLimit', String(params.categoryLimit));
+      }
+      if (params?.location != null && String(params.location).trim()) {
+        queryParams.append('location', String(params.location).trim());
+      }
+      if (params?.tile != null && String(params.tile).trim()) {
+        queryParams.append('tile', String(params.tile).trim());
+      }
+      if (params?.precise != null && params.precise !== false && String(params.precise) !== '') {
+        queryParams.append('precise', String(params.precise));
       }
       if (params?.lat != null && Number.isFinite(params.lat)) {
         queryParams.append('lat', String(params.lat));
