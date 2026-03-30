@@ -88,13 +88,12 @@ function CategoryProviderCardComponent({
     <Link
       href={`/service/${id}`}
       className={cn(
-        "group flex-shrink-0 w-[160px] sm:w-[180px] bg-card rounded-lg md:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:scale-[1.02]",
+        "group flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/40 transition-all duration-300 hover:shadow-md hover:ring-primary/20 md:rounded-xl",
         className
       )}
       style={{ contentVisibility: "auto" }}
     >
-      {/* Image Container */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
         <img
           ref={imgRef}
           src={optimizedImage}
@@ -136,33 +135,34 @@ function CategoryProviderCardComponent({
         )}
       </div>
 
-      {/* Content */}
-      <div className="p-2 md:p-3">
-        <h3 className="font-semibold text-foreground text-xs md:text-sm line-clamp-2 break-words group-hover:text-primary transition-colors">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-xs font-semibold leading-snug text-foreground break-words transition-colors group-hover:text-primary md:min-h-[2.75rem] md:text-sm">
           {name}
         </h3>
-        <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5 line-clamp-1">
+        <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground md:text-xs">
           {location}
         </p>
-        
-        <div className="flex items-center justify-between mt-1.5 md:mt-2">
-          <p className="text-foreground text-xs md:text-sm">
+
+        <div className="mt-1.5 flex min-w-0 items-start justify-between gap-1.5 md:mt-2">
+          <div className="min-w-0 flex-1 text-xs leading-tight text-foreground md:text-sm">
             {mrp != null && mrp > 0 && (
-              <span className="text-[10px] md:text-xs text-muted-foreground line-through mr-1">
+              <span className="mr-1 text-[10px] text-muted-foreground line-through md:text-xs">
                 ₹{mrp.toLocaleString("en-IN")}
               </span>
             )}
-            <span className="font-bold">₹{price.toLocaleString('en-IN')}</span>
-            <span className="text-[10px] md:text-xs text-muted-foreground"> {priceLabel}</span>
-          </p>
-          <div className="flex items-center gap-0.5">
-            <Star className="h-3 w-3 md:h-3.5 md:w-3.5 fill-foreground text-foreground" />
-            <span className="font-medium text-[10px] md:text-xs">{rating}</span>
+            <span className="line-clamp-2 break-words font-bold">
+              ₹{price.toLocaleString("en-IN")}
+              <span className="font-normal text-muted-foreground"> {priceLabel}</span>
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
+            <Star className="h-3 w-3 fill-foreground text-foreground md:h-3.5 md:w-3.5" />
+            <span className="text-[10px] font-medium md:text-xs">{rating}</span>
           </div>
         </div>
 
         <div
-          className="mt-2"
+          className="mt-auto w-full min-w-0 shrink-0 pt-2"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -177,7 +177,7 @@ function CategoryProviderCardComponent({
             providerName={name}
             showQuantity={false}
             label="Add to cart"
-            className="h-7 text-xs px-3 flex-1 min-w-0 whitespace-nowrap"
+            className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:px-3"
           />
         </div>
       </div>
