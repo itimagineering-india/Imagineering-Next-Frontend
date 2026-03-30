@@ -108,15 +108,25 @@ export function TopProvidersSection() {
 
     const fetchTopProviders = async () => {
       try {
-        const response = await api.providers.getAll({
-          topRated: true,
-          verified: true,
-          limit: 10,
-        });
+        // Prefer verified + top-rated; fall back when DB rows still have defaults (both false).
+        const attempts = [
+          { topRated: true, verified: true, limit: 10 },
+          { verified: true, limit: 10 },
+          { limit: 10 },
+        ] as const;
 
-        const providersData: ProviderApiItem[] = response.success && response.data
-          ? (response.data as any).providers || []
-          : [];
+        let providersData: ProviderApiItem[] = [];
+        for (const params of attempts) {
+          const response = await api.providers.getAll(params);
+          const list =
+            response.success && response.data
+              ? (response.data as { providers?: ProviderApiItem[] }).providers || []
+              : [];
+          if (list.length > 0) {
+            providersData = list;
+            break;
+          }
+        }
 
         const normalizedProviders = normalizeProviders(providersData).slice(0, 10);
         setProviders(normalizedProviders);
