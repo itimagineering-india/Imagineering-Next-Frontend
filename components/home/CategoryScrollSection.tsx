@@ -3,7 +3,7 @@ import { useRef, useEffect, memo } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CategoryProviderCard } from "./CategoryProviderCard";
+import { ServicesList, type ServicesListHandle } from "./ServicesList";
 
 interface Service {
   id: string;
@@ -22,6 +22,8 @@ interface CategoryScrollSectionProps {
   categorySlug?: string;
   services: Service[];
   prioritizeImages?: boolean;
+  favoritesById: Record<string, boolean>;
+  onToggleFavorite: (serviceId: string) => void;
 }
 
 function CategoryScrollSectionComponent({
@@ -29,21 +31,17 @@ function CategoryScrollSectionComponent({
   categorySlug,
   services,
   prioritizeImages = false,
+  favoritesById,
+  onToggleFavorite,
 }: CategoryScrollSectionProps) {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const listHandleRef = useRef<ServicesListHandle | null>(null);
 
   /* =======================
      SCROLL HANDLER
   ======================= */
   const scroll = (direction: "left" | "right") => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-
-    el.scrollBy({
-      left: direction === "left" ? -320 : 320,
-      behavior: "smooth",
-    });
+    listHandleRef.current?.scrollByItems(direction, 3);
   };
 
   return (
@@ -87,24 +85,19 @@ function CategoryScrollSectionComponent({
       </div>
 
       {/* Scroll Area - horizontal only, no vertical scroll */}
-      <div
-        ref={scrollContainerRef}
-        className="flex flex-nowrap gap-2 md:gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide px-3 md:px-4"
-      >
-        {services.length === 0 ? (
-          <div className="py-8 text-muted-foreground">
-            No services available
-          </div>
-        ) : (
-          services.map((service, index) => (
-            <CategoryProviderCard 
-              key={service.id} 
-              {...service} 
-              priority={prioritizeImages && index < 4}
-            />
-          ))
-        )}
-      </div>
+      {services.length === 0 ? (
+        <div className="py-8 text-muted-foreground">No services available</div>
+      ) : (
+        <div className="px-3 md:px-4">
+          <ServicesList
+            ref={listHandleRef}
+            services={services}
+            prioritizeImages={prioritizeImages}
+            favoritesById={favoritesById}
+            onToggleFavorite={onToggleFavorite}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -122,6 +115,13 @@ export const CategoryScrollSection = memo(
       return false;
     }
     
+    if (
+      prev.favoritesById !== next.favoritesById ||
+      prev.onToggleFavorite !== next.onToggleFavorite
+    ) {
+      return false;
+    }
+
     // Deep compare service IDs and images to detect changes
     for (let i = 0; i < prev.services.length; i++) {
       if (
