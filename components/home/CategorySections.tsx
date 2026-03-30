@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { CategoryScrollSection } from "./CategoryScrollSection";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
+import { useFavorites } from "@/hooks/useFavorites";
+import { CardSkeleton } from "./CardSkeleton";
 
 interface CategorySection {
   title: string;
@@ -61,17 +63,46 @@ export function CategorySections() {
   const fetchedWithoutCoordsRef = useRef(false);
   const viewTriggeredRef = useRef(false);
 
+  const allServiceIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of sections) {
+      for (const item of s.services) {
+        if (item?.id) ids.add(item.id);
+      }
+    }
+    return Array.from(ids);
+  }, [sections]);
+
+  const { favorites, toggleFavorite } = useFavorites({
+    serviceIds: allServiceIds,
+    enabled: allServiceIds.length > 0,
+  });
+
+  const favoritesById = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    favorites.forEach((id) => {
+      map[id] = true;
+    });
+    return map;
+  }, [favorites]);
+
+  const onToggleFavorite = useCallback((serviceId: string) => {
+    void toggleFavorite(serviceId);
+  }, [toggleFavorite]);
+
   const loadData = useCallback(async () => {
     setLoadError(null);
     try {
       const params: { limit: number; categoryLimit: number; lat?: number; lng?: number; radiusKm?: number } = {
         limit: 6,
-        categoryLimit: 100,
+        // Homepage carousels ke liye small categoryLimit better for performance.
+        categoryLimit: 8,
       };
       if (userLocation?.lat != null && userLocation?.lng != null) {
         params.lat = userLocation.lat;
         params.lng = userLocation.lng;
-        params.radiusKm = radiusKm;
+        // Geo radius ko cap karna zaroori hai warna geo candidate set explode hota hai.
+        params.radiusKm = Math.min(radiusKm, 15);
       }
       const res = await api.services.getByCategories(params);
       if (!res?.success) {
@@ -161,25 +192,20 @@ export function CategorySections() {
     return (
       <section ref={sectionRef} className="py-12 bg-white" aria-busy="true" aria-label="Loading categories">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="py-3 md:py-4">
-              <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
-                <div className="h-7 w-48 animate-pulse rounded bg-slate-200" />
-                <div className="flex gap-2">
-                  <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
-                  <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
-                </div>
-              </div>
-              <div className="flex gap-4 overflow-hidden">
-                {[1, 2, 3, 4, 5, 6].map((j) => (
-                  <div
-                    key={j}
-                    className="h-[200px] w-[180px] shrink-0 animate-pulse rounded-xl bg-slate-200"
-                  />
-                ))}
+          <div className="py-3 md:py-4">
+            <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
+              <div className="h-7 w-48 animate-pulse rounded bg-slate-200" />
+              <div className="flex gap-2">
+                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
+                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
               </div>
             </div>
-          ))}
+            <div className="flex gap-4 overflow-hidden">
+              {Array.from({ length: 10 }).map((_, idx) => (
+                <CardSkeleton key={idx} />
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -225,6 +251,8 @@ export function CategorySections() {
             categorySlug={section.categorySlug}
             services={section.services}
             prioritizeImages={sectionIndex === 0}
+            favoritesById={favoritesById}
+            onToggleFavorite={onToggleFavorite}
           />
         ))}
       </div>
