@@ -47,6 +47,8 @@ export default function ProviderLeads() {
   const isLocked = kycStatus !== "KYC_APPROVED";
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [manpowerInvites, setManpowerInvites] = useState<any[]>([]);
+  const [isManpowerLoading, setIsManpowerLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -57,6 +59,55 @@ export default function ProviderLeads() {
   useEffect(() => {
     fetchLeads();
   }, [searchQuery, statusFilter]);
+
+  useEffect(() => {
+    fetchManpowerInvites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchManpowerInvites = async () => {
+    setIsManpowerLoading(true);
+    try {
+      const response = await api.manpowerCrew.listWorkerInvites({ limit: 50 });
+      const invites =
+        (response as any)?.data?.invites ??
+        (response as any)?.data?.data?.invites ??
+        [];
+
+      if (response.success && Array.isArray(invites)) {
+        setManpowerInvites(invites);
+      } else {
+        setManpowerInvites([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch manpower invites:", error);
+      setManpowerInvites([]);
+    } finally {
+      setIsManpowerLoading(false);
+    }
+  };
+
+  const respondManpowerInvite = async (inviteId: string, action: "accept" | "decline") => {
+    try {
+      const response = await api.manpowerCrew.respondInvite(inviteId, action);
+      if (response.success) {
+        toast({
+          title: action === "accept" ? "Accepted" : "Declined",
+          description: "Labour Hire invitation updated",
+        });
+        await fetchManpowerInvites();
+      } else {
+        throw new Error(response.error?.message || "Failed to update status");
+      }
+    } catch (error: any) {
+      console.error("Update manpower invite error:", error);
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update manpower request",
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchLeads = async () => {
     setIsLoading(true);
@@ -133,6 +184,89 @@ export default function ProviderLeads() {
           onSearchChange={setSearchQuery}
           onStatusChange={setStatusFilter}
         />
+
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base md:text-lg">Labour Hire Requests</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                  Invites to you (Labour Hire)
+                </CardDescription>
+              </div>
+              {isManpowerLoading ? null : (
+                <Badge variant="secondary">{manpowerInvites.length}</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            {isManpowerLoading ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground">Loading invitations...</p>
+              </div>
+            ) : manpowerInvites.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground">No labour hire invites found</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {manpowerInvites.map((inv: any) => {
+                  const crew = inv.crewRequest || {};
+                  const city = crew.location?.city || crew.location?.address || "";
+                  const start = crew.startDate ? new Date(crew.startDate).toLocaleDateString() : "";
+                  return (
+                    <div key={inv._id} className="border rounded-lg p-4 bg-muted/20">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-sm md:text-base truncate">
+                              {crew.title || "Labour requirement"}
+                            </h3>
+                            <Badge
+                              className={
+                                inv.status === "pending"
+                                  ? "bg-blue-500"
+                                  : inv.status === "accepted"
+                                    ? "bg-success"
+                                    : "bg-destructive"
+                              }
+                            >
+                              {inv.status}
+                            </Badge>
+                          </div>
+                          {crew.description ? (
+                            <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mt-1">{crew.description}</p>
+                          ) : null}
+                          <div className="text-[11px] md:text-xs text-muted-foreground mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                            {crew.headcount != null ? <span>{crew.headcount} workers needed</span> : null}
+                            {city ? <span>{city}</span> : null}
+                            {start ? <span>{start}</span> : null}
+                          </div>
+                        </div>
+                        {inv.status === "pending" ? (
+                          <div className="flex gap-2 flex-col sm:flex-row sm:items-center">
+                            <Button size="sm" onClick={() => respondManpowerInvite(inv._id, "accept")}>
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => respondManpowerInvite(inv._id, "decline")}
+                            >
+                              Decline
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground pt-2">No action</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="p-4 md:p-6">
