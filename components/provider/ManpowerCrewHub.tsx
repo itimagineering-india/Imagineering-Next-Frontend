@@ -373,24 +373,18 @@ export default function ManpowerCrewHub() {
       </div>
 
       <Tabs defaultValue="browse" className="w-full min-w-0">
-        <TabsList className="flex w-full h-auto flex-nowrap justify-center sm:justify-start gap-0.5 sm:gap-1 overflow-x-auto overscroll-x-contain rounded-lg bg-muted/80 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <TabsList className="flex w-full h-auto flex-nowrap justify-start gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-border/60 bg-muted/40 p-1 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <TabsTrigger
             value="browse"
-            className="shrink-0 whitespace-nowrap px-3 py-2.5 text-xs sm:text-sm sm:px-4 data-[state=active]:shadow-sm"
+            className="shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs sm:text-sm sm:px-4 bg-transparent data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/60 hover:bg-muted/60 transition-colors"
           >
             Labour directory
           </TabsTrigger>
           <TabsTrigger
             value="mine"
-            className="shrink-0 whitespace-nowrap px-3 py-2.5 text-xs sm:text-sm sm:px-4 data-[state=active]:shadow-sm"
+            className="shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs sm:text-sm sm:px-4 bg-transparent data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-border/60 hover:bg-muted/60 transition-colors"
           >
             My requests
-          </TabsTrigger>
-          <TabsTrigger
-            value="incoming"
-            className="shrink-0 whitespace-nowrap px-3 py-2.5 text-xs sm:text-sm sm:px-4 data-[state=active]:shadow-sm"
-          >
-            Invites to me
           </TabsTrigger>
         </TabsList>
 
@@ -536,53 +530,7 @@ export default function ManpowerCrewHub() {
           )}
         </TabsContent>
 
-        <TabsContent value="incoming" className="mt-4 space-y-4">
-          {loadingLists ? (
-            <Loader2 className="h-8 w-8 animate-spin" />
-          ) : incoming.length === 0 ? (
-            <p className="text-muted-foreground">No invites yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {incoming.map((inv) => {
-                const cr = inv.crewRequest as CrewRequest | undefined;
-                const title = cr?.title ?? "Request";
-                const pending = inv.status === "pending";
-                const crewId = cr?._id ? String(cr._id) : "";
-                return (
-                  <li
-                    key={inv._id}
-                    className="rounded-lg border p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="font-medium">{title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {inv.status}
-                        {cr?.headcount != null ? ` · ${cr.headcount} workers` : ""}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 justify-end">
-                      {crewId ? (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/dashboard/provider/manpower-crew/${crewId}`}>View request</Link>
-                        </Button>
-                      ) : null}
-                      {pending ? (
-                        <>
-                          <Button size="sm" onClick={() => respond(inv._id, "accept")}>
-                            Accept
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => respond(inv._id, "decline")}>
-                            Decline
-                          </Button>
-                        </>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </TabsContent>
+        {/* Incoming invites tab removed. Use Provider Leads page instead. */}
       </Tabs>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
