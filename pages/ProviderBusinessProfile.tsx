@@ -21,7 +21,6 @@ import api from "@/lib/api-client";
 import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
-import { KycLock } from "@/components/provider/KycLock";
 import { useToast } from "@/hooks/use-toast";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -103,7 +102,6 @@ export default function ProviderBusinessProfile() {
     website: "",
     coordinates: { lat: "", lng: "" },
   });
-  const isLocked = kycStatus !== "KYC_APPROVED";
 
   const {
     inputRef: addressInputRef,
@@ -335,12 +333,13 @@ export default function ProviderBusinessProfile() {
         </p>
       </div>
 
-      {isLocked && (
-        <KycLock status={kycStatus} title="Business Profile locked" message="Complete KYC to manage your business profile" />
+      {kycStatus !== "KYC_APPROVED" && (
+        <p className="text-sm text-muted-foreground mt-2">
+          Your KYC is not approved yet. You can still edit your business profile.
+        </p>
       )}
 
-      {!isLocked && (
-        <Card>
+      <Card>
           <CardHeader>
             <CardTitle>Business Information</CardTitle>
             <CardDescription>
@@ -879,7 +878,6 @@ export default function ProviderBusinessProfile() {
             </div>
           </CardContent>
         </Card>
-      )}
     </div>
   );
 }
