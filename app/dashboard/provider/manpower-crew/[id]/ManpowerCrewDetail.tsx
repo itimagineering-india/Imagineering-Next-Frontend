@@ -27,7 +27,9 @@ type CrewRequest = {
   headcount: number;
   acceptedCount: number;
   status: string;
-  location?: { city?: string; state?: string };
+  location?: { city?: string; state?: string; address?: string };
+  startDate?: string | Date;
+  endDate?: string | Date;
 };
 
 type InviteRow = {
@@ -123,6 +125,8 @@ export default function ManpowerCrewDetail() {
         addressQ: debouncedLocation.addressQ || undefined,
         city: debouncedLocation.city || undefined,
         state: debouncedLocation.state || undefined,
+        startDate: crew?.startDate ? new Date(crew.startDate as any).toISOString() : undefined,
+        endDate: crew?.endDate ? new Date(crew.endDate as any).toISOString() : undefined,
         minRating:
           browseFilters.minRating === "" ? undefined : Number.parseFloat(browseFilters.minRating),
         minExperience:
@@ -151,6 +155,8 @@ export default function ManpowerCrewDetail() {
     browseFilters.subManpower,
     browseFilters.subTechnical,
     debouncedLocation,
+    crew?.startDate,
+    crew?.endDate,
     toast,
   ]);
 
@@ -313,6 +319,37 @@ export default function ManpowerCrewDetail() {
 
   const isOwner = Boolean(myUserId && String(crew.requesterUser ?? "") === myUserId);
 
+  const formatDate = (v: string | Date | undefined) => {
+    if (!v) return "";
+    const d = v instanceof Date ? v : new Date(v);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString();
+  };
+
+  const formatTime = (v: string | Date | undefined) => {
+    if (!v) return "";
+    const d = v instanceof Date ? v : new Date(v);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const durationDays = (() => {
+    if (!crew.startDate || !crew.endDate) return null;
+    const s = crew.startDate instanceof Date ? crew.startDate : new Date(crew.startDate);
+    const e = crew.endDate instanceof Date ? crew.endDate : new Date(crew.endDate);
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return null;
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const diffDays = Math.floor((e.getTime() - s.getTime()) / msPerDay);
+    return Math.max(1, diffDays + 1); // inclusive
+  })();
+
+  const scheduleSummary =
+    crew.startDate && crew.endDate
+      ? `${formatDate(crew.startDate)} ${formatTime(crew.startDate)} - ${formatDate(crew.endDate)} ${formatTime(
+          crew.endDate
+        )}${durationDays ? ` (${durationDays} day${durationDays === 1 ? "" : "s"})` : ""}`
+      : "";
+
   return (
     <div className="max-w-[1600px] mx-auto min-w-0 w-full space-y-4 sm:space-y-6 px-3 py-4 sm:px-4 md:p-6 overflow-x-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <Link
@@ -328,7 +365,8 @@ export default function ManpowerCrewDetail() {
           <CardTitle className="break-words">{crew.title}</CardTitle>
           <CardDescription>
             Progress: {crew.acceptedCount ?? 0} / {crew.headcount} accepted · Status: {crew.status}
-            {crew.location?.city ? ` · ${crew.location.city}` : ""}
+            {crew.location?.address ? ` · ${crew.location.address}` : crew.location?.city ? ` · ${crew.location.city}` : ""}
+            {scheduleSummary ? ` · ${scheduleSummary}` : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
