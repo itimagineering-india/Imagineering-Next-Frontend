@@ -63,7 +63,7 @@ export function JobsSection() {
 
   return (
     <section
-      className="relative py-12 md:py-16 lg:py-20 overflow-hidden"
+      className="relative py-8 md:py-10 lg:py-12 overflow-hidden"
       role="region"
       aria-labelledby="home-jobs-heading"
     >
