@@ -11,7 +11,7 @@ import api, { type ApiResponse } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Briefcase, MapPin, Search, IndianRupee, Clock, LayoutDashboard } from "lucide-react";
-import { formatJobLocation } from "@/utils/jobLocation";
+import { formatJobLocation } from "@/lib/utils";
 
 interface UserJobPost {
   _id: string;
