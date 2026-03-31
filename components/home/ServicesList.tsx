@@ -79,7 +79,8 @@ type ServicesListProps = {
   services: Service[];
   prioritizeImages?: boolean;
   favoritesById: Record<string, boolean>;
-  favoritesVersion: number;
+  /** When favorites change (e.g. same object ref), bump to re-render rows. Defaults to 0. */
+  favoritesVersion?: number;
   onToggleFavorite: (serviceId: string) => void;
   isLoading?: boolean;
   skeletonCount?: number;
@@ -106,7 +107,7 @@ export const ServicesList = memo(
       services,
       prioritizeImages = false,
       favoritesById,
-      favoritesVersion,
+      favoritesVersion = 0,
       onToggleFavorite,
       isLoading = false,
       skeletonCount = 10,
