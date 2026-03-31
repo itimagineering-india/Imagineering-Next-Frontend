@@ -23,7 +23,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
-import { formatJobLocation } from "@/utils/jobLocation";
+import { formatJobLocation } from "@/lib/utils";
 
 interface UserJobPost {
   _id: string;
