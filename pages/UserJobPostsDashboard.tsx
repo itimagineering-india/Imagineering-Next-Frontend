@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import api, { type ApiResponse } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Briefcase, MapPin, IndianRupee, Clock } from "lucide-react";
-import { formatJobLocation } from "@/utils/jobLocation";
+import { formatJobLocation } from "@/lib/utils";
 
 interface UserJobPost {
   _id: string;
