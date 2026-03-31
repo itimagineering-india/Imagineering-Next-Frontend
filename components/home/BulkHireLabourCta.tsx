@@ -38,7 +38,7 @@ export function BulkHireLabourCta() {
       aria-labelledby="bulk-hire-heading"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]" />
-      <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-14 md:px-8 md:py-16">
+      <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 md:px-8 md:py-12">
         <div className="relative min-h-[min(22rem,70vw)] overflow-hidden rounded-2xl border border-border/70 shadow-lg shadow-primary/[0.06] ring-1 ring-black/[0.04] dark:ring-white/[0.06] sm:min-h-[20rem] lg:min-h-[19rem]">
           <span className="sr-only">
             Decorative background photograph of workers at a construction site.
