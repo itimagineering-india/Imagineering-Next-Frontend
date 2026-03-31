@@ -90,24 +90,24 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   return (
     <Link href={`/services?category=${category.slug}`} className="block min-w-0">
       {/* flex-col + icon area must not use h-full or it steals space from the label on narrow cards */}
-      <div className="group relative aspect-square bg-white rounded-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-105 cursor-pointer flex flex-col items-stretch min-h-0 gap-1 px-1.5 py-2 sm:px-2 sm:pt-4 sm:pb-4 border border-slate-200 hover:border-red-400 overflow-hidden">
-        {/* Image / icon — flex-1 min-h-0 keeps the title row visible */}
+      <div className="group relative aspect-square bg-white rounded-lg shadow-none transition-all duration-300 ease-out cursor-pointer flex flex-col items-stretch min-h-0 gap-1 px-1.5 py-2 sm:px-2 sm:py-2.5 border border-slate-200 overflow-hidden hover:border-transparent hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_10px_10px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1">
+        {/* Image / icon — flex-1 + % width so icon scales with card */}
         {categoryImage ? (
-          <div className="relative z-10 flex flex-1 min-h-0 items-center justify-center p-0.5 sm:p-1 md:p-2 transition-all duration-300 group-hover:scale-110">
-            <div className="max-w-[44px] max-h-[44px] w-full aspect-square sm:max-w-[56px] sm:max-h-[56px] md:max-w-[64px] md:max-h-[64px] lg:max-w-[72px] lg:max-h-[72px] xl:max-w-[80px] xl:max-h-[80px] rounded-md sm:rounded-lg overflow-hidden shadow-sm group-hover:shadow-lg transition-shadow duration-300">
+          <div className="relative z-10 flex flex-1 min-h-0 w-full items-center justify-center p-1 sm:p-1.5 transition-transform duration-300 group-hover:scale-[1.02]">
+            <div className="aspect-square w-[min(88%,_6.75rem)] sm:w-[min(82%,_8rem)] md:w-[min(78%,_9.5rem)] lg:w-[min(72%,_11rem)] max-w-full rounded-lg overflow-hidden shadow-sm group-hover:shadow-lg transition-shadow duration-300">
               <img
                 src={categoryImage}
                 alt=""
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-cover"
+                className="h-full w-full object-contain"
               />
             </div>
           </div>
         ) : useCustomIcon ? (
-          <div className="relative z-10 flex flex-1 min-h-0 items-center justify-center p-0.5 sm:p-1 md:p-2 transition-all duration-300 group-hover:scale-110">
-            <div className="max-w-[32px] max-h-[32px] w-full aspect-square sm:max-w-[38px] sm:max-h-[38px] md:max-w-[45px] md:max-h-[45px] lg:max-w-[50px] lg:max-h-[50px] xl:max-w-[55px] xl:max-h-[55px] flex items-center justify-center">
-              <IconComponent className="w-full h-full" />
+          <div className="relative z-10 flex flex-1 min-h-0 w-full items-center justify-center p-1 sm:p-1.5 transition-transform duration-300 group-hover:scale-[1.02]">
+            <div className="aspect-square w-[min(88%,_6.5rem)] sm:w-[min(82%,_7.5rem)] md:w-[min(78%,_9rem)] lg:w-[min(72%,_10rem)] flex items-center justify-center">
+              <IconComponent className="h-full w-full" />
             </div>
           </div>
         ) : (
@@ -119,10 +119,10 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
         )}
 
         <span
-          className={`relative z-10 shrink-0 w-full text-slate-800 font-semibold text-center leading-snug group-hover:text-red-500 transition-colors duration-300 line-clamp-2 [overflow-wrap:anywhere] ${
+          className={`relative z-10 shrink-0 w-full text-slate-800 font-semibold text-center leading-snug group-hover:text-red-500 transition-colors duration-300 line-clamp-2 [overflow-wrap:anywhere] px-0.5 pb-0.5 ${
             size === "large"
-              ? "text-[11px] leading-[1.25] sm:text-xs md:text-sm"
-              : "text-[10px] leading-[1.25] sm:text-[10px] md:text-xs"
+              ? "text-xs sm:text-sm md:text-base"
+              : "text-[11px] sm:text-xs md:text-sm"
           }`}
         >
           {category.name}
