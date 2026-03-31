@@ -22,7 +22,7 @@ import {
   Loader2,
   CalendarCheck,
 } from "lucide-react";
-import { formatJobLocation } from "@/utils/jobLocation";
+import { formatJobLocation } from "@/lib/utils";
 import { format } from "date-fns";
 
 interface UserJobPost {
