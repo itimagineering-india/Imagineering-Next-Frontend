@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { cn } from "@/lib/utils";
+import { Header } from "@/components/layout/Header";
 import type { LucideIcon } from "lucide-react";
 import {
   Loader2,
@@ -601,18 +602,23 @@ export function OnboardingSignupFlow() {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center" style={{ backgroundColor: BG }}>
-        <Loader2 className="h-8 w-8 animate-spin text-red-500" />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <Header />
+        <div className="flex flex-1 items-center justify-center" style={{ backgroundColor: BG }}>
+          <Loader2 className="h-8 w-8 animate-spin text-red-500" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col lg:flex-row" style={{ backgroundColor: BG }}>
-      <div className="hidden lg:flex lg:w-[46%] max-w-xl flex-col justify-center bg-zinc-900 px-10 py-14 text-white xl:px-14">
-        <Link href="/" className="mb-10 inline-flex items-center gap-3 opacity-95 hover:opacity-100">
-          <img src={LOGO_URL} alt="" className="h-11 w-11 object-contain" />
-          <span className="text-xl font-bold">Imagineering India</span>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Header />
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ backgroundColor: BG }}>
+      <div className="hidden lg:flex lg:w-[46%] max-w-xl flex-col justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-red-950/45 px-10 py-14 text-white xl:px-14">
+        <Link href="/" className="mb-10 inline-flex items-center gap-4 opacity-95 hover:opacity-100">
+          <img src={LOGO_URL} alt="" className="h-16 w-16 shrink-0 object-contain" />
+          <span className="text-2xl font-bold">Imagineering India</span>
         </Link>
         {(userType ?? "buyer") === "buyer" ? (
           <>
@@ -644,11 +650,6 @@ export function OnboardingSignupFlow() {
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8 lg:py-14">
-        <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden">
-          <img src={LOGO_URL} alt="" className="h-10 w-10 object-contain" />
-          <span className="text-lg font-bold text-gray-900">Imagineering India</span>
-        </Link>
-
         <div className="w-full max-w-lg">
           <div className="mb-6 flex items-center justify-between gap-3">
             <button
@@ -1124,6 +1125,7 @@ export function OnboardingSignupFlow() {
           </p>
         </div>
       </div>
+    </div>
     </div>
   );
 }
