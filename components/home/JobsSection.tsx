@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Briefcase, MapPin, IndianRupee, Clock, ArrowRight } from "lucide-react";
 import api from "@/lib/api-client";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { formatJobLocation } from "@/utils/jobLocation";
+import { formatJobLocation } from "@/lib/utils";
 
 interface JobPost {
   _id: string;
