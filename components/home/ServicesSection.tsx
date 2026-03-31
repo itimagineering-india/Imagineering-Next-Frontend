@@ -31,7 +31,7 @@ export function ServicesSection() {
   const rest = ordered.slice(5);
 
   return (
-    <section className="relative px-4 sm:px-6 md:px-6 lg:px-8 overflow-hidden py-14 sm:py-16 lg:py-20">
+    <section className="relative px-4 sm:px-6 md:px-6 lg:px-8 overflow-hidden py-10 sm:py-12 lg:py-14">
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(40_25%_98%)] via-background to-background" />
       <div className="absolute top-1/4 left-0 w-64 h-64 bg-[hsl(var(--red-accent))]/[0.06] rounded-full blur-3xl -translate-x-1/2 pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-primary/[0.04] rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
