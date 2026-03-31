@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiClient, setAuthToken } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Header } from "@/components/layout/Header";
 
 export default function SignupCompleteContent() {
   const [profile, setProfile] = useState<{ email: string; name: string; photoURL?: string } | null>(null);
@@ -93,14 +94,19 @@ export default function SignupCompleteContent() {
 
   if (!profile) {
     return (
-      <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <p className="text-gray-600">Loading...</p>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <Header />
+        <div className="mx-auto max-w-md flex-1 px-4 py-16 text-center">
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-16">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <Header />
+      <div className="mx-auto max-w-md flex-1 px-4 py-16">
       <h1 className="text-2xl font-bold mb-2">Complete your signup</h1>
       <p className="text-gray-600 mb-6">
         Welcome, {profile.name}! Choose your role to continue.
@@ -174,6 +180,7 @@ export default function SignupCompleteContent() {
           Back to login
         </Link>
       </p>
+    </div>
     </div>
   );
 }
