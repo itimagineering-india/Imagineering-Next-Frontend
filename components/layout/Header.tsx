@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText } from "lucide-react";
+import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAuthToken } from "@/lib/api-client";
 import api from "@/lib/api-client";
@@ -38,6 +38,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { LocationSearchInline } from "./LocationSearchInline";
 import { useTranslation } from "react-i18next";
+import {
+  ConstructionCompaniesIcon,
+  ConstructionMaterialsIcon,
+  ContractorsIcon,
+  FinancingIcon,
+  LogisticsIcon,
+  MachinesIcon,
+  ManpowerIcon,
+  ManufacturerIcon,
+  RentalServicesIcon,
+  TechnicalManpowerIcon,
+  HomesIcon,
+} from "@/components/home/CategoryIcons";
 
 export function Header() {
   const { t } = useTranslation(["header", "common"]);
@@ -58,8 +71,40 @@ export function Header() {
   const { userLocation, isLoading: isLocationLoading } = useUserLocation();
 
   const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
+  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
   const [headerCategories, setHeaderCategories] = useState<Array<{ _id?: string; id?: string; name: string; slug: string; subcategories?: string[] }>>([]);
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+
+  const getExploreCategoryIcon = (slug: string) => {
+    switch (slug) {
+      case "construction-companies":
+        return <ConstructionCompaniesIcon className="h-6 w-6" />;
+      case "construction-materials":
+        return <ConstructionMaterialsIcon className="h-6 w-6" />;
+      case "contractors":
+        return <ContractorsIcon className="h-6 w-6" />;
+      case "financing":
+        return <FinancingIcon className="h-6 w-6" />;
+      case "logistics":
+        return <LogisticsIcon className="h-6 w-6" />;
+      case "machines":
+        return <MachinesIcon className="h-6 w-6" />;
+      case "manpower":
+        return <ManpowerIcon className="h-6 w-6" />;
+      case "manufacturer":
+        return <ManufacturerIcon className="h-6 w-6" />;
+      case "real-estate":
+        return <HomesIcon className="h-6 w-6" />;
+      case "rental-services":
+        return <RentalServicesIcon className="h-6 w-6" />;
+      case "technical-manpower":
+        return <TechnicalManpowerIcon className="h-6 w-6" />;
+      case "consultant":
+        return <ManpowerIcon className="h-6 w-6" />;
+      default:
+        return <ConstructionMaterialsIcon className="h-6 w-6" />;
+    }
+  };
 
   // Fetch categories from backend (with subcategories)
   useEffect(() => {
@@ -68,7 +113,15 @@ export function Header() {
       if (!mounted) return;
       if (res.success && res.data) {
         const cats = (res.data as { categories?: any[] }).categories || [];
-        setHeaderCategories(Array.isArray(cats) ? cats : []);
+        const normalized = Array.isArray(cats) ? cats : [];
+        setHeaderCategories(normalized);
+        const firstWithSubs =
+          normalized.find((c: any) => Array.isArray(c?.subcategories) && c.subcategories.length > 0) ||
+          normalized[0];
+        if (!activeCategorySlug && firstWithSubs?.slug) {
+          setActiveCategorySlug(firstWithSubs.slug);
+        }
+        setActiveSubcategory(null);
       }
     }).catch(() => { if (mounted) setHeaderCategories([]); });
     return () => { mounted = false; };
@@ -553,89 +606,125 @@ export function Header() {
               <NavigationMenuItem key="browse-services">
                 <NavigationMenuTrigger className="bg-transparent">{t("header:exploreServices")}</NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <div className="grid w-[560px] gap-4 p-4 md:grid-cols-2">
-                    {/* Left: main categories */}
-                    <div className="space-y-2 pr-3 border-r">
-                      <p className="text-xs font-semibold text-muted-foreground">
-                        Browse by category
-                      </p>
-                      <div className="space-y-1.5">
-                      {headerCategories.slice(0, 12).map((category, idx) => {
-                        const isActive =
-                          activeCategorySlug === category.slug ||
-                          (!activeCategorySlug && idx === 0);
+                  <div className="w-[900px] max-w-[90vw] rounded-2xl bg-white shadow-xl border border-slate-100 overflow-hidden">
+                    <div className="flex h-[360px]">
+                      {/* Left: categories list */}
+                      <div className="w-64 border-r border-slate-100 bg-white">
+                        <div className="px-4 pt-3 pb-2">
+                          <p className="text-xs font-semibold text-slate-500">
+                            Browse by category
+                          </p>
+                        </div>
+                        <div className="max-h-[310px] overflow-y-auto pb-2">
+                          {headerCategories.slice(0, 12).map((category, idx) => {
+                            const isActive =
+                              activeCategorySlug === category.slug ||
+                              (!activeCategorySlug && idx === 0);
 
-                        return (
-                          <NavigationMenuLink key={category.id || category._id || category.slug || `cat-${idx}`} asChild>
-                            <Link
-                              href={`/services?category=${category.slug}`}
-                              className={cn(
-                                "block select-none rounded-md px-3 py-2 leading-none no-underline outline-none transition-colors text-sm",
-                                isActive
-                                  ? "bg-accent text-accent-foreground shadow-sm"
-                                  : "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                              )}
-                              onMouseEnter={(e) => {
-                                // Only update preview, don't trigger navigation
-                                e.preventDefault();
-                                setActiveCategorySlug(category.slug);
-                              }}
-                            >
-                              <div className="font-medium leading-none">
-                                {category.name}
-                              </div>
-                            </Link>
-                          </NavigationMenuLink>
-                        );
-                      })}
+                            return (
+                              <button
+                                key={category.id || category._id || category.slug || `cat-${idx}`}
+                                type="button"
+                                onMouseEnter={() => {
+                                  setActiveCategorySlug(category.slug);
+                                  setActiveSubcategory(null);
+                                }}
+                                className={cn(
+                                  "flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-800 cursor-pointer transition-colors",
+                                  "border-l-4 border-transparent hover:bg-slate-50",
+                                  isActive && "bg-red-50 border-red-500 font-semibold"
+                                )}
+                              >
+                                <span className="inline-flex h-6 w-6 items-center justify-center">
+                                  {getExploreCategoryIcon(category.slug)}
+                                </span>
+                                <span className="truncate">{category.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Right: subcategories preview */}
-                    <div className="hidden md:block pl-1">
-                      {(() => {
-                        const fallbackCategory = headerCategories[0];
-                        const active =
-                          headerCategories.find((c) => c.slug === activeCategorySlug) ||
-                          fallbackCategory;
-                        const subs =
-                          (active?.subcategories && Array.isArray(active.subcategories)) 
-                            ? active.subcategories 
-                            : [];
+                      {/* Right: subcategories panel */}
+                      <div className="flex-1 min-w-[520px]">
+                        {(() => {
+                          const fallbackCategory = headerCategories[0];
+                          const active =
+                            headerCategories.find((c) => c.slug === activeCategorySlug) ||
+                            fallbackCategory;
+                          if (!active) return null;
 
-                        if (!active) return null;
+                          const subs =
+                            active?.subcategories && Array.isArray(active.subcategories)
+                              ? active.subcategories
+                              : [];
+                          const effectiveActiveSub =
+                            activeSubcategory && subs.includes(activeSubcategory)
+                              ? activeSubcategory
+                              : subs[0] || null;
 
-                        return (
-                          <div className="rounded-md border bg-muted/40 p-3 h-full">
-                            <p className="text-xs font-semibold text-muted-foreground mb-2">
-                              {active.name} subcategories
-                            </p>
-                            {subs.length > 0 ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                {subs.slice(0, 10).map((sub, i) => (
-                                  <button
-                                    key={`${active.slug}-${sub}-${i}`}
-                                    type="button"
-                                    onClick={() => {
-                                      const params = new URLSearchParams();
-                                      params.set("category", active.slug);
-                                      params.set("subcategory", sub);
-                                      router.push(`/services?${params.toString()}`);
-                                    }}
-                                    className="w-full text-left text-[11px] px-2 py-1 rounded-md bg-background hover:bg-accent hover:text-accent-foreground border text-muted-foreground transition-colors"
-                                  >
-                                    {sub}
-                                  </button>
-                                ))}
+                          return (
+                            <div className="flex h-full flex-col px-6 py-5">
+                              {/* Chips */}
+                              <div className="mt-1 flex-1 overflow-y-auto pr-2">
+                                {subs.length > 0 ? (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-3">
+                                    {subs.map((sub) => {
+                                      const isChipActive = effectiveActiveSub === sub;
+                                      return (
+                                        <button
+                                          key={`${active.slug}-${sub}`}
+                                          type="button"
+                                          onMouseEnter={() => setActiveSubcategory(sub)}
+                                          onFocus={() => setActiveSubcategory(sub)}
+                                          onClick={() => {
+                                            const params = new URLSearchParams();
+                                            params.set("category", active.slug);
+                                            params.set("subcategory", sub);
+                                            router.push(`/services?${params.toString()}`);
+                                          }}
+                                          className={cn(
+                                            "inline-flex items-center justify-center w-full rounded-lg border px-4 py-2.5 text-[11px] md:text-sm leading-snug text-center transition-all duration-150",
+                                            isChipActive
+                                              ? "border-red-500 bg-red-500 text-white shadow-sm"
+                                              : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:bg-red-500 hover:text-white hover:border-red-500 hover:shadow-sm"
+                                          )}
+                                        >
+                                          <span className="whitespace-normal break-words">
+                                            {sub}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="flex h-full items-center justify-center px-6 text-center">
+                                    <p className="text-xs text-slate-500">
+                                      Explore all services in{" "}
+                                      <span className="font-semibold text-slate-700">
+                                        {active.name}
+                                      </span>
+                                      .
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <p className="text-[11px] text-muted-foreground">
-                                Explore all services in {active.name}.
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })()}
+
+                              {/* Bottom View All row */}
+                              {subs.length > 0 && (
+                                <div className="mt-4 border-t border-slate-100 pt-4 flex justify-center">
+                                  <Link
+                                    href={`/services?category=${active.slug}`}
+                                    className="inline-flex items-center text-xs font-medium text-red-500 hover:text-red-600 hover:underline"
+                                  >
+                                    View All {active.name} <span className="ml-1">→</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </NavigationMenuContent>
@@ -741,6 +830,14 @@ export function Header() {
                             <Link href="/jobs" className="flex items-center cursor-pointer">
                               <Briefcase className="mr-2 h-4 w-4" />
                               Browse jobs
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
+                        {user.role === "provider" && (
+                          <DropdownMenuItem asChild>
+                            <Link href="/dashboard/provider/manpower-crew" className="flex items-center cursor-pointer">
+                              <Users className="mr-2 h-4 w-4" />
+                              Hire labour
                             </Link>
                           </DropdownMenuItem>
                         )}
@@ -909,6 +1006,15 @@ export function Header() {
                               onClick={() => setIsOpen(false)}
                             >
                               Browse jobs
+                            </Link>
+                          )}
+                          {user.role === "provider" && (
+                            <Link
+                              href="/dashboard/provider/manpower-crew"
+                              className="text-lg font-medium"
+                              onClick={() => setIsOpen(false)}
+                            >
+                              Hire labour
                             </Link>
                           )}
                           <Link
