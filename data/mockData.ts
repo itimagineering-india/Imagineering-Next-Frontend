@@ -527,29 +527,58 @@ export const stats = [
   { label: "Projects Completed", value: "500,000+" },
 ];
 
-export const faqItems = [
+export type FaqIconId = "filePen" | "star" | "creditCard" | "briefcase" | "alert" | "calendar";
+
+export interface FaqItem {
+  question: string;
+  answer: string;
+  answerIntro?: string;
+  bullets?: string[];
+  icon: FaqIconId;
+}
+
+export const faqItems: FaqItem[] = [
   {
     question: "How do I get started as a buyer?",
-    answer: "Simply create a free account, browse services or search for specific skills, and send a quote request to providers. You can communicate through our platform to discuss project details before making any commitments.",
+    answer:
+      "Simply create a free account, browse services or search for specific skills, and send a quote request to providers. You can communicate through our platform to discuss project details before making any commitments.",
+    answerIntro: "Getting started as a buyer is easy:",
+    bullets: [
+      "Sign up for a free account",
+      "Search for services and request quotes",
+      "Compare service providers based on profiles, reviews, and quotes provided",
+      "Book your service and communicate with providers directly through our platform",
+    ],
+    icon: "filePen",
   },
   {
     question: "What's included in the Premium subscription?",
-    answer: "Premium subscribers get priority search placement, advanced filters, saved searches, in-app chat with providers, and priority support. Pro plan is $29/month, Business plan is $99/month with additional team features.",
+    answer:
+      "Premium subscribers get priority search placement, advanced filters, saved searches, in-app chat with providers, and priority support. See the pricing section for current plans and fees.",
+    icon: "star",
   },
   {
     question: "How do payments work?",
-    answer: "For platform-facilitated projects, payments are held in escrow until work is completed. All communication happens through our in-app chat.",
+    answer:
+      "For platform-facilitated projects, payments are held in escrow until work is completed. All communication happens through our in-app chat.",
+    icon: "creditCard",
   },
   {
     question: "How do I become a provider?",
-    answer: "Click 'Become a Provider' and complete your profile with your skills, portfolio, and services. Once approved, your profile will be visible to potential clients.",
+    answer:
+      "Click Become a Provider and complete your profile with your skills, portfolio, and services. Once approved, your profile will be visible to potential clients.",
+    icon: "briefcase",
   },
   {
     question: "What if I'm not satisfied with the work?",
-    answer: "We have a satisfaction guarantee for platform-facilitated projects. If there's a dispute, our support team will mediate and can issue refunds for qualifying cases.",
+    answer:
+      "We have a satisfaction guarantee for platform-facilitated projects. If there's a dispute, our support team will mediate and can issue refunds for qualifying cases.",
+    icon: "alert",
   },
   {
     question: "Can I cancel my subscription anytime?",
-    answer: "Yes, you can cancel your subscription at any time. Your premium features will remain active until the end of your current billing period.",
+    answer:
+      "Yes, you can cancel your subscription at any time. Your premium features will remain active until the end of your current billing period.",
+    icon: "calendar",
   },
 ];
