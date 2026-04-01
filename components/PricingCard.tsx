@@ -14,8 +14,8 @@ interface PricingCardProps {
   limitations?: string[];
   cta: string;
   popular?: boolean;
+  savingsBadge?: string;
   className?: string;
-  // Payment integration props
   subscriptionId?: string;
   subscriptionType?: "buyer" | "provider";
   onActivate?: () => void;
@@ -30,56 +30,98 @@ export function PricingCard({
   limitations = [],
   cta,
   popular,
+  savingsBadge,
   className,
   subscriptionId,
   subscriptionType,
   onActivate,
 }: PricingCardProps) {
+  const priceDisplay =
+    price === 0 ? "Free" : `₹${price.toLocaleString("en-IN")}`;
+
+  const ctaButtonClass = cn(
+    "w-full rounded-xl text-sm sm:text-base h-11 sm:h-12 font-semibold shadow-sm transition-colors",
+    popular
+      ? "bg-red-600 text-white hover:bg-red-700 border-0"
+      : "bg-slate-900 text-white hover:bg-slate-800 border-0"
+  );
+
   return (
     <Card
       className={cn(
-        "relative flex flex-col transition-all duration-300 hover:shadow-lg",
-        popular && "border-primary shadow-lg sm:scale-105 z-10",
+        "relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-300",
+        popular
+          ? "z-10 border-2 border-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.06),0_20px_40px_-12px_rgba(15,23,42,0.18)] md:scale-[1.02]"
+          : "border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300/90",
         className
       )}
     >
-      {popular && (
-        <Badge className="absolute -top-2.5 sm:-top-3 left-1/2 -translate-x-1/2 px-3 sm:px-4 text-xs sm:text-sm">
-          Most Popular
-        </Badge>
-      )}
-
-      <CardHeader className="text-center pb-3 sm:pb-4 p-4 sm:p-6">
-        <h3 className="text-lg sm:text-xl font-semibold">{name}</h3>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2">{description}</p>
-        <div className="mt-3 sm:mt-4">
-          <span className="text-3xl sm:text-4xl font-bold">
-            {price === 0 ? "Free" : `₹${price}`}
-          </span>
-          {price > 0 && (
-            <span className="text-muted-foreground ml-1 text-xs sm:text-sm">{billing}</span>
-          )}
+      <CardHeader
+        className={cn(
+          "text-center pb-2 pt-8 sm:pt-10",
+          popular && "space-y-3 pt-6 sm:pt-8"
+        )}
+      >
+        {popular ? (
+          <div className="flex justify-center">
+            <Badge className="border-0 bg-red-600 px-4 py-1 text-xs font-semibold text-white shadow-md hover:bg-red-600 sm:text-sm">
+              Most Popular
+            </Badge>
+          </div>
+        ) : null}
+        <h3 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+          {name}
+        </h3>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-500 sm:text-sm">
+          {description}
+        </p>
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <div className="flex flex-wrap items-baseline justify-center gap-x-1">
+            <span className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              {priceDisplay}
+            </span>
+            {price > 0 && (
+              <span className="text-sm font-medium text-slate-500 sm:text-base">
+                {billing}
+              </span>
+            )}
+          </div>
+          {savingsBadge ? (
+            <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-900">
+              {savingsBadge}
+            </span>
+          ) : null}
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 p-4 sm:p-6 pt-0">
-        <ul className="space-y-2 sm:space-y-3">
+      <CardContent className="flex-1 px-5 pb-2 pt-0 sm:px-6">
+        <ul className="space-y-2.5 sm:space-y-3">
           {features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2">
-              <Check className="h-4 w-4 sm:h-5 sm:w-5 text-success shrink-0 mt-0.5" />
-              <span className="text-xs sm:text-sm">{feature}</span>
+            <li key={feature} className="flex items-start gap-2.5">
+              <Check
+                className="mt-0.5 h-[18px] w-[18px] shrink-0 text-emerald-600 sm:h-5 sm:w-5"
+                strokeWidth={2.5}
+              />
+              <span className="text-left text-xs leading-snug text-slate-700 sm:text-sm">
+                {feature}
+              </span>
             </li>
           ))}
           {limitations.map((limitation) => (
-            <li key={limitation} className="flex items-start gap-2 text-muted-foreground">
-              <X className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 mt-0.5" />
-              <span className="text-xs sm:text-sm">{limitation}</span>
+            <li
+              key={limitation}
+              className="flex items-start gap-2.5 text-slate-500"
+            >
+              <X className="mt-0.5 h-[18px] w-[18px] shrink-0 text-slate-400 sm:h-5 sm:w-5" />
+              <span className="text-left text-xs leading-snug sm:text-sm">
+                {limitation}
+              </span>
             </li>
           ))}
         </ul>
       </CardContent>
 
-      <CardFooter className="p-4 sm:p-6 pt-0">
+      <CardFooter className="mt-auto px-5 pb-6 pt-4 sm:px-6">
         {subscriptionId && subscriptionType && price > 0 ? (
           <RazorpayCheckout
             subscriptionId={subscriptionId}
@@ -89,14 +131,14 @@ export function PricingCard({
             onSuccess={() => {
               onActivate?.();
             }}
-            className="w-full text-sm sm:text-base h-10 sm:h-11"
+            className={ctaButtonClass}
+            variant="default"
           >
             {cta}
           </RazorpayCheckout>
         ) : (
           <Button
-            className="w-full text-sm sm:text-base h-10 sm:h-11"
-            variant={popular ? "default" : "outline"}
+            className={ctaButtonClass}
             size="lg"
             onClick={onActivate}
             disabled={price === 0 && !onActivate}
