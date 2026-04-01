@@ -195,7 +195,20 @@ export default function HelpCenter() {
                       {item.question}
                     </AccordionTrigger>
                     <AccordionContent className="text-xs sm:text-sm text-muted-foreground pr-4">
-                      {item.answer}
+                      {item.bullets?.length ? (
+                        <div>
+                          {item.answerIntro ? (
+                            <p className="mb-3 text-foreground/90">{item.answerIntro}</p>
+                          ) : null}
+                          <ul className="list-inside list-disc space-y-2">
+                            {item.bullets.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        item.answer
+                      )}
                     </AccordionContent>
                   </AccordionItem>
                 ))}
