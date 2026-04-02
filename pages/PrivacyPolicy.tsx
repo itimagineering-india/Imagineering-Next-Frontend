@@ -1,6 +1,8 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Shield,
   Lock,
@@ -10,7 +12,6 @@ import {
   Database,
   Timer,
   Mail,
-  Phone,
 } from "lucide-react";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -140,6 +141,49 @@ export default function PrivacyPolicy() {
           </div>
         </section>
 
+        {/* Mobile permissions */}
+        <section className="py-14 bg-secondary/30">
+          <div className="container max-w-6xl space-y-6">
+            <div className="space-y-2">
+              <h2 className="text-3xl font-semibold text-foreground">Mobile App Permissions</h2>
+              <p className="text-muted-foreground max-w-3xl">
+                When you use our Imagineering India mobile app, we may request certain permissions from your device to enable core features.
+                You can review or revoke these permissions in your device settings at any time.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">Location (Approximate / Precise)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Used to show services and providers near you, improve search relevance, and help display distances/availability.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">Camera</h3>
+                <p className="text-sm text-muted-foreground">
+                  Used when you choose to take photos for profile updates and verification (KYC).
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">Photos / Media Library (Storage)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Used to select and upload images/documents for profile, verification (KYC), and receipts/related uploads.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-foreground">Notifications</h3>
+                <p className="text-sm text-muted-foreground">
+                  Used to send booking updates, messages, and important alerts related to your account and requests.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <Separator />
 
         {/* How we use data */}
@@ -264,19 +308,11 @@ export default function PrivacyPolicy() {
             </div>
             <h3 className="text-3xl font-semibold text-foreground">Need to reach us?</h3>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              If you have questions about this policy or want to exercise your privacy rights,
-              contact our support team.
+              For questions about this policy, reach out to us anytime.
             </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 justify-center">
-                <Mail className="h-4 w-4 text-primary" />
-                privacy@imagineeringindia.com
-              </div>
-              <div className="flex items-center gap-2 justify-center">
-                <Phone className="h-4 w-4 text-primary" />
-                +91 98765 43210
-              </div>
-            </div>
+            <Button asChild variant="secondary" className="mx-auto">
+              <Link href="/contact">Contact us</Link>
+            </Button>
             <p className="text-xs text-muted-foreground">
               We may update this Privacy Policy periodically. We will post updates with a new effective date above.
             </p>
