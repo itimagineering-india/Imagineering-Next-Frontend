@@ -4,10 +4,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MapPin, Loader2 } from "lucide-react";
-import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
+import { useGoogleGeocoder, type PlaceDetails, parseAddressContext } from "@/hooks/useGoogleGeocoder";
+import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { isGoogleMapsConfigured } from "@/lib/mapConfig";
+import { isMapboxConfigured } from "@/lib/mapboxConfig";
+import { isPublicLocationSearchConfigured } from "@/lib/publicMaps";
 
 interface LocationSearchInlineProps {
   onClose?: () => void;
@@ -20,6 +24,52 @@ export function LocationSearchInline({ onClose, className = "" }: LocationSearch
   const { setUserLocation } = useUserLocation();
   const { toast } = useToast();
 
+  const onPlaceSelect = (place: PlaceDetails) => {
+    setIsGettingLocation(false);
+    if (place.geometry?.location) {
+      const lat =
+        typeof place.geometry.location.lat === "function" ? place.geometry.location.lat() : place.geometry.location.lat;
+      const lng =
+        typeof place.geometry.location.lng === "function" ? place.geometry.location.lng() : place.geometry.location.lng;
+      const parsed = parseAddressContext({
+        place_name: place.formatted_address,
+        center: [0, 0],
+        id: "",
+      });
+      setUserLocation({
+        lat,
+        lng,
+        address: place.formatted_address,
+        city: place.city?.trim() || parsed.city?.trim() || undefined,
+        timestamp: Date.now(),
+      });
+      setLocationInput("");
+      onClose?.();
+    }
+  };
+
+  const onGeoError = (error: string) => {
+    setIsGettingLocation(false);
+    toast({
+      title: "Location Error",
+      description: error,
+      variant: "destructive",
+    });
+  };
+
+  const useMb = isMapboxConfigured();
+  const mapboxGeo = useMapboxGeocoder({
+    enabled: useMb,
+    deferScriptLoad: true,
+    onPlaceSelect,
+    onError: onGeoError,
+  });
+  const googleGeo = useGoogleGeocoder({
+    enabled: !useMb && isGoogleMapsConfigured(),
+    deferScriptLoad: true,
+    onPlaceSelect,
+    onError: onGeoError,
+  });
   const {
     inputRef,
     isLoaded,
@@ -29,32 +79,9 @@ export function LocationSearchInline({ onClose, className = "" }: LocationSearch
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useGoogleGeocoder({
-    onPlaceSelect: (place) => {
-      setIsGettingLocation(false);
-      if (place.geometry?.location) {
-        const lat = typeof place.geometry.location.lat === "function" ? place.geometry.location.lat() : place.geometry.location.lat;
-        const lng = typeof place.geometry.location.lng === "function" ? place.geometry.location.lng() : place.geometry.location.lng;
-        setUserLocation({
-          lat,
-          lng,
-          address: place.formatted_address,
-          city: place.formatted_address?.split(",")[0]?.trim(),
-          timestamp: Date.now(),
-        });
-        setLocationInput("");
-        onClose?.();
-      }
-    },
-    onError: (error) => {
-      setIsGettingLocation(false);
-      toast({
-        title: "Location Error",
-        description: error,
-        variant: "destructive",
-      });
-    },
-  });
+  } = useMb ? mapboxGeo : googleGeo;
+
+  const mapsSearchReady = isPublicLocationSearchConfigured();
 
   const handleUseCurrentLocation = () => {
     if (!navigator?.geolocation) {
@@ -75,14 +102,20 @@ export function LocationSearchInline({ onClose, className = "" }: LocationSearch
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           ref={inputRef}
-          placeholder={isLoaded ? "Search city or address..." : "Loading..."}
+          placeholder={
+            !mapsSearchReady
+              ? "Location search unavailable"
+              : isLoaded
+                ? "Search city or address..."
+                : "Type to search (loads on demand)…"
+          }
           value={locationInput}
           onChange={(e) => {
             setLocationInput(e.target.value);
             handleInputChange(e);
           }}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-          disabled={!isLoaded}
+          disabled={!mapsSearchReady}
           className="pl-9 h-9"
         />
         {showSuggestions && suggestions.length > 0 && (
