@@ -18,6 +18,8 @@ export interface PlaceDetails {
 }
 
 interface UseGoogleGeocoderOptions {
+  /** When false, hook is inert (use when public site prefers Mapbox). */
+  enabled?: boolean;
   onPlaceSelect?: (place: PlaceDetails) => void;
   onError?: (error: string) => void;
   /** Defer loading Maps JS until user types or uses current location (faster first paint on home). */
@@ -48,7 +50,27 @@ export function parseAddressContext(feature: AddressSuggestionFeature): { city: 
 export const parseMapboxContext = parseAddressContext;
 export type MapboxFeature = AddressSuggestionFeature;
 
+function extractCityFromGoogleComponents(
+  components?: google.maps.GeocoderAddressComponent[]
+): string {
+  if (!components?.length) return "";
+  const pick = (...types: string[]) => {
+    for (const t of types) {
+      const c = components.find((x) => x.types.includes(t));
+      if (c?.long_name?.trim()) return c.long_name.trim();
+    }
+    return "";
+  };
+  return pick(
+    "locality",
+    "sublocality_level_1",
+    "administrative_area_level_3",
+    "administrative_area_level_2"
+  );
+}
+
 export function useGoogleGeocoder({
+  enabled = true,
   onPlaceSelect,
   onError,
   deferScriptLoad = false,
@@ -64,7 +86,7 @@ export function useGoogleGeocoder({
   const loadPromiseRef = useRef<Promise<void> | null>(null);
 
   const apiKey = getGoogleMapsApiKey();
-  const canUseGoogle = Boolean(apiKey);
+  const canUseGoogle = enabled && Boolean(apiKey);
 
   const ensureScriptLoaded = useCallback(async () => {
     if (!canUseGoogle) return;
@@ -92,6 +114,7 @@ export function useGoogleGeocoder({
   }, [canUseGoogle, onError]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!canUseGoogle) {
       console.warn(
         "Google address search unavailable. Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (Maps JavaScript API + Places)."
@@ -112,7 +135,7 @@ export function useGoogleGeocoder({
     return () => {
       cancelled = true;
     };
-  }, [canUseGoogle, onError, deferScriptLoad]);
+  }, [enabled, canUseGoogle, onError, deferScriptLoad]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -199,7 +222,9 @@ export function useGoogleGeocoder({
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
           const formatted = place.formatted_address || s.place_name;
-          const { city, state } = parseAddressContext({ ...s, place_name: formatted });
+          const parsed = parseAddressContext({ ...s, place_name: formatted });
+          const cityResolved =
+            extractCityFromGoogleComponents(place.address_components) || parsed.city || "";
           const placeData: PlaceDetails = {
             formatted_address: formatted,
             geometry: {
@@ -210,8 +235,8 @@ export function useGoogleGeocoder({
             },
             place_id: s.id!,
             name: place.name || formatted,
-            city: city || undefined,
-            state: state || undefined,
+            city: cityResolved || undefined,
+            state: parsed.state || undefined,
           };
           setSelectedPlace(placeData);
           setSuggestions([]);
