@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useEffect, memo } from "react";
+import { useCallback, useRef, memo } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ interface CategoryScrollSectionProps {
   services: Service[];
   prioritizeImages?: boolean;
   favoritesById: Record<string, boolean>;
+  favoritesVersion: number;
   onToggleFavorite: (serviceId: string) => void;
 }
 
@@ -32,6 +33,7 @@ function CategoryScrollSectionComponent({
   services,
   prioritizeImages = false,
   favoritesById,
+  favoritesVersion,
   onToggleFavorite,
 }: CategoryScrollSectionProps) {
   const sectionRef = useRef<HTMLElement>(null);
@@ -40,9 +42,12 @@ function CategoryScrollSectionComponent({
   /* =======================
      SCROLL HANDLER
   ======================= */
-  const scroll = (direction: "left" | "right") => {
+  const scroll = useCallback((direction: "left" | "right") => {
     listHandleRef.current?.scrollByItems(direction, 3);
-  };
+  }, []);
+
+  const handleScrollLeft = useCallback(() => scroll("left"), [scroll]);
+  const handleScrollRight = useCallback(() => scroll("right"), [scroll]);
 
   return (
     <section ref={sectionRef} className="py-3 md:py-4">
@@ -66,7 +71,7 @@ function CategoryScrollSectionComponent({
           <Button 
             size="icon" 
             variant="outline" 
-            onClick={() => scroll("left")}
+            onClick={handleScrollLeft}
             aria-label={`Scroll ${title} left`}
             title={`Scroll ${title} left`}
           >
@@ -75,7 +80,7 @@ function CategoryScrollSectionComponent({
           <Button 
             size="icon" 
             variant="outline" 
-            onClick={() => scroll("right")}
+            onClick={handleScrollRight}
             aria-label={`Scroll ${title} right`}
             title={`Scroll ${title} right`}
           >
@@ -94,6 +99,7 @@ function CategoryScrollSectionComponent({
             services={services}
             prioritizeImages={prioritizeImages}
             favoritesById={favoritesById}
+            favoritesVersion={favoritesVersion}
             onToggleFavorite={onToggleFavorite}
           />
         </div>
@@ -102,36 +108,4 @@ function CategoryScrollSectionComponent({
   );
 }
 
-export const CategoryScrollSection = memo(
-  CategoryScrollSectionComponent,
-  (prev, next) => {
-    // Basic field comparisons
-    if (
-      prev.title !== next.title ||
-      prev.categorySlug !== next.categorySlug ||
-      prev.services.length !== next.services.length ||
-      prev.prioritizeImages !== next.prioritizeImages
-    ) {
-      return false;
-    }
-    
-    if (
-      prev.favoritesById !== next.favoritesById ||
-      prev.onToggleFavorite !== next.onToggleFavorite
-    ) {
-      return false;
-    }
-
-    // Deep compare service IDs and images to detect changes
-    for (let i = 0; i < prev.services.length; i++) {
-      if (
-        prev.services[i].id !== next.services[i].id ||
-        prev.services[i].image !== next.services[i].image
-      ) {
-        return false;
-      }
-    }
-    
-    return true;
-  }
-);
+export const CategoryScrollSection = memo(CategoryScrollSectionComponent);
