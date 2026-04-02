@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { CategoryScrollSection } from "./CategoryScrollSection";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
+import { parseAddressContext } from "@/hooks/useGoogleGeocoder";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CardSkeleton } from "./CardSkeleton";
 
@@ -53,14 +54,12 @@ function normalizeService(s: any): {
 }
 
 export function CategorySections() {
-  const { userLocation } = useUserLocation();
+  const { userLocation, radiusKm } = useUserLocation();
   const [sections, setSections] = useState<CategorySection[]>([]);
   const [initialLoad, setInitialLoad] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasEnteredView, setHasEnteredView] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
-  const hasFetchedRef = useRef(false);
-  const fetchedWithoutCityRef = useRef(false);
   const viewTriggeredRef = useRef(false);
 
   const allServiceIds = useMemo(() => {
@@ -115,12 +114,38 @@ export function CategorySections() {
   const loadData = useCallback(async () => {
     setLoadError(null);
     try {
-      const params: { limit: number; location?: string } = { limit: 6 };
-      const cityLabel =
+      const params: {
+        limit: number;
+        location?: string;
+        lat?: number;
+        lng?: number;
+        radiusKm?: number;
+      } = { limit: 6 };
+      const cityFromProfile =
         typeof userLocation?.city === "string" && userLocation.city.trim()
           ? userLocation.city.trim()
           : "";
-      if (cityLabel) params.location = cityLabel;
+      const cityFromAddress =
+        !cityFromProfile && userLocation?.address
+          ? parseAddressContext({
+              place_name: userLocation.address,
+              center: [0, 0],
+              id: "",
+            }).city.trim()
+          : "";
+      const cityLabel = cityFromProfile || cityFromAddress;
+      if (cityLabel) {
+        params.location = cityLabel;
+      } else if (
+        userLocation?.lat != null &&
+        userLocation?.lng != null &&
+        Number.isFinite(userLocation.lat) &&
+        Number.isFinite(userLocation.lng)
+      ) {
+        params.lat = userLocation.lat;
+        params.lng = userLocation.lng;
+        params.radiusKm = radiusKm;
+      }
       const res = await api.services.getByCategories(params);
       if (!res?.success) {
         const msg =
@@ -149,7 +174,7 @@ export function CategorySections() {
       );
       setInitialLoad(false);
     }
-  }, [userLocation?.city]);
+  }, [userLocation?.city, userLocation?.address, userLocation?.lat, userLocation?.lng, radiusKm]);
 
   useEffect(() => {
     const el = sectionRef.current;
@@ -169,32 +194,8 @@ export function CategorySections() {
 
   useEffect(() => {
     if (!hasEnteredView) return;
-
-    const hasCoords =
-      userLocation?.lat != null &&
-      userLocation?.lng != null &&
-      Number.isFinite(userLocation.lat) &&
-      Number.isFinite(userLocation.lng);
-    const hasCity =
-      typeof userLocation?.city === "string" && userLocation.city.trim().length > 0;
-
-    if (!hasFetchedRef.current) {
-      // If we have coords but city isn't resolved yet, wait.
-      if (hasCoords && !hasCity) return;
-
-      hasFetchedRef.current = true;
-      fetchedWithoutCityRef.current = !hasCity;
-      void loadData();
-      return;
-    }
-
-    // If we initially loaded without city (slow reverse-geocode),
-    // refetch once city becomes available.
-    if (fetchedWithoutCityRef.current && hasCity) {
-      fetchedWithoutCityRef.current = false;
-      void loadData();
-    }
-  }, [hasEnteredView, userLocation?.lat, userLocation?.lng, userLocation?.city, loadData]);
+    void loadData();
+  }, [hasEnteredView, loadData]);
 
   if (!hasEnteredView) {
     return (
