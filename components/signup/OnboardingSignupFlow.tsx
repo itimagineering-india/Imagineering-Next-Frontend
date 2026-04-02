@@ -36,6 +36,7 @@ import {
 
 const LOGO_URL = "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png";
 const STORAGE_KEY = "ii-onboarding-signup-v1";
+const PHONE_OTP_RESEND_COOLDOWN_SEC = 60;
 const PRIMARY = "#ef4444";
 const BG = "#f9fafb";
 
@@ -127,6 +128,8 @@ export function OnboardingSignupFlow() {
   const [isSendingOTP, setIsSendingOTP] = useState(false);
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [phoneAlreadyRegistered, setPhoneAlreadyRegistered] = useState(false);
+  /** Seconds until phone OTP can be resent; 0 = allowed */
+  const [phoneOtpResendIn, setPhoneOtpResendIn] = useState(0);
 
   useEffect(() => {
     try {
@@ -191,6 +194,14 @@ export function OnboardingSignupFlow() {
     persist();
   }, [persist]);
 
+  useEffect(() => {
+    if (phoneOtpResendIn <= 0) return;
+    const id = window.setInterval(() => {
+      setPhoneOtpResendIn((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phoneOtpResendIn]);
+
   const clearPersist = () => {
     try {
       sessionStorage.removeItem(STORAGE_KEY);
@@ -205,6 +216,7 @@ export function OnboardingSignupFlow() {
     setEmailVerified(false);
     setError("");
     setPhoneAlreadyRegistered(false);
+    setPhoneOtpResendIn(0);
   };
 
   const goBack = () => {
@@ -225,6 +237,7 @@ export function OnboardingSignupFlow() {
       if (verifyInner === "otp") {
         setVerifyInner("collect");
         setOtp("");
+        setPhoneOtpResendIn(0);
         return;
       }
       setMainStep(2);
@@ -325,6 +338,7 @@ export function OnboardingSignupFlow() {
       const res = await api.auth.sendPhoneOTP(phone.trim(), "signup");
       if (res.success) {
         setVerifyInner("otp");
+        setPhoneOtpResendIn(PHONE_OTP_RESEND_COOLDOWN_SEC);
         toast({ title: "OTP sent", description: "Check your phone for the code." });
       } else {
         const msg = (res as { error?: { message?: string } }).error?.message || "Failed to send OTP";
@@ -333,6 +347,29 @@ export function OnboardingSignupFlow() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to send OTP";
+      setError(msg);
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setIsSendingOTP(false);
+    }
+  };
+
+  const handleResendPhoneOTP = async () => {
+    if (phoneOtpResendIn > 0 || isSendingOTP) return;
+    setError("");
+    setIsSendingOTP(true);
+    try {
+      const res = await api.auth.sendPhoneOTP(phone.trim(), "signup");
+      if (res.success) {
+        setPhoneOtpResendIn(PHONE_OTP_RESEND_COOLDOWN_SEC);
+        toast({ title: "OTP sent", description: "Check your phone for the new code." });
+      } else {
+        const msg = (res as { error?: { message?: string } }).error?.message || "Failed to resend OTP";
+        setError(msg);
+        toast({ title: "Error", description: msg, variant: "destructive" });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to resend OTP";
       setError(msg);
       toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
@@ -849,6 +886,32 @@ export function OnboardingSignupFlow() {
                       <p className="flex items-center justify-center gap-1 text-xs text-emerald-600">
                         <ShieldCheck className="h-3.5 w-3.5" /> Sent to {phone}
                       </p>
+                      <div className="flex flex-col items-center gap-0.5 pt-1">
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto py-1 text-xs text-red-600"
+                          disabled={isSendingOTP || phoneOtpResendIn > 0}
+                          onClick={() => void handleResendPhoneOTP()}
+                        >
+                          {isSendingOTP ? (
+                            <>
+                              <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />
+                              Sending…
+                            </>
+                          ) : phoneOtpResendIn > 0 ? (
+                            `Resend OTP in ${Math.floor(phoneOtpResendIn / 60)}:${String(phoneOtpResendIn % 60).padStart(2, "0")}`
+                          ) : (
+                            "Resend OTP"
+                          )}
+                        </Button>
+                        {phoneOtpResendIn > 0 ? (
+                          <p className="text-center text-[11px] text-gray-500">
+                            You can request a new code after 1 minute.
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                     <Button
                       type="submit"
