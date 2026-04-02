@@ -11,10 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
+import { useGoogleGeocoder, type PlaceDetails } from "@/hooks/useGoogleGeocoder";
+import { useMapboxGeocoder } from "@/hooks/useMapboxGeocoder";
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
+import { isGoogleMapsConfigured } from "@/lib/mapConfig";
+import { isMapboxConfigured } from "@/lib/mapboxConfig";
+import { isPublicLocationSearchConfigured } from "@/lib/publicMaps";
 
 export function LocationSearchBar() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -73,6 +77,47 @@ export function LocationSearchBar() {
     setSelectedSubcategory(""); // Reset subcategory when category changes
   };
 
+  const onPlaceSelect = (place: PlaceDetails) => {
+    setLocation(place.formatted_address);
+    setIsGettingLocation(false);
+    if (place.geometry?.location) {
+      const lat =
+        typeof place.geometry.location.lat === "function" ? place.geometry.location.lat() : place.geometry.location.lat;
+      const lng =
+        typeof place.geometry.location.lng === "function" ? place.geometry.location.lng() : place.geometry.location.lng;
+      setUserLocation({
+        lat,
+        lng,
+        address: place.formatted_address,
+        city: place.city?.trim() || undefined,
+        timestamp: Date.now(),
+      });
+    }
+  };
+
+  const onGeoError = (error: string) => {
+    setIsGettingLocation(false);
+    toast({
+      title: "Location Access Failed",
+      description: error,
+      variant: "destructive",
+      duration: 5000,
+    });
+  };
+
+  const useMb = isMapboxConfigured();
+  const mapboxGeo = useMapboxGeocoder({
+    enabled: useMb,
+    deferScriptLoad: true,
+    onPlaceSelect,
+    onError: onGeoError,
+  });
+  const googleGeo = useGoogleGeocoder({
+    enabled: !useMb && isGoogleMapsConfigured(),
+    deferScriptLoad: true,
+    onPlaceSelect,
+    onError: onGeoError,
+  });
   const {
     inputRef,
     isLoaded,
@@ -83,27 +128,7 @@ export function LocationSearchBar() {
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useGoogleGeocoder({
-    deferScriptLoad: true,
-    onPlaceSelect: (place) => {
-      setLocation(place.formatted_address);
-      setIsGettingLocation(false);
-      if (place.geometry?.location) {
-        const lat = typeof place.geometry.location.lat === "function" ? place.geometry.location.lat() : place.geometry.location.lat;
-        const lng = typeof place.geometry.location.lng === "function" ? place.geometry.location.lng() : place.geometry.location.lng;
-        setUserLocation({ lat, lng, address: place.formatted_address, timestamp: Date.now() });
-      }
-    },
-    onError: (error) => {
-      setIsGettingLocation(false);
-      toast({
-        title: "Location Access Failed",
-        description: error,
-        variant: "destructive",
-        duration: 5000,
-      });
-    },
-  });
+  } = useMb ? mapboxGeo : googleGeo;
 
   const getDisplayCategory = () => {
     if (!selectedCategory) return "Services";
@@ -182,16 +207,18 @@ export function LocationSearchBar() {
           {/* Location row – full width when subcategory exists so it never gets squashed */}
           <div className={hasSubcategory ? "w-full relative" : "flex-1 relative min-w-0 md:min-w-[200px]"}>
             <MapPin className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 h-4 w-4 md:h-5 md:w-5 text-slate-500 z-10" />
-            {!isLoaded && (
+            {!isLoaded && isPublicLocationSearchConfigured() && location.length >= 2 && (
               <Loader2 className="absolute right-2.5 md:right-3 top-1/2 -translate-y-1/2 h-3 w-3 md:h-4 md:w-4 text-slate-500 animate-spin" />
             )}
             <Input
               ref={inputRef}
               type="text"
               placeholder={
-                isLoaded
-                  ? "Enter a location or postal code *"
-                  : "Loading location services..."
+                !isPublicLocationSearchConfigured()
+                  ? "Location search unavailable"
+                  : isLoaded
+                    ? "Enter a location or postal code *"
+                    : "Type to search — loads when needed"
               }
               className="pl-9 md:pl-10 pr-9 md:pr-10 h-10 md:h-12 text-xs md:text-sm lg:text-base w-full border-slate-300"
               value={location}
@@ -201,7 +228,7 @@ export function LocationSearchBar() {
               }}
               onFocus={() => handleInputChange({ target: { value: location } } as React.ChangeEvent<HTMLInputElement>)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              disabled={!isLoaded}
+              disabled={!isPublicLocationSearchConfigured()}
               required
             />
             {showSuggestions && suggestions.length > 0 && (
