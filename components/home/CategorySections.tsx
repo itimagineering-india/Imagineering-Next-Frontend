@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { CategoryScrollSection } from "./CategoryScrollSection";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
-import { parseAddressContext } from "@/hooks/useGoogleGeocoder";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CardSkeleton } from "./CardSkeleton";
 
@@ -54,7 +53,7 @@ function normalizeService(s: any): {
 }
 
 export function CategorySections() {
-  const { userLocation, radiusKm } = useUserLocation();
+  const { userLocation } = useUserLocation();
   const [sections, setSections] = useState<CategorySection[]>([]);
   const [initialLoad, setInitialLoad] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -117,34 +116,18 @@ export function CategorySections() {
       const params: {
         limit: number;
         location?: string;
+        tile?: string;
         lat?: number;
         lng?: number;
         radiusKm?: number;
       } = { limit: 6 };
-      const cityFromProfile =
-        typeof userLocation?.city === "string" && userLocation.city.trim()
-          ? userLocation.city.trim()
-          : "";
-      const cityFromAddress =
-        !cityFromProfile && userLocation?.address
-          ? parseAddressContext({
-              place_name: userLocation.address,
-              center: [0, 0],
-              id: "",
-            }).city.trim()
-          : "";
-      const cityLabel = cityFromProfile || cityFromAddress;
-      if (cityLabel) {
-        params.location = cityLabel;
-      } else if (
+      const hasCoords =
         userLocation?.lat != null &&
         userLocation?.lng != null &&
         Number.isFinite(userLocation.lat) &&
-        Number.isFinite(userLocation.lng)
-      ) {
-        params.lat = userLocation.lat;
-        params.lng = userLocation.lng;
-        params.radiusKm = radiusKm;
+        Number.isFinite(userLocation.lng);
+      if (hasCoords) {
+        params.tile = `${Math.floor(userLocation.lat)}_${Math.floor(userLocation.lng)}`;
       }
       const res = await api.services.getByCategories(params);
       if (!res?.success) {
@@ -174,7 +157,7 @@ export function CategorySections() {
       );
       setInitialLoad(false);
     }
-  }, [userLocation?.city, userLocation?.address, userLocation?.lat, userLocation?.lng, radiusKm]);
+  }, [userLocation?.lat, userLocation?.lng]);
 
   useEffect(() => {
     const el = sectionRef.current;
@@ -279,6 +262,7 @@ export function CategorySections() {
             favoritesById={favoritesByIdRef.current}
             favoritesVersion={favoritesVersion}
             onToggleFavorite={onToggleFavorite}
+            userLocation={userLocation}
           />
         ))}
       </div>
