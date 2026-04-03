@@ -82,6 +82,7 @@ export default function Services(props: ServicesProps = {}) {
   const [currentPage, setCurrentPage] = useState(1);
   const BROWSE_PAGE_SIZE = 20;
   const MAP_PAGE_SIZE = 50;
+  const MAP_CARDS_PAGE_SIZE = 20; // 20-20 pagination only for sidebar cards
   /** Grid/list first page; map without coords uses MAP_PAGE_SIZE until tile is available. */
   const itemsPerPage = BROWSE_PAGE_SIZE;
   const mapRadiusKm = 50; // Map radius filter when user location is available
@@ -91,7 +92,7 @@ export default function Services(props: ServicesProps = {}) {
   // Map view pagination (sidebar list) mirrors server-side pagination
   const mapViewCurrentPage = currentPage;
   /** Align with API page size for map when coords not yet available (tile fetch omits limit). */
-  const mapViewItemsPerPage = MAP_PAGE_SIZE;
+  const mapViewItemsPerPage = MAP_CARDS_PAGE_SIZE;
   
   // Map (Mappls) — fly-to from sidebar / cards
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -288,20 +289,26 @@ export default function Services(props: ServicesProps = {}) {
 
   // Build query params - only include valid values (no undefined)
   // When in map view, fetch more services so all markers show (like Google Maps did)
-  const servicesParams = useMemo(() => {
-    const locationLat = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : null);
-    const locationLng = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : null);
-    const hasCoordsForTile =
-      typeof locationLat === "number" &&
-      typeof locationLng === "number" &&
-      Number.isFinite(locationLat) &&
-      Number.isFinite(locationLng);
+  const tileLatForMap = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : null);
+  const tileLngForMap = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : null);
+  const hasCoordsForTileForMap =
+    typeof tileLatForMap === "number" &&
+    typeof tileLngForMap === "number" &&
+    Number.isFinite(tileLatForMap) &&
+    Number.isFinite(tileLngForMap);
 
+  const servicesParams = useMemo(() => {
     const params: any = {
-      page: currentPage,
-      ...(hasCoordsForTile
-        ? {}
-        : { limit: viewMode === "map" ? MAP_PAGE_SIZE : BROWSE_PAGE_SIZE }),
+      // For tile-based map: fetch full tile once so markers are complete.
+      // Sidebar cards will be paginated client-side.
+      page: viewMode === "map" && hasCoordsForTileForMap ? 1 : currentPage,
+      // Grid/list: always fetch 20 at a time.
+      // Map: when tile/coords exist, omit `limit` to allow the tile bucket to drive the result set.
+      ...(viewMode === "map"
+        ? hasCoordsForTileForMap
+          ? {}
+          : { limit: MAP_PAGE_SIZE }
+        : { limit: BROWSE_PAGE_SIZE }),
     };
     
     // Priority: filters.category > URL categoryParam
@@ -369,8 +376,8 @@ export default function Services(props: ServicesProps = {}) {
     }
     
     // `tile` → backend matches `location.tileKey` (no radius / $geoNear).
-    if (hasCoordsForTile) {
-      params.tile = `${Math.floor(locationLat!)}_${Math.floor(locationLng!)}`;
+    if (hasCoordsForTileForMap) {
+      params.tile = `${Math.floor(tileLatForMap!)}_${Math.floor(tileLngForMap!)}`;
       if (viewMode === "map") {
         params.compact = 1;
       }
@@ -412,6 +419,9 @@ export default function Services(props: ServicesProps = {}) {
     fixedLocationText,
     fixedLat,
     fixedLng,
+    hasCoordsForTileForMap,
+    tileLatForMap,
+    tileLngForMap,
     maxPriceParam,
     sortParam,
     locationGateReady,
@@ -808,8 +818,20 @@ export default function Services(props: ServicesProps = {}) {
   // Map view uses server-side pagination; show current page results
   const mapViewServicesToShow = useMemo(() => {
     if (viewMode !== "map") return filteredServices;
+    // In tile-based mode we fetch full tile for markers; slice ONLY cards.
+    if (hasCoordsForTileForMap) {
+      const start = (currentPage - 1) * mapViewItemsPerPage;
+      return mapViewServicesAll.slice(start, start + mapViewItemsPerPage);
+    }
     return mapViewServicesAll;
-  }, [filteredServices, viewMode, mapViewServicesAll]);
+  }, [
+    filteredServices,
+    viewMode,
+    mapViewServicesAll,
+    hasCoordsForTileForMap,
+    currentPage,
+    mapViewItemsPerPage,
+  ]);
 
   // Providers filtering (client-side search)
   const filteredProviders = useMemo(() => {
@@ -1697,7 +1719,8 @@ export default function Services(props: ServicesProps = {}) {
                         </div>
                         {/* Pagination for map view */}
                         {(() => {
-                          const totalCount = servicesPagination?.total ?? mapViewServicesAll.length;
+                          if (!hasCoordsForTileForMap) return null;
+                          const totalCount = mapViewServicesAll.length;
                           const totalPages = Math.ceil(totalCount / mapViewItemsPerPage);
                           if (totalPages <= 1) return null;
                           const startIndex = (mapViewCurrentPage - 1) * mapViewItemsPerPage;
