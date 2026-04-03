@@ -29,21 +29,30 @@ import {
 // Category images mapping - using Unsplash placeholder images
 const categoryImages: Record<string, string> = {
   "contractors": "https://img.icons8.com/color/96/worker-male--v1.png",
-  "machines": "https://img.icons8.com/color/96/crane.png",
+  "machines": "/category%20images/machines%20resale%20image.png",
   "consultants": "https://img.icons8.com/external-flaticons-flat-flat-icons/64/external-consultant-gig-economy-flaticons-flat-flat-icons-2.png",
   "real-estate": "https://img.icons8.com/color/96/mansion.png",
   "tools": "https://img.icons8.com/color/96/maintenance.png",
   "manufacturer": "https://img.icons8.com/color/96/factory.png",
   "logistics": "https://img.icons8.com/color/96/delivery--v1.png",
   "traders": "https://img.icons8.com/color/96/supplier.png",
-  "rental-services": "https://img.icons8.com/color/96/key-exchange.png",
+  "rental-services": "/category%20images/machine%20rental%20image.png",
   "furniture": "https://img.icons8.com/color/96/furniture.png",
-  "construction-materials": "https://img.icons8.com/color/96/steel-i-beam.png",
-  "manpower": "https://img.icons8.com/color/96/workers-male--v1.png",
-  "technical-manpower": "https://img.icons8.com/color/96/engineer-skin-type-2.png",
+  "construction-materials": "/category%20images/construction%20material%20Image.png",
+  "manpower": "/category%20images/manpower%20image.png",
+  "technical-manpower": "/category%20images/technical%20manpower%20image.png",
   "finance": "https://img.icons8.com/color/96/bank-building.png",
   "construction-companies": "https://img.icons8.com/color/96/group-of-companies.png",
   "electrical-lighting": "https://img.icons8.com/color/96/light.png",
+};
+
+/** Full-bleed image tiles (no label) — same assets as `categoryImages` for these slugs. */
+const IMAGE_ONLY_TILES: Record<string, string> = {
+  "construction-materials": "/category%20images/construction%20material%20Image.png",
+  manpower: "/category%20images/manpower%20image.png",
+  "technical-manpower": "/category%20images/technical%20manpower%20image.png",
+  "rental-services": "/category%20images/machine%20rental%20image.png",
+  machines: "/category%20images/machines%20resale%20image.png",
 };
 
 // All 19 service categories with colorful custom icons
@@ -90,6 +99,23 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
         <div className="aspect-square bg-slate-100 rounded-xl transition-all duration-300 hover:shadow-lg hover:-translate-y-2 cursor-pointer flex items-center justify-center border border-slate-200">
         <span className="text-slate-400 text-xs font-medium">Coming Soon</span>
       </div>
+    );
+  }
+
+  const imageOnlySrc = IMAGE_ONLY_TILES[category.slug];
+  if (imageOnlySrc) {
+    return (
+      <Link href={servicesHref} className="block min-w-0">
+        <div className="group relative aspect-square rounded-lg border border-slate-200 overflow-hidden cursor-pointer bg-white">
+          <img
+            src={imageOnlySrc}
+            alt={category.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          />
+        </div>
+      </Link>
     );
   }
 
