@@ -69,6 +69,20 @@ function extractCityFromGoogleComponents(
   );
 }
 
+function pickLocalityLevelGeocodeResult(
+  results: google.maps.GeocoderResult[]
+): google.maps.GeocoderResult | null {
+  if (!results?.length) return null;
+  const pick = (type: string) => results.find((r) => r.types.includes(type));
+  return (
+    pick("locality") ||
+    pick("administrative_area_level_3") ||
+    pick("sublocality_level_1") ||
+    pick("administrative_area_level_2") ||
+    results[0]
+  );
+}
+
 export function useGoogleGeocoder({
   enabled = true,
   onPlaceSelect,
@@ -269,31 +283,70 @@ export function useGoogleGeocoder({
           }
           const geocoder = new google.maps.Geocoder();
           geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
-            const addr =
-              status === "OK" && results?.[0]?.formatted_address
-                ? results[0].formatted_address
-                : `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+            const fallbackAddr = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+            if (status !== "OK" || !results?.length) {
+              const placeData: PlaceDetails = {
+                formatted_address: fallbackAddr,
+                geometry: {
+                  location: {
+                    lat: () => latitude,
+                    lng: () => longitude,
+                  },
+                },
+                place_id: `rev-${latitude}-${longitude}`,
+                name: fallbackAddr,
+              };
+              setSelectedPlace(placeData);
+              if (inputRef.current) inputRef.current.value = fallbackAddr;
+              onPlaceSelect?.(placeData);
+              return;
+            }
+            const picked = pickLocalityLevelGeocodeResult(results);
+            if (!picked) {
+              const placeData: PlaceDetails = {
+                formatted_address: fallbackAddr,
+                geometry: {
+                  location: {
+                    lat: () => latitude,
+                    lng: () => longitude,
+                  },
+                },
+                place_id: `rev-${latitude}-${longitude}`,
+                name: fallbackAddr,
+              };
+              setSelectedPlace(placeData);
+              if (inputRef.current) inputRef.current.value = fallbackAddr;
+              onPlaceSelect?.(placeData);
+              return;
+            }
+            const latUse = picked.geometry.location.lat();
+            const lngUse = picked.geometry.location.lng();
+            const addr = picked.formatted_address || fallbackAddr;
             const feat: AddressSuggestionFeature = {
               place_name: addr,
-              center: [longitude, latitude],
-              id: `rev-${latitude}-${longitude}`,
+              center: [lngUse, latUse],
+              id: picked.place_id || `rev-${latUse}-${lngUse}`,
             };
-            const { city, state } = parseAddressContext(feat);
+            const parsed = parseAddressContext(feat);
+            const cityResolved =
+              extractCityFromGoogleComponents(picked.address_components) || parsed.city || undefined;
+            const cityLine = (cityResolved || parsed.city || "").trim();
+            const displayFormatted = cityLine || addr;
             const placeData: PlaceDetails = {
-              formatted_address: addr,
+              formatted_address: displayFormatted,
               geometry: {
                 location: {
-                  lat: () => latitude,
-                  lng: () => longitude,
+                  lat: () => latUse,
+                  lng: () => lngUse,
                 },
               },
               place_id: feat.id!,
-              name: addr,
-              city: city || undefined,
-              state: state || undefined,
+              name: displayFormatted,
+              city: cityResolved || cityLine || undefined,
+              state: parsed.state || undefined,
             };
             setSelectedPlace(placeData);
-            if (inputRef.current) inputRef.current.value = addr;
+            if (inputRef.current) inputRef.current.value = displayFormatted;
             onPlaceSelect?.(placeData);
           });
         },
