@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo } from "react";
+import { useUserLocation } from "@/contexts/UserLocationContext";
+import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
 import {
   ContractorsIcon,
   MachinesIcon,
@@ -72,7 +77,13 @@ interface ServicePlaceholderCardProps {
 }
 
 export function ServicePlaceholderCard({ index, size = "default" }: ServicePlaceholderCardProps) {
+  const { userLocation } = useUserLocation();
   const category = serviceCategories[index];
+
+  const servicesHref = useMemo(
+    () => `/services?${buildServicesBrowseQuery(category?.slug ?? "", userLocation)}`,
+    [category?.slug, userLocation]
+  );
 
   if (!category) {
     return (
@@ -88,7 +99,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   const categoryImage = categoryImages[category.slug] || null;
 
   return (
-    <Link href={`/services?category=${category.slug}`} className="block min-w-0">
+    <Link href={servicesHref} className="block min-w-0">
       {/* flex-col + icon area must not use h-full or it steals space from the label on narrow cards */}
       <div className="group relative aspect-square bg-white rounded-lg shadow-none transition-all duration-300 ease-out cursor-pointer flex flex-col items-stretch min-h-0 gap-1 px-1.5 py-2 sm:px-2 sm:py-2.5 border border-slate-200 overflow-hidden hover:border-transparent hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_10px_10px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1">
         {/* Image / icon — flex-1 + % width so icon scales with card */}
