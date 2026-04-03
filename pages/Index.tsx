@@ -1,4 +1,5 @@
 "use client";
+import { HomeRequirementPopup } from "@/components/home/HomeRequirementPopup";
 import { HeroSection } from "@/components/home/HeroSection";
 import { SearchBarSection } from "@/components/home/SearchBarSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
@@ -15,6 +16,7 @@ export async function getServerSideProps() {
 const Index = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <HomeRequirementPopup />
       <main className="flex-1">
         <HeroSection />
         <SearchBarSection />
