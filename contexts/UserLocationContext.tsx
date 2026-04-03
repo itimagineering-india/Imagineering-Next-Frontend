@@ -110,9 +110,11 @@ export function UserLocationProvider({ children }: { children: React.ReactNode }
           const data = await res.json();
           const addr = data?.address;
           if (addr) {
-            const city = addr.city || addr.town || addr.village || addr.county || addr.state;
-            const address = data?.display_name;
-            const fullLoc: UserLocation = { ...loc, city, address };
+            const city =
+              addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state;
+            const cityStr = city ? String(city).trim() : "";
+            const address = cityStr || (typeof data?.display_name === "string" ? data.display_name : "");
+            const fullLoc: UserLocation = { ...loc, city: cityStr || undefined, address };
             setUserLocationState(fullLoc);
             saveToStorage(fullLoc);
           }
