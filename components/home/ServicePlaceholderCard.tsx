@@ -48,11 +48,20 @@ const categoryImages: Record<string, string> = {
 
 /** Full-bleed image tiles (no label) — same assets as `categoryImages` for these slugs. */
 const IMAGE_ONLY_TILES: Record<string, string> = {
-  "construction-materials": "/category%20images/construction%20material%20Image.png",
-  manpower: "/category%20images/manpower%20image.png",
-  "technical-manpower": "/category%20images/technical%20manpower%20image.png",
-  "rental-services": "/category%20images/machine%20rental%20image.png",
-  machines: "/category%20images/machines%20resale%20image.png",
+  "construction-materials": "https://dwkazjggpovin.cloudfront.net/category%20images/construction%20material%20Image.png",
+  manpower: "https://dwkazjggpovin.cloudfront.net/category%20images/manpower%20image.png",
+  "technical-manpower": "https://dwkazjggpovin.cloudfront.net/category%20images/technical%20manpower%20image.png",
+  "rental-services": "https://dwkazjggpovin.cloudfront.net/category%20images/machine%20rental%20image.png",
+  machines: "https://dwkazjggpovin.cloudfront.net/category%20images/machine%20resale%20image.png",
+  "consultants": "https://dwkazjggpovin.cloudfront.net/category%20images/consultants%20image.png",
+  "real-estate": "https://dwkazjggpovin.cloudfront.net/category%20images/real%20estate%20image.png",
+  "tools": "https://dwkazjggpovin.cloudfront.net/category%20images/tools%20image.png",
+  "manufacturer": "https://dwkazjggpovin.cloudfront.net/category%20images/Manufacturer%20image.png",
+  "logistics": "https://dwkazjggpovin.cloudfront.net/category%20images/logistics%20image.png",
+  "traders": "https://dwkazjggpovin.cloudfront.net/category%20images/traders%20image.png",
+  finance: "https://dwkazjggpovin.cloudfront.net/category%20images/finance%20%26%20Insurance%20image.png",
+  "construction-companies": "https://dwkazjggpovin.cloudfront.net/category%20images/construction%20comapnies%20image.png",
+  contractors: "https://dwkazjggpovin.cloudfront.net/category%20images/contractors%20image.png",
 };
 
 // All 19 service categories with colorful custom icons
@@ -102,7 +111,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
     );
   }
 
-  const imageOnlySrc = IMAGE_ONLY_TILES[category.slug];
+  const imageOnlySrc = IMAGE_ONLY_TILES[category.slug] ?? categoryImages[category.slug] ?? null;
   if (imageOnlySrc) {
     return (
       <Link href={servicesHref} className="block min-w-0">
