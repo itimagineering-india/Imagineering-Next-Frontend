@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { HomeRequirementPopup } from "@/components/home/HomeRequirementPopup";
 import { HeroSection } from "@/components/home/HeroSection";
 import { SearchBarSection } from "@/components/home/SearchBarSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <HomeRequirementPopup />
       <main className="flex-1">
         <HeroSection />
         <SearchBarSection />
