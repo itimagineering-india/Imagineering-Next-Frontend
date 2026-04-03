@@ -20,8 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useServices } from "@/hooks/useServices";
-import { isGoogleMapsConfigured } from "@/lib/mapConfig";
-import { GoogleMap, type ServiceMarker, type ProviderMarker } from "@/components/map/GoogleMap";
+import { isBrowseMapAvailable } from "@/lib/publicMaps";
+import { BrowseMap, type ServiceMarker, type ProviderMarker } from "@/components/map/BrowseMap";
 
 import type { CitySeoContent } from "@/constants/citySeoContent";
 import { CitySeoSections } from "@/components/seo/CitySeoSections";
@@ -80,14 +80,18 @@ export default function Services(props: ServicesProps = {}) {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20; // Show 50 services per page
+  const BROWSE_PAGE_SIZE = 20;
+  const MAP_PAGE_SIZE = 50;
+  /** Grid/list first page; map without coords uses MAP_PAGE_SIZE until tile is available. */
+  const itemsPerPage = BROWSE_PAGE_SIZE;
   const mapRadiusKm = 50; // Map radius filter when user location is available
   // We do client-side pagination on `filteredServices`, so fetch enough services from the API.
   // Server-side pagination is used for the services API
   
   // Map view pagination (sidebar list) mirrors server-side pagination
   const mapViewCurrentPage = currentPage;
-  const mapViewItemsPerPage = itemsPerPage;
+  /** Align with API page size for map when coords not yet available (tile fetch omits limit). */
+  const mapViewItemsPerPage = MAP_PAGE_SIZE;
   
   // Map (Mappls) — fly-to from sidebar / cards
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -115,6 +119,25 @@ export default function Services(props: ServicesProps = {}) {
   const latParam = searchParams?.get("lat");
   const lngParam = searchParams?.get("lng");
   const radiusKmParam = searchParams?.get("radiusKm");
+
+  /** Block services fetch until URL/city coords known or browser geolocation finishes — stops duplicate cache keys (no-lat vs lat). */
+  const [locationGateReady, setLocationGateReady] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const hasUrl =
+      latParam &&
+      lngParam &&
+      Number.isFinite(parseFloat(latParam)) &&
+      Number.isFinite(parseFloat(lngParam));
+    const hasFixed =
+      fixedLat != null &&
+      fixedLng != null &&
+      Number.isFinite(fixedLat) &&
+      Number.isFinite(fixedLng);
+    if (hasUrl || hasFixed) return true;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return true;
+    return false;
+  });
+
   const maxPriceParam = searchParams?.get("maxPrice");
   const sortParam = searchParams?.get("sort") || "";
 
@@ -258,22 +281,6 @@ export default function Services(props: ServicesProps = {}) {
     return null;
   }, [categories, categoryParam]);
 
-  // Auto-detect user location on page load if not in URL params
-  // Always try to get location to show nearby services
-  useEffect(() => {
-    // Get location if:
-    // 1. Not already set
-    // 2. Not in URL params
-    // 3. Geolocation is available
-    if (!userLocation && !latParam && !lngParam && navigator.geolocation) {
-      getUserLocation().catch((error) => {
-        // If location access denied, don't set default location
-        // This allows all services to show when we can't get user location
-        console.log('Could not get user location:', error);
-      });
-    }
-  }, []); // Run once on mount
-
   // Update userLocationRef when userLocation changes
   useEffect(() => {
     userLocationRef.current = userLocation;
@@ -282,9 +289,19 @@ export default function Services(props: ServicesProps = {}) {
   // Build query params - only include valid values (no undefined)
   // When in map view, fetch more services so all markers show (like Google Maps did)
   const servicesParams = useMemo(() => {
+    const locationLat = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : null);
+    const locationLng = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : null);
+    const hasCoordsForTile =
+      typeof locationLat === "number" &&
+      typeof locationLng === "number" &&
+      Number.isFinite(locationLat) &&
+      Number.isFinite(locationLng);
+
     const params: any = {
       page: currentPage,
-      limit: viewMode === "map" ? 100 : itemsPerPage,
+      ...(hasCoordsForTile
+        ? {}
+        : { limit: viewMode === "map" ? MAP_PAGE_SIZE : BROWSE_PAGE_SIZE }),
     };
     
     // Priority: filters.category > URL categoryParam
@@ -302,6 +319,10 @@ export default function Services(props: ServicesProps = {}) {
     } else if (categoryParam && categories.length === 0) {
       // If we have categoryParam but categories haven't loaded yet, return empty params
       // This will prevent API call until categories are loaded
+      return null;
+    }
+
+    if (!locationGateReady) {
       return null;
     }
     
@@ -347,12 +368,12 @@ export default function Services(props: ServicesProps = {}) {
       if (sortParam === "rating") params.sort = "-rating";
     }
     
-    // Include location for backend radius filtering when available (city page uses fixedLat/fixedLng)
-    const locationLat = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : null);
-    const locationLng = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : null);
-    if (typeof locationLat === "number" && typeof locationLng === "number") {
-      params.lat = locationLat;
-      params.lng = locationLng;
+    // `tile` → backend matches `location.tileKey` (no radius / $geoNear).
+    if (hasCoordsForTile) {
+      params.tile = `${Math.floor(locationLat!)}_${Math.floor(locationLng!)}`;
+      if (viewMode === "map") {
+        params.compact = 1;
+      }
     }
 
     // If user came from header location search or city page (fixedLocationText), pass location to backend
@@ -368,7 +389,6 @@ export default function Services(props: ServicesProps = {}) {
     return params;
   }, [
     currentPage,
-    itemsPerPage,
     viewMode,
     categoryObj,
     categoryParam,
@@ -394,6 +414,7 @@ export default function Services(props: ServicesProps = {}) {
     fixedLng,
     maxPriceParam,
     sortParam,
+    locationGateReady,
   ]);
 
   // Reset UI pagination when the query context changes
@@ -426,6 +447,8 @@ export default function Services(props: ServicesProps = {}) {
     debounceMs: 0, // No debounce for initial load - fetch immediately
     immediate: true, // Fetch immediately, don't wait for map
   });
+
+  const servicesLoading = !locationGateReady || isLoading;
 
   // Fetch providers when in Providers browse mode
   useEffect(() => {
@@ -501,13 +524,15 @@ export default function Services(props: ServicesProps = {}) {
     console.log('[Services] useServices hook state:', {
       servicesCount: services.length,
       isLoading,
+      servicesLoading,
+      locationGateReady,
       error: servicesError,
       params: servicesParams,
       userLocation,
       latParam,
       lngParam,
     });
-  }, [services.length, isLoading, servicesError, servicesParams, userLocation, latParam, lngParam]);
+  }, [services.length, isLoading, servicesLoading, servicesError, servicesParams, locationGateReady, userLocation, latParam, lngParam]);
 
   // Show error toast if services fetch fails
   useEffect(() => {
@@ -691,8 +716,13 @@ export default function Services(props: ServicesProps = {}) {
       if (result.length === 0) return [];
     }
 
-    // Radius filter (50km) when user location is available
-    if (currentUserLocation && currentUserLocation.lat && currentUserLocation.lng) {
+    // Radius filter (50km) for grid/list — map uses tile-scoped API; 50km here would drop edge-of-tile services.
+    if (
+      viewMode !== "map" &&
+      currentUserLocation &&
+      currentUserLocation.lat &&
+      currentUserLocation.lng
+    ) {
       result = result.filter((s) => {
         const distance = (s as any)._distance;
         // Keep items without coordinates so map can geocode them later
@@ -708,7 +738,7 @@ export default function Services(props: ServicesProps = {}) {
     }
 
     return result;
-  }, [servicesWithDistances, filters.verified, filters.deliveryTime, currentUserLocation]);
+  }, [servicesWithDistances, filters.verified, filters.deliveryTime, currentUserLocation, viewMode]);
 
   // Reset pagination when results change
   useEffect(() => {
@@ -841,13 +871,7 @@ export default function Services(props: ServicesProps = {}) {
 
   const providersMapTotalPages = Math.max(1, Math.ceil(mapViewProvidersAll.length / PROVIDERS_MAP_PER_PAGE));
 
-  const mapReady = isGoogleMapsConfigured();
-
-  // Fetch user location for map center when in map view
-  useEffect(() => {
-    if (!mapReady || viewMode !== "map" || userLocation) return;
-    getUserLocation().catch(() => {});
-  }, [mapReady, viewMode]);
+  const mapReady = isBrowseMapAvailable();
 
   // Map center for Mappls (city → URL → user search location → map-only GPS → Delhi)
   const mapCenter = useMemo(() => {
@@ -932,7 +956,7 @@ export default function Services(props: ServicesProps = {}) {
 
   // Dismiss loading toast when services finish loading
   useEffect(() => {
-    if (!isLoading && filterChangeToastRef.current !== null) {
+    if (!servicesLoading && filterChangeToastRef.current !== null) {
       dismissToast(String(filterChangeToastRef.current));
       
       // Show success toast briefly
@@ -946,11 +970,11 @@ export default function Services(props: ServicesProps = {}) {
       filterChangeToastRef.current = null;
     }
 
-    if (!isLoading && paginationToastRef.current !== null) {
+    if (!servicesLoading && paginationToastRef.current !== null) {
       dismissToast(String(paginationToastRef.current));
       paginationToastRef.current = null;
     }
-  }, [isLoading, filteredServices.length, toast, dismissToast]);
+  }, [servicesLoading, filteredServices.length, toast, dismissToast]);
 
   const currentCategory = categories.find((c) => c.slug === categoryParam);
 
@@ -1000,7 +1024,7 @@ export default function Services(props: ServicesProps = {}) {
   };
 
   // Get user's current location (updates userLocation state - affects search/filter)
-  const getUserLocation = (): Promise<{ lat: number; lng: number }> => {
+  const getUserLocation = useCallback((): Promise<{ lat: number; lng: number }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("Geolocation is not supported by this browser."));
@@ -1049,7 +1073,33 @@ export default function Services(props: ServicesProps = {}) {
         }
       );
     });
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    const hasUrl =
+      latParam &&
+      lngParam &&
+      Number.isFinite(parseFloat(latParam)) &&
+      Number.isFinite(parseFloat(lngParam));
+    const hasFixed =
+      fixedLat != null &&
+      fixedLng != null &&
+      Number.isFinite(fixedLat) &&
+      Number.isFinite(fixedLng);
+
+    if (hasUrl || hasFixed) {
+      setLocationGateReady(true);
+      return;
+    }
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationGateReady(true);
+      return;
+    }
+
+    getUserLocation()
+      .catch(() => {})
+      .finally(() => setLocationGateReady(true));
+  }, [latParam, lngParam, fixedLat, fixedLng, getUserLocation]);
 
 
 
@@ -1233,7 +1283,7 @@ export default function Services(props: ServicesProps = {}) {
                           zIndex: viewMode === "map" ? 1 : -1,
                         }}
                       >
-                        <GoogleMap
+                        <BrowseMap
                           center={mapCenter}
                           zoom={12}
                           serviceMarkers={mapServiceMarkers}
@@ -1256,7 +1306,16 @@ export default function Services(props: ServicesProps = {}) {
                             <div>
                               <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">Map access required</h3>
                               <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
-                                Add a <strong>Google Maps</strong> API key from{" "}
+                                Add a <strong>Mapbox</strong> public token (recommended for the public site) from{" "}
+                                <a
+                                  href="https://account.mapbox.com/"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary underline"
+                                >
+                                  Mapbox
+                                </a>
+                                , or a <strong>Google Maps</strong> key from{" "}
                                 <a
                                   href="https://console.cloud.google.com/google/maps-apis"
                                   target="_blank"
@@ -1265,20 +1324,25 @@ export default function Services(props: ServicesProps = {}) {
                                 >
                                   Google Cloud Console
                                 </a>
-                                . Enable <strong>Maps JavaScript API</strong> and <strong>Places API</strong>.
+                                . For Google-only setup, enable <strong>Maps JavaScript API</strong> and{" "}
+                                <strong>Places API</strong>.
                               </p>
                               <div className="text-left bg-muted p-2.5 md:p-3 rounded-lg space-y-1.5 md:space-y-2">
-                                <p className="text-[11px] md:text-xs font-medium">Steps:</p>
-                                <ol className="text-[10px] md:text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                                  <li>Create an API key and restrict it by HTTP referrer in Google Cloud.</li>
+                                <p className="text-[11px] md:text-xs font-medium">Environment (e.g. .env.local):</p>
+                                <ul className="text-[10px] md:text-xs text-muted-foreground space-y-1 list-disc list-inside">
                                   <li>
-                                    In <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs">.env.local</code>:{" "}
-                                    <code className="px-1 py-0.5 bg-background rounded text-[10px] md:text-xs break-all">
+                                    <code className="px-1 py-0.5 bg-background rounded break-all">
+                                      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=...
+                                    </code>
+                                  </li>
+                                  <li>
+                                    or{" "}
+                                    <code className="px-1 py-0.5 bg-background rounded break-all">
                                       NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
                                     </code>
                                   </li>
-                                  <li>Restart the dev server</li>
-                                </ol>
+                                </ul>
+                                <p className="text-[10px] md:text-xs text-muted-foreground">Restart the dev server after changes.</p>
                               </div>
                               <Button variant="outline" size="sm" onClick={() => setViewMode("grid")} className="mt-4">
                                 Switch to Grid View
@@ -1477,7 +1541,7 @@ export default function Services(props: ServicesProps = {}) {
                           </Button>
                         </div>
                       )
-                    ) : isLoading ? (
+                    ) : servicesLoading ? (
                       <div className="space-y-3">
                         <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">
                           Services on Map
@@ -1726,7 +1790,7 @@ export default function Services(props: ServicesProps = {}) {
                           );
                         })()}
                       </>
-                    ) : isLoading ? (
+                    ) : servicesLoading ? (
                       /* Loading State with Skeleton for Map View Sidebar */
                       <div className="space-y-3">
                         {Array.from({ length: 5 }).map((_, index) => (
@@ -1945,7 +2009,7 @@ export default function Services(props: ServicesProps = {}) {
                     </div>
                   </div>
                 )
-              ) : isLoading ? (
+              ) : servicesLoading ? (
                 /* Loading State with Skeleton for Grid/List View */
                 <div className="space-y-3 md:space-y-4">
                   <div
@@ -1994,7 +2058,12 @@ export default function Services(props: ServicesProps = {}) {
                       const totalCount = servicesPagination?.total ?? filteredServices.length;
                       const totalPages = Math.ceil(totalCount / itemsPerPage);
                       const startIndex = (currentPage - 1) * itemsPerPage + 1;
-                      const endIndex = Math.min(currentPage * itemsPerPage, totalCount);
+                      const endIndexRaw = startIndex + filteredServices.length - 1;
+                      const endIndex = totalPages > 1 ? Math.min(endIndexRaw, totalCount) : endIndexRaw;
+
+                      // If backend doesn't compute `total`, we still allow Next/Prev using "hasMore".
+                      const hasMore = filteredServices.length === itemsPerPage;
+                      const hasAccurateTotal = typeof servicesPagination?.total === "number";
                       
                       return (
                         <>
@@ -2023,12 +2092,13 @@ export default function Services(props: ServicesProps = {}) {
                           </div>
                           
                           {/* Pagination Info and Controls */}
-                          {totalPages > 1 && (
+                          {(totalPages > 1 || hasMore || currentPage > 1) && (
                             <div className="mt-6 md:mt-8 lg:mt-10 px-4 space-y-4">
                               {/* Pagination Info */}
                               <div className="text-center text-sm text-muted-foreground">
-                                Showing {startIndex}-{endIndex} of {totalCount} services
-                                {totalPages > 1 && ` (Page ${currentPage} of ${totalPages})`}
+                                Showing {startIndex}-{endIndex}
+                                {hasAccurateTotal ? ` of ${totalCount} services` : ""}
+                                {totalPages > 1 ? ` (Page ${currentPage} of ${totalPages})` : ""}
                               </div>
                               
                               {/* Pagination Controls */}
@@ -2045,7 +2115,7 @@ export default function Services(props: ServicesProps = {}) {
                                   <span className="sm:hidden">Prev</span>
                                 </Button>
                                 
-                                {(() => {
+                                {totalPages > 1 && (() => {
                                   const pages: (number | string)[] = [];
                                   const maxVisible = 5;
                                   
@@ -2104,8 +2174,8 @@ export default function Services(props: ServicesProps = {}) {
                                   variant="outline" 
                                   size="sm" 
                                   className="text-xs md:text-sm"
-                                  disabled={currentPage === totalPages}
-                                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                  disabled={!hasMore}
+                                  onClick={() => setCurrentPage((prev) => prev + 1)}
                                 >
                                   <span className="hidden sm:inline">Next</span>
                                   <span className="sm:hidden">Next</span>
