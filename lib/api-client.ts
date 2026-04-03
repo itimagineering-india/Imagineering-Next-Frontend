@@ -1934,7 +1934,8 @@ export const api = {
       title: string;
       description: string;
       category?: string;
-      location?: { address?: string; city?: string; state?: string; zipCode?: string };
+      location?: string | { address?: string; city?: string; state?: string; zipCode?: string };
+      contactPhone?: string;
       budgetMin?: number;
       budgetMax?: number;
       expectedBudget?: number;
