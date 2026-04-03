@@ -1,9 +1,11 @@
 "use client";
-import { useCallback, useRef, memo } from "react";
+import { useCallback, useRef, useMemo, memo } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServicesList, type ServicesListHandle } from "./ServicesList";
+import type { UserLocation } from "@/contexts/UserLocationContext";
+import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
 
 interface Service {
   id: string;
@@ -25,6 +27,8 @@ interface CategoryScrollSectionProps {
   favoritesById: Record<string, boolean>;
   favoritesVersion: number;
   onToggleFavorite: (serviceId: string) => void;
+  /** When set, `/services` links include tile + lat/lng so the listing is not capped to the no-geo limit. */
+  userLocation?: UserLocation | null;
 }
 
 function CategoryScrollSectionComponent({
@@ -35,9 +39,18 @@ function CategoryScrollSectionComponent({
   favoritesById,
   favoritesVersion,
   onToggleFavorite,
+  userLocation = null,
 }: CategoryScrollSectionProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const listHandleRef = useRef<ServicesListHandle | null>(null);
+
+  const categoryHeaderHref = useMemo(() => {
+    const q = buildServicesBrowseQuery(
+      categorySlug ? categorySlug : title,
+      userLocation
+    );
+    return `/services?${q}`;
+  }, [categorySlug, title, userLocation]);
 
   /* =======================
      SCROLL HANDLER
@@ -53,14 +66,7 @@ function CategoryScrollSectionComponent({
     <section ref={sectionRef} className="py-3 md:py-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
-        <Link
-          href={
-            categorySlug
-              ? `/services?category=${categorySlug}`
-              : `/services?category=${encodeURIComponent(title)}`
-          }
-          className="flex items-center gap-2 group min-w-0 flex-1"
-        >
+        <Link href={categoryHeaderHref} className="flex items-center gap-2 group min-w-0 flex-1">
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold truncate text-slate-900 group-hover:text-red-500 transition">
             {title}
           </h2>
