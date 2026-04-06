@@ -159,8 +159,25 @@ interface SubscriptionPlan {
   name: string;
   type: "buyer" | "provider";
   price: number;
+  discountedPrice?: number | null;
   billingCycle: "monthly" | "yearly";
   description?: string;
+}
+
+function effectivePlanCharge(plan: { price: number; discountedPrice?: number | null }): number {
+  const list = Math.max(0, Number(plan.price) || 0);
+  const d = plan.discountedPrice;
+  if (d !== undefined && d !== null && !Number.isNaN(Number(d))) {
+    return Math.max(0, Number(d));
+  }
+  return list;
+}
+
+function mrpForStrikeThrough(plan: SubscriptionPlan): number | undefined {
+  const d = plan.discountedPrice;
+  if (d === undefined || d === null || Number.isNaN(Number(d))) return undefined;
+  if (Number(d) === Number(plan.price)) return undefined;
+  return Math.max(0, Number(plan.price));
 }
 
 export default function Pricing() {
@@ -217,14 +234,9 @@ export default function Pricing() {
     setUserRole(((user as any)?.role as "buyer" | "provider" | "admin") || null);
   }, [user, isAuthLoading]);
 
-  const formatPrice = (price: number) => {
-    if (!price) return 0;
-    return price;
-  };
-
   const planSubtitle = (plan: SubscriptionPlan, role: "buyer" | "provider") => {
     if (plan.description?.trim()) return plan.description.trim();
-    if (plan.price === 0) {
+    if (effectivePlanCharge(plan) === 0) {
       return role === "buyer"
         ? "Free plan with standard platform fees"
         : "Free provider plan with standard commission";
@@ -350,7 +362,8 @@ export default function Pricing() {
                           >
                             <PricingCard
                               name={plan.name}
-                              price={formatPrice(plan.price)}
+                              price={effectivePlanCharge(plan)}
+                              listPriceStrikeThrough={mrpForStrikeThrough(plan)}
                               billing={
                                 plan.billingCycle === "yearly"
                                   ? "per year"
@@ -365,21 +378,21 @@ export default function Pricing() {
                                 "Access to featured providers and verified pros",
                               ]}
                               limitations={
-                                plan.price === 0
+                                effectivePlanCharge(plan) === 0
                                   ? ["Advanced benefits may require paid plans"]
                                   : []
                               }
                               cta={
-                                plan.price === 0
+                                effectivePlanCharge(plan) === 0
                                   ? "Get Started"
                                   : "Upgrade Buyer Plan"
                               }
                               popular={
-                                plan.price > 0 &&
+                                effectivePlanCharge(plan) > 0 &&
                                 plan.billingCycle === "yearly"
                               }
                               savingsBadge={
-                                plan.price > 0 &&
+                                effectivePlanCharge(plan) > 0 &&
                                 plan.billingCycle === "yearly"
                                   ? "Save 20%"
                                   : undefined
@@ -387,7 +400,7 @@ export default function Pricing() {
                               subscriptionId={plan._id}
                               subscriptionType="buyer"
                               onActivate={async () => {
-                                if (plan.price === 0) {
+                                if (effectivePlanCharge(plan) === 0) {
                                   try {
                                     const res =
                                       await api.subscriptions.activate({
@@ -465,7 +478,8 @@ export default function Pricing() {
                           >
                             <PricingCard
                               name={plan.name}
-                              price={formatPrice(plan.price)}
+                              price={effectivePlanCharge(plan)}
+                              listPriceStrikeThrough={mrpForStrikeThrough(plan)}
                               billing={
                                 plan.billingCycle === "yearly"
                                   ? "per year"
@@ -480,23 +494,23 @@ export default function Pricing() {
                                 "Access to basic analytics and buyer insights",
                               ]}
                               limitations={
-                                plan.price === 0
+                                effectivePlanCharge(plan) === 0
                                   ? [
                                       "Advanced visibility & analytics require paid plans",
                                     ]
                                   : []
                               }
                               cta={
-                                plan.price === 0
+                                effectivePlanCharge(plan) === 0
                                   ? "Get Started"
                                   : "Upgrade Provider Plan"
                               }
                               popular={
-                                plan.price > 0 &&
+                                effectivePlanCharge(plan) > 0 &&
                                 plan.billingCycle === "yearly"
                               }
                               savingsBadge={
-                                plan.price > 0 &&
+                                effectivePlanCharge(plan) > 0 &&
                                 plan.billingCycle === "yearly"
                                   ? "Save 20%"
                                   : undefined
@@ -504,7 +518,7 @@ export default function Pricing() {
                               subscriptionId={plan._id}
                               subscriptionType="provider"
                               onActivate={async () => {
-                                if (plan.price === 0) {
+                                if (effectivePlanCharge(plan) === 0) {
                                   try {
                                     const res =
                                       await api.subscriptions.activate({
