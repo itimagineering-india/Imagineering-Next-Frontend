@@ -31,11 +31,13 @@ import {
   List,
   Search,
   Loader2,
+  Phone,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBuyerPremium } from "@/hooks/useBuyerPremium";
+import { useAuth } from "@/contexts/AuthContext";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -120,7 +122,8 @@ export default function ProviderProfile() {
   const id = typeof params?.id === "string" ? params.id : params?.id?.[0];
   const router = useRouter();
   const { toast } = useToast();
-  const { isPremium: isBuyerPremium } = useBuyerPremium();
+  const { user, isAuthenticated } = useAuth();
+  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
   const [provider, setProvider] = useState<ProviderData | null>(null);
   const [services, setServices] = useState<ServiceData[]>([]);
   const [totalServices, setTotalServices] = useState(0);
@@ -368,6 +371,42 @@ export default function ProviderProfile() {
     };
   }, [provider]);
 
+  const handleCallNow = useCallback(() => {
+    const buyerPlansPath = "/subscriptions/buyer";
+    if (!isAuthenticated) {
+      router.push(buyerPlansPath);
+      return;
+    }
+    if (user?.role === "buyer") {
+      if (!isBuyerPremium) {
+        router.push(buyerPlansPath);
+        return;
+      }
+    } else {
+      router.push(buyerPlansPath);
+      return;
+    }
+    const raw = providerDisplay?.phone?.trim();
+    if (!raw) {
+      toast({
+        title: "Phone unavailable",
+        description: "This provider has not shared a phone number yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const dial = raw.replace(/[^\d+]/g, "");
+    if (!dial) {
+      toast({
+        title: "Invalid number",
+        description: "Could not start a call from this number.",
+        variant: "destructive",
+      });
+      return;
+    }
+    window.location.href = `tel:${dial}`;
+  }, [isAuthenticated, user?.role, isBuyerPremium, router, toast, providerDisplay?.phone]);
+
   // Loading state
   if (loading) {
     return (
@@ -554,11 +593,25 @@ export default function ProviderProfile() {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button className="w-full" size="lg" asChild>
-                    <Link href="#services">
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      View Services
-                    </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-red-600 bg-red-600 text-white hover:bg-red-700 hover:border-red-700 hover:text-white"
+                    size="lg"
+                    onClick={handleCallNow}
+                    disabled={isAuthenticated && user?.role === "buyer" && buyerSubLoading}
+                  >
+                    {isAuthenticated && user?.role === "buyer" && buyerSubLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Checking subscription…
+                      </>
+                    ) : (
+                      <>
+                        <Phone className="mr-2 h-4 w-4" />
+                        Call Now
+                      </>
+                    )}
                   </Button>
 
                   <Button
@@ -568,11 +621,6 @@ export default function ProviderProfile() {
                     onClick={() => {
                       if (!provider?.user?._id) return;
                       if (!isBuyerPremium) {
-                        toast({
-                          title: "Subscription Required",
-                          description: "Please subscribe to a buyer plan to chat with providers.",
-                          variant: "destructive",
-                        });
                         router.push("/subscriptions/buyer");
                         return;
                       }
@@ -581,12 +629,6 @@ export default function ProviderProfile() {
                   >
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Chat with Provider
-                  </Button>
-
-                  <Button variant="ghost" className="w-full" asChild>
-                    <Link href="/pricing">
-                      {isBuyerPremium ? "Manage Subscription" : "View Plans"}
-                    </Link>
                   </Button>
                 </CardContent>
               </Card>
