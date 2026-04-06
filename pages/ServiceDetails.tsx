@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight, Home, Share2, Heart, Star, MapPin, MessageCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { ChevronRight, Home, Share2, Heart, Star, MapPin, MessageCircle, CheckCircle2, Loader2, Phone } from "lucide-react";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBuyerPremium } from "@/hooks/useBuyerPremium";
@@ -330,7 +330,45 @@ export default function ServiceDetails() {
     setRequestModalOpen(true);
   }, [isAuthenticated, service, actualId, router, toast, canBook]);
 
-  const { isPremium: isBuyerPremium } = useBuyerPremium();
+  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
+
+  const handleCallNow = useCallback(() => {
+    const buyerPlansPath = "/subscriptions/buyer";
+
+    if (!isAuthenticated) {
+      router.push(buyerPlansPath);
+      return;
+    }
+
+    if (user?.role === "buyer") {
+      if (!isBuyerPremium) {
+        router.push(buyerPlansPath);
+        return;
+      }
+    } else {
+      router.push(buyerPlansPath);
+      return;
+    }
+    const raw = service?.provider?.phone?.trim();
+    if (!raw) {
+      toast({
+        title: "Phone unavailable",
+        description: "This provider has not shared a phone number yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const dial = raw.replace(/[^\d+]/g, "");
+    if (!dial) {
+      toast({
+        title: "Invalid number",
+        description: "Could not start a call from this number.",
+        variant: "destructive",
+      });
+      return;
+    }
+    window.location.href = `tel:${dial}`;
+  }, [isAuthenticated, user?.role, isBuyerPremium, router, toast, service?.provider?.phone]);
 
   const handleOpenChat = useCallback(() => {
     if (!isAuthenticated) {
@@ -820,6 +858,26 @@ export default function ServiceDetails() {
                           {isAuthenticated ? primaryCTA : "Login to Continue"}
                         </Button>
                       )}
+                      <Button
+                        type="button"
+                        onClick={handleCallNow}
+                        variant="outline"
+                        className="w-full h-11 border-2 border-red-600 bg-red-600 text-white hover:bg-red-700 hover:border-red-700 hover:text-white"
+                        size="lg"
+                        disabled={isAuthenticated && user?.role === "buyer" && buyerSubLoading}
+                      >
+                        {isAuthenticated && user?.role === "buyer" && buyerSubLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Checking subscription…
+                          </>
+                        ) : (
+                          <>
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call Now
+                          </>
+                        )}
+                      </Button>
                       {/* Chat - platform-only contact (OLX style) */}
                       <Button
                         onClick={handleOpenChat}
