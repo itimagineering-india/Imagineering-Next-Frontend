@@ -7,7 +7,10 @@ import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 
 interface PricingCardProps {
   name: string;
+  /** Charged amount (after admin discount if any). */
   price: number;
+  /** Optional MRP struck through when a discounted price applies. */
+  listPriceStrikeThrough?: number;
   billing: string;
   description: string;
   features: string[];
@@ -24,6 +27,7 @@ interface PricingCardProps {
 export function PricingCard({
   name,
   price,
+  listPriceStrikeThrough,
   billing,
   description,
   features,
@@ -76,15 +80,24 @@ export function PricingCard({
           {description}
         </p>
         <div className="mt-5 flex flex-col items-center gap-2">
-          <div className="flex flex-wrap items-baseline justify-center gap-x-1">
-            <span className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              {priceDisplay}
-            </span>
-            {price > 0 && (
-              <span className="text-sm font-medium text-slate-500 sm:text-base">
-                {billing}
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-wrap items-baseline justify-center gap-x-1">
+              <span className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                {priceDisplay}
               </span>
-            )}
+              {price > 0 && (
+                <span className="text-sm font-medium text-slate-500 sm:text-base">
+                  {billing}
+                </span>
+              )}
+            </div>
+            {listPriceStrikeThrough != null &&
+              listPriceStrikeThrough > 0 &&
+              listPriceStrikeThrough !== price && (
+                <span className="text-sm font-medium text-slate-400 line-through">
+                  ₹{listPriceStrikeThrough.toLocaleString("en-IN")}
+                </span>
+              )}
           </div>
           {savingsBadge ? (
             <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-900">
