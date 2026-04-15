@@ -15,6 +15,7 @@ export interface PlaceDetails {
   name?: string;
   city?: string;
   state?: string;
+  postalCode?: string;
 }
 
 interface UseGoogleGeocoderOptions {
@@ -54,19 +55,52 @@ function extractCityFromGoogleComponents(
   components?: google.maps.GeocoderAddressComponent[]
 ): string {
   if (!components?.length) return "";
-  const pick = (...types: string[]) => {
-    for (const t of types) {
-      const c = components.find((x) => x.types.includes(t));
-      if (c?.long_name?.trim()) return c.long_name.trim();
-    }
-    return "";
-  };
-  return pick(
+  return extractLongNameFromGoogleComponents(
+    components,
     "locality",
     "sublocality_level_1",
     "administrative_area_level_3",
     "administrative_area_level_2"
   );
+}
+
+function extractLongNameFromGoogleComponents(
+  components: google.maps.GeocoderAddressComponent[] | undefined,
+  ...types: string[]
+): string {
+  if (!components?.length) return "";
+  for (const t of types) {
+    const c = components.find((x) => x.types.includes(t));
+    if (c?.long_name?.trim()) return c.long_name.trim();
+  }
+  return "";
+}
+
+function extractStateFromGoogleComponents(
+  components?: google.maps.GeocoderAddressComponent[]
+): string {
+  return extractLongNameFromGoogleComponents(
+    components,
+    "administrative_area_level_1",
+    "administrative_area_level_2"
+  );
+}
+
+function extractPostalCodeFromGoogleComponents(
+  components?: google.maps.GeocoderAddressComponent[]
+): string {
+  return extractLongNameFromGoogleComponents(components, "postal_code");
+}
+
+function extractPostalCodeFromGoogleResults(
+  results?: google.maps.GeocoderResult[]
+): string {
+  if (!results?.length) return "";
+  for (const result of results) {
+    const postal = extractPostalCodeFromGoogleComponents(result.address_components);
+    if (postal) return postal;
+  }
+  return "";
 }
 
 function pickLocalityLevelGeocodeResult(
@@ -239,6 +273,9 @@ export function useGoogleGeocoder({
           const parsed = parseAddressContext({ ...s, place_name: formatted });
           const cityResolved =
             extractCityFromGoogleComponents(place.address_components) || parsed.city || "";
+          const stateResolved =
+            extractStateFromGoogleComponents(place.address_components) || parsed.state || "";
+          const postalCodeResolved = extractPostalCodeFromGoogleComponents(place.address_components);
           const placeData: PlaceDetails = {
             formatted_address: formatted,
             geometry: {
@@ -250,7 +287,8 @@ export function useGoogleGeocoder({
             place_id: s.id!,
             name: place.name || formatted,
             city: cityResolved || undefined,
-            state: parsed.state || undefined,
+            state: stateResolved || undefined,
+            postalCode: postalCodeResolved || undefined,
           };
           setSelectedPlace(placeData);
           setSuggestions([]);
@@ -330,6 +368,12 @@ export function useGoogleGeocoder({
             const parsed = parseAddressContext(feat);
             const cityResolved =
               extractCityFromGoogleComponents(picked.address_components) || parsed.city || undefined;
+            const stateResolved =
+              extractStateFromGoogleComponents(picked.address_components) || parsed.state || undefined;
+            const postalCodeResolved =
+              extractPostalCodeFromGoogleComponents(picked.address_components) ||
+              extractPostalCodeFromGoogleResults(results) ||
+              undefined;
             const cityLine = (cityResolved || parsed.city || "").trim();
             const displayFormatted = cityLine || addr;
             const placeData: PlaceDetails = {
@@ -343,7 +387,8 @@ export function useGoogleGeocoder({
               place_id: feat.id!,
               name: displayFormatted,
               city: cityResolved || cityLine || undefined,
-              state: parsed.state || undefined,
+              state: stateResolved || undefined,
+              postalCode: postalCodeResolved,
             };
             setSelectedPlace(placeData);
             if (inputRef.current) inputRef.current.value = displayFormatted;
