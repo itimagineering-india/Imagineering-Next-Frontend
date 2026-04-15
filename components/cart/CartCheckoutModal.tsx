@@ -25,6 +25,7 @@ import {
   Receipt,
   ClipboardList,
   Wallet,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
@@ -245,11 +246,14 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     onPlaceSelect: (place) => {
       const formatted = place.formatted_address || "";
       const { addr, parsedCity, parsedState, parsedZip } = parseAddress(formatted);
+      const resolvedCity = (place.city || parsedCity || "").trim();
+      const resolvedState = (place.state || parsedState || "").trim();
+      const resolvedZip = (place.postalCode || parsedZip || "").trim();
 
       setAddress(addr || formatted);
-      setCity(parsedCity);
-      setStateVal(parsedState);
-      setZip(parsedZip);
+      setCity(resolvedCity);
+      setStateVal(resolvedState);
+      setZip(resolvedZip);
       setIsGettingLocation(false);
     },
     onError: () => {
@@ -859,18 +863,39 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   </div>
                 </BookingSectionCard>
 
-                <BookingSectionCard icon={Wallet} title="Payment method">
-                  <PaymentOptionsSelector
-                    value={paymentMethod}
-                    onChange={(v) => {
-                      setPaymentMethod(v);
-                      if (v !== "neft") setNeftReceiptFile(null);
-                      if (v !== "sbicollect") setSbiCollectReceiptFile(null);
-                    }}
-                    amount={amount}
-                    className="[&>label]:text-xs [&>label]:font-medium [&>label]:text-slate-600 dark:[&>label]:text-slate-400"
-                  />
-                </BookingSectionCard>
+                <div className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-[#f9fafb] shadow-sm dark:border-slate-800 dark:bg-muted/40">
+                  <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-sky-50/60 px-4 py-3.5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20 sm:px-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
+                          <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Payment method</p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400">Select your preferred gateway to continue</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Imagineering India Secure Pay
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+                    <PaymentOptionsSelector
+                      value={paymentMethod}
+                      onChange={(v) => {
+                        setPaymentMethod(v);
+                        if (v !== "neft") setNeftReceiptFile(null);
+                        if (v !== "sbicollect") setSbiCollectReceiptFile(null);
+                      }}
+                      amount={amount}
+                    />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      You can switch payment method anytime before placing this order.
+                    </p>
+                  </div>
+                </div>
 
                 {paymentMethod === "sbicollect" && (
                   <div className="space-y-3 rounded-[12px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-5">
