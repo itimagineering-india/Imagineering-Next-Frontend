@@ -1252,6 +1252,11 @@ export const api = {
           startDate: Date;
           endDate: Date;
         };
+        invoice?: {
+          id: string;
+          invoiceNumber: string;
+          downloadUrl: string;
+        } | null;
       }>('/api/payments/verify', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -1276,6 +1281,11 @@ export const api = {
           startDate: Date;
           endDate: Date;
         };
+        invoice?: {
+          id: string;
+          invoiceNumber: string;
+          downloadUrl: string;
+        } | null;
       }>('/api/payments/cashfree/verify', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -2111,6 +2121,7 @@ export const api = {
           status: 'paid' | 'refunded' | 'cancelled';
           invoiceDate: string;
           createdAt: string;
+          invoiceType?: string;
         }>;
         pagination: {
           page: number;
