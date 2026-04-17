@@ -39,13 +39,16 @@ export default function Chat() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
-  const { isPremium: isProviderPremium, loading: providerSubLoading } = useProviderPremium();
-  const subscriptionLoading = user?.role === "buyer" ? buyerSubLoading : providerSubLoading;
-  const isProviderWithoutSub = user?.role === "provider" && !providerSubLoading && !isProviderPremium;
   const providerIdParam = searchParams?.get("providerId");
   const serviceIdParam = searchParams?.get("serviceId");
   const otherNameParam = searchParams?.get("name");
+  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
+  const { isPremium: isProviderPremium, loading: providerSubLoading } = useProviderPremium();
+  const needsBuyerPlanToUseChat =
+    user?.role === "buyer" || (user?.role === "provider" && !!providerIdParam);
+  const isProviderWithoutSub = user?.role === "provider" && !providerSubLoading && !isProviderPremium;
+  const blockProviderMessagingForInbox =
+    isProviderWithoutSub && !(!!providerIdParam && isBuyerPremium);
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
@@ -89,6 +92,10 @@ export default function Chat() {
     )
       return;
 
+    const requiresBuyerPlan =
+      user?.role === "buyer" || (user?.role === "provider" && !!providerIdParam);
+    if (requiresBuyerPlan && (buyerSubLoading || !isBuyerPremium)) return;
+
     const openConversation = async () => {
       setOpeningConv(true);
       setOpenError(null);
@@ -123,7 +130,16 @@ export default function Chat() {
     };
 
     openConversation();
-  }, [isAuthenticated, user?._id, providerIdParam, serviceIdParam, otherNameParam]);
+  }, [
+    isAuthenticated,
+    user?._id,
+    user?.role,
+    providerIdParam,
+    serviceIdParam,
+    otherNameParam,
+    buyerSubLoading,
+    isBuyerPremium,
+  ]);
 
   // Load conversations
   useEffect(() => {
@@ -203,9 +219,9 @@ export default function Chat() {
     });
   }, [blockedListOpen, blockedUsers]);
 
-  // Subscribe to messages for selected conversation (providers without sub don't load messages)
+  // Subscribe to messages for selected conversation (provider inbox needs supplier plan unless buyer-side chat)
   useEffect(() => {
-    if (!selectedConv?.id || isProviderWithoutSub) {
+    if (!selectedConv?.id || blockProviderMessagingForInbox) {
       setMessages([]);
       return;
     }
@@ -214,7 +230,7 @@ export default function Chat() {
       setMessages(msgs);
     });
     return () => unsubscribe();
-  }, [selectedConv?.id, isProviderWithoutSub]);
+  }, [selectedConv?.id, blockProviderMessagingForInbox]);
 
   const handleSend = async () => {
     if (!input.trim() || !selectedConv || !user?._id || sending) return;
@@ -313,22 +329,32 @@ export default function Chat() {
     return null;
   }
 
-  // Buyers need subscription to chat
-  if (user?.role === "buyer" && !subscriptionLoading && !isBuyerPremium) {
-    return (
-      <div className="min-h-screen flex flex-col bg-background">
-        <main className="flex-1 container max-w-md mx-auto px-4 py-12 flex flex-col items-center justify-center text-center">
-          <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Subscription Required</h2>
-          <p className="text-muted-foreground mb-6">
-            Please subscribe to a buyer plan to chat with providers.
-          </p>
-          <Button onClick={() => router.push("/subscriptions/buyer")}>
-            View Subscription Plans
-          </Button>
-        </main>
-      </div>
-    );
+  if (needsBuyerPlanToUseChat) {
+    if (buyerSubLoading) {
+      return (
+        <div className="min-h-screen flex flex-col bg-background">
+          <main className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+          </main>
+        </div>
+      );
+    }
+    if (!isBuyerPremium) {
+      return (
+        <div className="min-h-screen flex flex-col bg-background">
+          <main className="flex-1 container max-w-md mx-auto px-4 py-12 flex flex-col items-center justify-center text-center">
+            <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Subscription Required</h2>
+            <p className="text-muted-foreground mb-6">
+              Please subscribe to a buyer plan to chat with providers.
+            </p>
+            <Button onClick={() => router.push("/subscriptions/buyer")}>
+              View Subscription Plans
+            </Button>
+          </main>
+        </div>
+      );
+    }
   }
 
   return (
@@ -406,7 +432,7 @@ export default function Chat() {
                         <p className="font-medium truncate">{getOtherName(conv)}</p>
                         {conv.lastMessage && (
                           <p className="text-xs text-muted-foreground truncate">
-                            {isProviderWithoutSub ? "New message" : conv.lastMessage.text}
+                            {blockProviderMessagingForInbox ? "New message" : conv.lastMessage.text}
                           </p>
                         )}
                       </div>
@@ -426,7 +452,7 @@ export default function Chat() {
           {/* Message thread - hidden on mobile when no conversation selected */}
           <Card className={`overflow-hidden flex flex-col ${!selectedConv && isMobile ? "hidden" : ""}`}>
             {selectedConv ? (
-              isProviderWithoutSub ? (
+              blockProviderMessagingForInbox ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 min-h-0">
                   <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
                   <h2 className="text-lg font-semibold mb-2">Subscription Required</h2>
