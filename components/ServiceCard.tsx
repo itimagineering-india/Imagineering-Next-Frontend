@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, Clock, Heart, Share2, MapPin, Crown } from "lucide-react";
+import { Star, Clock, Heart, Share2, MapPin, Crown, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -188,6 +188,21 @@ function ServiceCardComponent({
   };
 
   const serviceUrl = `/service/${slug || id}`;
+  const whatsappUrl = useMemo(() => {
+    const serviceLink = typeof window !== "undefined" ? window.location.origin + serviceUrl : serviceUrl;
+    const details = [
+      `Service: ${title}`,
+      showPricing ? `Price: ₹${formattedPrice}${priceLabel}` : "Price: Contact for pricing",
+      provider?.businessName || provider?.name ? `Provider: ${provider.businessName || provider.name}` : null,
+      `Link: ${serviceLink}`,
+      "",
+      "I want to know more about this product.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return `https://wa.me/?text=${encodeURIComponent(details)}`;
+  }, [serviceUrl, title, showPricing, formattedPrice, priceLabel, provider?.businessName, provider?.name]);
 
   const handleShare = () => {
     if (navigator.share) {
@@ -321,7 +336,7 @@ function ServiceCardComponent({
       <div className="relative">
         <Link
           href={serviceUrl}
-          className="block aspect-[16/10] overflow-hidden"
+          className="block aspect-square overflow-hidden"
         >
           <img
             src={image}
@@ -349,6 +364,11 @@ function ServiceCardComponent({
           >
             <Heart className={cn("h-4 w-4", isFavorite && "fill-destructive text-destructive")} />
           </Button>
+          <div className="h-8 px-2 rounded-full bg-background/80 backdrop-blur-sm flex items-center gap-1 text-xs">
+            <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+            <span className="font-medium">{rating}</span>
+            <span className="text-muted-foreground">({reviewCount})</span>
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -387,23 +407,6 @@ function ServiceCardComponent({
           </p>
         )}
 
-        {/* Rating & Delivery */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-xs">
-          <div className="flex items-center gap-1">
-            <Star className="h-4 w-4 fill-warning text-warning" />
-            <span className="font-medium">{rating}</span>
-            <span className="text-muted-foreground">({reviewCount})</span>
-          </div>
-          {location?.city && (
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span className="line-clamp-1">
-                {location.city}
-                {location.state && `, ${location.state}`}
-              </span>
-            </div>
-          )}
-        </div>
       </CardContent>
 
       <CardFooter className="p-3 sm:p-4 pt-2 pb-3 sm:pb-4 mt-auto flex flex-col items-stretch gap-2">
@@ -423,9 +426,26 @@ function ServiceCardComponent({
           </div>
         )}
         <div className="flex flex-col gap-2 w-full">
-          <Button size="sm" asChild className="w-full h-8 px-3">
-            <Link href={serviceUrl}>{ctaText}</Link>
-          </Button>
+          <div className="grid grid-cols-2 gap-2 w-full">
+            <Button size="sm" asChild className="w-full h-8 px-2 sm:px-3">
+              <Link href={serviceUrl}>{ctaText}</Link>
+            </Button>
+            <Button
+              size="sm"
+              asChild
+              className="w-full h-8 px-2 sm:px-3 bg-[#25D366] text-white hover:bg-[#1ebe5d]"
+            >
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Open WhatsApp for product enquiry"
+                title="Open WhatsApp"
+              >
+                <MessageCircle className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
           {showPricing && (
             <AddToCartButton
               serviceId={id}
