@@ -377,12 +377,10 @@ export default function ProviderProfile() {
       router.push(buyerPlansPath);
       return;
     }
-    if (user?.role === "buyer") {
-      if (!isBuyerPremium) {
-        router.push(buyerPlansPath);
-        return;
-      }
-    } else {
+    if (buyerSubLoading) {
+      return;
+    }
+    if (!isBuyerPremium) {
       router.push(buyerPlansPath);
       return;
     }
@@ -405,7 +403,7 @@ export default function ProviderProfile() {
       return;
     }
     window.location.href = `tel:${dial}`;
-  }, [isAuthenticated, user?.role, isBuyerPremium, router, toast, providerDisplay?.phone]);
+  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, router, toast, providerDisplay?.phone]);
 
   // Loading state
   if (loading) {
@@ -599,9 +597,9 @@ export default function ProviderProfile() {
                     className="w-full border-red-600 bg-red-600 text-white hover:bg-red-700 hover:border-red-700 hover:text-white"
                     size="lg"
                     onClick={handleCallNow}
-                    disabled={isAuthenticated && user?.role === "buyer" && buyerSubLoading}
+                    disabled={isAuthenticated && buyerSubLoading}
                   >
-                    {isAuthenticated && user?.role === "buyer" && buyerSubLoading ? (
+                    {isAuthenticated && buyerSubLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Checking subscription…
