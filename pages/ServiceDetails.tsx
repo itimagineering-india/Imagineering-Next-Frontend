@@ -340,12 +340,11 @@ export default function ServiceDetails() {
       return;
     }
 
-    if (user?.role === "buyer") {
-      if (!isBuyerPremium) {
-        router.push(buyerPlansPath);
-        return;
-      }
-    } else {
+    if (buyerSubLoading) {
+      return;
+    }
+
+    if (!isBuyerPremium) {
       router.push(buyerPlansPath);
       return;
     }
@@ -368,7 +367,7 @@ export default function ServiceDetails() {
       return;
     }
     window.location.href = `tel:${dial}`;
-  }, [isAuthenticated, user?.role, isBuyerPremium, router, toast, service?.provider?.phone]);
+  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, router, toast, service?.provider?.phone]);
 
   const handleOpenChat = useCallback(() => {
     if (!isAuthenticated) {
@@ -864,9 +863,9 @@ export default function ServiceDetails() {
                         variant="outline"
                         className="w-full h-11 border-2 border-red-600 bg-red-600 text-white hover:bg-red-700 hover:border-red-700 hover:text-white"
                         size="lg"
-                        disabled={isAuthenticated && user?.role === "buyer" && buyerSubLoading}
+                        disabled={isAuthenticated && buyerSubLoading}
                       >
-                        {isAuthenticated && user?.role === "buyer" && buyerSubLoading ? (
+                        {isAuthenticated && buyerSubLoading ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Checking subscription…
