@@ -380,7 +380,10 @@ export default function ServiceDetails() {
       });
       return;
     }
-    if (user?.role === "buyer" && !isBuyerPremium) {
+    if (buyerSubLoading) {
+      return;
+    }
+    if (!isBuyerPremium) {
       toast({
         title: "Subscription Required",
         description: "Please subscribe to a buyer plan to chat with providers.",
@@ -398,7 +401,7 @@ export default function ServiceDetails() {
       ...(providerName && { name: String(providerName) }),
     });
     router.push(`/chat?${params.toString()}`);
-  }, [isAuthenticated, user?.role, isBuyerPremium, actualId, router, toast, service?.provider, service?.id]);
+  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, actualId, router, toast, service?.provider, service?.id]);
 
   const handleSubmitRequest = useCallback(async (data: {
     date: Date;
@@ -883,9 +886,19 @@ export default function ServiceDetails() {
                         variant="outline"
                         className="w-full h-11 border-2"
                         size="lg"
+                        disabled={isAuthenticated && buyerSubLoading}
                       >
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Chat with Provider
+                        {isAuthenticated && buyerSubLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Checking subscription…
+                          </>
+                        ) : (
+                          <>
+                            <MessageCircle className="h-4 w-4 mr-2" />
+                            Chat with Provider
+                          </>
+                        )}
                       </Button>
                       {helperText && (
                         <p className="text-xs text-muted-foreground text-center">
