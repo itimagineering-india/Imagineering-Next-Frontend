@@ -616,8 +616,10 @@ export default function ProviderProfile() {
                     variant="outline"
                     className="w-full"
                     size="lg"
+                    disabled={isAuthenticated && buyerSubLoading}
                     onClick={() => {
                       if (!provider?.user?._id) return;
+                      if (buyerSubLoading) return;
                       if (!isBuyerPremium) {
                         router.push("/subscriptions/buyer");
                         return;
@@ -625,8 +627,17 @@ export default function ProviderProfile() {
                       router.push(`/chat?providerId=${provider.user._id}&name=${encodeURIComponent(providerDisplay.name)}`);
                     }}
                   >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Chat with Provider
+                    {isAuthenticated && buyerSubLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Checking subscription…
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Chat with Provider
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
