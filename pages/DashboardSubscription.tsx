@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { billingHistoryMock } from "@/data/subscription";
-import { CheckCircle2, Shield, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, FileText, Shield, Sparkles } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,6 +30,18 @@ const DashboardSubscription = () => {
   const { toast } = useToast();
   const [buyerSub, setBuyerSub] = useState<MySubscriptionResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [subscriptionInvoices, setSubscriptionInvoices] = useState<
+    Array<{
+      _id: string;
+      invoiceNumber: string;
+      invoiceType?: string;
+      serviceTitle?: string;
+      totalAmount: number;
+      invoiceDate: string;
+      paidAt?: string;
+    }>
+  >([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,6 +69,27 @@ const DashboardSubscription = () => {
       isMounted = false;
     };
   }, [toast]);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await api.invoices.getBuyerInvoices(1, 50);
+        if (!alive || !res.success || !Array.isArray(res.data)) return;
+        const subOnly = (res.data as any[]).filter(
+          (inv) => inv.invoiceType === "SUBSCRIPTION"
+        );
+        setSubscriptionInvoices(subOnly);
+      } catch {
+        if (alive) setSubscriptionInvoices([]);
+      } finally {
+        if (alive) setInvoicesLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const currentPlanName =
     buyerSub?.subscription?.name || "FREE (Buyer)";
@@ -151,21 +183,60 @@ const DashboardSubscription = () => {
           <div className="container grid lg:grid-cols-2 gap-8">
             <Card className="border-0 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Billing History</CardTitle>
+                <CardTitle className="text-lg">Invoices & receipts</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Tax invoices for subscription payments (PDF).
+                </p>
               </CardHeader>
               <CardContent className="space-y-3">
-                {billingHistoryMock.map((bill) => (
-                  <div key={bill.id} className="p-3 rounded-lg border flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{bill.plan}</p>
-                      <p className="text-xs text-muted-foreground">{bill.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">{bill.amount}</p>
-                      <Badge variant="secondary" className="mt-1">Paid</Badge>
-                    </div>
+                {invoicesLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading invoices…</p>
+                ) : subscriptionInvoices.length === 0 ? (
+                  <div className="p-4 rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    No subscription invoices yet. After you pay for a plan, your invoice appears here and is emailed to you.
                   </div>
-                ))}
+                ) : (
+                  subscriptionInvoices.map((inv) => (
+                    <div
+                      key={inv._id}
+                      className="p-3 rounded-lg border flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {inv.serviceTitle || "Subscription"}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {inv.invoiceNumber}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {inv.invoiceDate
+                            ? new Date(inv.invoiceDate).toLocaleDateString("en-IN")
+                            : "—"}{" "}
+                          · ₹{Number(inv.totalAmount || 0).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() =>
+                          api.invoices.downloadPdf(inv._id).catch((e: Error) =>
+                            toast({
+                              title: "Download failed",
+                              description: e?.message || "Could not download PDF.",
+                              variant: "destructive",
+                            })
+                          )
+                        }
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        PDF
+                      </Button>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
 
