@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { useUserLocation } from "@/contexts/UserLocationContext";
 import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
 import {
   ContractorsIcon,
@@ -95,12 +94,11 @@ interface ServicePlaceholderCardProps {
 }
 
 export function ServicePlaceholderCard({ index, size = "default" }: ServicePlaceholderCardProps) {
-  const { userLocation } = useUserLocation();
   const category = serviceCategories[index];
 
   const servicesHref = useMemo(
-    () => `/services?${buildServicesBrowseQuery(category?.slug ?? "", userLocation)}`,
-    [category?.slug, userLocation]
+    () => `/services?${buildServicesBrowseQuery(category?.slug ?? "")}`,
+    [category?.slug]
   );
 
   if (!category) {
