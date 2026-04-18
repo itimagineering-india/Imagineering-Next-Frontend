@@ -22,9 +22,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useServices } from "@/hooks/useServices";
 import { isBrowseMapAvailable } from "@/lib/publicMaps";
 import { BrowseMap, type ServiceMarker, type ProviderMarker } from "@/components/map/BrowseMap";
+import { countPlottableMapMarkers } from "@/utils/mapMarkerCount";
 
 import type { CitySeoContent } from "@/constants/citySeoContent";
 import { CitySeoSections } from "@/components/seo/CitySeoSections";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -81,20 +90,14 @@ export default function Services(props: ServicesProps = {}) {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const BROWSE_PAGE_SIZE = 20;
-  const MAP_PAGE_SIZE = 50;
-  const MAP_CARDS_PAGE_SIZE = 20; // 20-20 pagination only for sidebar cards
-  /** Grid/list first page; map without coords uses MAP_PAGE_SIZE until tile is available. */
+  /** Grid/list first page. */
   const itemsPerPage = BROWSE_PAGE_SIZE;
-  const mapRadiusKm = 50; // Map radius filter when user location is available
+  /** Nearby radius for services + providers (matches backend SERVICES_GEO_MAX_RADIUS_KM). */
+  const mapRadiusKm = 50;
   // We do client-side pagination on `filteredServices`, so fetch enough services from the API.
   // Server-side pagination is used for the services API
-  
-  // Map view pagination (sidebar list) mirrors server-side pagination
-  const mapViewCurrentPage = currentPage;
-  /** Align with API page size for map when coords not yet available (tile fetch omits limit). */
-  const mapViewItemsPerPage = MAP_CARDS_PAGE_SIZE;
-  
-  // Map (Mappls) — fly-to from sidebar / cards
+
+  // Map — fly-to from “Center on My Location” / marker interactions
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [mapOnlyUserLocation, setMapOnlyUserLocation] = useState<{ lat: number; lng: number } | null>(null); // For marker only – does not trigger search refetch
   const userLocationRef = useRef<{ lat: number; lng: number } | null>(null); // Ref to avoid stale closures
@@ -102,13 +105,15 @@ export default function Services(props: ServicesProps = {}) {
   const [mapFlyTo, setMapFlyTo] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [mapFlyRevision, setMapFlyRevision] = useState(0);
 
+  const [locationNudgeOpen, setLocationNudgeOpen] = useState(false);
+  const [locationNudgeKind, setLocationNudgeKind] = useState<"gps_failed" | "no_api">("gps_failed");
+  const [locationRetryLoading, setLocationRetryLoading] = useState(false);
+
   // Providers state (for Providers browse mode)
   const [providers, setProviders] = useState<any[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersError, setProvidersError] = useState<string | null>(null);
   const [providersPagination, setProvidersPagination] = useState<any>(null);
-  const [providersMapPage, setProvidersMapPage] = useState(1);
-  const PROVIDERS_MAP_PER_PAGE = 25;
 
   const queryParam = searchParams?.get("q") || "";
   const categoryParam = searchParams?.get("category") || "";
@@ -119,7 +124,6 @@ export default function Services(props: ServicesProps = {}) {
   const providerParam = searchParams?.get("provider") || "";
   const latParam = searchParams?.get("lat");
   const lngParam = searchParams?.get("lng");
-  const radiusKmParam = searchParams?.get("radiusKm");
 
   /** Block services fetch until URL/city coords known or browser geolocation finishes — stops duplicate cache keys (no-lat vs lat). */
   const [locationGateReady, setLocationGateReady] = useState(() => {
@@ -298,17 +302,10 @@ export default function Services(props: ServicesProps = {}) {
     Number.isFinite(tileLngForMap);
 
   const servicesParams = useMemo(() => {
+    const usePreciseGeo = hasCoordsForTileForMap;
     const params: any = {
-      // For tile-based map: fetch full tile once so markers are complete.
-      // Sidebar cards will be paginated client-side.
-      page: viewMode === "map" && hasCoordsForTileForMap ? 1 : currentPage,
-      // Grid/list: always fetch 20 at a time.
-      // Map: when tile/coords exist, omit `limit` to allow the tile bucket to drive the result set.
-      ...(viewMode === "map"
-        ? hasCoordsForTileForMap
-          ? {}
-          : { limit: MAP_PAGE_SIZE }
-        : { limit: BROWSE_PAGE_SIZE }),
+      page: viewMode === "map" ? 1 : currentPage,
+      ...(viewMode !== "map" ? { limit: BROWSE_PAGE_SIZE } : {}),
     };
     
     // Priority: filters.category > URL categoryParam
@@ -374,17 +371,22 @@ export default function Services(props: ServicesProps = {}) {
       if (sortParam === "price_high") params.sort = "-price";
       if (sortParam === "rating") params.sort = "-rating";
     }
-    
-    // `tile` → backend matches `location.tileKey` (no radius / $geoNear).
-    if (hasCoordsForTileForMap) {
-      params.tile = `${Math.floor(tileLatForMap!)}_${Math.floor(tileLngForMap!)}`;
-      if (viewMode === "map") {
-        params.compact = 1;
-      }
+
+    // Precise lat/lng + precise=1 → $geoNear, distance-sorted (nearest first).
+    // Do NOT send `tile` here: tile bucket uses createdAt order, not distance.
+    if (usePreciseGeo) {
+      params.lat = tileLatForMap!;
+      params.lng = tileLngForMap!;
+      params.radiusKm = mapRadiusKm;
+      params.precise = 1;
     }
 
-    // If user came from header location search or city page (fixedLocationText), pass location to backend
-    if (effectiveLocationText && !locationParam) {
+    if (viewMode === "map") {
+      params.compact = 1;
+    }
+
+    // City label for non-geo queries only — omit when precise=1 so cache keys match geo intent.
+    if (effectiveLocationText && !locationParam && !usePreciseGeo) {
       params.location = effectiveLocationText;
     }
     
@@ -425,6 +427,7 @@ export default function Services(props: ServicesProps = {}) {
     maxPriceParam,
     sortParam,
     locationGateReady,
+    mapRadiusKm,
   ]);
 
   // Reset UI pagination when the query context changes
@@ -476,10 +479,6 @@ export default function Services(props: ServicesProps = {}) {
         const locationLat = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : NaN);
         const locationLng = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : NaN);
         const hasLocation = Number.isFinite(locationLat) && Number.isFinite(locationLng);
-        const radiusKm =
-          radiusKmParam && Number.isFinite(Number(radiusKmParam))
-            ? Number(radiusKmParam)
-            : 50;
 
         const resp = await api.providers.getAll({
           categorySlug,
@@ -487,10 +486,8 @@ export default function Services(props: ServicesProps = {}) {
             (filters.subcategory && filters.subcategory.length > 0 ? filters.subcategory[0] : "") ||
             subcategoryParam ||
             undefined,
-          verified: filters.verified ? true : undefined,
           q: queryParam || undefined,
-          // Show ALL providers within 50km radius (no limit/pagination); use city center when on city page
-          ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm } : {}),
+          ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm: mapRadiusKm } : {}),
         });
 
         if (isCancelled) return;
@@ -520,13 +517,16 @@ export default function Services(props: ServicesProps = {}) {
   }, [
     browseMode,
     filters.category,
+    filters.subcategory,
     categoryParam,
-    filters.verified,
+    subcategoryParam,
+    queryParam,
     userLocation,
     latParam,
     lngParam,
     fixedLat,
     fixedLng,
+    mapRadiusKm,
   ]);
   
   // Debug log
@@ -558,8 +558,63 @@ export default function Services(props: ServicesProps = {}) {
   // Track previous filter state to detect changes
   const prevFiltersRef = useRef<FilterState>(filters);
   const filterChangeToastRef = useRef<string | number | null>(null);
+  const mapMarkersLoadingToastRef = useRef<string | number | null>(null);
   const paginationToastRef = useRef<string | number | null>(null);
   const prevPageRef = useRef(currentPage);
+
+  // Map view: loading toast until services or provider markers finish loading
+  useEffect(() => {
+    if (viewMode !== "map") {
+      if (mapMarkersLoadingToastRef.current !== null) {
+        dismissToast(String(mapMarkersLoadingToastRef.current));
+        mapMarkersLoadingToastRef.current = null;
+      }
+      return;
+    }
+
+    const loading =
+      browseMode === "services" ? servicesLoading : providersLoading;
+
+    if (!loading) {
+      if (mapMarkersLoadingToastRef.current !== null) {
+        dismissToast(String(mapMarkersLoadingToastRef.current));
+        mapMarkersLoadingToastRef.current = null;
+      }
+      return;
+    }
+
+    if (mapMarkersLoadingToastRef.current !== null) {
+      dismissToast(String(mapMarkersLoadingToastRef.current));
+      mapMarkersLoadingToastRef.current = null;
+    }
+    const headline =
+      browseMode === "services"
+        ? "Loading services…"
+        : "Loading providers…";
+    const t = toast({
+      title: (
+        <span className="flex w-full flex-col items-center gap-4 py-1 text-center">
+          <Loader2
+            className="h-12 w-12 shrink-0 animate-spin text-primary"
+            aria-hidden
+          />
+          <span className="text-base font-semibold leading-tight">{headline}</span>
+        </span>
+      ),
+      description: (
+        <span className="block text-center text-sm text-muted-foreground">
+          Plotting markers on the map
+        </span>
+      ),
+      duration: 0,
+      className:
+        "fixed left-1/2 top-1/2 z-[200] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 border border-border/80 bg-background/95 p-6 shadow-2xl backdrop-blur-md " +
+        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 " +
+        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 " +
+        "sm:bottom-auto sm:right-auto [&>button]:hidden",
+    });
+    mapMarkersLoadingToastRef.current = t.id;
+  }, [viewMode, browseMode, servicesLoading, providersLoading, toast, dismissToast]);
 
   // Show loading toast when filters change (but not on initial mount)
   useEffect(() => {
@@ -647,42 +702,90 @@ export default function Services(props: ServicesProps = {}) {
     return R * c; // Distance in km
   }, []);
 
-  // Memoize user location to avoid recalculations
+  // Memoize user location to avoid recalculations (city page → fixed coords; else URL or GPS)
   const currentUserLocation = useMemo(() => {
-    return userLocation || (latParam && lngParam ? {
-      lat: parseFloat(latParam),
-      lng: parseFloat(lngParam)
-    } : null);
-  }, [userLocation, latParam, lngParam]);
+    if (
+      typeof fixedLat === "number" &&
+      typeof fixedLng === "number" &&
+      Number.isFinite(fixedLat) &&
+      Number.isFinite(fixedLng)
+    ) {
+      return { lat: fixedLat, lng: fixedLng };
+    }
+    if (userLocation) return userLocation;
+    if (
+      latParam &&
+      lngParam &&
+      Number.isFinite(parseFloat(latParam)) &&
+      Number.isFinite(parseFloat(lngParam))
+    ) {
+      return { lat: parseFloat(latParam), lng: parseFloat(lngParam) };
+    }
+    return null;
+  }, [userLocation, latParam, lngParam, fixedLat, fixedLng]);
+
+  // Used for distance + map (must be above hooks that depend on it)
+  const getServiceCoordinates = useCallback((service: any): { lat: number; lng: number } | null => {
+    const coords = service?.location?.coordinates;
+    if (coords && coords.lat !== undefined && coords.lng !== undefined) {
+      const lat = Number(coords.lat);
+      const lng = Number(coords.lng);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+    const lat = service?.location?.lat ?? service?.location?.latitude;
+    const lng = service?.location?.lng ?? service?.location?.longitude;
+    if (lat !== undefined && lng !== undefined) {
+      const parsedLat = Number(lat);
+      const parsedLng = Number(lng);
+      if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
+        return { lat: parsedLat, lng: parsedLng };
+      }
+    }
+    const providerAddr = service?.provider?.businessAddress;
+    const provCoords = providerAddr?.coordinates;
+    if (provCoords && provCoords.lat !== undefined && provCoords.lng !== undefined) {
+      const pl = Number(provCoords.lat);
+      const pn = Number(provCoords.lng);
+      if (!Number.isNaN(pl) && !Number.isNaN(pn)) return { lat: pl, lng: pn };
+    }
+    return null;
+  }, []);
+
+  const getProviderCoordinates = useCallback((provider: any): { lat: number; lng: number } | null => {
+    const coords =
+      provider?.businessAddress?.coordinates ||
+      provider?.user?.location?.coordinates ||
+      provider?.location?.coordinates;
+    if (!coords) return null;
+    const lat = Number(coords.lat);
+    const lng = Number(coords.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }, []);
 
   // Memoize distance calculations - only calculate when needed for sorting
   const servicesWithDistances = useMemo(() => {
     const shouldComputeDistances = Boolean(
-      currentUserLocation && currentUserLocation.lat && currentUserLocation.lng
+      currentUserLocation && currentUserLocation.lat != null && currentUserLocation.lng != null
     );
 
     if (!shouldComputeDistances || !currentUserLocation) {
-      return services.map((s) => ({ ...s, _distance: Infinity }));
+      return services.map((s) => ({ ...s, _distance: Infinity as number }));
     }
 
     const loc = currentUserLocation;
-    return services.map((s) => {
-      const serviceLocation = s.location?.coordinates;
-      
-      if (!serviceLocation || serviceLocation.lat === undefined || serviceLocation.lng === undefined) {
-        return { ...s, _distance: Infinity };
+    return services.map((s: any) => {
+      if (typeof s.distanceKm === "number" && Number.isFinite(s.distanceKm)) {
+        return { ...s, _distance: s.distanceKm };
       }
-      
-      const distance = calculateDistance(
-        loc.lat,
-        loc.lng,
-        serviceLocation.lat,
-        serviceLocation.lng
-      );
-      
+      const pt = getServiceCoordinates(s);
+      if (!pt) return { ...s, _distance: Infinity as number };
+      const distance = calculateDistance(loc.lat, loc.lng, pt.lat, pt.lng);
       return { ...s, _distance: distance };
     });
-  }, [services, currentUserLocation, calculateDistance]);
+  }, [services, currentUserLocation, calculateDistance, getServiceCoordinates]);
 
   // Optimized filtering: Apply cheapest filters first, early returns
   const filteredServices = useMemo(() => {
@@ -692,17 +795,6 @@ export default function Services(props: ServicesProps = {}) {
     }
 
     let result = servicesWithDistances;
-
-    // Client-only filters (backend already handles most filters)
-    if (filters.verified) {
-      result = result.filter((s) => {
-        if (typeof s.provider === 'object' && s.provider !== null) {
-          return s.provider.verified === true;
-        }
-        return false;
-      });
-      if (result.length === 0) return [];
-    }
 
     // Filter by delivery time (client-only)
     if (filters.deliveryTime.length > 0) {
@@ -739,7 +831,9 @@ export default function Services(props: ServicesProps = {}) {
         if (distance === Infinity) return true;
         return typeof distance === "number" && distance <= mapRadiusKm;
       });
-      if (result.length === 0) return [];
+      // Do not return [] here — map may use tile/city scope (wide area) while this filter
+      // tightens to ~50km; if everything is outside that ring, fall through to the safety
+      // check below so grid/list still shows the same rows the map had.
     }
 
     // Safety check: If all services were filtered out, show original services
@@ -747,45 +841,29 @@ export default function Services(props: ServicesProps = {}) {
       return servicesWithDistances;
     }
 
+    // Nearest first when "Relevance" and we have a reference point (matches API $geoNear order + ties)
+    if (
+      sortBy === "relevance" &&
+      currentUserLocation?.lat != null &&
+      currentUserLocation?.lng != null
+    ) {
+      result = [...result].sort((a: any, b: any) => {
+        const da = a._distance ?? Infinity;
+        const db = b._distance ?? Infinity;
+        if (da === db) return 0;
+        return da - db;
+      });
+    }
+
     return result;
-  }, [servicesWithDistances, filters.verified, filters.deliveryTime, currentUserLocation, viewMode]);
-
-  // Reset pagination when results change
-  useEffect(() => {
-    if (viewMode === "map") {
-      setCurrentPage(1);
-    }
-  }, [filteredServices.length, viewMode]);
-
-  // Helpers for map coordinates (fallback to provider's businessAddress when service has no location)
-  const getServiceCoordinates = (service: any): { lat: number; lng: number } | null => {
-    const coords = service?.location?.coordinates;
-    if (coords && coords.lat !== undefined && coords.lng !== undefined) {
-      const lat = Number(coords.lat);
-      const lng = Number(coords.lng);
-      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
-        return { lat, lng };
-      }
-    }
-    const lat = service?.location?.lat ?? service?.location?.latitude;
-    const lng = service?.location?.lng ?? service?.location?.longitude;
-    if (lat !== undefined && lng !== undefined) {
-      const parsedLat = Number(lat);
-      const parsedLng = Number(lng);
-      if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLng)) {
-        return { lat: parsedLat, lng: parsedLng };
-      }
-    }
-    // Fallback: use provider's businessAddress coordinates
-    const providerAddr = service?.provider?.businessAddress;
-    const provCoords = providerAddr?.coordinates;
-    if (provCoords && provCoords.lat !== undefined && provCoords.lng !== undefined) {
-      const pl = Number(provCoords.lat);
-      const pn = Number(provCoords.lng);
-      if (!Number.isNaN(pl) && !Number.isNaN(pn)) return { lat: pl, lng: pn };
-    }
-    return null;
-  };
+  }, [
+    servicesWithDistances,
+    filters.deliveryTime,
+    currentUserLocation,
+    viewMode,
+    sortBy,
+    services.length,
+  ]);
 
   const getServiceLocationKey = (service: any): string => {
     const location = service?.location || {};
@@ -806,32 +884,14 @@ export default function Services(props: ServicesProps = {}) {
     return "";
   };
 
-  // Map view services with coordinates or geocodable location (filter first, then paginate)
+  // Map view services with coordinates or geocodable location
   const mapViewServicesAll = useMemo(() => {
     if (viewMode !== "map") return filteredServices;
     return filteredServices.filter((service) => {
       if (getServiceCoordinates(service)) return true;
       return Boolean(getServiceLocationKey(service));
     });
-  }, [filteredServices, viewMode]);
-
-  // Map view uses server-side pagination; show current page results
-  const mapViewServicesToShow = useMemo(() => {
-    if (viewMode !== "map") return filteredServices;
-    // In tile-based mode we fetch full tile for markers; slice ONLY cards.
-    if (hasCoordsForTileForMap) {
-      const start = (currentPage - 1) * mapViewItemsPerPage;
-      return mapViewServicesAll.slice(start, start + mapViewItemsPerPage);
-    }
-    return mapViewServicesAll;
-  }, [
-    filteredServices,
-    viewMode,
-    mapViewServicesAll,
-    hasCoordsForTileForMap,
-    currentPage,
-    mapViewItemsPerPage,
-  ]);
+  }, [filteredServices, viewMode, getServiceCoordinates]);
 
   // Providers filtering (client-side search)
   const filteredProviders = useMemo(() => {
@@ -857,17 +917,25 @@ export default function Services(props: ServicesProps = {}) {
     });
   }, [providers, queryParam]);
 
-  const getProviderCoordinates = (provider: any): { lat: number; lng: number } | null => {
-    const coords =
-      provider?.businessAddress?.coordinates ||
-      provider?.user?.location?.coordinates ||
-      provider?.location?.coordinates;
-    if (!coords) return null;
-    const lat = Number(coords.lat);
-    const lng = Number(coords.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-    return { lat, lng };
-  };
+  /** Providers browse: nearest first when we have a reference point */
+  const providersOrdered = useMemo(() => {
+    if (
+      !currentUserLocation?.lat ||
+      !currentUserLocation?.lng ||
+      filteredProviders.length === 0
+    ) {
+      return filteredProviders;
+    }
+    const { lat: ulat, lng: ulng } = currentUserLocation;
+    return [...filteredProviders].sort((a: any, b: any) => {
+      const ca = getProviderCoordinates(a);
+      const cb = getProviderCoordinates(b);
+      const da = ca ? calculateDistance(ulat, ulng, ca.lat, ca.lng) : Infinity;
+      const db = cb ? calculateDistance(ulat, ulng, cb.lat, cb.lng) : Infinity;
+      if (da === db) return 0;
+      return da - db;
+    });
+  }, [filteredProviders, currentUserLocation, calculateDistance, getProviderCoordinates]);
 
   const getProviderLocationKey = (provider: any): string => {
     const addr = provider?.businessAddress || provider?.user?.location || provider?.location || {};
@@ -879,36 +947,21 @@ export default function Services(props: ServicesProps = {}) {
   };
 
   const mapViewProvidersAll = useMemo(() => {
-    if (viewMode !== "map") return filteredProviders;
-    return (filteredProviders || []).filter((p: any) => {
+    if (viewMode !== "map") return providersOrdered;
+    return (providersOrdered || []).filter((p: any) => {
       if (getProviderCoordinates(p)) return true;
       return Boolean(getProviderLocationKey(p));
     });
-  }, [filteredProviders, viewMode]);
-
-  const mapViewProvidersPaginated = useMemo(() => {
-    const start = (providersMapPage - 1) * PROVIDERS_MAP_PER_PAGE;
-    return mapViewProvidersAll.slice(start, start + PROVIDERS_MAP_PER_PAGE);
-  }, [mapViewProvidersAll, providersMapPage]);
-
-  const providersMapTotalPages = Math.max(1, Math.ceil(mapViewProvidersAll.length / PROVIDERS_MAP_PER_PAGE));
+  }, [providersOrdered, viewMode]);
 
   const mapReady = isBrowseMapAvailable();
 
-  // Map center for Mappls (city → URL → user search location → map-only GPS → Delhi)
+  // Map center for Mappls (same priority as search: city/URL/GPS, then map-only GPS, then Delhi)
   const mapCenter = useMemo(() => {
-    if (typeof fixedLat === "number" && typeof fixedLng === "number") {
-      return { lat: fixedLat, lng: fixedLng };
-    }
-    if (latParam && lngParam) {
-      const lat = parseFloat(latParam);
-      const lng = parseFloat(lngParam);
-      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
-    }
-    if (userLocation) return userLocation;
     if (mapOnlyUserLocation) return mapOnlyUserLocation;
+    if (currentUserLocation) return currentUserLocation;
     return { lat: 28.6139, lng: 77.209 };
-  }, [fixedLat, fixedLng, latParam, lngParam, userLocation, mapOnlyUserLocation]);
+  }, [currentUserLocation, mapOnlyUserLocation]);
 
   // Map service markers (Mappls)
   const mapServiceMarkers = useMemo((): ServiceMarker[] => {
@@ -972,9 +1025,10 @@ export default function Services(props: ServicesProps = {}) {
     });
   }, [mapViewProvidersAll]);
 
-  useEffect(() => {
-    setProvidersMapPage(1);
-  }, [mapViewProvidersAll.length]);
+  const mapPlottedMarkerCount = useMemo(
+    () => countPlottableMapMarkers(browseMode, mapServiceMarkers, mapProviderMarkers),
+    [browseMode, mapServiceMarkers, mapProviderMarkers],
+  );
 
   // Dismiss loading toast when services finish loading
   useEffect(() => {
@@ -1046,56 +1100,73 @@ export default function Services(props: ServicesProps = {}) {
   };
 
   // Get user's current location (updates userLocation state - affects search/filter)
-  const getUserLocation = useCallback((): Promise<{ lat: number; lng: number }> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error("Geolocation is not supported by this browser."));
-        return;
-      }
-
-      setIsLocationLoading(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setUserLocation(location);
-          setIsLocationLoading(false);
-          resolve(location);
-        },
-        (error) => {
-          setIsLocationLoading(false);
-          let errorMessage = "Unable to get your location. ";
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage += "Please allow location access in your browser settings.";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage += "Location information is unavailable.";
-              break;
-            case error.TIMEOUT:
-              errorMessage += "Location request timed out. Please try again.";
-              break;
-            default:
-              errorMessage += "An unknown error occurred.";
-              break;
-          }
-          toast({
-            title: "Location Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
-          reject(new Error(errorMessage));
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
+  const getUserLocation = useCallback(
+    (opts?: { silent?: boolean }): Promise<{ lat: number; lng: number }> => {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation is not supported by this browser."));
+          return;
         }
-      );
-    });
-  }, [toast]);
+
+        setIsLocationLoading(true);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const location = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            setUserLocation(location);
+            setIsLocationLoading(false);
+            resolve(location);
+          },
+          (error) => {
+            setIsLocationLoading(false);
+            let errorMessage = "Unable to get your location. ";
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage += "Please allow location access in your browser settings.";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage += "Location information is unavailable.";
+                break;
+              case error.TIMEOUT:
+                errorMessage += "Location request timed out. Please try again.";
+                break;
+              default:
+                errorMessage += "An unknown error occurred.";
+                break;
+            }
+            if (!opts?.silent) {
+              toast({
+                title: "Location Error",
+                description: errorMessage,
+                variant: "destructive",
+              });
+            }
+            reject(new Error(errorMessage));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      });
+    },
+    [toast]
+  );
+
+  const handleRetryLocationFromDialog = useCallback(async () => {
+    setLocationRetryLoading(true);
+    try {
+      await getUserLocation();
+      setLocationNudgeOpen(false);
+    } catch {
+      // Toast already shown by getUserLocation
+    } finally {
+      setLocationRetryLoading(false);
+    }
+  }, [getUserLocation]);
 
   useEffect(() => {
     const hasUrl =
@@ -1111,22 +1182,88 @@ export default function Services(props: ServicesProps = {}) {
 
     if (hasUrl || hasFixed) {
       setLocationGateReady(true);
+      setLocationNudgeOpen(false);
       return;
     }
     if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationNudgeKind("no_api");
+      setLocationNudgeOpen(true);
       setLocationGateReady(true);
       return;
     }
 
-    getUserLocation()
-      .catch(() => {})
-      .finally(() => setLocationGateReady(true));
+    let cancelled = false;
+    getUserLocation({ silent: true })
+      .catch(() => {
+        if (!cancelled) {
+          setLocationNudgeKind("gps_failed");
+          setLocationNudgeOpen(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLocationGateReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [latParam, lngParam, fixedLat, fixedLng, getUserLocation]);
 
 
 
   return (
     <div className="min-h-screen flex flex-col">
+
+      <Dialog open={locationNudgeOpen} onOpenChange={setLocationNudgeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8">
+              <MapPin className="h-5 w-5 shrink-0 text-primary" />
+              {locationNudgeKind === "no_api"
+                ? "Location not available in this browser"
+                : "Turn on location for better results"}
+            </DialogTitle>
+            <DialogDescription className="text-left space-y-2 pt-1">
+              {locationNudgeKind === "no_api" ? (
+                <>
+                  Imagineering India uses your area to show nearby services and providers. This browser does not
+                  support GPS, or access is blocked. Use the <strong>location search in the header</strong> to set
+                  your city or area, then results will match that place.
+                </>
+              ) : (
+                <>
+                  We could not read your current location (permission denied, timeout, or unavailable). For{" "}
+                  <strong>nearest-first</strong> listings and distance on cards, allow location when prompted, or
+                  choose a place from the <strong>header search</strong>. You can continue browsing without it—results
+                  may be less local.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLocationNudgeOpen(false)}
+              disabled={locationRetryLoading}
+            >
+              {locationNudgeKind === "no_api" ? "Got it" : "Continue without location"}
+            </Button>
+            {locationNudgeKind === "gps_failed" && (
+              <Button type="button" onClick={() => void handleRetryLocationFromDialog()} disabled={locationRetryLoading}>
+                {locationRetryLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Getting location…
+                  </>
+                ) : (
+                  "Try again"
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {cityIntro && (
         <section className="border-b bg-muted/30">
@@ -1144,6 +1281,7 @@ export default function Services(props: ServicesProps = {}) {
             {/* Desktop Filters Sidebar */}
             <aside className="hidden lg:block w-64 shrink-0">
               <FilterPanel 
+                showVerifiedOnlyFilter={false}
                 onFilterChange={(newFilters) => {
                   // Clear subcategories if categories are cleared
                   if (newFilters.category.length === 0 && filters.category.length > 0) {
@@ -1175,6 +1313,7 @@ export default function Services(props: ServicesProps = {}) {
                       </SheetHeader>
                       <div className="flex-1 overflow-y-auto px-4 py-3">
                         <FilterPanel 
+                          showVerifiedOnlyFilter={false}
                           onFilterChange={(newFilters) => {
                             // Clear subcategories if categories are cleared
                             if (newFilters.category.length === 0 && filters.category.length > 0) {
@@ -1205,33 +1344,33 @@ export default function Services(props: ServicesProps = {}) {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Providers / Services Toggle (mobile + desktop) */}
-                  <div className="flex border rounded-lg overflow-hidden w-full sm:w-auto">
-                    <Button
-                      variant={browseMode === "providers" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="rounded-none flex-1 sm:flex-initial"
-                      onClick={() => {
-                        setBrowseModeAndPersist("providers");
-                        setCurrentPage(1);
-                        // Keep map as default in providers mode
-                        setViewMode("map");
-                      }}
-                    >
-                      Providers
-                    </Button>
-                    <Button
-                      variant={browseMode === "services" ? "secondary" : "ghost"}
-                      size="sm"
-                      className="rounded-none border-l flex-1 sm:flex-initial"
-                      onClick={() => {
-                        setBrowseModeAndPersist("services");
-                        setCurrentPage(1);
-                      }}
-                    >
-                      Services
-                    </Button>
-                  </div>
+                  {/* Providers / Services — in toolbar for list/grid; above map when map view */}
+                  {viewMode !== "map" && (
+                    <div className="flex border rounded-lg overflow-hidden w-full sm:w-auto">
+                      <Button
+                        variant={browseMode === "providers" ? "secondary" : "ghost"}
+                        size="sm"
+                        className="rounded-none flex-1 sm:flex-initial"
+                        onClick={() => {
+                          setBrowseModeAndPersist("providers");
+                          setCurrentPage(1);
+                        }}
+                      >
+                        Providers
+                      </Button>
+                      <Button
+                        variant={browseMode === "services" ? "secondary" : "ghost"}
+                        size="sm"
+                        className="rounded-none border-l flex-1 sm:flex-initial"
+                        onClick={() => {
+                          setBrowseModeAndPersist("services");
+                          setCurrentPage(1);
+                        }}
+                      >
+                        Services
+                      </Button>
+                    </div>
+                  )}
 
                   {/* View Toggle */}
                   <div className="hidden sm:flex border rounded-lg">
@@ -1277,11 +1416,16 @@ export default function Services(props: ServicesProps = {}) {
                       size="sm"
                       onClick={async () => {
                         try {
-                          const location = await getLocationForMapCenter();
-                          setMapOnlyUserLocation(location); // Show blue marker – does not trigger search
-                          setMapFlyTo({ lat: location.lat, lng: location.lng, zoom: 12 });
+                          let location: { lat: number; lng: number };
+                          if (userLocation) {
+                            location = userLocation;
+                          } else {
+                            location = await getLocationForMapCenter();
+                          }
+                          setMapOnlyUserLocation(location);
+                          setMapFlyTo({ lat: location.lat, lng: location.lng, zoom: 14 });
                           setMapFlyRevision((n) => n + 1);
-                        } catch (error) {
+                        } catch {
                           // Error already handled in getLocationForMapCenter
                         }
                       }}
@@ -1294,14 +1438,43 @@ export default function Services(props: ServicesProps = {}) {
                     </Button>
                   </div>
                   
-                  <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-lg border overflow-hidden bg-muted">
+                  <div className="relative h-[min(58vh,560px)] sm:h-[min(65vh,680px)] md:h-[min(72vh,820px)] lg:h-[min(78vh,900px)] rounded-lg border overflow-hidden bg-muted">
+                    {viewMode === "map" && (
+                      <div className="pointer-events-none absolute top-3 left-3 z-30 max-w-[min(100%,calc(100%-1.5rem))]">
+                        <div className="pointer-events-auto flex overflow-hidden rounded-md border bg-background/95 shadow-md backdrop-blur-sm">
+                          <Button
+                            type="button"
+                            variant={browseMode === "providers" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 rounded-none px-3 text-[11px] font-semibold sm:text-xs"
+                            onClick={() => {
+                              setBrowseModeAndPersist("providers");
+                              setCurrentPage(1);
+                              setViewMode("map");
+                            }}
+                          >
+                            Providers
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={browseMode === "services" ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8 rounded-none border-l border-border px-3 text-[11px] font-semibold sm:text-xs"
+                            onClick={() => {
+                              setBrowseModeAndPersist("services");
+                              setCurrentPage(1);
+                            }}
+                          >
+                            Services
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     {mapReady ? (
                       <div
-                        className="w-full h-full bg-muted"
+                        className="relative w-full h-full min-h-0 bg-muted"
                         style={{
                           display: viewMode === "map" ? "block" : "none",
-                          minHeight: "600px",
-                          position: "relative",
                           zIndex: viewMode === "map" ? 1 : -1,
                         }}
                       >
@@ -1310,15 +1483,33 @@ export default function Services(props: ServicesProps = {}) {
                           zoom={12}
                           serviceMarkers={mapServiceMarkers}
                           providerMarkers={mapProviderMarkers}
-                          userLocation={userLocation || mapOnlyUserLocation}
+                          userLocation={mapOnlyUserLocation ?? userLocation}
                           browseMode={browseMode}
                           className="rounded-lg"
                           flyToTarget={mapFlyTo}
                           flyToRevision={mapFlyRevision}
                         />
+                        {viewMode === "map" && (
+                          <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[min(100%,calc(100%-1.5rem))]">
+                            <Badge
+                              variant="secondary"
+                              className="border bg-background/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-sm tabular-nums sm:text-xs"
+                            >
+                              {mapPlottedMarkerCount}{" "}
+                              {browseMode === "services"
+                                ? mapPlottedMarkerCount === 1
+                                  ? "service"
+                                  : "services"
+                                : mapPlottedMarkerCount === 1
+                                  ? "provider"
+                                  : "providers"}{" "}
+                              on map
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="w-full h-full min-h-[600px] bg-muted flex items-center justify-center" />
+                      <div className="w-full h-full min-h-0 bg-muted flex items-center justify-center" />
                     )}
                     {!mapReady && viewMode === "map" && (
                       <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-20 p-4">
@@ -1376,488 +1567,6 @@ export default function Services(props: ServicesProps = {}) {
                     )}
                   </div>
 
-                  {/* Map Sidebar */}
-                  <div className="mt-3 md:mt-4">
-                    {browseMode === "providers" ? (
-                      providersLoading ? (
-                        <div className="space-y-3">
-                          <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">
-                            Providers on Map
-                          </h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                            {Array.from({ length: Math.min(itemsPerPage, 10) }).map((_, index) => (
-                              <Card key={`map-provider-skeleton-${index}`} className="overflow-hidden">
-                                <Skeleton className="w-full h-20" />
-                                <CardContent className="p-2 space-y-2">
-                                  <Skeleton className="h-3 w-3/4" />
-                                  <Skeleton className="h-3 w-full" />
-                                  <div className="flex items-center justify-between">
-                                    <Skeleton className="h-3 w-16" />
-                                    <Skeleton className="h-3 w-12" />
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
-                      ) : mapViewProvidersAll.length > 0 ? (
-                        <>
-                          <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">
-                            Providers on Map ({mapViewProvidersAll.length})
-                          </h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                            {mapViewProvidersPaginated.map((p: any) => {
-                              const coords = getProviderCoordinates(p);
-                              const name = p?.businessName || p?.user?.name || "Provider";
-                              const addr = p?.businessAddress || p?.user?.location || {};
-                              const fullLocation = [addr.address, addr.city, addr.state]
-                                .filter(Boolean)
-                                .map((v: any) => String(v).trim())
-                                .filter(Boolean)
-                                .join(", ");
-                              const distanceKm =
-                                userLocation && coords
-                                  ? calculateDistance(userLocation.lat, userLocation.lng, coords.lat, coords.lng)
-                                  : null;
-                              return (
-                                <Card
-                                  key={p._id}
-                                  className="border hover:shadow-md transition-shadow overflow-hidden"
-                                >
-                                <Link
-                                  href={
-                                    p?.isFallbackProfile
-                                      ? `/services?provider=${encodeURIComponent(
-                                          p?.user?._id || p?._id
-                                        )}&view=services`
-                                      : `/provider/${p?.slug || p._id}`
-                                  }
-                                >
-                                    <div className="relative w-full h-20 overflow-hidden bg-muted flex items-center justify-center">
-                                      <div className="text-muted-foreground text-[10px]">
-                                        {p?.businessLogo ? " " : "Business"}
-                                      </div>
-                                    </div>
-                                    <CardContent className="p-2 cursor-pointer">
-                                      <div className="text-xs font-semibold line-clamp-2">{name}</div>
-                                      <div className="text-[10px] text-muted-foreground line-clamp-1">
-                                        {fullLocation || "Location"}
-                                      </div>
-                                      {distanceKm !== null && Number.isFinite(distanceKm) && (
-                                        <div className="text-[10px] text-muted-foreground">
-                                          {distanceKm.toFixed(1)} km away
-                                        </div>
-                                      )}
-                                      
-                                      {/* Rating and Experience */}
-                                      <div className="flex items-center gap-2 mt-1.5">
-                                        {/* Rating */}
-                                        <div className="flex items-center gap-0.5">
-                                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                          <span className="text-[10px] font-medium">
-                                            {p?.averageRating ? p.averageRating.toFixed(1) : '4.5'}
-                                          </span>
-                                        </div>
-                                        
-                                        {/* Experience */}
-                                        {p?.yearsOfExperience && (
-                                          <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                                            <Briefcase className="h-3 w-3" />
-                                            <span>{p.yearsOfExperience}+ yrs</span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </CardContent>
-                                  </Link>
-                                  {coords && (
-                                    <div className="px-2 pb-2">
-                                      <div className="flex gap-2">
-                                        <Button
-                                          variant="outline"
-                                          size="icon"
-                                          className="h-8 w-8"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            setMapFlyTo({ lat: coords.lat, lng: coords.lng, zoom: 14 });
-                                            setMapFlyRevision((n) => n + 1);
-                                          }}
-                                        >
-                                          <MapIcon className="h-4 w-4" />
-                                        </Button>
-                                        <Button asChild size="sm" className="flex-1 text-[11px]">
-                                          <Link
-                                            href={
-                                              p?.isFallbackProfile
-                                                ? `/services?provider=${encodeURIComponent(
-                                                    p?.user?._id || p?._id
-                                                  )}&view=services`
-                                                : `/provider/${p?.slug || p._id}`
-                                            }
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            View Services
-                                          </Link>
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </Card>
-                              );
-                            })}
-                          </div>
-                          {mapViewProvidersAll.length > PROVIDERS_MAP_PER_PAGE && (
-                            <div className="mt-3 md:mt-4 flex flex-col sm:flex-row items-center justify-between gap-2 border-t pt-3">
-                              <p className="text-xs md:text-sm text-muted-foreground">
-                                Showing {(providersMapPage - 1) * PROVIDERS_MAP_PER_PAGE + 1}–{Math.min(providersMapPage * PROVIDERS_MAP_PER_PAGE, mapViewProvidersAll.length)} of {mapViewProvidersAll.length}
-                              </p>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 text-xs"
-                                  onClick={() => setProvidersMapPage((prev) => Math.max(1, prev - 1))}
-                                  disabled={providersMapPage <= 1}
-                                >
-                                  Previous
-                                </Button>
-                                <span className="text-xs text-muted-foreground px-1">
-                                  Page {providersMapPage} of {providersMapTotalPages}
-                                </span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 text-xs"
-                                  onClick={() => setProvidersMapPage((prev) => Math.min(providersMapTotalPages, prev + 1))}
-                                  disabled={providersMapPage >= providersMapTotalPages}
-                                >
-                                  Next
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="text-center py-6 md:py-8">
-                          <MapPin className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground mb-3 md:mb-4" />
-                          <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">No Providers Found</h3>
-                          <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4 px-4">
-                            No providers match your search criteria in this area.
-                          </p>
-                          <Button
-                            variant="outline"
-                            onClick={() =>
-                              setFilters({
-                                category: [],
-                                subcategory: [],
-                                priceRange: [0, 5000],
-                                rating: 0,
-                                deliveryTime: [],
-                                verified: false,
-                                featured: false,
-                                location: undefined,
-                                sortBy: "relevance",
-                              })
-                            }
-                          >
-                            Clear Filters
-                          </Button>
-                        </div>
-                      )
-                    ) : servicesLoading ? (
-                      <div className="space-y-3">
-                        <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">
-                          Services on Map
-                        </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                          {Array.from({ length: Math.min(itemsPerPage, 10) }).map((_, index) => (
-                            <Card key={`map-service-skeleton-${index}`} className="overflow-hidden">
-                              <Skeleton className="w-full h-20" />
-                              <CardContent className="p-2 space-y-2">
-                                <Skeleton className="h-3 w-3/4" />
-                                <Skeleton className="h-3 w-full" />
-                                <div className="flex items-center justify-between">
-                                  <Skeleton className="h-3 w-16" />
-                                  <Skeleton className="h-3 w-12" />
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    ) : filteredServices.length > 0 ? (
-                      <>
-                        <h3 className="text-base md:text-lg font-semibold mb-2 md:mb-3">
-                          Services on Map ({mapViewServicesAll.length})
-                        </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                          {mapViewServicesToShow.map((service) => {
-                            const serviceLocation = service.location?.coordinates;
-                            const distance = userLocation && serviceLocation
-                              ? calculateDistance(
-                                  userLocation.lat,
-                                  userLocation.lng,
-                                  serviceLocation.lat,
-                                  serviceLocation.lng
-                                )
-                              : null;
-                            
-                            // Get service image
-                            const getServiceImage = (): string | null => {
-                              if (service.images && service.images.length > 0) {
-                                return service.images[0];
-                              }
-                              if (service.image) {
-                                return service.image;
-                              }
-                              return null;
-                            };
-                            
-                            const serviceImage = getServiceImage();
-                            
-                            return (
-                              <Card
-                                key={service.id || service._id}
-                                className="border hover:shadow-md transition-shadow overflow-hidden"
-                              >
-                                <Link href={`/service/${service.slug || service.id || service._id}`}>
-                                  {/* Service Image */}
-                                  {serviceImage ? (
-                                    <div className="relative w-full h-32 overflow-hidden bg-muted flex items-center justify-center">
-                                      <img
-                                        src={serviceImage}
-                                        alt={service.title}
-                                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement;
-                                          target.style.display = 'none';
-                                        }}
-                                      />
-                                      {service.featured && (
-                                        <Badge className="absolute top-1 right-1 bg-warning text-warning-foreground text-[9px] px-1 py-0">
-                                          Featured
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div className="relative w-full h-28 bg-muted flex items-center justify-center">
-                                      <div className="text-muted-foreground text-[10px]">No Image</div>
-                                      {service.featured && (
-                                        <Badge className="absolute top-1 right-1 bg-warning text-warning-foreground text-[9px] px-1 py-0">
-                                          Featured
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  <CardContent 
-                                    className="p-2 cursor-pointer"
-                                    onClick={(e) => {
-                                      // Allow map interaction on click, but also navigate
-                                      if (serviceLocation) {
-                                        setMapFlyTo({
-                                          lat: serviceLocation.lat,
-                                          lng: serviceLocation.lng,
-                                          zoom: 15,
-                                        });
-                                        setMapFlyRevision((n) => n + 1);
-                                      }
-                                    }}
-                                  >
-                                    <div className="mb-1">
-                                      <h4 className="font-semibold text-xs line-clamp-2 hover:text-primary transition-colors leading-tight break-words">
-                                        {service.title}
-                                      </h4>
-                                    </div>
-                                    {(service.provider?.businessName || service.provider?.name) && (
-                                      <p className="text-[10px] text-muted-foreground line-clamp-1 mb-1">
-                                        {service.provider?.businessName || service.provider?.name}
-                                      </p>
-                                    )}
-                                    <p className="text-[10px] text-muted-foreground line-clamp-1 mb-1.5 leading-relaxed">
-                                      {service.description}
-                                    </p>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-xs">
-                                          ₹{service.price?.toLocaleString()}
-                                          <span className="font-normal text-muted-foreground ml-0.5">
-                                            {(() => {
-                                              const m: Record<string, string> = {
-                                                fixed: "", hourly: "/hr", daily: "/day", per_minute: "/min",
-                                                per_article: "/article", monthly: "/mo", per_kg: "/kg",
-                                                per_litre: "/litre", per_unit: "/unit", metric_ton: "/metric ton",
-                                                per_sqft: "/sqft", per_sqm: "/sqm", per_load: "/load",
-                                                per_trip: "/trip", per_cuft: "/cuft", per_cum: "/cum",
-                                                per_metre: "/metre", per_bag: "/bag", lumpsum: "",
-                                                per_project: "/project", negotiable: "",
-                                              };
-                                              const pt = String(service.priceType || "");
-                                              return m[pt] || "";
-                                            })()}
-                                          </span>
-                                        </span>
-                                        {/* Rating */}
-                                        <div className="flex items-center gap-0.5">
-                                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                          <span className="text-[10px] font-medium">
-                                            {service.averageRating ? service.averageRating.toFixed(1) : '4.5'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      {distance !== null && (
-                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0">
-                                          {distance.toFixed(1)} km
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </CardContent>
-                                </Link>
-                              </Card>
-                            );
-                          })}
-                        </div>
-                        {/* Pagination for map view */}
-                        {(() => {
-                          if (!hasCoordsForTileForMap) return null;
-                          const totalCount = mapViewServicesAll.length;
-                          const totalPages = Math.ceil(totalCount / mapViewItemsPerPage);
-                          if (totalPages <= 1) return null;
-                          const startIndex = (mapViewCurrentPage - 1) * mapViewItemsPerPage;
-                          const endIndex = Math.min(mapViewCurrentPage * mapViewItemsPerPage, totalCount);
-                          
-                          return (
-                            <div className="mt-4 space-y-3">
-                              <div className="text-center text-xs text-muted-foreground">
-                                Showing {startIndex + 1}-{endIndex} of {totalCount}
-                              </div>
-                              <div className="flex justify-center">
-                                <div className="flex gap-1 flex-wrap justify-center">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-[11px]"
-                                    disabled={mapViewCurrentPage === 1}
-                                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                                  >
-                                    Prev
-                                  </Button>
-                                  
-                                  {(() => {
-                                    const pages: (number | string)[] = [];
-                                    const maxVisible = 5;
-                                    
-                                    if (totalPages <= maxVisible) {
-                                      for (let i = 1; i <= totalPages; i++) {
-                                        pages.push(i);
-                                      }
-                                    } else {
-                                      pages.push(1);
-                                      
-                                      if (mapViewCurrentPage > 3) {
-                                        pages.push('...');
-                                      }
-                                      
-                                      const start = Math.max(2, mapViewCurrentPage - 1);
-                                      const end = Math.min(totalPages - 1, mapViewCurrentPage + 1);
-                                      
-                                      for (let i = start; i <= end; i++) {
-                                        pages.push(i);
-                                      }
-                                      
-                                      if (mapViewCurrentPage < totalPages - 2) {
-                                        pages.push('...');
-                                      }
-                                      
-                                      if (totalPages > 1) {
-                                        pages.push(totalPages);
-                                      }
-                                    }
-                                    
-                                    return pages.map((page, idx) => {
-                                      if (page === '...') {
-                                        return (
-                                          <span key={`map-ellipsis-${idx}`} className="px-1.5 py-1 text-[11px] text-muted-foreground">
-                                            ...
-                                          </span>
-                                        );
-                                      }
-                                      
-                                      const pageNum = page as number;
-                                      return (
-                                        <Button
-                                          key={`map-page-${pageNum}`}
-                                          variant={mapViewCurrentPage === pageNum ? "secondary" : "outline"}
-                                          size="sm"
-                                          className="text-[11px]"
-                                          onClick={() => setCurrentPage(pageNum)}
-                                        >
-                                          {pageNum}
-                                        </Button>
-                                      );
-                                    });
-                                  })()}
-                                  
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-[11px]"
-                                    disabled={mapViewCurrentPage === totalPages}
-                                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                                  >
-                                    Next
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </>
-                    ) : servicesLoading ? (
-                      /* Loading State with Skeleton for Map View Sidebar */
-                      <div className="space-y-3">
-                        {Array.from({ length: 5 }).map((_, index) => (
-                          <Card key={index} className="overflow-hidden">
-                            <Skeleton className="w-full h-20" />
-                            <CardContent className="p-2 space-y-2">
-                              <Skeleton className="h-4 w-3/4" />
-                              <Skeleton className="h-3 w-full" />
-                              <div className="flex items-center justify-between">
-                                <Skeleton className="h-4 w-16" />
-                                <Skeleton className="h-4 w-12" />
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-6 md:py-8">
-                        <MapPin className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground mb-3 md:mb-4" />
-                        <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">No Services Found</h3>
-                        <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4 px-4">
-                          No services match your search criteria in this area.
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={() =>
-                            setFilters({
-                              category: [],
-                              subcategory: [],
-                              priceRange: [0, 5000],
-                              rating: 0,
-                              deliveryTime: [],
-                              verified: false,
-                              featured: false,
-                              location: undefined,
-                              sortBy: "relevance",
-                            })
-                          }
-                        >
-                          Clear Filters
-                        </Button>
-                      </div>
-                    )}
-                  </div>
                 </div>
               ) : browseMode === "providers" ? (
                 providersLoading ? (
@@ -1866,7 +1575,7 @@ export default function Services(props: ServicesProps = {}) {
                     <div
                       className={
                         viewMode === "grid"
-                          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6"
+                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
                           : "space-y-3 md:space-y-4"
                       }
                     >
@@ -1895,16 +1604,16 @@ export default function Services(props: ServicesProps = {}) {
                       ))}
                     </div>
                   </div>
-                ) : filteredProviders.length > 0 ? (
+                ) : providersOrdered.length > 0 ? (
                   <>
                     <div
                       className={
                         viewMode === "grid"
-                          ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
+                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
                           : "space-y-3 md:space-y-4"
                       }
                     >
-                      {filteredProviders.map((p: any, index: number) => {
+                      {providersOrdered.map((p: any, index: number) => {
                         const name = p?.businessName || p?.user?.name || "Provider";
                         const addr = p?.businessAddress || p?.user?.location || {};
                         const coords = getProviderCoordinates(p);
@@ -1914,8 +1623,8 @@ export default function Services(props: ServicesProps = {}) {
                           .filter(Boolean)
                           .join(", ");
                         const distanceKm =
-                          userLocation && coords
-                            ? calculateDistance(userLocation.lat, userLocation.lng, coords.lat, coords.lng)
+                          currentUserLocation && coords
+                            ? calculateDistance(currentUserLocation.lat, currentUserLocation.lng, coords.lat, coords.lng)
                             : null;
                         return (
                           <Card
@@ -2038,7 +1747,7 @@ export default function Services(props: ServicesProps = {}) {
                   <div
                     className={
                       viewMode === "grid"
-                        ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6"
+                        ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
                         : "space-y-3 md:space-y-4"
                     }
                   >
@@ -2093,7 +1802,7 @@ export default function Services(props: ServicesProps = {}) {
                           <div
                             className={
                               viewMode === "grid"
-                                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
+                                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
                                 : "space-y-3 md:space-y-4"
                             }
                           >
@@ -2109,6 +1818,15 @@ export default function Services(props: ServicesProps = {}) {
                                   slug={service.slug}
                                   viewMode={viewMode}
                                   location={service.location}
+                                  distanceKm={
+                                    typeof (service as any).distanceKm === "number" &&
+                                    Number.isFinite((service as any).distanceKm)
+                                      ? (service as any).distanceKm
+                                      : (service as any)._distance != null &&
+                                          (service as any)._distance !== Infinity
+                                        ? Math.round((service as any)._distance * 10) / 10
+                                        : undefined
+                                  }
                                 />
                               </div>
                             ))}
