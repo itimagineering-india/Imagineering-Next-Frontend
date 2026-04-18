@@ -58,6 +58,20 @@ interface UseServicesReturn {
 const servicesCache = new Map<string, { data: ServicesData; timestamp: number }>();
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes cache
 
+function preserveServicesOnFetchError(err: unknown): boolean {
+  const msg = String((err as any)?.message ?? err ?? '');
+  const name = String((err as any)?.name ?? '');
+  return (
+    name === 'TypeError' ||
+    msg.includes('Failed to fetch') ||
+    msg.includes('NetworkError') ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('Load failed') ||
+    msg.includes('Network request failed')
+  );
+}
+
 // Clean query params - remove undefined values
 const cleanParams = (params: ServicesQueryParamsOrNull): Record<string, string | number> => {
   if (params === null) return {};
@@ -199,7 +213,7 @@ export function useServices(
         if (!responseProcessed) {
           controller.abort();
         }
-      }, 60000); // 60 seconds timeout
+      }, 190000);
 
       // Create API request promise
       console.log('[useServices] Making API call with params:', cleanedParams);
@@ -291,6 +305,7 @@ export function useServices(
       const isTimeout = err.message?.includes('timeout') || 
                         err.message?.includes('30 seconds') || 
                         err.message?.includes('60 seconds') || 
+                        err.message?.includes('180 seconds') ||
                         err.message?.includes('8 seconds') ||
                         err.name === 'AbortError' ||
                         controller.signal.aborted;
@@ -311,9 +326,13 @@ export function useServices(
         }
         // Only set error and clear services if we haven't processed the response
         if (!responseProcessed) {
-          setError('Request timeout after 60 seconds. The category may have too many services. Please try filtering or searching.');
-          setServices([]);
-          setTotal(0);
+          setError('Request timed out while loading services. Try again, or narrow filters if the list is very large.');
+          setServices((prev) =>
+            preserveServicesOnFetchError(err) && prev.length > 0 ? prev : []
+          );
+          setTotal((prev) =>
+            preserveServicesOnFetchError(err) && prev > 0 ? prev : 0
+          );
         }
         return;
       }
@@ -333,8 +352,12 @@ export function useServices(
       // Only clear services if response wasn't processed
       if (!responseProcessed) {
         setError(err.message || 'Failed to fetch services');
-        setServices([]);
-        setTotal(0);
+        setServices((prev) =>
+          preserveServicesOnFetchError(err) && prev.length > 0 ? prev : []
+        );
+        setTotal((prev) =>
+          preserveServicesOnFetchError(err) && prev > 0 ? prev : 0
+        );
       } else {
         console.log('[useServices] Error occurred but response was already processed, keeping services');
         setIsLoading(false);
