@@ -262,7 +262,6 @@ export function CategorySections() {
             favoritesById={favoritesByIdRef.current}
             favoritesVersion={favoritesVersion}
             onToggleFavorite={onToggleFavorite}
-            userLocation={userLocation}
           />
         ))}
       </div>
