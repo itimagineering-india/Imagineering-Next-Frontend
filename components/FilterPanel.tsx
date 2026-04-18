@@ -21,6 +21,8 @@ interface FilterPanelProps {
   onFilterChange?: (filters: FilterState) => void;
   className?: string;
   categories?: Array<{ _id: string; name: string; slug: string; subcategories?: string[] }>;
+  /** When false, hides "Verified providers only" (browse shows all providers). Default true. */
+  showVerifiedOnlyFilter?: boolean;
 }
 
 export interface FilterState {
@@ -48,7 +50,12 @@ const deliveryOptions = [
 const providersCache: { data: Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>; timestamp: number } | null = null;
 const PROVIDERS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-export function FilterPanel({ onFilterChange, className, categories = [] }: FilterPanelProps) {
+export function FilterPanel({
+  onFilterChange,
+  className,
+  categories = [],
+  showVerifiedOnlyFilter = true,
+}: FilterPanelProps) {
   const [providers, setProviders] = useState<Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>>([]);
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [hasFetchedProviders, setHasFetchedProviders] = useState(false);
@@ -182,7 +189,7 @@ export function FilterPanel({ onFilterChange, className, categories = [] }: Filt
     filters.subcategory.length +
     filters.deliveryTime.length +
     (filters.rating > 0 ? 1 : 0) +
-    (filters.verified ? 1 : 0) +
+    (showVerifiedOnlyFilter && filters.verified ? 1 : 0) +
     (filters.featured ? 1 : 0) +
     (filters.provider ? 1 : 0) +
     (filters.location ? 1 : 0) +
@@ -464,25 +471,29 @@ export function FilterPanel({ onFilterChange, className, categories = [] }: Filt
           </AccordionContent>
         </AccordionItem>
 
-        {/* Verified Only */}
+        {/* Verified (optional) + Featured */}
         <AccordionItem value="verified" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">Provider Status</AccordionTrigger>
+          <AccordionTrigger className="py-2.5 text-sm">
+            {showVerifiedOnlyFilter ? "Provider Status" : "Highlights"}
+          </AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-2 pt-1">
-              <div className="flex items-center space-x-2 py-0.5">
-                <Checkbox
-                  id="verified"
-                  checked={filters.verified}
-                  onCheckedChange={(checked) =>
-                    updateFilter("verified", checked as boolean)
-                  }
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="verified" className="text-sm font-normal cursor-pointer flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  Verified providers only
-                </Label>
-              </div>
+              {showVerifiedOnlyFilter && (
+                <div className="flex items-center space-x-2 py-0.5">
+                  <Checkbox
+                    id="verified"
+                    checked={filters.verified}
+                    onCheckedChange={(checked) =>
+                      updateFilter("verified", checked as boolean)
+                    }
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="verified" className="text-sm font-normal cursor-pointer flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    Verified providers only
+                  </Label>
+                </div>
+              )}
               <div className="flex items-center space-x-2 py-0.5">
                 <Checkbox
                   id="featured"
@@ -507,7 +518,7 @@ export function FilterPanel({ onFilterChange, className, categories = [] }: Filt
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {[
-                { value: "relevance", label: "Relevance" },
+                { value: "relevance", label: "Nearest first" },
                 { value: "rating", label: "Highest Rated" },
                 { value: "price-low", label: "Price: Low to High" },
                 { value: "price-high", label: "Price: High to Low" },
