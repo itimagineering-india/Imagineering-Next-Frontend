@@ -4,7 +4,6 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServicesList, type ServicesListHandle } from "./ServicesList";
-import type { UserLocation } from "@/contexts/UserLocationContext";
 import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
 
 interface Service {
@@ -27,8 +26,6 @@ interface CategoryScrollSectionProps {
   favoritesById: Record<string, boolean>;
   favoritesVersion: number;
   onToggleFavorite: (serviceId: string) => void;
-  /** When set, `/services` links include tile + lat/lng so the listing is not capped to the no-geo limit. */
-  userLocation?: UserLocation | null;
 }
 
 function CategoryScrollSectionComponent({
@@ -39,18 +36,14 @@ function CategoryScrollSectionComponent({
   favoritesById,
   favoritesVersion,
   onToggleFavorite,
-  userLocation = null,
 }: CategoryScrollSectionProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const listHandleRef = useRef<ServicesListHandle | null>(null);
 
   const categoryHeaderHref = useMemo(() => {
-    const q = buildServicesBrowseQuery(
-      categorySlug ? categorySlug : title,
-      userLocation
-    );
+    const q = buildServicesBrowseQuery(categorySlug ? categorySlug : title);
     return `/services?${q}`;
-  }, [categorySlug, title, userLocation]);
+  }, [categorySlug, title]);
 
   /* =======================
      SCROLL HANDLER
