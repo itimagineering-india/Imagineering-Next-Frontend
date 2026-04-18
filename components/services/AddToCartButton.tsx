@@ -90,10 +90,7 @@ export const AddToCartButton = ({
     <>
       <div className="flex items-center gap-2 w-full">
         {showQuantity && (
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
-              Qty
-            </span>
+          <div className="flex items-center shrink-0">
             <Input
               type="number"
               min={minQty}
