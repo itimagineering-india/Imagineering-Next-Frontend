@@ -7,7 +7,7 @@ import { JobsSection } from "@/components/home/JobsSection";
 import { BulkHireLabourCta } from "@/components/home/BulkHireLabourCta";
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
-import { AppDownloadSection } from "@/components/home/AppDownloadSection";
+import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
 import { BASE_URL } from "@/lib/constants";
 
 export const revalidate = 3600;
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: BASE_URL },
 };
 
-/** Home layout matches Vite/React app: Hero → Search → Services → Jobs → Top providers → Categories → App banner */
+/** Home layout matches Vite/React app: Hero → Search → Services → Jobs → Top providers → Categories */
 export default function Home() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -29,7 +29,7 @@ export default function Home() {
         <BulkHireLabourCta />
         <TopProvidersSection />
         <CategorySections />
-        <AppDownloadSection />
+        <PlatformAudienceSection />
       </main>
     </div>
   );
