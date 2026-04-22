@@ -6,7 +6,7 @@ import { ServicesSection } from "@/components/home/ServicesSection";
 import { JobsSection } from "@/components/home/JobsSection";
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
-import { AppDownloadSection } from "@/components/home/AppDownloadSection";
+import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
 
 export async function getServerSideProps() {
   return { props: {} };
@@ -24,7 +24,7 @@ const Index = () => {
         <JobsSection />
         <TopProvidersSection />
         <CategorySections />
-        <AppDownloadSection />
+        <PlatformAudienceSection />
       </main>
     </div>
   );
