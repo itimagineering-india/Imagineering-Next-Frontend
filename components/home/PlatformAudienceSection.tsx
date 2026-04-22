@@ -28,7 +28,7 @@ export function PlatformAudienceSection() {
             <img
               src={USER_BANNER}
               alt="Imagineering India for users"
-              className="h-44 w-full object-cover"
+              className="w-full h-auto max-h-56 object-contain bg-muted/30"
               loading="lazy"
             />
             <div className="p-6 sm:p-7 space-y-4">
@@ -67,7 +67,7 @@ export function PlatformAudienceSection() {
             <img
               src={PROVIDER_BANNER}
               alt="Imagimitra for providers"
-              className="h-44 w-full object-cover"
+              className="w-full h-auto max-h-56 object-contain bg-muted/30"
               loading="lazy"
             />
             <div className="p-6 sm:p-7 space-y-4">
