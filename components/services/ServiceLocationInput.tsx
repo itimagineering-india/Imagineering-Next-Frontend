@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MapPin, Clock, X } from "lucide-react";
 import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
 
@@ -14,12 +16,38 @@ interface Location {
   };
 }
 
+export type ProviderBusinessAddressSnapshot = {
+  address: string;
+  city: string;
+  state: string;
+  coordinates?: { lat: number; lng: number };
+};
+
+function normLocPart(s: string | undefined) {
+  return String(s ?? "").trim().toLowerCase();
+}
+
+function hasUsableBusinessAddress(biz: ProviderBusinessAddressSnapshot | null | undefined): boolean {
+  if (!biz) return false;
+  return !!(normLocPart(biz.address) || normLocPart(biz.city) || normLocPart(biz.state));
+}
+
+function locationMatchesBusiness(loc: Location, biz: ProviderBusinessAddressSnapshot): boolean {
+  if (!hasUsableBusinessAddress(biz)) return false;
+  return (
+    normLocPart(loc.address) === normLocPart(biz.address) &&
+    normLocPart(loc.city) === normLocPart(biz.city) &&
+    normLocPart(loc.state) === normLocPart(biz.state)
+  );
+}
+
 interface ServiceLocationInputProps {
   location: Location;
   onLocationChange: (location: Location) => void;
   onClear: () => void;
   isGettingLocation: boolean;
   onGettingLocationChange: (value: boolean) => void;
+  providerBusinessAddress?: ProviderBusinessAddressSnapshot | null | undefined;
 }
 
 export function ServiceLocationInput({
@@ -28,7 +56,30 @@ export function ServiceLocationInput({
   onClear,
   isGettingLocation,
   onGettingLocationChange,
+  providerBusinessAddress,
 }: ServiceLocationInputProps) {
+  const matchesBusiness = useMemo(
+    () =>
+      !!providerBusinessAddress && locationMatchesBusiness(location, providerBusinessAddress),
+    [location, providerBusinessAddress]
+  );
+
+  const applyProviderBusinessAddress = () => {
+    if (!providerBusinessAddress || !hasUsableBusinessAddress(providerBusinessAddress)) return;
+    const lat = Number(providerBusinessAddress.coordinates?.lat);
+    const lng = Number(providerBusinessAddress.coordinates?.lng);
+    onLocationChange({
+      address: String(providerBusinessAddress.address || "").trim(),
+      city: String(providerBusinessAddress.city || "").trim(),
+      state: String(providerBusinessAddress.state || "").trim(),
+      coordinates:
+        Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
+          ? { lat, lng }
+          : undefined,
+    });
+    onGettingLocationChange(false);
+  };
+
   const { inputRef, isLoaded: isLocationLoaded, getCurrentLocation } = usePlacesAutocomplete({
     onPlaceSelect: (place) => {
       let city = '';
@@ -78,10 +129,41 @@ export function ServiceLocationInput({
     onClear();
   };
 
+  const businessAddressReady = providerBusinessAddress !== undefined;
+  const showBusinessAddressOption = hasUsableBusinessAddress(providerBusinessAddress);
+
   return (
     <div className="space-y-4">
       <Label>Service Location (Optional)</Label>
-      
+
+      {businessAddressReady && showBusinessAddressOption && (
+        <div className="flex items-start gap-3 rounded-lg border bg-muted/25 p-3">
+          <Checkbox
+            id="service-location-same-as-business"
+            checked={matchesBusiness}
+            onCheckedChange={(v) => {
+              if (v === true) applyProviderBusinessAddress();
+              else handleClear();
+            }}
+            className="mt-0.5"
+          />
+          <div className="min-w-0 space-y-1">
+            <label htmlFor="service-location-same-as-business" className="text-sm font-medium leading-snug cursor-pointer">
+              Same as my business address
+            </label>
+            <p className="text-xs text-muted-foreground leading-snug">
+              When this service is offered from the same place as your Business Profile, tick this to copy that
+              address. Untick to clear the listing location.
+            </p>
+          </div>
+        </div>
+      )}
+      {businessAddressReady && !showBusinessAddressOption && (
+        <p className="text-xs text-muted-foreground rounded-md border border-dashed bg-muted/20 px-3 py-2">
+          Save a business address on your Business Profile to enable “Same as my business address” here.
+        </p>
+      )}
+
       {/* Address Search with Autocomplete */}
       <div className="space-y-2">
         <Label htmlFor="location-search" className="text-sm">Search Address</Label>
