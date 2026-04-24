@@ -26,7 +26,6 @@ export function SubCategorySelector({
   categoryName,
   error,
 }: SubCategorySelectorProps) {
-  console.log(`SubCategorySelector: category=${categoryName}, subcategories count=${subcategories.length}`);
   const [inputMode, setInputMode] = useState(false);
   const [manualInput, setManualInput] = useState(selectedSubcategory);
 
