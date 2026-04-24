@@ -1,9 +1,9 @@
-"use client";
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import api from "@/lib/api-client";
+import { Loader2, Plus } from "lucide-react";
+import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
@@ -23,18 +23,37 @@ import {
 } from "@/components/services";
 import { MultiStepServiceForm } from "@/components/services/form";
 
-export async function getServerSideProps() { return { props: {} }; }
+function isProviderBusinessProfileComplete(provider: unknown): boolean {
+  if (!provider || typeof provider !== "object") return false;
+  const p = provider as { businessName?: string; bio?: string };
+  return Boolean(String(p.businessName ?? "").trim() && String(p.bio ?? "").trim());
+}
+
+async function fetchProviderRecordForUser(userId: string): Promise<unknown | null> {
+  const providerResponse = await api.providers.getByUserId(userId);
+  let provider: unknown =
+    providerResponse.success && providerResponse.data
+      ? ((providerResponse.data as { provider?: unknown }).provider ?? providerResponse.data)
+      : null;
+  if (!provider) {
+    const fallbackResponse = await api.providers.getById(userId, 0);
+    if (fallbackResponse.success && fallbackResponse.data) {
+      provider = (fallbackResponse.data as { provider?: unknown }).provider ?? fallbackResponse.data;
+    }
+  }
+  return provider || null;
+}
 
 interface Service {
   _id: string;
   title: string;
   description: string;
-  category?: {
+  category: {
     _id: string;
     name: string;
     slug: string;
   };
-  subcategory?: string;
+  subcategory: string;
   price: number;
   priceType: string;
   image?: string;
@@ -57,6 +76,7 @@ interface Service {
 
 export default function ProviderServices() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +85,8 @@ export default function ProviderServices() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
   const [addServiceDialogOpen, setAddServiceDialogOpen] = useState(false);
+  const [businessProfileRequiredOpen, setBusinessProfileRequiredOpen] = useState(false);
+  const [isCheckingBusinessProfile, setIsCheckingBusinessProfile] = useState(false);
   const [editServiceDialogOpen, setEditServiceDialogOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
   const { toast } = useToast();
@@ -80,8 +102,7 @@ export default function ProviderServices() {
       // Force refresh to bypass any cached categories without subcategories
       const response = await api.categories.getAll(true, { includeSubcategories: true });
       if (response.success && response.data) {
-        const d = response.data as { categories?: any[] };
-        setCategories(d.categories || []);
+        setCategories(response.data.categories || []);
       }
     } catch (error) {
       console.error("Failed to fetch categories:", error);
@@ -96,8 +117,7 @@ export default function ProviderServices() {
       // Fetch services by provider
       const response = await api.services.getByProvider(userId);
       if (response.success && response.data) {
-        const d = response.data as { services?: any[] };
-        setServices(d.services || []);
+        setServices(response.data.services || []);
       }
     } catch (error) {
       console.error("Failed to fetch services:", error);
@@ -118,6 +138,35 @@ export default function ProviderServices() {
 
   const handleServiceSuccess = () => {
     fetchServices();
+  };
+
+  const tryOpenAddServiceDialog = async () => {
+    const userId = (user as { _id?: string; id?: string } | null)?._id || (user as { id?: string } | null)?.id;
+    if (!userId) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to add a service.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsCheckingBusinessProfile(true);
+    try {
+      const provider = await fetchProviderRecordForUser(String(userId));
+      if (!isProviderBusinessProfileComplete(provider)) {
+        setBusinessProfileRequiredOpen(true);
+        return;
+      }
+      setAddServiceDialogOpen(true);
+    } catch {
+      toast({
+        title: "Could not verify profile",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingBusinessProfile(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -169,14 +218,19 @@ export default function ProviderServices() {
               Manage all your service listings
             </p>
           </div>
-          <Button 
-            onClick={() => setAddServiceDialogOpen(true)} 
-            size="sm" 
+          <Button
+            onClick={() => void tryOpenAddServiceDialog()}
+            disabled={isCheckingBusinessProfile}
+            size="sm"
             className="text-xs sm:text-sm self-start sm:self-auto w-full sm:w-auto h-9 sm:h-10"
           >
-            <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Add New Service</span>
-            <span className="sm:hidden">Add Service</span>
+            {isCheckingBusinessProfile ? (
+              <Loader2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+            ) : (
+              <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            )}
+            <span className="hidden sm:inline">{isCheckingBusinessProfile ? "Checking…" : "Add New Service"}</span>
+            <span className="sm:hidden">{isCheckingBusinessProfile ? "…" : "Add Service"}</span>
           </Button>
         </div>
 
@@ -202,14 +256,21 @@ export default function ProviderServices() {
                 {searchQuery ? "No services found matching your search" : "No services yet"}
               </p>
               {!searchQuery && (
-                <Button 
-                  onClick={() => setAddServiceDialogOpen(true)} 
-                  size="sm" 
+                <Button
+                  onClick={() => void tryOpenAddServiceDialog()}
+                  disabled={isCheckingBusinessProfile}
+                  size="sm"
                   className="text-xs sm:text-sm h-9 sm:h-10"
                 >
-                  <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline">Add Your First Service</span>
-                  <span className="sm:hidden">Add Service</span>
+                  {isCheckingBusinessProfile ? (
+                    <Loader2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                  ) : (
+                    <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isCheckingBusinessProfile ? "Checking…" : "Add Your First Service"}
+                  </span>
+                  <span className="sm:hidden">{isCheckingBusinessProfile ? "…" : "Add Service"}</span>
                 </Button>
               )}
             </CardContent>
@@ -262,7 +323,7 @@ export default function ProviderServices() {
             editMode={true}
             serviceId={serviceToEdit._id}
             initialData={{
-              category: (typeof serviceToEdit.category === "string" ? serviceToEdit.category : serviceToEdit.category?._id) ?? "",
+              category: serviceToEdit.category._id || serviceToEdit.category,
               subcategory: serviceToEdit.subcategory || "",
               title: serviceToEdit.title || "",
               brandName: (serviceToEdit as any).brandName || "",
@@ -283,12 +344,36 @@ export default function ProviderServices() {
                 days: [],
                 timeSlots: [{ start: "09:00", end: "18:00" }],
               },
-              dynamicData: { ...((serviceToEdit as any).resumeUrl && { resumeUrl: (serviceToEdit as any).resumeUrl }) },
+              dynamicData: { ...(serviceToEdit.resumeUrl && { resumeUrl: serviceToEdit.resumeUrl }) },
               contactMode: "platform",
               visibility: serviceToEdit.featured ? "featured" : "normal",
             }}
           />
         )}
+
+        <AlertDialog open={businessProfileRequiredOpen} onOpenChange={setBusinessProfileRequiredOpen}>
+          <AlertDialogContent className="mx-3 sm:mx-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-base sm:text-lg">Business profile required</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm">
+                Add your business name and description under Business Profile first. After you save there, you can
+                create service listings here.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+              <AlertDialogCancel className="w-full sm:w-auto text-sm">Not now</AlertDialogCancel>
+              <AlertDialogAction
+                className="w-full sm:w-auto text-sm"
+                onClick={() => {
+                  setBusinessProfileRequiredOpen(false);
+                  navigate("/dashboard/provider/business-profile");
+                }}
+              >
+                Go to Business Profile
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
