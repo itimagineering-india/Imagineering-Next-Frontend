@@ -105,6 +105,134 @@
     background: hsl(var(--background));
     color: hsl(var(--foreground));
     font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+
+  h1,
+  .heading-xl {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.43;
+    letter-spacing: 0;
+  }
+
+  h2,
+  .heading-md {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.18;
+    letter-spacing: -0.44px;
+  }
+
+  h3,
+  .card-title {
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.43;
+    letter-spacing: 0;
+  }
+
+  h4,
+  .listing-title {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.18px;
+  }
+
+  h5,
+  h6,
+  .subtitle {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+
+  p,
+  span,
+  label,
+  input,
+  textarea,
+  select,
+  .body {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+
+  .caption {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.29;
+    letter-spacing: 0;
+    color: #6b7280;
+  }
+
+  .badge {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.33;
+    letter-spacing: 0;
+  }
+
+  .micro {
+    font-size: 8px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: 0.32px;
+    text-transform: uppercase;
+  }
+
+  strong,
+  b {
+    font-weight: 700;
+  }
+
+  .font-normal {
+    font-weight: 500 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  h1,
+  .heading-xl {
+    font-size: 24px;
+  }
+
+  h2,
+  .heading-md {
+    font-size: 19px;
+  }
+
+  h3,
+  .card-title {
+    font-size: 18px;
+  }
+
+  h4,
+  .listing-title {
+    font-size: 17px;
+  }
+
+  h5,
+  h6,
+  .subtitle,
+  p,
+  span,
+  label,
+  input,
+  textarea,
+  select,
+  .body {
+    font-size: 14px;
+  }
+
+  .caption {
+    font-size: 12px;
   }
 }
 
