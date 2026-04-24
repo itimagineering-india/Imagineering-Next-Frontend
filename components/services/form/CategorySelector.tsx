@@ -19,6 +19,8 @@ interface CategorySelectorProps {
   selectedCategoryId: string;
   onCategoryChange: (categoryId: string) => void;
   error?: string;
+  /** When true, category cannot be changed (e.g. locked to business profile primary category). */
+  disabled?: boolean;
 }
 
 export function CategorySelector({
@@ -26,6 +28,7 @@ export function CategorySelector({
   selectedCategoryId,
   onCategoryChange,
   error,
+  disabled = false,
 }: CategorySelectorProps) {
   return (
     <div className="space-y-2">
@@ -35,8 +38,9 @@ export function CategorySelector({
       <Select
         value={selectedCategoryId || ""}
         onValueChange={onCategoryChange}
+        disabled={disabled}
       >
-        <SelectTrigger id="category" className={error ? "border-destructive" : ""}>
+        <SelectTrigger id="category" className={error ? "border-destructive" : ""} disabled={disabled}>
           <SelectValue placeholder="Select a category" />
         </SelectTrigger>
         <SelectContent>
