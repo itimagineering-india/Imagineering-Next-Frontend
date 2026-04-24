@@ -11,6 +11,10 @@ import {
   Image as ImageIcon,
   CheckCircle2,
 } from "lucide-react";
+import {
+  getManpowerServiceOfferPresetsForSubcategory,
+  humanizeManpowerTaskId,
+} from "@/config/manpowerServiceOfferPresets";
 
 interface Location {
   address: string;
@@ -38,6 +42,7 @@ interface SubmitReviewProps {
     detailedDescription: string;
     category: string;
     categoryName?: string;
+    categorySlug?: string;
     subcategory: string;
     pricingType: "fixed" | "hourly" | "daily" | "per_minute" | "per_article" | "monthly" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip" | "per_cuft" | "per_cum" | "per_metre" | "per_bag" | "lumpsum" | "per_project" | "negotiable";
     startingPrice: string;
@@ -65,6 +70,14 @@ export function SubmitReview({
 }: SubmitReviewProps) {
   const totalImages = formData.images.length + formData.uploadedImages.length;
   const hasLocation = formData.location.address || formData.location.city;
+  const manpowerOfferPresetRows = getManpowerServiceOfferPresetsForSubcategory(formData.subcategory);
+  const manpowerTaskIds = (formData.dynamicData?.manpowerTaskIds as string[] | undefined) ?? [];
+  const manpowerCustomTasks = (formData.dynamicData?.manpowerCustomTasks as string[] | undefined) ?? [];
+  const showManpowerOffersReview =
+    formData.categorySlug === "manpower" &&
+    !!formData.subcategory?.trim() &&
+    formData.subcategory !== "Technical Manpower" &&
+    (manpowerTaskIds.length > 0 || manpowerCustomTasks.length > 0);
 
   return (
     <div className="space-y-6">
@@ -118,6 +131,27 @@ export function SubmitReview({
                   {formData.skills.map((skill, i) => (
                     <Badge key={i} variant="secondary" className="font-normal">
                       {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {showManpowerOffersReview && (
+              <div>
+                <Label className="text-sm text-muted-foreground">Services you offer</Label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {manpowerTaskIds.map((id) => {
+                    const label =
+                      manpowerOfferPresetRows.find((p) => p.id === id)?.label ?? humanizeManpowerTaskId(id);
+                    return (
+                      <Badge key={id} variant="outline" className="font-normal">
+                        {label}
+                      </Badge>
+                    );
+                  })}
+                  {manpowerCustomTasks.map((line, i) => (
+                    <Badge key={`custom-${i}`} variant="secondary" className="font-normal">
+                      {line}
                     </Badge>
                   ))}
                 </div>
@@ -216,7 +250,11 @@ export function SubmitReview({
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {Object.entries(formData.dynamicData).map(([key, value]) => {
+                {Object.entries(formData.dynamicData)
+                  .filter(([key]) =>
+                    !["manpowerTaskIds", "manpowerCustomTasks", "resumeOrDocument", "resumeUrl"].includes(key)
+                  )
+                  .map(([key, value]) => {
                   if (!value || (Array.isArray(value) && value.length === 0)) return null;
                   return (
                     <div key={key} className="flex justify-between">
