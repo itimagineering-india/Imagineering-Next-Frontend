@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus } from "lucide-react";
 import api from "@/lib/api-client";
@@ -23,6 +23,7 @@ import {
   ServiceGrid,
 } from "@/components/services";
 import { MultiStepServiceForm } from "@/components/services/form";
+import { pickConstructionMetadataFields } from "@/lib/constructionMaterials";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -30,6 +31,17 @@ function isProviderBusinessProfileComplete(provider: unknown): boolean {
   if (!provider || typeof provider !== "object") return false;
   const p = provider as { businessName?: string; bio?: string };
   return Boolean(String(p.businessName ?? "").trim() && String(p.bio ?? "").trim());
+}
+
+function providerPrimaryCategoryIdFromDoc(provider: unknown): string | null {
+  if (!provider || typeof provider !== "object") return null;
+  const raw = (provider as { primaryCategory?: unknown }).primaryCategory;
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "object" && raw !== null && "_id" in (raw as object)) {
+    const id = (raw as { _id?: unknown })._id;
+    return id != null && String(id) ? String(id) : null;
+  }
+  return String(raw);
 }
 
 async function fetchProviderRecordForUser(userId: string): Promise<unknown | null> {
@@ -88,7 +100,8 @@ export default function ProviderServices() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
   const [addServiceDialogOpen, setAddServiceDialogOpen] = useState(false);
-  const [businessProfileRequiredOpen, setBusinessProfileRequiredOpen] = useState(false);
+  const [businessProfileGate, setBusinessProfileGate] = useState<null | "basic" | "primary_category">(null);
+  const [providerPrimaryCategoryIdForForm, setProviderPrimaryCategoryIdForForm] = useState<string | null>(null);
   const [isCheckingBusinessProfile, setIsCheckingBusinessProfile] = useState(false);
   const [editServiceDialogOpen, setEditServiceDialogOpen] = useState(false);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
@@ -121,7 +134,7 @@ export default function ProviderServices() {
       // Fetch services by provider
       const response = await api.services.getByProvider(userId);
       if (response.success && response.data) {
-        const d = response.data as { services?: any[] };
+        const d = response.data as { services?: Service[] };
         setServices(d.services || []);
       }
     } catch (error) {
@@ -136,9 +149,48 @@ export default function ProviderServices() {
     }
   };
 
-  const handleEditClick = (service: Service) => {
-    setServiceToEdit(service);
-    setEditServiceDialogOpen(true);
+  const handleEditClick = async (service: Service) => {
+    const userId = (user as { _id?: string; id?: string } | null)?._id || (user as { id?: string } | null)?.id;
+    if (!userId) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to edit a service.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const provider = await fetchProviderRecordForUser(String(userId));
+      if (!isProviderBusinessProfileComplete(provider)) {
+        setBusinessProfileGate("basic");
+        return;
+      }
+      const primary = providerPrimaryCategoryIdFromDoc(provider);
+      if (!primary) {
+        setBusinessProfileGate("primary_category");
+        return;
+      }
+      const cat = service.category as { _id?: string } | undefined;
+      const svcCatId = cat && typeof cat === "object" && "_id" in cat ? cat._id : undefined;
+      if (!svcCatId || String(svcCatId) !== String(primary)) {
+        toast({
+          title: "Cannot edit this service",
+          description:
+            "This listing is under a different category than the primary category on your business profile.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setProviderPrimaryCategoryIdForForm(primary);
+      setServiceToEdit(service);
+      setEditServiceDialogOpen(true);
+    } catch {
+      toast({
+        title: "Could not verify profile",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleServiceSuccess = () => {
@@ -159,9 +211,15 @@ export default function ProviderServices() {
     try {
       const provider = await fetchProviderRecordForUser(String(userId));
       if (!isProviderBusinessProfileComplete(provider)) {
-        setBusinessProfileRequiredOpen(true);
+        setBusinessProfileGate("basic");
         return;
       }
+      const primary = providerPrimaryCategoryIdFromDoc(provider);
+      if (!primary) {
+        setBusinessProfileGate("primary_category");
+        return;
+      }
+      setProviderPrimaryCategoryIdForForm(primary);
       setAddServiceDialogOpen(true);
     } catch {
       toast({
@@ -211,6 +269,12 @@ export default function ProviderServices() {
     service.category?.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const serviceStats = useMemo(() => {
+    const total = services.length;
+    const active = services.filter((s) => s.isActive).length;
+    return { total, active, inactive: Math.max(0, total - active) };
+  }, [services]);
+
   return (
     <div className="p-3 sm:p-4 md:p-6 lg:p-8 space-y-3 sm:space-y-4 md:space-y-6">
         {/* Header */}
@@ -220,7 +284,7 @@ export default function ProviderServices() {
               My Services
             </h1>
             <p className="text-xs sm:text-sm md:text-base text-muted-foreground mt-1">
-              Manage all your service listings
+              Manage your service listings on Imagineering India
             </p>
           </div>
           <Button
@@ -238,6 +302,44 @@ export default function ProviderServices() {
             <span className="sm:hidden">{isCheckingBusinessProfile ? "…" : "Add Service"}</span>
           </Button>
         </div>
+
+        {!isLoading && (
+          <Card className="overflow-hidden border-muted shadow-sm">
+            <CardHeader className="border-b bg-muted/30 py-3 sm:py-4">
+              <CardTitle className="text-sm font-semibold text-foreground sm:text-base">
+                Listing overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-3 divide-x divide-border">
+                <div className="py-4 text-center">
+                  <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{serviceStats.total}</p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                    Total
+                  </p>
+                </div>
+                <div className="py-4 text-center">
+                  <p className="text-2xl font-bold tabular-nums tracking-tight text-primary">{serviceStats.active}</p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                    Active
+                  </p>
+                </div>
+                <div className="py-4 text-center">
+                  <p className="text-2xl font-bold tabular-nums tracking-tight text-muted-foreground">
+                    {serviceStats.inactive}
+                  </p>
+                  <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+                    Inactive
+                  </p>
+                </div>
+              </div>
+              <p className="border-t border-border bg-muted/25 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground sm:px-4 sm:text-xs">
+                Active listings can appear to buyers on Imagineering India. Paused listings stay on your account until
+                you turn them back on.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Search and Filters */}
         <ServiceFilters
@@ -307,10 +409,12 @@ export default function ProviderServices() {
             setAddServiceDialogOpen(open);
             if (!open) {
               setServiceToEdit(null);
+              setProviderPrimaryCategoryIdForForm(null);
             }
           }}
           categories={categories}
           onSuccess={handleServiceSuccess}
+          providerPrimaryCategoryId={providerPrimaryCategoryIdForForm ?? undefined}
         />
 
         {/* Edit Service Dialog */}
@@ -321,10 +425,12 @@ export default function ProviderServices() {
               setEditServiceDialogOpen(open);
               if (!open) {
                 setServiceToEdit(null);
+                setProviderPrimaryCategoryIdForForm(null);
               }
             }}
             categories={categories}
             onSuccess={handleServiceSuccess}
+            providerPrimaryCategoryId={providerPrimaryCategoryIdForForm ?? undefined}
             editMode={true}
             serviceId={serviceToEdit._id}
             initialData={{
@@ -349,20 +455,51 @@ export default function ProviderServices() {
                 days: [],
                 timeSlots: [{ start: "09:00", end: "18:00" }],
               },
-              dynamicData: { ...((serviceToEdit as any).resumeUrl && { resumeUrl: (serviceToEdit as any).resumeUrl }) },
+              dynamicData: (() => {
+                const meta = (serviceToEdit as { metadata?: Record<string, unknown> }).metadata;
+                const fromMeta: Record<string, unknown> = {};
+                if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+                  if (Array.isArray(meta.manpowerTaskIds)) fromMeta.manpowerTaskIds = meta.manpowerTaskIds;
+                  if (Array.isArray(meta.manpowerCustomTasks))
+                    fromMeta.manpowerCustomTasks = meta.manpowerCustomTasks;
+                }
+                const cat = serviceToEdit.category;
+                const catSlug =
+                  cat && typeof cat === "object" && cat !== null && "slug" in cat
+                    ? String((cat as { slug?: string }).slug ?? "")
+                    : "";
+                const metaObj = meta && typeof meta === "object" && !Array.isArray(meta) ? meta : null;
+                const isConstructionListing =
+                  catSlug === "construction-materials" ||
+                  metaObj?.formVariant === "construction_materials";
+                if (isConstructionListing && metaObj) {
+                  const cm = pickConstructionMetadataFields(metaObj);
+                  if (Object.keys(cm).length > 0) Object.assign(fromMeta, cm);
+                }
+                const resumeUrl = (serviceToEdit as { resumeUrl?: string }).resumeUrl;
+                return {
+                  ...fromMeta,
+                  ...(resumeUrl ? { resumeUrl } : {}),
+                };
+              })(),
               contactMode: "platform",
               visibility: serviceToEdit.featured ? "featured" : "normal",
             }}
           />
         )}
 
-        <AlertDialog open={businessProfileRequiredOpen} onOpenChange={setBusinessProfileRequiredOpen}>
+        <AlertDialog open={businessProfileGate !== null} onOpenChange={(o) => !o && setBusinessProfileGate(null)}>
           <AlertDialogContent className="mx-3 sm:mx-4">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-base sm:text-lg">Business profile required</AlertDialogTitle>
+              <AlertDialogTitle className="text-base sm:text-lg">
+                {businessProfileGate === "primary_category"
+                  ? "Primary category required"
+                  : "Business profile required"}
+              </AlertDialogTitle>
               <AlertDialogDescription className="text-sm">
-                Add your business name and description under Business Profile first. After you save there, you can
-                create service listings here.
+                {businessProfileGate === "primary_category"
+                  ? "Choose your primary service category on your Business Profile and save. You can only add services in that category."
+                  : "Add your business name and description under Business Profile first. After you save there, you can create service listings here."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
@@ -370,7 +507,7 @@ export default function ProviderServices() {
               <AlertDialogAction
                 className="w-full sm:w-auto text-sm"
                 onClick={() => {
-                  setBusinessProfileRequiredOpen(false);
+                  setBusinessProfileGate(null);
                   router.push("/dashboard/provider/business-profile");
                 }}
               >
