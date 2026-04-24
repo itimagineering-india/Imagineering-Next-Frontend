@@ -1,9 +1,10 @@
+"use client";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus } from "lucide-react";
-import api from "@/lib/api";
+import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
@@ -22,6 +23,8 @@ import {
   ServiceGrid,
 } from "@/components/services";
 import { MultiStepServiceForm } from "@/components/services/form";
+
+export async function getServerSideProps() { return { props: {} }; }
 
 function isProviderBusinessProfileComplete(provider: unknown): boolean {
   if (!provider || typeof provider !== "object") return false;
@@ -48,12 +51,12 @@ interface Service {
   _id: string;
   title: string;
   description: string;
-  category: {
+  category?: {
     _id: string;
     name: string;
     slug: string;
   };
-  subcategory: string;
+  subcategory?: string;
   price: number;
   priceType: string;
   image?: string;
@@ -76,7 +79,7 @@ interface Service {
 
 export default function ProviderServices() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,7 +105,8 @@ export default function ProviderServices() {
       // Force refresh to bypass any cached categories without subcategories
       const response = await api.categories.getAll(true, { includeSubcategories: true });
       if (response.success && response.data) {
-        setCategories(response.data.categories || []);
+        const d = response.data as { categories?: any[] };
+        setCategories(d.categories || []);
       }
     } catch (error) {
       console.error("Failed to fetch categories:", error);
@@ -117,7 +121,8 @@ export default function ProviderServices() {
       // Fetch services by provider
       const response = await api.services.getByProvider(userId);
       if (response.success && response.data) {
-        setServices(response.data.services || []);
+        const d = response.data as { services?: any[] };
+        setServices(d.services || []);
       }
     } catch (error) {
       console.error("Failed to fetch services:", error);
@@ -323,7 +328,7 @@ export default function ProviderServices() {
             editMode={true}
             serviceId={serviceToEdit._id}
             initialData={{
-              category: serviceToEdit.category._id || serviceToEdit.category,
+              category: (typeof serviceToEdit.category === "string" ? serviceToEdit.category : serviceToEdit.category?._id) ?? "",
               subcategory: serviceToEdit.subcategory || "",
               title: serviceToEdit.title || "",
               brandName: (serviceToEdit as any).brandName || "",
@@ -344,7 +349,7 @@ export default function ProviderServices() {
                 days: [],
                 timeSlots: [{ start: "09:00", end: "18:00" }],
               },
-              dynamicData: { ...(serviceToEdit.resumeUrl && { resumeUrl: serviceToEdit.resumeUrl }) },
+              dynamicData: { ...((serviceToEdit as any).resumeUrl && { resumeUrl: (serviceToEdit as any).resumeUrl }) },
               contactMode: "platform",
               visibility: serviceToEdit.featured ? "featured" : "normal",
             }}
@@ -366,7 +371,7 @@ export default function ProviderServices() {
                 className="w-full sm:w-auto text-sm"
                 onClick={() => {
                   setBusinessProfileRequiredOpen(false);
-                  navigate("/dashboard/provider/business-profile");
+                  router.push("/dashboard/provider/business-profile");
                 }}
               >
                 Go to Business Profile
