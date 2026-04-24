@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldConfig, getDynamicFields } from "@/config/serviceFields";
+import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { ConstructionMaterialsDynamicFields } from "./ConstructionMaterialsDynamicFields";
 
 interface DynamicFieldsRendererProps {
   categorySlug: string;
@@ -32,6 +34,26 @@ export function DynamicFieldsRenderer({
         <p className="text-sm text-muted-foreground">
           Select a category and subcategory to see dynamic fields
         </p>
+      </div>
+    );
+  }
+
+  if (isConstructionMaterialsCategorySlug(categorySlug)) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-sm font-medium text-muted-foreground">
+            Additional Information
+          </span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+        <ConstructionMaterialsDynamicFields
+          subcategory={subcategory}
+          dynamicData={dynamicData}
+          onFieldChange={onFieldChange}
+          errors={errors}
+        />
       </div>
     );
   }
