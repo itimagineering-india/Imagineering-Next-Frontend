@@ -15,8 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, MapPin, Loader2, Upload, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { MapPin, Loader2, Upload, X } from "lucide-react";
 import api from "@/lib/api-client";
 import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,7 +79,6 @@ export default function ProviderBusinessProfile() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
-  const [newServiceArea, setNewServiceArea] = useState({ city: "", state: "", radius: "" });
   const [businessProfile, setBusinessProfile] = useState({
     businessName: "",
     providerType: "Individual" as "Individual" | "Company" | "Firm" | "Proprietorship",
@@ -100,6 +98,8 @@ export default function ProviderBusinessProfile() {
     businessPhone: "",
     businessEmail: "",
     website: "",
+    gstRegistered: false,
+    gstNumber: "",
     coordinates: { lat: "", lng: "" },
   });
 
@@ -222,6 +222,8 @@ export default function ProviderBusinessProfile() {
             businessPhone: provider.businessPhone || "",
             businessEmail: provider.businessEmail || "",
             website: provider.website || "",
+            gstRegistered: Boolean(provider.gstRegistered ?? (provider.gstNumber && String(provider.gstNumber).trim())),
+            gstNumber: provider.gstNumber || "",
             coordinates: {
               lat: provider.businessAddress?.coordinates?.lat?.toString() || "",
               lng: provider.businessAddress?.coordinates?.lng?.toString() || "",
@@ -266,6 +268,12 @@ export default function ProviderBusinessProfile() {
       if (businessProfile.businessPhone) updateData.businessPhone = businessProfile.businessPhone.trim();
       if (businessProfile.businessEmail) updateData.businessEmail = businessProfile.businessEmail.trim().toLowerCase();
       if (businessProfile.website) updateData.website = businessProfile.website.trim();
+      updateData.gstRegistered = Boolean(businessProfile.gstRegistered);
+      if (businessProfile.gstRegistered && businessProfile.gstNumber?.trim()) {
+        updateData.gstNumber = businessProfile.gstNumber.trim().toUpperCase();
+      } else {
+        updateData.gstNumber = "";
+      }
       if (businessProfile.businessLogo) updateData.businessLogo = businessProfile.businessLogo;
       if (businessProfile.coverImage) updateData.coverImage = businessProfile.coverImage;
       if (businessProfile.primaryCategory) updateData.primaryCategory = businessProfile.primaryCategory;
@@ -763,78 +771,6 @@ export default function ProviderBusinessProfile() {
 
                 <Separator />
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>Service Areas</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (newServiceArea.city && newServiceArea.state) {
-                          setBusinessProfile({
-                            ...businessProfile,
-                            serviceAreas: [
-                              ...businessProfile.serviceAreas,
-                              {
-                                city: newServiceArea.city,
-                                state: newServiceArea.state,
-                                radius: newServiceArea.radius ? Number(newServiceArea.radius) : undefined,
-                              },
-                            ],
-                          });
-                          setNewServiceArea({ city: "", state: "", radius: "" });
-                        }
-                      }}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add Area
-                    </Button>
-                  </div>
-                  <div className="grid sm:grid-cols-3 gap-2">
-                    <Input
-                      placeholder="City"
-                      value={newServiceArea.city}
-                      onChange={(e) => setNewServiceArea({ ...newServiceArea, city: e.target.value })}
-                    />
-                    <Input
-                      placeholder="State"
-                      value={newServiceArea.state}
-                      onChange={(e) => setNewServiceArea({ ...newServiceArea, state: e.target.value })}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Radius (km)"
-                      value={newServiceArea.radius}
-                      onChange={(e) => setNewServiceArea({ ...newServiceArea, radius: e.target.value })}
-                    />
-                  </div>
-                  {businessProfile.serviceAreas.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {businessProfile.serviceAreas.map((area, index) => (
-                        <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                          {area.city}, {area.state}
-                          {area.radius && ` (${area.radius} km)`}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBusinessProfile({
-                                ...businessProfile,
-                                serviceAreas: businessProfile.serviceAreas.filter((_, i) => i !== index),
-                              });
-                            }}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <Separator />
-
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="business-phone">Business Phone Number</Label>
@@ -867,6 +803,40 @@ export default function ProviderBusinessProfile() {
                     value={businessProfile.website}
                     onChange={(e) => setBusinessProfile({ ...businessProfile, website: e.target.value })}
                   />
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="gst-registered"
+                      checked={businessProfile.gstRegistered}
+                      onCheckedChange={(checked) =>
+                        setBusinessProfile((prev) => ({
+                          ...prev,
+                          gstRegistered: Boolean(checked),
+                          gstNumber: checked ? prev.gstNumber : "",
+                        }))
+                      }
+                    />
+                    <Label htmlFor="gst-registered" className="cursor-pointer">
+                      GST Registered
+                    </Label>
+                  </div>
+                  {businessProfile.gstRegistered && (
+                    <div className="space-y-2">
+                      <Label htmlFor="gst-number">GST Number</Label>
+                      <Input
+                        id="gst-number"
+                        placeholder="e.g., 22AAAAA0000A1Z5"
+                        value={businessProfile.gstNumber}
+                        onChange={(e) =>
+                          setBusinessProfile({ ...businessProfile, gstNumber: e.target.value.toUpperCase() })
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
