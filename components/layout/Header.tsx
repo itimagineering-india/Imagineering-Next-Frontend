@@ -454,7 +454,7 @@ export function Header() {
        setShowSuggestions(false);
       }
      }}
-     className="pl-8 pr-8 lg:pl-9 lg:pr-9 h-8 lg:h-9 w-full min-w-0 max-w-full lg:w-80 placeholder:transition-all placeholder:duration-500 body"
+     className="pl-8 pr-8 lg:pl-12 lg:pr-12 h-8 lg:h-9 w-full min-w-0 max-w-full lg:w-80 placeholder:transition-all placeholder:duration-500 body"
     />
     {searchQuery && (
      <button
@@ -537,17 +537,20 @@ export function Header() {
  );
 
  return (
-  <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-   <div className="container flex min-h-16 h-auto py-2 sm:py-3 items-center justify-between gap-2 sm:gap-3">
+  <header className="sticky top-0 z-50 w-full max-w-full overflow-x-hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+   <div className="layout-shell flex w-full min-w-0 max-w-full min-h-16 h-auto py-2 sm:py-3 items-center justify-between gap-2 sm:gap-3">
     {/* Logo */}
-    <Link href="/" className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+    <Link
+     href="/"
+     className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2 lg:flex-none lg:shrink-0"
+    >
      <img 
       src="https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png" 
       alt="Imagineering India Logo" 
       className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 object-contain shrink-0"
      />
-     <div className="flex flex-col min-w-0">
-      <span className="body  text-foreground leading-tight whitespace-nowrap">Imagineering India</span>
+     <div className="flex min-w-0 flex-col">
+      <span className="body truncate text-foreground leading-tight">Imagineering India</span>
       <span className="micro leading-tight">
        One Point Solution for all the Construction M3
       </span>
@@ -560,7 +563,7 @@ export function Header() {
       <Button
        variant="secondary"
        size="sm"
-       className="hidden sm:flex items-center gap-1.5 text-muted-foreground hover:text-foreground shrink-0 max-w-[140px] md:max-w-[180px]"
+       className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground shrink-0 max-w-[140px] md:max-w-[180px]"
        title={userLocation?.city || userLocation?.address || "Set or change your location"}
       >
        <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -607,7 +610,7 @@ export function Header() {
        <NavigationMenuItem key="browse-services">
         <NavigationMenuTrigger className="bg-transparent">{t("header:exploreServices")}</NavigationMenuTrigger>
         <NavigationMenuContent>
-         <div className="w-[900px] max-w-[90vw] rounded-2xl bg-white shadow-xl border border-slate-100 overflow-hidden">
+         <div className="w-[min(92vw,980px)] rounded-2xl bg-white shadow-xl border border-slate-100 overflow-hidden">
           <div className="flex h-[360px]">
            {/* Left: categories list */}
            <div className="w-64 border-r border-slate-100 bg-white">
@@ -631,7 +634,7 @@ export function Header() {
                  setActiveSubcategory(null);
                 }}
                 className={cn(
-                 "flex w-full items-center gap-3 px-4 py-2.5 body text-slate-800 cursor-pointer transition-colors",
+                 "flex w-full items-center gap-3 px-4 py-3 body text-slate-800 cursor-pointer transition-colors",
                  "border-l-4 border-transparent hover:bg-slate-50",
                  isActive && "bg-red-50 border-red-500 subtitle"
                 )}
@@ -647,7 +650,7 @@ export function Header() {
            </div>
 
            {/* Right: subcategories panel */}
-           <div className="flex-1 min-w-[520px]">
+           <div className="flex-1 min-w-0 w-[min(62vw,700px)]">
             {(() => {
              const fallbackCategory = headerCategories[0];
              const active =
@@ -665,7 +668,7 @@ export function Header() {
                : subs[0] || null;
 
              return (
-              <div className="flex h-full flex-col px-6 py-5">
+              <div className="flex h-full flex-col px-6 py-6">
                {/* Chips */}
                <div className="mt-1 flex-1 overflow-y-auto pr-2">
                 {subs.length > 0 ? (
@@ -685,7 +688,7 @@ export function Header() {
                       router.push(`/services?${params.toString()}`);
                      }}
                      className={cn(
-                      "inline-flex items-center justify-center w-full rounded-lg border px-4 py-2.5 caption leading-snug text-center transition-all duration-150",
+                      "inline-flex items-center justify-center w-full rounded-lg border px-4 py-3 caption leading-snug text-center transition-all duration-150",
                       isChipActive
                        ? "border-red-500 bg-red-500 text-white shadow-sm"
                        : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:bg-red-500 hover:text-white hover:border-red-500 hover:shadow-sm"
@@ -872,7 +875,7 @@ export function Header() {
     </div>
 
     {/* Mobile: Search icon + Menu (3 lines) - grouped together */}
-    <div className="flex items-center gap-0 lg:hidden">
+    <div className="flex shrink-0 items-center gap-0 lg:hidden">
      <Button
       type="button"
       variant="search"
