@@ -53,6 +53,7 @@ import {
 } from "@/components/home/CategoryIcons";
 
 export function Header() {
+ const mainHeadline = "ONE POINT SOLUTION FOR ALL THE CONSTRUCTION M3";
  const { t } = useTranslation(["header", "common"]);
  const [isOpen, setIsOpen] = useState(false);
  const [searchQuery, setSearchQuery] = useState("");
@@ -74,6 +75,21 @@ export function Header() {
  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
  const [headerCategories, setHeaderCategories] = useState<Array<{ _id?: string; id?: string; name: string; slug: string; subcategories?: string[] }>>([]);
  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+ const [typedHeadline, setTypedHeadline] = useState("");
+
+ useEffect(() => {
+  setTypedHeadline("");
+  let charIndex = 0;
+  const timer = window.setInterval(() => {
+   charIndex += 1;
+   setTypedHeadline(mainHeadline.slice(0, charIndex));
+   if (charIndex >= mainHeadline.length) {
+    window.clearInterval(timer);
+   }
+  }, 50);
+
+  return () => window.clearInterval(timer);
+ }, [mainHeadline]);
 
  const getExploreCategoryIcon = (slug: string) => {
   switch (slug) {
@@ -551,9 +567,7 @@ export function Header() {
      />
      <div className="flex min-w-0 flex-col">
       <span className="body truncate text-foreground leading-tight">Imagineering India</span>
-      <span className="micro leading-tight">
-       One Point Solution for all the Construction M3
-      </span>
+      <span className="micro leading-tight">{typedHeadline}</span>
      </div>
     </Link>
 
