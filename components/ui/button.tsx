@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[8px] text-[16px] font-medium leading-[1.25] tracking-[0] ring-offset-background transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF385C] focus-visible:ring-offset-2 active:scale-[0.98] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-[#F2F2F2] disabled:text-[#9CA3AF] disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[8px] shadow-sm text-[16px] font-medium leading-[1.25] tracking-[0] ring-offset-background transition-[box-shadow,transform,background-color,color,border-color] duration-200 ease-out hover:-translate-y-[2px] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF385C] focus-visible:ring-offset-2 active:translate-y-0 active:scale-[0.98] active:shadow-sm disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-[#F2F2F2] disabled:text-[#9CA3AF] disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -17,9 +17,10 @@ const buttonVariants = cva(
         ghost: "bg-transparent text-[#111827] hover:bg-[#F3F4F6]",
         link: "text-primary underline-offset-4 hover:underline",
         icon: "h-10 w-10 rounded-full bg-[#F3F4F6] p-0 text-[#111827] hover:bg-[#E5E7EB]",
-        search: "h-12 w-12 rounded-full bg-[#FF385C] p-0 text-white hover:bg-[#E03150]",
+        search:
+          "h-12 w-12 rounded-full bg-transparent p-0 text-[#111827] shadow-none hover:-translate-y-0 hover:shadow-none hover:bg-[#F3F4F6]",
         pillTab:
-          "h-auto rounded-[999px] border border-transparent bg-transparent px-4 py-2 text-[16px] font-medium text-[#111827] hover:bg-[#F9FAFB] data-[state=active]:border-b-2 data-[state=active]:border-b-[#111827] data-[state=active]:rounded-b-none",
+          "h-auto rounded-full border border-transparent bg-transparent px-4 py-2 text-[16px] font-medium text-[#111827] hover:bg-[#F9FAFB] data-[state=active]:border-b-2 data-[state=active]:border-b-[#111827] data-[state=active]:rounded-b-none",
       },
       size: {
         default: "h-10 px-4",
