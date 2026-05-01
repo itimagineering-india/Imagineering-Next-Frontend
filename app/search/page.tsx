@@ -1,39 +1,29 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { BASE_URL } from "@/lib/constants";
-
-export const dynamic = "force-dynamic";
+import { SearchPageClient } from "@/components/search/SearchPageClient";
 
 export const metadata: Metadata = {
   title: "Search services",
-  robots: { index: false, follow: true },
+  description:
+    "Search Imagineering India for services, categories, and providers, then view full results on the services directory.",
   alternates: { canonical: `${BASE_URL}/search` },
+  /** Internal search landing — avoid competing with /services in SERPs */
+  robots: { index: false, follow: true },
 };
 
-type SearchPageProps = {
-  searchParams: Promise<{
-    q?: string;
-    service?: string;
-    city?: string;
-    sort?: string;
-  }>;
-};
-
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const params = await searchParams;
-  const { q, service, city, sort } = params;
-
+function SearchFallback() {
   return (
-    <main className="min-h-screen px-4 py-10">
-      <h1 className="text-2xl font-semibold mb-4">Search services</h1>
-      <p className="text-gray-600 mb-4">
-        This page will host the full search experience (filters, map, etc.) and
-        is marked as noindex for SEO.
-      </p>
-      <pre className="mt-4 rounded bg-gray-100 p-4 text-sm text-gray-800">
-        {JSON.stringify({ q, service, city, sort }, null, 2)}
-      </pre>
-    </main>
+    <div className="min-h-[50vh] flex items-center justify-center text-muted-foreground">
+      Loading search…
+    </div>
   );
 }
 
-
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchFallback />}>
+      <SearchPageClient />
+    </Suspense>
+  );
+}
