@@ -7,7 +7,7 @@ const LABOUR_BG = "https://dwkazjggpovin.cloudfront.net/banners/bulk%20hire%20ba
 export function BulkHireLabourCta() {
   return (
     <section className="relative border-y border-border/80 bg-muted/30">
-      <div className="layout-shell py-8 mobile:py-10 smallTablet:py-12">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 md:px-8 py-8 mobile:py-10 smallTablet:py-12">
         <Link href="/dashboard/provider/manpower-crew" className="block">
           <img
             src={LABOUR_BG}
