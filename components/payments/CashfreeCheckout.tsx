@@ -14,6 +14,8 @@ interface CashfreeCheckoutProps {
   couponUsageId?: string;
   bookingPayload?: Record<string, any>;
   bookingPaymentStage?: "initial" | "balance";
+  requirementId?: string;
+  requirementDescription?: string;
 
   // Common props
   amount: number;
@@ -39,6 +41,8 @@ export function CashfreeCheckout({
   couponUsageId,
   bookingPayload,
   bookingPaymentStage = "initial",
+  requirementId,
+  requirementDescription,
   amount,
   onSuccess,
   onError,
@@ -52,6 +56,7 @@ export function CashfreeCheckout({
   const [isLoading, setIsLoading] = useState(false);
 
   const isBooking = !!bookingId || !!cartId;
+  const isRequirement = !!requirementId;
 
   // Lazy-load Cashfree JS SDK from CDN when needed
   const loadCashfree = async (): Promise<any> => {
@@ -101,7 +106,7 @@ export function CashfreeCheckout({
   };
 
   const handlePayment = async () => {
-    if (!isBooking) {
+    if (!isBooking && !isRequirement) {
       toast({
         title: "Error",
         description: "Invalid payment configuration",
@@ -120,7 +125,15 @@ export function CashfreeCheckout({
 
       // 1. Create Cashfree order on backend
       let orderResponse;
-      if (bookingPaymentStage === "balance") {
+      if (isRequirement) {
+        if (!requirementId) {
+          throw new Error("Requirement ID is required");
+        }
+        orderResponse = await api.payments.createRequirementOrder({
+          requirementId,
+          gateway: "cashfree",
+        });
+      } else if (bookingPaymentStage === "balance") {
         if (!bookingId) {
           throw new Error("Booking ID is required for balance payment");
         }
@@ -210,10 +223,15 @@ export function CashfreeCheckout({
       }
 
       // 4. Verify payment on backend
-      const verifyResponse = await api.payments.verifyCashfreeBooking({
-        orderId,
-        paymentId,
-      });
+      const verifyResponse = isRequirement
+        ? await api.payments.verifyCashfreeRequirement({
+            orderId,
+            paymentId,
+          })
+        : await api.payments.verifyCashfreeBooking({
+            orderId,
+            paymentId,
+          });
 
       if (verifyResponse.success) {
         const bookingIdResp = (verifyResponse as any)?.data?.booking?.id;
@@ -230,7 +248,9 @@ export function CashfreeCheckout({
 
         toast({
           title: "Payment Successful",
-          description: bookingDescription || bookingMessage,
+          description: isRequirement
+            ? requirementDescription || "Requirement payment completed successfully."
+            : bookingDescription || bookingMessage,
           variant: "default",
         });
         onSuccess?.();
