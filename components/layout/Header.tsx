@@ -554,7 +554,7 @@ export function Header() {
 
  return (
   <header className="sticky top-0 z-50 w-full max-w-full overflow-x-hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-   <div className="layout-shell flex w-full min-w-0 max-w-full min-h-16 h-auto py-2 sm:py-3 items-center justify-between gap-2 sm:gap-3">
+   <div className="mx-auto flex h-auto min-h-16 w-full min-w-0 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 md:px-8 lg:px-10 py-2 sm:py-3 sm:gap-3">
     {/* Logo */}
     <Link
      href="/"
