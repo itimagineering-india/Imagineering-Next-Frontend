@@ -143,7 +143,7 @@ export function TopProvidersSection() {
   return (
     <section
       ref={sectionRef}
-      className="py-6 sm:py-8 md:py-10 lg:py-12 bg-gradient-to-b from-muted/40 via-background to-background"
+      className="py-6 sm:py-8 md:py-12 lg:py-12 bg-gradient-to-b from-muted/40 via-background to-background"
     >
       <div className="container mx-auto px-4 sm:px-6 md:px-6 lg:px-8 max-w-7xl">
         <div className="text-center mb-4 sm:mb-6 md:mb-8">
