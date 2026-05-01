@@ -12,8 +12,8 @@ const PROVIDER_APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id
 export function PlatformAudienceSection() {
   return (
     <section className="border-y border-border/80 bg-muted/20">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:px-8 md:py-14">
-        <div className="mb-8 sm:mb-10">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:px-8 md:py-16">
+        <div className="mb-8 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold">
             Find Services or Grow Your Business
           </h2>
@@ -31,7 +31,7 @@ export function PlatformAudienceSection() {
               className="w-full h-auto max-h-56 object-contain bg-muted/30"
               loading="lazy"
             />
-            <div className="p-6 sm:p-7 space-y-4">
+            <div className="p-6 sm:p-8 space-y-4">
               <p className="text-xs font-semibold tracking-wide text-primary uppercase">
                 For Users
               </p>
@@ -47,7 +47,7 @@ export function PlatformAudienceSection() {
               <div className="pt-1 flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/services"
-                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
                   Explore Services
                 </Link>
@@ -55,7 +55,7 @@ export function PlatformAudienceSection() {
                   href={USER_APP_DOWNLOAD_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
+                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg border border-border px-6 py-3 text-sm font-medium hover:bg-accent transition-colors"
                 >
                   Download App (Play Store)
                 </a>
@@ -70,7 +70,7 @@ export function PlatformAudienceSection() {
               className="w-full h-auto max-h-56 object-contain bg-muted/30"
               loading="lazy"
             />
-            <div className="p-6 sm:p-7 space-y-4">
+            <div className="p-6 sm:p-8 space-y-4">
               <p className="text-xs font-semibold tracking-wide text-primary uppercase">
                 For Providers
               </p>
@@ -86,7 +86,7 @@ export function PlatformAudienceSection() {
               <div className="pt-1 flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/signup?role=provider"
-                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
                   Join as Provider
                 </Link>
@@ -94,7 +94,7 @@ export function PlatformAudienceSection() {
                   href={PROVIDER_APP_DOWNLOAD_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
+                  className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg border border-border px-6 py-3 text-sm font-medium hover:bg-accent transition-colors"
                 >
                   Download App (Play Store)
                 </a>
