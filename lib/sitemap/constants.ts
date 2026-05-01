@@ -1,12 +1,23 @@
 /** Google allows max ~50k URLs per sitemap file; we split below that for safety. */
 export const MAX_URLS_PER_SITEMAP_FILE = 5000;
 
-/** SEO static paths only — no /cart, /login, /search, /admin, etc. */
+/** SEO static paths only — no /cart, /login, /dashboard, /admin, etc. */
 export const STATIC_SEO_PATHS = [
   "/",
   "/about",
   "/contact",
   "/privacy",
+  "/terms",
+  "/services",
+  "/pricing",
+  "/help",
+  "/careers",
+  "/community",
+  "/subscriptions",
+  "/subscriptions/buyer",
+  "/subscriptions/supplier",
+  "/jobs",
+  "/requirement/submit",
 ] as const;
 
 /**
