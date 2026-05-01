@@ -77,54 +77,70 @@ export function SearchPageClient() {
     router.push(`/services${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
+  const quickLinks = [
+    { href: "/services", label: "Browse all services" },
+    { href: "/services?category=construction-materials", label: "Construction materials" },
+    { href: "/services?category=manpower", label: "Manpower" },
+    { href: "/services?category=machines", label: "Machines" },
+  ] as const;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:py-16 md:py-16">
+      <main className="flex-1 w-full px-4 py-8 sm:px-6 sm:py-12 md:py-14">
         <div className="w-full max-w-2xl mx-auto">
-          <form
-            onSubmit={handleSubmit}
-            className="relative flex flex-row flex-wrap gap-2 items-stretch sm:flex-nowrap"
-          >
-            <div className="relative flex-1 min-w-0 bg-background border border-border rounded-xl overflow-hidden">
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                ref={inputRef}
-                type="text"
-                placeholder="Search services, categories, or providers..."
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                className="pl-12 pr-12 h-12 sm:h-14 text-base sm:text-lg border-0 focus-visible:ring-0 rounded-xl"
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQuery("");
-                    setSuggestions([]);
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Clear"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-            <Button
-              type="submit"
-              size="lg"
-              className="h-12 sm:h-14 px-4 sm:px-6 shrink-0 bg-[hsl(var(--red-accent))] hover:bg-[hsl(var(--red-accent))]/90 rounded-xl"
-            >
-              <SearchIcon className="h-4 w-4 mr-2 sm:mr-2" />
-              Search
-            </Button>
+          <div className="mb-8 text-center sm:mb-10 sm:text-left">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <span className="text-foreground">Search </span>
+              <span className="text-[hsl(var(--red-accent))]">Imagineering India</span>
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground sm:text-base max-w-xl sm:mx-0 mx-auto leading-relaxed">
+              Find services, categories, and providers — results open in the services directory with your location when set.
+            </p>
+          </div>
 
-            {showSuggestions && query.trim().length >= 2 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="relative w-full">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+              <div className="relative flex-1 min-w-0 rounded-xl border border-border bg-background shadow-sm overflow-hidden">
+                <SearchIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Search services, categories, or providers..."
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  className="h-12 border-0 pl-12 pr-12 text-base focus-visible:ring-0 sm:h-14 sm:text-lg rounded-xl"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      setSuggestions([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                ) : null}
+              </div>
+              <Button
+                type="submit"
+                size="lg"
+                className="h-12 w-full shrink-0 rounded-xl bg-[hsl(var(--red-accent))] px-6 hover:bg-[hsl(var(--red-accent))]/90 sm:h-14 sm:w-auto"
+              >
+                <SearchIcon className="mr-2 h-4 w-4" />
+                Search
+              </Button>
+            </div>
+
+            {showSuggestions && query.trim().length >= 2 ? (
+              <div className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-80 overflow-y-auto rounded-xl border bg-popover shadow-lg">
                 {isLoadingSuggestions ? (
                   <div className="p-4 flex items-center justify-center gap-2 text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -163,34 +179,27 @@ export function SearchPageClient() {
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </form>
 
-          <div className="mt-8 sm:mt-12">
-            <p className="text-sm text-muted-foreground text-center mb-4">Quick links</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Link href="/services">
-                <Button variant="outline" size="sm">
-                  Browse all services
-                </Button>
-              </Link>
-              <Link href="/services?category=construction-materials">
-                <Button variant="outline" size="sm">
-                  Construction Materials
-                </Button>
-              </Link>
-              <Link href="/services?category=manpower">
-                <Button variant="outline" size="sm">
-                  Manpower
-                </Button>
-              </Link>
-              <Link href="/services?category=machines">
-                <Button variant="outline" size="sm">
-                  Machines
-                </Button>
-              </Link>
-            </div>
-          </div>
+          <section
+            className="mt-10 rounded-2xl border border-border/80 bg-muted/30 p-5 shadow-sm sm:mt-12 sm:p-6 dark:bg-muted/20"
+            aria-labelledby="search-quick-links"
+          >
+            <h2 id="search-quick-links" className="text-sm font-semibold text-foreground">
+              Quick links
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">Jump to popular categories</p>
+            <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {quickLinks.map(({ href, label }) => (
+                <li key={href}>
+                  <Button variant="outline" className="h-auto w-full justify-start py-3 text-left font-medium" asChild>
+                    <Link href={href}>{label}</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </main>
     </div>
