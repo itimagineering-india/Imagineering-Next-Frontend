@@ -19,6 +19,8 @@ interface RazorpayCheckoutProps {
           couponUsageId?: string;
           bookingPayload?: Record<string, any>;
   bookingPaymentStage?: "initial" | "balance";
+  requirementId?: string;
+  requirementDescription?: string;
   
   // Common props
   amount: number;
@@ -47,6 +49,8 @@ export function RazorpayCheckout({
           couponUsageId,
         bookingPayload,
         bookingPaymentStage = "initial",
+          requirementId,
+          requirementDescription,
           amount,
           onSuccess,
           onError,
@@ -63,6 +67,7 @@ export function RazorpayCheckout({
   // Determine payment type
   const isSubscription = !!subscriptionId;
   const isBooking = !!bookingId || !!cartId;
+  const isRequirement = !!requirementId;
 
   // Load Razorpay script - preload for faster modal opening
   useEffect(() => {
@@ -192,7 +197,7 @@ export function RazorpayCheckout({
       return;
     }
 
-    if (!isSubscription && !isBooking) {
+    if (!isSubscription && !isBooking && !isRequirement) {
       toast({
         title: "Error",
         description: "Invalid payment configuration",
@@ -235,6 +240,14 @@ export function RazorpayCheckout({
             ...(bookingPayload || {}),
           });
         }
+      } else if (isRequirement) {
+        if (!requirementId) {
+          throw new Error("Requirement ID is required");
+        }
+        orderResponse = await api.payments.createRequirementOrder({
+          requirementId,
+          gateway: "razorpay",
+        });
       } else {
         throw new Error("Invalid payment type");
       }
@@ -287,7 +300,9 @@ export function RazorpayCheckout({
         name: "Imagineering India",
         description: isSubscription 
           ? `Subscription: ${subscriptionName || "Premium Plan"}`
-          : bookingDescription || "Service Booking",
+          : isRequirement
+            ? requirementDescription || "Requirement Payment"
+            : bookingDescription || "Service Booking",
         order_id: orderId,
         handler: async function (response: any) {
           // Restore console methods when payment handler is called
@@ -306,6 +321,13 @@ export function RazorpayCheckout({
               });
             } else if (isBooking) {
               verifyResponse = await api.payments.verifyBooking({
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                paymentId: paymentId,
+              });
+            } else if (isRequirement) {
+              verifyResponse = await api.payments.verifyRequirement({
                 razorpayOrderId: response.razorpay_order_id,
                 razorpayPaymentId: response.razorpay_payment_id,
                 razorpaySignature: response.razorpay_signature,
@@ -331,6 +353,8 @@ export function RazorpayCheckout({
                 title: "Payment Successful",
                 description: isSubscription
                   ? "Your subscription has been activated successfully!"
+                  : isRequirement
+                    ? "Requirement payment completed successfully."
                   : bookingMessage,
                 variant: "default",
               });
