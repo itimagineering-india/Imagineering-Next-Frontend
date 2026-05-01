@@ -44,10 +44,10 @@ const buyerNavItems = [
   { label: "Post a Job", href: "/dashboard/buyer/job-posts/new", icon: Plus },
   { label: "My Requirements", href: "/dashboard/buyer/requirements", icon: FileText },
   { label: "My Tickets", href: "/dashboard/buyer/tickets", icon: HelpCircle },
-  { label: "Favorites", href: "/dashboard/buyer/favorites", icon: Heart },
-  { label: "Messages", href: "/dashboard/buyer/messages", icon: MessageSquare },
-  { label: "Subscription", href: "/dashboard/buyer/subscription", icon: CreditCard },
-  { label: "Settings", href: "/dashboard/buyer/settings", icon: Settings },
+  { label: "Favorites", href: "/profile#favorites", icon: Heart },
+  { label: "Messages", href: "/chat", icon: MessageSquare },
+  { label: "Subscription", href: "/dashboard/subscription", icon: CreditCard },
+  { label: "Settings", href: "/profile", icon: Settings },
 ];
 
 const providerNavItems = [
@@ -216,7 +216,7 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
       <div className="flex min-h-screen flex-col bg-background">
         {/* Header */}
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b bg-card px-4 md:px-6">
-          <Link href="/" className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
+          <Link href="/" className="flex items-center gap-2 sm:gap-2 shrink-0 min-w-0">
             <img
               src="https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png"
               alt="Imagineering India Logo"
