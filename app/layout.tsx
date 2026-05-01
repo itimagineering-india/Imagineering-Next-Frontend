@@ -24,6 +24,16 @@ export const metadata: Metadata = {
     shortcut: LOGO_URL,
     apple: LOGO_URL,
   },
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    siteName: "Imagineering India",
+    url: BASE_URL,
+    images: [{ url: LOGO_URL, width: 512, height: 512, alt: "Imagineering India" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({
