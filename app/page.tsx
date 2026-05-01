@@ -14,6 +14,12 @@ export const revalidate = 3600;
 
 export const metadata: Metadata = {
   alternates: { canonical: BASE_URL },
+  openGraph: {
+    url: BASE_URL,
+    title: "Imagineering India - Find Verified Service Providers Near You",
+    description:
+      "Connect with verified service providers for machines, contractors, logistics, and spaces. Transparent pricing and real reviews.",
+  },
 };
 
 /** Home layout matches Vite/React app: Hero → Search → Services → Jobs → Top providers → Categories */
