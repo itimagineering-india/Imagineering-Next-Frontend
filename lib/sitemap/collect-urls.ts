@@ -1,3 +1,4 @@
+import { CITIES } from "@/constants/cities";
 import { getSiteUrl } from "@/lib/site-url";
 import { STATIC_SEO_PATHS, getProductPathPrefix } from "./constants";
 import type { SitemapUrlEntry } from "./types";
@@ -27,6 +28,16 @@ export async function collectSitemapUrlEntries(): Promise<SitemapUrlEntry[]> {
       lastmod: new Date().toISOString(),
       changefreq: isHome ? "weekly" : "monthly",
       priority: isHome ? 1.0 : 0.5,
+    });
+  }
+
+  for (const city of CITIES) {
+    if (!city.slug) continue;
+    entries.push({
+      loc: `${base}/${escapeLocPath(city.slug)}`,
+      lastmod: new Date().toISOString(),
+      changefreq: "weekly",
+      priority: 0.75,
     });
   }
 
