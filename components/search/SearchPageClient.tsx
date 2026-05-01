@@ -14,7 +14,7 @@ export function SearchPageClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { userLocation } = useUserLocation();
-  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [query, setQuery] = useState(() => searchParams?.get("q") ?? "");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -26,8 +26,8 @@ export function SearchPageClient() {
   }, []);
 
   useEffect(() => {
-    const q = searchParams.get("q");
-    if (q !== null) setQuery(q);
+    const q = searchParams?.get("q");
+    if (q !== null && q !== undefined) setQuery(q);
   }, [searchParams]);
 
   useEffect(() => {
