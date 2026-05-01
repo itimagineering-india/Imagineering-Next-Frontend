@@ -1,26 +1,8 @@
 "use client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { 
-  Home, 
-  Briefcase, 
-  DollarSign, 
-  Info, 
-  Mail, 
-  HelpCircle, 
-  Users, 
-  CreditCard, 
-  FileText,
-  LogIn,
-  UserPlus,
-  Map,
-  MapPin
-} from "lucide-react";
+import { Home, Info, CreditCard, FileText, UserPlus, Map, MapPin } from "lucide-react";
 import { CITIES } from "@/constants/cities";
-
-export async function getServerSideProps() {
-  return { props: {} };
-}
 
 interface SitemapSection {
   title: string;
