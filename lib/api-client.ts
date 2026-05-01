@@ -17,6 +17,10 @@ const API_BASE_URL =
 const apiCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
+const SEARCH_SUGGESTIONS_TTL_MS = 60_000;
+const searchSuggestionsCache = new Map<string, { ts: number; data: any[] }>();
+const inFlightSearchSuggestions = new Map<string, Promise<any[]>>();
+
 // Get cached response if available and not expired
 const getCachedResponse = <T>(key: string): ApiResponse<T> | null => {
   const cached = apiCache.get(key);
@@ -260,6 +264,85 @@ export const apiRequest = async <T>(
 
   return makeRequest();
 };
+
+/** Autocomplete for /search — aligned with Vite `fetchSearchSuggestions` */
+export async function fetchSearchSuggestions(query: string, limit = 5): Promise<any[]> {
+  const normalizedQuery = String(query || "").trim().toLowerCase();
+  if (normalizedQuery.length < 2) return [];
+  const cacheKey = `${normalizedQuery}|${limit}`;
+  const cached = searchSuggestionsCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < SEARCH_SUGGESTIONS_TTL_MS) {
+    return cached.data;
+  }
+  const inFlight = inFlightSearchSuggestions.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const request = (async () => {
+    const response = await apiRequest<any>(
+      `/api/search/suggest?q=${encodeURIComponent(normalizedQuery)}&limit=${Math.max(1, limit)}`
+    );
+    if (!response.success || !response.data) return [];
+
+    const data = response.data as any;
+    if (Array.isArray(data.suggestions)) return data.suggestions;
+    const services = data.services || [];
+    const categories = data.categories || [];
+    const providers = data.providers || [];
+    const locations = data.locations || [];
+    const suggestions: any[] = [];
+
+    services.slice(0, 3).forEach((service: any) => {
+      suggestions.push({
+        type: "service",
+        id: service._id || service.id,
+        title: service.title,
+        subtitle: service.category?.name || "Service",
+        url: `/service/${service.slug || service._id || service.id}`,
+      });
+    });
+
+    categories.slice(0, 2).forEach((category: any) => {
+      suggestions.push({
+        type: "category",
+        id: category._id || category.id,
+        title: category.name,
+        subtitle: "Category",
+        url: `/services?category=${category.slug || category._id}`,
+      });
+    });
+
+    providers.slice(0, 2).forEach((provider: any) => {
+      const providerId = provider._id || provider.id || provider.user?._id;
+      suggestions.push({
+        type: "provider",
+        id: providerId,
+        title: provider.businessName || provider.user?.name || provider.name || "Provider",
+        subtitle: "Provider",
+        url: `/provider/${provider.slug || providerId}`,
+      });
+    });
+
+    locations.slice(0, 2).forEach((loc: any) => {
+      const label = (loc?.label || "").toString().trim();
+      if (!label) return;
+      suggestions.push({
+        type: "location",
+        id: label,
+        title: label,
+        subtitle: "Location",
+        url: `/services?locationText=${encodeURIComponent(label)}&view=services`,
+      });
+    });
+
+    searchSuggestionsCache.set(cacheKey, { ts: Date.now(), data: suggestions });
+    return suggestions;
+  })().finally(() => {
+    inFlightSearchSuggestions.delete(cacheKey);
+  });
+
+  inFlightSearchSuggestions.set(cacheKey, request);
+  return request;
+}
 
 // API Endpoints
 export const api = {
@@ -688,19 +771,59 @@ export const api = {
         }))
         .finally(() => clearTimeout(timeoutId));
     },
+    generateDescription: (body: {
+      locale?: "en" | "hi";
+      title: string;
+      categoryName: string;
+      categorySlug?: string;
+      formVariant?: string;
+      contextLines: string[];
+    }) =>
+      apiRequest<{ description: string }>("/api/services/generate-description", {
+        method: "POST",
+        body: JSON.stringify({
+          locale: body.locale === "hi" ? "hi" : "en",
+          title: body.title,
+          categoryName: body.categoryName,
+          categorySlug: body.categorySlug,
+          formVariant: body.formVariant ?? "provider_web",
+          contextLines: body.contextLines,
+        }),
+        timeoutMs: 65000,
+      }),
+    generateTitle: (body: {
+      locale?: "en" | "hi";
+      title?: string;
+      categoryName: string;
+      categorySlug?: string;
+      formVariant?: string;
+      contextLines: string[];
+    }) =>
+      apiRequest<{ title: string }>("/api/services/generate-title", {
+        method: "POST",
+        body: JSON.stringify({
+          locale: body.locale === "hi" ? "hi" : "en",
+          title: body.title ?? "",
+          categoryName: body.categoryName,
+          categorySlug: body.categorySlug,
+          formVariant: body.formVariant ?? "provider_web",
+          contextLines: body.contextLines,
+        }),
+        timeoutMs: 65000,
+      }),
     create: (serviceData: any) =>
-      apiRequest('/api/services', {
-        method: 'POST',
+      apiRequest("/api/services", {
+        method: "POST",
         body: JSON.stringify(serviceData),
       }),
     update: (id: string, serviceData: any) =>
       apiRequest(`/api/services/${id}`, {
-        method: 'PUT',
+        method: "PUT",
         body: JSON.stringify(serviceData),
       }),
     delete: (id: string) =>
       apiRequest(`/api/services/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       }),
   },
 
@@ -745,6 +868,7 @@ export const api = {
       lng?: number;
       radiusKm?: number;
       q?: string;
+      mapMarkers?: number | boolean;
     }) => {
       const queryParams = new URLSearchParams();
       if (params) {
@@ -997,6 +1121,11 @@ export const api = {
       return apiRequest(`/api/bookings/buyer${queryString ? `?${queryString}` : ''}`, options);
     },
     getById: (id: string) => apiRequest(`/api/bookings/${id}`),
+    cancelByBuyer: (id: string, reason?: string) =>
+      apiRequest(`/api/bookings/${id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
     deletePending: (id: string) =>
       apiRequest(`/api/bookings/${id}`, {
         method: 'DELETE',
@@ -1147,6 +1276,28 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ usageId }),
       }),
+    /** Authenticated: active coupons for current user role (buyer/provider) */
+    getActive: (params?: { page?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.page != null) q.set('page', String(params.page));
+      if (params?.limit != null) q.set('limit', String(params.limit));
+      const qs = q.toString();
+      return apiRequest<{
+        coupons: Array<{
+          code: string;
+          description?: string;
+          discountType: 'PERCENTAGE' | 'FLAT';
+          discountValue: number;
+          maxDiscount?: number;
+          minOrderValue?: number;
+          interactionType?: string;
+          applicableUserType?: string;
+          startDate?: string;
+          endDate?: string;
+        }>;
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/coupons/active${qs ? `?${qs}` : ''}`);
+    },
   },
 
   bookingFields: {
@@ -1403,6 +1554,39 @@ export const api = {
           paymentStatus: string;
         };
       }>('/api/payments/cashfree/verify-booking', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    createRequirementOrder: (payload: { requirementId: string; gateway?: 'razorpay' | 'cashfree' }) =>
+      apiRequest<{
+        orderId: string;
+        amount: number;
+        currency: string;
+        paymentId: string;
+        key?: string;
+        paymentSessionId?: string;
+      }>('/api/payments/create-requirement-order', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    verifyRequirement: (payload: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+      paymentId: string;
+    }) =>
+      apiRequest<{
+        payment: { id: string; status: string; amount: number; paidAt: Date };
+        requirement: { id: string; paid: boolean; paymentStatus: string };
+      }>('/api/payments/verify-requirement', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    verifyCashfreeRequirement: (payload: { orderId: string; paymentId: string }) =>
+      apiRequest<{
+        payment: { id: string; status: string; amount: number; paidAt: Date };
+        requirement: { id: string; paid: boolean; paymentStatus: string };
+      }>('/api/payments/cashfree/verify-requirement', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
