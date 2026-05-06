@@ -15,6 +15,7 @@ const footerLinkKeys = {
     { key: "exploreServices" as const, href: "/services" },
     { key: "howItWorks" as const, href: "/about" },
     { key: "pricingPlans" as const, href: "/pricing" },
+    { key: "standardPrices" as const, href: "/standard-prices" },
     { key: "caseStudies" as const, href: "/about" },
   ],
   forProviders: [
@@ -141,8 +142,8 @@ export function Footer() {
         {/* Newsletter Section */}
         <div className="mb-6 md:mb-8 lg:mb-12 flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6 rounded-lg md:rounded-xl bg-primary p-4 md:p-6 lg:p-8">
           <div className="text-center md:text-left w-full md:w-auto">
-            <h3 className="text-base md:text-lg lg:text-xl font-semibold text-primary-foreground">{t("stayUpdated")}</h3>
-            <p className="mt-1 text-xs md:text-sm text-primary-foreground/80">{t("newsletterDesc")}</p>
+            <h3 className="heading-md text-primary-foreground">{t("stayUpdated")}</h3>
+            <p className="mt-1 caption text-primary-foreground/80">{t("newsletterDesc")}</p>
           </div>
           <form onSubmit={handleSubscribe} className="flex w-full md:w-auto gap-2">
             <Input
@@ -151,7 +152,7 @@ export function Footer() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading || isSubscribed}
-              className="w-full md:w-56 lg:w-64 bg-primary-foreground border-0 text-xs md:text-sm h-9 md:h-10"
+              className="w-full md:w-56 lg:w-64 bg-primary-foreground border-0 caption h-9 md:h-10"
               required
             />
             <Button 
@@ -159,23 +160,23 @@ export function Footer() {
               variant="secondary" 
               size="sm" 
               disabled={isLoading || isSubscribed}
-              className="text-xs md:text-sm h-9 md:h-10 whitespace-nowrap"
+              className="caption h-9 md:h-10 whitespace-nowrap"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4 animate-spin" />
+                  <Loader2 className="mr-2 md:mr-2 h-3 w-3 md:h-4 md:w-4 animate-spin" />
                   <span className="hidden sm:inline">Subscribing...</span>
                   <span className="sm:hidden">...</span>
                 </>
               ) : isSubscribed ? (
                 <>
-                  <CheckCircle2 className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                  <CheckCircle2 className="mr-2 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   <span className="hidden sm:inline">Subscribed!</span>
                   <span className="sm:hidden">Done</span>
                 </>
               ) : (
                 <>
-                  <Mail className="mr-1.5 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                  <Mail className="mr-2 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                   <span className="hidden sm:inline">{t("subscribe")}</span>
                   <span className="sm:hidden">Subscribe</span>
                 </>
@@ -186,19 +187,19 @@ export function Footer() {
 
         {/* SEO: Keyword-rich intro + internal links */}
         <section className="mb-6 md:mb-8" aria-label="Services and locations">
-          <p className="text-xs md:text-sm text-muted-foreground max-w-4xl mb-4 md:mb-6 leading-relaxed">
+          <p className="caption text-muted-foreground max-w-4xl mb-4 md:mb-6 leading-relaxed">
             One stop for local construction services, contractors, and vendors across India — find plumbing, electrical, painting, carpentry, HVAC, interior design, and more. We help you discover verified service providers in Mumbai, Delhi, Bangalore, Hyderabad, Chennai, Pune, Kolkata, and other cities. Book services, compare quotes, and manage projects from a single platform.
           </p>
           <div className="flex flex-col gap-4 md:gap-6">
             {categories.length > 0 && (
               <div>
-                <h4 className="font-semibold text-foreground mb-2 text-sm flex items-center gap-1.5">
+                <h4 className="subtitle text-foreground mb-2 flex items-center gap-2">
                   <Briefcase className="h-3.5 w-3.5" />
                   {t("popularCategories")}
                 </h4>
-                <ul className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs md:text-sm text-muted-foreground">
+                <ul className="flex flex-wrap gap-x-3 gap-y-2 caption text-muted-foreground">
                   {categories.map((cat, i) => (
-                    <li key={cat._id} className="inline-flex items-center gap-1.5">
+                    <li key={cat._id} className="inline-flex items-center gap-2">
                       <Link href={`/services?category=${encodeURIComponent(cat.slug)}`} className="hover:text-primary transition-colors">
                         {toTitleCase(cat.name)}
                       </Link>
@@ -209,13 +210,13 @@ export function Footer() {
               </div>
             )}
             <div>
-              <h4 className="font-semibold text-foreground mb-2 text-sm flex items-center gap-1.5">
+              <h4 className="subtitle text-foreground mb-2 flex items-center gap-2">
                 <MapPin className="h-3.5 w-3.5" />
                 {t("popularCities")}
               </h4>
-              <ul className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs md:text-sm text-muted-foreground">
+              <ul className="flex flex-wrap gap-x-3 gap-y-2 caption text-muted-foreground">
                 {CITIES.map((city, i) => (
-                  <li key={city.slug} className="inline-flex items-center gap-1.5">
+                  <li key={city.slug} className="inline-flex items-center gap-2">
                     <Link href={`/${city.slug}`} className="hover:text-primary transition-colors">
                       {toTitleCase(city.name)}
                     </Link>
@@ -232,11 +233,11 @@ export function Footer() {
         {/* Links Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 lg:gap-8 mb-6 md:mb-8 lg:mb-12">
           <div>
-            <h4 className="font-semibold text-foreground mb-2 md:mb-3 lg:mb-4 text-sm md:text-base">{t("forBuyers")}</h4>
+            <h4 className="subtitle text-foreground mb-2 md:mb-3 lg:mb-4">{t("forBuyers")}</h4>
             <ul className="space-y-1.5 md:space-y-2 lg:space-y-3">
               {footerLinkKeys.forBuyers.map((link) => (
                 <li key={link.key}>
-                  <Link href={link.href} className="text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">
+                  <Link href={link.href} className="caption text-muted-foreground hover:text-primary transition-colors">
                     {t(link.key)}
                   </Link>
                 </li>
@@ -244,11 +245,11 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-2 md:mb-3 lg:mb-4 text-sm md:text-base">{t("forProviders")}</h4>
+            <h4 className="subtitle text-foreground mb-2 md:mb-3 lg:mb-4">{t("forProviders")}</h4>
             <ul className="space-y-1.5 md:space-y-2 lg:space-y-3">
               {footerLinkKeys.forProviders.map((link) => (
                 <li key={link.key}>
-                  <Link href={link.href} className="text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">
+                  <Link href={link.href} className="caption text-muted-foreground hover:text-primary transition-colors">
                     {t(link.key)}
                   </Link>
                 </li>
@@ -256,11 +257,11 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-2 md:mb-3 lg:mb-4 text-sm md:text-base">{t("company")}</h4>
+            <h4 className="subtitle text-foreground mb-2 md:mb-3 lg:mb-4">{t("company")}</h4>
             <ul className="space-y-1.5 md:space-y-2 lg:space-y-3">
               {footerLinkKeys.company.map((link) => (
                 <li key={link.key}>
-                  <Link href={link.href} className="text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">
+                  <Link href={link.href} className="caption text-muted-foreground hover:text-primary transition-colors">
                     {t(link.key)}
                   </Link>
                 </li>
@@ -268,11 +269,11 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-foreground mb-2 md:mb-3 lg:mb-4 text-sm md:text-base">{t("support")}</h4>
+            <h4 className="subtitle text-foreground mb-2 md:mb-3 lg:mb-4">{t("support")}</h4>
             <ul className="space-y-1.5 md:space-y-2 lg:space-y-3">
               {footerLinkKeys.support.map((link) => (
                 <li key={link.key}>
-                  <Link href={link.href} className="text-xs md:text-sm text-muted-foreground hover:text-primary transition-colors">
+                  <Link href={link.href} className="caption text-muted-foreground hover:text-primary transition-colors">
                     {t(link.key)}
                   </Link>
                 </li>
@@ -292,16 +293,16 @@ export function Footer() {
               className="h-8 w-8 md:h-10 md:w-10 object-contain shrink-0"
             />
             <div className="flex flex-col leading-tight">
-              <span className="text-base md:text-lg lg:text-xl font-bold text-foreground">
+              <span className="heading-md text-foreground">
                 Imagineering India
               </span>
-              <span className="text-xs md:text-sm text-muted-foreground">
+              <span className="caption text-muted-foreground">
                 Integrated Construction Solutions Platform
               </span>
             </div>
           </div>
 
-          <p className="text-[10px] md:text-xs lg:text-sm text-muted-foreground text-center md:text-left order-3 md:order-2">
+          <p className="caption text-muted-foreground text-center md:text-left order-3 md:order-2">
             © {new Date().getFullYear()} Imagineering Construct Pvt. Ltd. {t("allRightsReserved")}
           </p>
 
