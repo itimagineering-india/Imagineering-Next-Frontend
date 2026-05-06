@@ -1354,6 +1354,29 @@ export const api = {
     }),
   },
 
+  standardServicePrices: {
+    lookup: (params: { city: string; categorySlug: string; subcategorySlug: string }) => {
+      const q = new URLSearchParams({
+        city: params.city,
+        categorySlug: params.categorySlug,
+        subcategorySlug: params.subcategorySlug,
+      });
+      return apiRequest<{
+        price: null | {
+          cityLabel?: string;
+          categorySlug?: string;
+          subcategorySlug?: string;
+          priceRangeMin?: number;
+          priceRangeMax?: number;
+          currency?: string;
+          priceType?: string;
+          isActive?: boolean;
+          notes?: string;
+        };
+      }>(`/api/standard-service-prices/lookup?${q.toString()}`);
+    },
+  },
+
   // Payments
   payments: {
     // Create Razorpay order for subscription payment
