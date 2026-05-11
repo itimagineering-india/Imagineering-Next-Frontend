@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   FileText,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   CreditCard,
 } from "lucide-react";
 
@@ -68,7 +68,7 @@ export function BookingStatsCards({ stats, isLoading }: BookingStatsCardsProps) 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:pb-2">
           <CardTitle className="text-[10px] sm:text-xs md:text-sm font-medium leading-tight">Total Earnings</CardTitle>
-          <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+          <IndianRupee className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
         </CardHeader>
         <CardContent className="p-3 sm:p-6 pt-0">
           <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold">₹{stats.totalEarnings.toLocaleString()}</div>
