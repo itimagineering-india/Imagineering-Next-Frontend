@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -24,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Calendar,
-  DollarSign,
+  IndianRupee,
   User,
   MapPin,
   Clock,
@@ -50,6 +51,7 @@ export async function getServerSideProps() { return { props: {} }; }
 
 interface Booking {
   _id: string;
+  rawStatus?: string;
   amount?: number;
   buyerFee?: number;
   services?: Array<{
@@ -57,6 +59,7 @@ interface Booking {
     title: string;
     quantity: number;
     price: number;
+    priceType?: string;
   }>;
   providerGST?: string;
   providerPAN?: string;
@@ -85,6 +88,7 @@ interface Booking {
     buyerGST?: string;
     buyerPAN?: string;
     providerGST?: string;
+    providerGSTRegistered?: boolean;
     providerPAN?: string;
     previousTotalAmountWithGst?: number;
     totalAmountWithGst?: number;
@@ -113,7 +117,21 @@ export default function BuyerBookings() {
   const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<string | null>(null);
   const [deletingBookingId, setDeletingBookingId] = useState<string | null>(null);
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelTargetBooking, setCancelTargetBooking] = useState<Booking | null>(null);
+  const [cancelReasonOption, setCancelReasonOption] = useState("");
+  const [cancelReasonOther, setCancelReasonOther] = useState("");
   const [paymentHistoryMap, setPaymentHistoryMap] = useState<Map<string, any[]>>(new Map());
+  const cancellationReasonOptions = [
+    "Change of plans",
+    "Booked by mistake",
+    "Found a better price elsewhere",
+    "Provider not responding",
+    "Service no longer required",
+    "Other",
+  ];
+
   const [loadingPaymentHistoryId, setLoadingPaymentHistoryId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -312,6 +330,74 @@ export default function BuyerBookings() {
     }
   };
 
+  const canCancelBooking = (booking: Booking) =>
+    ["pending", "confirmed", "in_progress"].includes(
+      String(booking?.status || "").toLowerCase()
+    );
+
+  const openCancelBookingDialog = (booking: Booking) => {
+    if (!canCancelBooking(booking)) return;
+    setCancelTargetBooking(booking);
+    setCancelReasonOption("");
+    setCancelReasonOther("");
+    setCancelDialogOpen(true);
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancelTargetBooking) return;
+    const reason =
+      cancelReasonOption === "Other"
+        ? cancelReasonOther.trim()
+        : cancelReasonOption.trim();
+    if (!reason) {
+      toast({
+        title: "Reason required",
+        description: "Please select a cancellation reason.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCancellingBookingId(cancelTargetBooking._id);
+    try {
+      const response = await api.bookings.cancelByBuyer(
+        cancelTargetBooking._id,
+        reason
+      );
+      if (response.success) {
+        toast({
+          title: "Cancelled",
+          description: "Booking cancelled successfully",
+        });
+        setBookings((prev) =>
+          prev.map((item) =>
+            item._id === cancelTargetBooking._id ? { ...item, status: "cancelled" } : item
+          )
+        );
+        setSelectedBooking((prev) =>
+          prev && prev._id === cancelTargetBooking._id ? { ...prev, status: "cancelled" } : prev
+        );
+        setCancelDialogOpen(false);
+        setCancelTargetBooking(null);
+        fetchBookings();
+      } else {
+        toast({
+          title: "Error",
+          description: response.error?.message || "Failed to cancel booking",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to cancel booking",
+        variant: "destructive",
+      });
+    } finally {
+      setCancellingBookingId(null);
+    }
+  };
+
   const openSupportPage = (booking: Booking) => {
     const subject = `Booking Support: ${booking.service?.title || "Service"} (${formatBookingId(
       booking._id
@@ -356,8 +442,19 @@ export default function BuyerBookings() {
     return Math.round(getSubtotal(booking) * 0.009 * 100) / 100;
   };
 
+  const isProviderGstRegistered = (booking: Booking) =>
+    Boolean(booking.metadata?.providerGSTRegistered === true);
+
+  const getServiceGst = (booking: Booking) =>
+    isProviderGstRegistered(booking)
+      ? Math.round(getSubtotal(booking) * 0.18 * 100) / 100
+      : 0;
+
+  const getPlatformFeeGst = (booking: Booking) =>
+    Math.round(getPlatformFee(booking) * 0.18 * 100) / 100;
+
   const getGst = (booking: Booking) =>
-    Math.round(getSubtotal(booking) * 0.18 * 100) / 100;
+    Number((getServiceGst(booking) + getPlatformFeeGst(booking)).toFixed(2));
 
   const getComputedTotal = (booking: Booking) =>
     Number((getSubtotal(booking) + getPlatformFee(booking) + getGst(booking)).toFixed(2));
@@ -428,6 +525,7 @@ export default function BuyerBookings() {
         title: item.service?.title || item.title || "Service",
         quantity: item.quantity || 1,
         price: item.price || 0,
+        priceType: item.priceType || item.service?.priceType || "",
       })) || [];
 
     const normalizedPaymentStatus =
@@ -437,6 +535,7 @@ export default function BuyerBookings() {
 
     return {
       _id: booking._id?.toString() || "",
+      rawStatus: String(booking.status || ""),
       service: {
         _id: booking.service?._id?.toString() || "",
         title: booking.service?.title || booking.title || "Service",
@@ -754,7 +853,18 @@ export default function BuyerBookings() {
     [bookings]
   );
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, rawStatus?: string) => {
+    const normalizedRaw = String(rawStatus || status || "").toUpperCase();
+    const cancelledLabel =
+      normalizedRaw === "CANCELLED_BY_USER"
+        ? "Cancelled by User"
+        : normalizedRaw === "CANCELLED_BY_ADMIN"
+        ? "Cancelled by Admin"
+        : normalizedRaw === "REJECTED_BY_PROVIDER"
+        ? "Cancelled by Provider"
+        : normalizedRaw === "CANCELLED_BY_SYSTEM"
+        ? "Cancelled by System"
+        : "Cancelled";
     switch (status) {
       case "pending":
       case "PENDING_PROVIDER":
@@ -778,7 +888,7 @@ export default function BuyerBookings() {
       case "completed":
         return <Badge className="bg-green-500 text-white">Completed</Badge>;
       case "cancelled":
-        return <Badge variant="destructive">Cancelled</Badge>;
+        return <Badge variant="destructive">{cancelledLabel}</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -803,7 +913,7 @@ export default function BuyerBookings() {
 
   return (
     <DashboardLayout type="buyer">
-      <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+      <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
           <div>
@@ -820,7 +930,7 @@ export default function BuyerBookings() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 smallTablet:grid-cols-3 laptop:grid-cols-6 gap-3 tablet:gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
@@ -879,7 +989,7 @@ export default function BuyerBookings() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-xs text-muted-foreground">Total Spent</p>
                   <p className="text-lg font-bold">₹{stats.totalSpent.toLocaleString()}</p>
@@ -899,7 +1009,7 @@ export default function BuyerBookings() {
                   placeholder="Search by service or provider..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-12"
                 />
               </div>
               <select
@@ -1005,7 +1115,7 @@ export default function BuyerBookings() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {getStatusBadge(booking.status)}
+                        {getStatusBadge(booking.status, booking.rawStatus)}
                         {getPaymentBadge(booking.paymentStatus)}
                       </div>
 
@@ -1037,6 +1147,21 @@ export default function BuyerBookings() {
                               <Clock className="h-4 w-4 animate-spin" />
                             ) : (
                               <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                        {canCancelBooking(booking) && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => openCancelBookingDialog(booking)}
+                            disabled={cancellingBookingId === booking._id}
+                            title="Cancel Booking"
+                          >
+                            {cancellingBookingId === booking._id ? (
+                              <Clock className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Cancel Booking"
                             )}
                           </Button>
                         )}
@@ -1121,7 +1246,7 @@ export default function BuyerBookings() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                        <TableCell>{getStatusBadge(booking.status, booking.rawStatus)}</TableCell>
                         <TableCell>{getPaymentBadge(booking.paymentStatus)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -1152,6 +1277,21 @@ export default function BuyerBookings() {
                                   <Clock className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                            {canCancelBooking(booking) && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => openCancelBookingDialog(booking)}
+                                disabled={cancellingBookingId === booking._id}
+                                title="Cancel Booking"
+                              >
+                                {cancellingBookingId === booking._id ? (
+                                  <Clock className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Cancel Booking"
                                 )}
                               </Button>
                             )}
@@ -1209,7 +1349,7 @@ export default function BuyerBookings() {
 
         {/* Booking Details Dialog */}
         <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Booking Details</DialogTitle>
               <DialogDescription>
@@ -1290,7 +1430,10 @@ export default function BuyerBookings() {
                             {getServiceItems(selectedBooking).map((item, index) => (
                               <div key={`${item._id || index}`} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm">
                                 <div className="col-span-6">{item.title || "Service"}</div>
-                                <div className="col-span-2 text-right">{item.quantity}</div>
+                                <div className="col-span-2 text-right">
+                                  {item.quantity}
+                                  {item.priceType ? ` ${item.priceType}` : ""}
+                                </div>
                                 <div className="col-span-4 text-right">₹{(item.price || 0).toLocaleString()}</div>
                               </div>
                             ))}
@@ -1301,9 +1444,9 @@ export default function BuyerBookings() {
                             <span>₹{getSubtotal(selectedBooking).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Platform Fee</span>
+                            <span className="text-muted-foreground">Platform Fee (incl. GST)</span>
                             <span>
-                              ₹{getPlatformFee(selectedBooking).toLocaleString()}
+                              ₹{(getPlatformFee(selectedBooking) + getPlatformFeeGst(selectedBooking)).toLocaleString()}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -1360,7 +1503,7 @@ export default function BuyerBookings() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Status</p>
-                      {getStatusBadge(selectedBooking.status)}
+                      {getStatusBadge(selectedBooking.status, selectedBooking.rawStatus)}
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Payment Status</p>
@@ -1405,6 +1548,20 @@ export default function BuyerBookings() {
                         >
                           Pay Remaining Balance (₹{getOutstanding(selectedBooking).toLocaleString()}) – Cashfree
                         </CashfreeCheckout>
+                      </div>
+                    )}
+                    {canCancelBooking(selectedBooking) && (
+                      <div className="col-span-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => openCancelBookingDialog(selectedBooking)}
+                          disabled={cancellingBookingId === selectedBooking._id}
+                        >
+                          {cancellingBookingId === selectedBooking._id
+                            ? "Cancelling..."
+                            : "Cancel Booking"}
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -1590,6 +1747,67 @@ export default function BuyerBookings() {
                 )}
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={cancelDialogOpen}
+          onOpenChange={(open) => {
+            setCancelDialogOpen(open);
+            if (!open) {
+              setCancelTargetBooking(null);
+              setCancelReasonOption("");
+              setCancelReasonOther("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Cancel Booking</DialogTitle>
+              <DialogDescription>
+                Please select a reason before cancelling this booking.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              {cancellationReasonOptions.map((option) => (
+                <label key={option} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="cancelReason"
+                    value={option}
+                    checked={cancelReasonOption === option}
+                    onChange={(e) => setCancelReasonOption(e.target.value)}
+                  />
+                  <span>{option}</span>
+                </label>
+              ))}
+              {cancelReasonOption === "Other" ? (
+                <Textarea
+                  placeholder="Enter your reason"
+                  value={cancelReasonOther}
+                  onChange={(e) => setCancelReasonOther(e.target.value)}
+                  rows={3}
+                />
+              ) : null}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+                  Close
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleCancelBooking}
+                  disabled={
+                    !cancelReasonOption ||
+                    (cancelReasonOption === "Other" && !cancelReasonOther.trim()) ||
+                    (cancelTargetBooking ? cancellingBookingId === cancelTargetBooking._id : false)
+                  }
+                >
+                  {cancelTargetBooking && cancellingBookingId === cancelTargetBooking._id
+                    ? "Cancelling..."
+                    : "Confirm Cancel"}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 
