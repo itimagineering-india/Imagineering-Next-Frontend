@@ -265,6 +265,63 @@ export const apiRequest = async <T>(
   return makeRequest();
 };
 
+/** Build dropdown suggestions from /api/search/suggest or /api/search payload (Mongo or Meilisearch). */
+function buildSuggestionsListFromSearchPayload(data: any, limit: number): any[] {
+  if (Array.isArray(data?.suggestions) && data.suggestions.length > 0) {
+    return data.suggestions.slice(0, limit);
+  }
+  const suggestions: any[] = [];
+  const services = data.services || [];
+  const categories = data.categories || [];
+  const providers = data.providers || [];
+  const locations = data.locations || [];
+
+  services.slice(0, 3).forEach((service: any) => {
+    suggestions.push({
+      type: "service",
+      id: service._id || service.id,
+      title: service.title,
+      subtitle: service.category?.name || "Service",
+      url: `/service/${service.slug || service._id || service.id}`,
+    });
+  });
+
+  categories.slice(0, 2).forEach((category: any) => {
+    suggestions.push({
+      type: "category",
+      id: category._id || category.id,
+      title: category.name,
+      subtitle: "Category",
+      url: `/services?category=${category.slug || category._id}`,
+    });
+  });
+
+  providers.slice(0, 2).forEach((provider: any) => {
+    const providerId = provider._id || provider.id || provider.user?._id;
+    suggestions.push({
+      type: "provider",
+      id: providerId,
+      title: provider.businessName || provider.user?.name || provider.name || "Provider",
+      subtitle: "Provider",
+      url: `/provider/${provider.slug || providerId}`,
+    });
+  });
+
+  locations.slice(0, 2).forEach((loc: any) => {
+    const label = (loc?.label || "").toString().trim();
+    if (!label) return;
+    suggestions.push({
+      type: "location",
+      id: label,
+      title: label,
+      subtitle: "Location",
+      url: `/services?locationText=${encodeURIComponent(label)}&view=services`,
+    });
+  });
+
+  return suggestions.slice(0, limit);
+}
+
 /** Autocomplete for /search — aligned with Vite `fetchSearchSuggestions` */
 export async function fetchSearchSuggestions(query: string, limit = 5): Promise<any[]> {
   const normalizedQuery = String(query || "").trim().toLowerCase();
@@ -278,64 +335,29 @@ export async function fetchSearchSuggestions(query: string, limit = 5): Promise<
   if (inFlight) return inFlight;
 
   const request = (async () => {
-    const response = await apiRequest<any>(
-      `/api/search/suggest?q=${encodeURIComponent(normalizedQuery)}&limit=${Math.max(1, limit)}`
+    const lim = Math.max(1, limit);
+    const suggestRes = await apiRequest<any>(
+      `/api/search/suggest?q=${encodeURIComponent(normalizedQuery)}&limit=${lim}`
     );
-    if (!response.success || !response.data) return [];
 
-    const data = response.data as any;
-    if (Array.isArray(data.suggestions)) return data.suggestions;
-    const services = data.services || [];
-    const categories = data.categories || [];
-    const providers = data.providers || [];
-    const locations = data.locations || [];
-    const suggestions: any[] = [];
+    let built: any[] = [];
+    if (suggestRes.success && suggestRes.data) {
+      built = buildSuggestionsListFromSearchPayload(suggestRes.data as any, lim);
+    }
 
-    services.slice(0, 3).forEach((service: any) => {
-      suggestions.push({
-        type: "service",
-        id: service._id || service.id,
-        title: service.title,
-        subtitle: service.category?.name || "Service",
-        url: `/service/${service.slug || service._id || service.id}`,
-      });
-    });
+    if (built.length === 0) {
+      const fullRes = await apiRequest<any>(
+        `/api/search?q=${encodeURIComponent(normalizedQuery)}&limit=${lim}&page=1`
+      );
+      if (fullRes.success && fullRes.data) {
+        built = buildSuggestionsListFromSearchPayload(fullRes.data as any, lim);
+      }
+    }
 
-    categories.slice(0, 2).forEach((category: any) => {
-      suggestions.push({
-        type: "category",
-        id: category._id || category.id,
-        title: category.name,
-        subtitle: "Category",
-        url: `/services?category=${category.slug || category._id}`,
-      });
-    });
-
-    providers.slice(0, 2).forEach((provider: any) => {
-      const providerId = provider._id || provider.id || provider.user?._id;
-      suggestions.push({
-        type: "provider",
-        id: providerId,
-        title: provider.businessName || provider.user?.name || provider.name || "Provider",
-        subtitle: "Provider",
-        url: `/provider/${provider.slug || providerId}`,
-      });
-    });
-
-    locations.slice(0, 2).forEach((loc: any) => {
-      const label = (loc?.label || "").toString().trim();
-      if (!label) return;
-      suggestions.push({
-        type: "location",
-        id: label,
-        title: label,
-        subtitle: "Location",
-        url: `/services?locationText=${encodeURIComponent(label)}&view=services`,
-      });
-    });
-
-    searchSuggestionsCache.set(cacheKey, { ts: Date.now(), data: suggestions });
-    return suggestions;
+    if (built.length > 0) {
+      searchSuggestionsCache.set(cacheKey, { ts: Date.now(), data: built });
+    }
+    return built;
   })().finally(() => {
     inFlightSearchSuggestions.delete(cacheKey);
   });
