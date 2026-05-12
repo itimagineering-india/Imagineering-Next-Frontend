@@ -21,12 +21,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
- Dialog,
- DialogContent,
- DialogHeader,
- DialogTitle,
-} from "@/components/ui/dialog";
 import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAuthToken } from "@/lib/api-client";
@@ -64,7 +58,6 @@ export function Header() {
  const searchRef = useRef<HTMLDivElement>(null);
  const searchInputRef = useRef<HTMLInputElement>(null);
  const suggestionsAbortRef = useRef<AbortController | null>(null);
- const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
  const pathname = usePathname();
  const router = useRouter();
  const { toast } = useToast();
@@ -365,6 +358,7 @@ export function Header() {
 
  const handleSearch = async (e?: React.FormEvent) => {
   if (e) e.preventDefault();
+  setShowSuggestions(false);
 
   const q = searchQuery.trim();
   const params = new URLSearchParams();
@@ -430,12 +424,6 @@ export function Header() {
   setSearchQuery("");
  };
 
- useEffect(() => {
-  if (mobileSearchOpen && searchInputRef.current) {
-   searchInputRef.current.focus();
-  }
- }, [mobileSearchOpen]);
-
  const searchForm = (onSubmitExtra?: () => void, onSuggestionSelect?: () => void) => (
   <form
    onSubmit={(e) => {
@@ -445,7 +433,14 @@ export function Header() {
    className="flex items-center flex-1 min-w-0 max-w-full"
   >
    <div className="relative w-full" ref={searchRef}>
-    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 text-muted-foreground z-10 pointer-events-none" />
+    <button
+     type="submit"
+     className="absolute left-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:left-2 lg:h-8 lg:w-8"
+     aria-label="Search"
+     title="Search"
+    >
+     <Search className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" />
+    </button>
     <Input
      ref={searchInputRef}
      type="text"
@@ -462,15 +457,11 @@ export function Header() {
       }
      }}
      onKeyDown={(e) => {
-      if (e.key === 'Enter') {
-       e.preventDefault();
-       setShowSuggestions(false);
-       handleSearch();
-      } else if (e.key === 'Escape') {
+      if (e.key === "Escape") {
        setShowSuggestions(false);
       }
      }}
-     className="pl-8 pr-8 lg:pl-12 lg:pr-12 h-8 lg:h-9 w-full min-w-0 max-w-full lg:w-80 placeholder:transition-all placeholder:duration-500 body"
+     className="h-8 pl-9 pr-9 lg:h-9 lg:pl-11 lg:pr-11 w-full min-w-0 max-w-full lg:w-80 placeholder:transition-all placeholder:duration-500 body"
     />
     {searchQuery && (
      <button
@@ -480,7 +471,7 @@ export function Header() {
        setSuggestions([]);
        setShowSuggestions(false);
       }}
-      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
+      className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:right-2 lg:h-8 lg:w-8"
       aria-label="Clear search"
       title="Clear search"
      >
@@ -553,21 +544,36 @@ export function Header() {
  );
 
  return (
-  <header className="sticky top-0 z-50 w-full max-w-full overflow-x-hidden border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-   <div className="mx-auto flex h-auto min-h-16 w-full min-w-0 max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 md:px-8 lg:px-10 py-2 sm:py-3 sm:gap-3">
-    {/* Logo */}
+  <header className="sticky top-0 z-50 w-full max-w-full overflow-x-clip overflow-y-visible border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+   <div className="flex h-auto min-h-14 w-full min-w-0 max-w-full items-center justify-between gap-2 px-2 py-2 sm:min-h-16 sm:px-3 md:px-4 lg:px-5 sm:py-3 sm:gap-3 2xl:px-6">
+    {/* Logo — full flex width on mobile; cap width md–lg for tablet */}
     <Link
      href="/"
-     className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2 lg:flex-none lg:shrink-0"
+     className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[min(100%,13rem)] md:max-w-[min(100%,16rem)] lg:max-w-none lg:flex-none lg:shrink-0"
     >
      <img 
       src="https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png" 
       alt="Imagineering India Logo" 
-      className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 object-contain shrink-0"
+      className="h-7 w-7 shrink-0 object-contain sm:h-8 sm:w-8 md:h-10 md:w-10"
      />
-     <div className="flex min-w-0 flex-col">
-      <span className="body truncate text-foreground leading-tight">Imagineering India</span>
-      <span className="micro leading-tight">{typedHeadline}</span>
+     <div className="min-w-0 flex-1">
+      <span className="block truncate text-sm font-semibold leading-tight text-foreground sm:text-base sm:font-medium">
+       Imagineering India
+      </span>
+      {/* div avoids globals `span { font-size: 16px }` wiping out small tagline text */}
+      <div
+       className="mt-0.5 max-w-full text-muted-foreground max-sm:truncate max-sm:whitespace-nowrap sm:whitespace-normal sm:line-clamp-2 sm:break-words sm:tracking-wide"
+       title={mainHeadline}
+       style={{
+        fontSize: "clamp(7px, 2.4vw, 9px)",
+        lineHeight: 1.2,
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+       }}
+      >
+       {typedHeadline}
+      </div>
      </div>
     </Link>
 
@@ -619,7 +625,8 @@ export function Header() {
 
     {/* Desktop Navigation */}
     <nav className="hidden lg:flex items-center gap-6 shrink-0">
-     <NavigationMenu>
+     {/** z-30: mega-menu must paint above the desktop search bar (next sibling), which otherwise covers the right-hand cards. */}
+     <NavigationMenu className="z-30">
       <NavigationMenuList>
        <NavigationMenuItem key="browse-services">
         <NavigationMenuTrigger className="bg-transparent">{t("header:exploreServices")}</NavigationMenuTrigger>
@@ -893,7 +900,7 @@ export function Header() {
      <Button
       type="button"
       variant="search"
-      onClick={() => setMobileSearchOpen(true)}
+      onClick={() => router.push("/search")}
       aria-label="Open search"
       title="Search"
      >
@@ -1071,27 +1078,6 @@ export function Header() {
      </SheetContent>
     </Sheet>
     </div>
-
-    {/* Mobile Search Dialog */}
-    <Dialog open={mobileSearchOpen} onOpenChange={(open) => {
-     setMobileSearchOpen(open);
-     if (!open) {
-      setSearchQuery("");
-      setShowSuggestions(false);
-     }
-    }}>
-     <DialogContent className="sm:max-w-md p-4 sm:p-6 gap-4 top-16 translate-y-0 rounded-t-none border-t-0">
-      <DialogHeader className="sr-only">
-       <DialogTitle>Search Services</DialogTitle>
-      </DialogHeader>
-      <div className="pt-2">
-       {searchForm(
-        () => setMobileSearchOpen(false),
-        () => setMobileSearchOpen(false)
-       )}
-      </div>
-     </DialogContent>
-    </Dialog>
    </div>
   </header>
  );
