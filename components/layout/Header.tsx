@@ -21,10 +21,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users } from "lucide-react";
+import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getAuthToken } from "@/lib/api-client";
-import api from "@/lib/api-client";
+import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -175,75 +174,10 @@ export function Header() {
    suggestionsAbortRef.current = controller;
    setIsLoadingSuggestions(true);
    try {
-    const response = await api.search.search({
-     q: searchQuery.trim(),
-     limit: 5, // Limit to 5 suggestions
-    }, { signal: controller.signal });
-
-    if (response.success && response.data) {
-     const data = response.data as any;
-     const services = data.services || [];
-     const categories = data.categories || [];
-     const providers = data.providers || [];
-     const locations = data.locations || [];
-
-     // Combine and format suggestions
-     const allSuggestions: any[] = [];
-     
-     // Add services
-     services.slice(0, 3).forEach((service: any) => {
-      allSuggestions.push({
-       type: 'service',
-       id: service._id || service.id,
-       title: service.title,
-       subtitle: service.category?.name || 'Service',
-       url: `/service/${service.slug || service._id || service.id}`,
-      });
-     });
-
-     // Add categories
-     categories.slice(0, 2).forEach((category: any) => {
-      allSuggestions.push({
-       type: 'category',
-       id: category._id || category.id,
-       title: category.name,
-       subtitle: 'Category',
-       url: `/services?category=${category.slug || category._id}`,
-      });
-     });
-
-     // Add providers
-     providers.slice(0, 2).forEach((provider: any) => {
-      // Provider profile uses provider document ID or user ID
-      const providerId = provider._id || provider.id || provider.user?._id;
-      allSuggestions.push({
-       type: 'provider',
-       id: providerId,
-       title: provider.businessName || provider.user?.name || 'Provider',
-       subtitle: 'Provider',
-       url: `/provider/${provider.slug || providerId}`,
-      });
-     });
-
-     // Add locations
-     locations.slice(0, 2).forEach((loc: any) => {
-      const label = (loc?.label || '').toString().trim();
-      if (!label) return;
-      allSuggestions.push({
-       type: 'location',
-       id: label,
-       title: label,
-       subtitle: 'Location',
-       url: `/services?locationText=${encodeURIComponent(label)}&view=services`,
-      });
-     });
-
-     setSuggestions(allSuggestions);
-     setShowSuggestions(allSuggestions.length > 0);
-    } else {
-     setSuggestions([]);
-     setShowSuggestions(false);
-    }
+    const allSuggestions = await fetchSearchSuggestions(searchQuery.trim(), 5);
+    if (controller.signal.aborted) return;
+    setSuggestions(allSuggestions);
+    setShowSuggestions(allSuggestions.length > 0);
    } catch (error: any) {
     if (error?.name === 'AbortError') {
      return;
@@ -501,6 +435,7 @@ export function Header() {
           className="flex items-center gap-3 px-4 py-2 hover:bg-accent transition-colors cursor-pointer"
          >
           <div className="flex-shrink-0">
+           {suggestion.type === 'popular' && <Zap className="h-4 w-4 text-amber-500" />}
            {suggestion.type === 'service' && <Briefcase className="h-4 w-4 text-muted-foreground" />}
            {suggestion.type === 'category' && <Building2 className="h-4 w-4 text-muted-foreground" />}
            {suggestion.type === 'provider' && <User className="h-4 w-4 text-muted-foreground" />}
