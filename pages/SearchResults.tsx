@@ -1,6 +1,7 @@
 "use client";
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +15,19 @@ import {
   Navigation,
 } from "lucide-react";
 import api from "@/lib/api-client";
+import {
+  createSerpVisibleTracker,
+  getSearchSessionId,
+  getSerpPaintAgeMs,
+  markSerpResultsPainted,
+  postQueryRefinementContext,
+  postSearchClickFromSerp,
+  postSerpVisibleBatch,
+  wireVisibleFlushOnHide,
+} from "@/lib/searchSignals";
 import { useToast } from "@/hooks/use-toast";
-import { isGoogleMapsConfigured } from "@/lib/mapConfig";
-import { GoogleMap, type ServiceMarker } from "@/components/map/GoogleMap";
+import { isBrowseMapAvailable } from "@/lib/publicMaps";
+import { BrowseMap, type ServiceMarker } from "@/components/map/BrowseMap";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -53,6 +64,17 @@ type ServiceResult = {
   };
 };
 
+type SearchRecoveryPayload = {
+  message: string;
+  didYouMean?: { query: string; confidence: number };
+  synonymChips: Array<{ label: string; url: string }>;
+  popularQueries: Array<{ label: string; url: string }>;
+  categories: Array<{ _id: string; name: string; slug: string }>;
+  providers: Array<{ _id: string; businessName: string; slug?: string }>;
+  services: Array<{ _id: string; title: string; slug?: string; rating?: number }>;
+  relatedCategories?: Array<{ _id: string; name: string; slug: string }>;
+};
+
 export default function SearchResults() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -63,15 +85,27 @@ export default function SearchResults() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [recovery, setRecovery] = useState<SearchRecoveryPayload | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const listRootRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreCallbackRef = useRef<() => void>(() => {});
+  const visibleTrackerRef = useRef<ReturnType<typeof createSerpVisibleTracker> | null>(null);
+  if (!visibleTrackerRef.current) {
+    visibleTrackerRef.current = createSerpVisibleTracker((rows) => {
+      const sid = getSearchSessionId();
+      if (sid && rows.length) postSerpVisibleBatch(rows, sid);
+    });
+  }
+  const prevQueryForRefinement = useRef<string | null>(null);
 
   const selectedCategory = searchParams?.get("category") || "";
   const selectedSubcategory = searchParams?.get("subcategory") || "";
   const selectedLocation = searchParams?.get("location") || "Nearby";
   const query = searchParams?.get("q") || "";
+
+  const serpDedupeKey = `${query}|${selectedCategory}|${selectedSubcategory}|${selectedLocation}`;
 
   // Fetch categories
   useEffect(() => {
@@ -111,8 +145,9 @@ export default function SearchResults() {
         if (isCancelled) return;
 
         if (response.success && response.data) {
-          const d = response.data as { services?: any[] };
+          const d = response.data as { services?: any[]; recovery?: SearchRecoveryPayload };
           setServices(d.services || []);
+          setRecovery(d.recovery ?? null);
           const pag = (response as any).pagination;
           if (pag) {
             setTotalCount(pag.total ?? 0);
@@ -129,6 +164,7 @@ export default function SearchResults() {
             variant: "destructive",
           });
           setServices([]);
+          setRecovery(null);
           setHasMore(false);
         }
       } catch (error: any) {
@@ -140,6 +176,7 @@ export default function SearchResults() {
             variant: "destructive",
           });
           setServices([]);
+          setRecovery(null);
           setHasMore(false);
         }
       } finally {
@@ -210,6 +247,87 @@ export default function SearchResults() {
   }, [viewMode]);
 
   const resultsCount = totalCount > 0 ? totalCount : services.length;
+
+  const handleSerpServiceNavigate = useCallback(
+    (serviceId: string, position: number) => {
+      const sid = getSearchSessionId();
+      const ttc = getSerpPaintAgeMs();
+      postSearchClickFromSerp({
+        query,
+        entityType: "service",
+        entityId: serviceId,
+        clickedPosition: position,
+        sessionId: sid,
+        timeToClickMs: ttc,
+      });
+    },
+    [query]
+  );
+
+  useEffect(() => {
+    visibleTrackerRef.current?.reset(serpDedupeKey);
+  }, [serpDedupeKey]);
+
+  useLayoutEffect(() => {
+    if (!isLoading && services.length > 0) {
+      markSerpResultsPainted();
+    }
+  }, [isLoading, services.length, viewMode]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (prevQueryForRefinement.current === null) {
+      prevQueryForRefinement.current = query;
+      return;
+    }
+    const prev = prevQueryForRefinement.current;
+    if (prev !== query) {
+      const sid = getSearchSessionId();
+      if (sid) {
+        void postQueryRefinementContext({
+          query,
+          previousQuery: prev,
+          resultCount: resultsCount,
+          sessionId: sid,
+        });
+      }
+      prevQueryForRefinement.current = query;
+    }
+  }, [query, isLoading, resultsCount]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const tr = visibleTrackerRef.current;
+    if (!tr) return undefined;
+    return wireVisibleFlushOnHide(() => tr.flushNow());
+  }, []);
+
+  useEffect(() => {
+    if (viewMode !== "list" || isLoading) {
+      visibleTrackerRef.current?.flushNow();
+      return undefined;
+    }
+    const root = listRootRef.current;
+    const tr = visibleTrackerRef.current;
+    if (!root || !tr) return undefined;
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const el = entry.target as HTMLElement;
+          const sid = el.dataset.searchSid;
+          const pos = Number(el.dataset.searchPos || 0);
+          if (!sid || !pos) return;
+          tr.handleEntry(sid, pos, entry);
+        });
+      },
+      { root: null, threshold: [0, tr.ioThreshold], rootMargin: "0px 0px -10% 0px" }
+    );
+    root.querySelectorAll<HTMLElement>("[data-search-sid]").forEach((el) => io.observe(el));
+    return () => {
+      io.disconnect();
+      tr.flushNow();
+    };
+  }, [services, viewMode, isLoading]);
 
   // Services with coordinates OR address (Mappls geocodes address)
   const getServiceCoords = (s: ServiceResult): { lat: number; lng: number } | null => {
@@ -316,22 +434,125 @@ export default function SearchResults() {
         </section>
 
         {/* Content */}
-        <section className="py-10">
+        <section className="py-12">
           <div className="container">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <p className="text-muted-foreground">Loading services...</p>
               </div>
             ) : services.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-lg font-medium text-foreground mb-2">No services found</p>
-                <p className="text-muted-foreground">Try adjusting your search filters</p>
+              <div className="max-w-3xl mx-auto space-y-8 py-4">
+                <div className="text-center space-y-2">
+                  <p className="text-lg font-medium text-foreground">No listings match this search</p>
+                  <p className="text-muted-foreground text-sm">
+                    {recovery?.message ||
+                      "Try a broader keyword or explore related categories on Imagineering India."}
+                  </p>
+                  {recovery?.didYouMean?.query && (
+                    <p className="text-sm">
+                      Did you mean{" "}
+                      <Button variant="link" className="h-auto p-0" asChild>
+                        <Link href={`/search-results?q=${encodeURIComponent(recovery.didYouMean.query)}`}>
+                          {recovery.didYouMean.query}
+                        </Link>
+                      </Button>
+                      ?
+                    </p>
+                  )}
+                </div>
+                {recovery && (
+                  <div className="space-y-6 text-left">
+                    {(recovery.popularQueries?.length > 0 || recovery.synonymChips?.length > 0) && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Try searching</p>
+                        <div className="flex flex-wrap gap-2">
+                          {recovery.popularQueries?.map((p) => (
+                            <Button key={p.url} variant="secondary" size="sm" asChild>
+                              <Link href={p.url}>{p.label}</Link>
+                            </Button>
+                          ))}
+                          {recovery.synonymChips?.map((c) => (
+                            <Button key={c.url} variant="outline" size="sm" asChild>
+                              <Link href={c.url}>{c.label}</Link>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {recovery.categories?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Related categories</p>
+                        <ul className="list-disc list-inside text-sm text-primary space-y-1">
+                          {recovery.categories.map((c) => (
+                            <li key={c._id}>
+                              <Link className="hover:underline" href={`/services?category=${encodeURIComponent(c.slug)}`}>
+                                {c.name}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {recovery.relatedCategories && recovery.relatedCategories.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Often browsed together</p>
+                        <div className="flex flex-wrap gap-2">
+                          {recovery.relatedCategories.map((c) => (
+                            <Button key={c._id} variant="outline" size="sm" asChild>
+                              <Link href={`/services?category=${encodeURIComponent(c.slug)}`}>{c.name}</Link>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {recovery.providers?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Related providers</p>
+                        <ul className="list-disc list-inside text-sm text-primary space-y-1">
+                          {recovery.providers.map((p) => (
+                            <li key={p._id}>
+                              <Link
+                                className="hover:underline"
+                                href={`/provider/${p.slug || p._id}`}
+                              >
+                                {p.businessName}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {recovery.services?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-foreground">Popular nearby services</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {recovery.services.map((s) => (
+                            <Card key={s._id} className="border shadow-sm">
+                              <CardContent className="py-3 px-4 flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium line-clamp-2">{s.title}</span>
+                                <Button size="sm" variant="outline" asChild>
+                                  <Link href={`/service/${s.slug || s._id}`}>View</Link>
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : viewMode === "list" ? (
               <>
-                <div className="grid gap-6 lg:grid-cols-3 md:grid-cols-2">
-                {services.map((service) => (
-                  <Card key={service._id} className="border shadow-sm hover:shadow-md transition-shadow">
+                <div ref={listRootRef} className="grid gap-6 lg:grid-cols-3 md:grid-cols-2">
+                {services.map((service, idx) => (
+                  <div
+                    key={service._id}
+                    data-search-sid={service._id}
+                    data-search-pos={idx + 1}
+                    className="min-h-0"
+                  >
+                  <Card className="border shadow-sm hover:shadow-md transition-shadow h-full">
                     <CardHeader className="space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
@@ -379,11 +600,17 @@ export default function SearchResults() {
                           Provider: <span className="font-medium text-foreground">{service.provider?.name || "N/A"}</span>
                         </span>
                         <Button variant="ghost" size="sm" className="px-2 text-primary" asChild>
-                          <a href={`/service/${service.slug || service._id}`}>View Details</a>
+                          <a
+                            href={`/service/${service.slug || service._id}`}
+                            onClick={() => handleSerpServiceNavigate(service._id, idx + 1)}
+                          >
+                            View Details
+                          </a>
                         </Button>
                       </div>
                     </CardContent>
                   </Card>
+                  </div>
                 ))}
                 </div>
                 {viewMode === "list" && (
@@ -407,8 +634,8 @@ export default function SearchResults() {
                         <MapIcon className="h-4 w-4 text-primary" />
                         Map view
                       </div>
-                      {isGoogleMapsConfigured() ? (
-                        <GoogleMap
+                      {isBrowseMapAvailable() ? (
+                        <BrowseMap
                           center={mapCenter}
                           zoom={11}
                           serviceMarkers={mapMarkers}
@@ -419,7 +646,8 @@ export default function SearchResults() {
                       ) : (
                         <div className="flex-1 rounded-xl border bg-muted flex items-center justify-center">
                           <p className="text-xs text-muted-foreground">
-                            Add <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in .env for map.
+                            Add <code>NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> or{" "}
+                            <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in <code>.env</code> for map.
                           </p>
                         </div>
                       )}
@@ -432,7 +660,7 @@ export default function SearchResults() {
                     {services.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No services found</p>
                     ) : (
-                      services.map((service) => (
+                      services.map((service, idx) => (
                         <Card key={service._id} className="border-0 shadow-sm">
                           <CardContent className="pt-4 space-y-2">
                             <div className="flex items-center justify-between">
@@ -448,7 +676,12 @@ export default function SearchResults() {
                               {service.rating?.toFixed(1) || "0.0"} • {service.reviewCount || 0} reviews
                             </div>
                             <Button variant="ghost" size="sm" className="w-full mt-2" asChild>
-                              <a href={`/service/${service.slug || service._id}`}>View Details</a>
+                              <a
+                                href={`/service/${service.slug || service._id}`}
+                                onClick={() => handleSerpServiceNavigate(service._id, idx + 1)}
+                              >
+                                View Details
+                              </a>
                             </Button>
                           </CardContent>
                         </Card>
