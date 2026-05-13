@@ -38,6 +38,7 @@ import {
   XCircle,
   AlertCircle,
   Download,
+  ExternalLink,
   Eye,
   Check,
   X,
@@ -120,7 +121,6 @@ export default function ProviderBookings() {
   const [selectedStatusForUpdate, setSelectedStatusForUpdate] = useState<string>("");
   const [statusUpdateNote, setStatusUpdateNote] = useState("");
   const [deliveryOtp, setDeliveryOtp] = useState("");
-  const [invoiceMode, setInvoiceMode] = useState<"AUTO" | "UPLOAD">("AUTO");
   const [providerInvoiceFile, setProviderInvoiceFile] = useState<File | null>(null);
   const [offlinePaid, setOfflinePaid] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -214,6 +214,7 @@ export default function ProviderBookings() {
         : Array.isArray((raw as any)?.data)
           ? (raw as any).data
           : [];
+      const providerVisibleInvoices = invoicesArray.filter((invoice: any) => invoice.invoiceType === 'COMMISSION');
 
       // Also fetch booking details to check for provider-uploaded invoice
       const bookingRes = await api.bookings.getById(bookingId);
@@ -232,7 +233,7 @@ export default function ProviderBookings() {
         }
       }
 
-      setBookingInvoices([...invoicesArray, ...extraInvoices]);
+      setBookingInvoices([...providerVisibleInvoices, ...extraInvoices]);
     } catch (error) {
       console.error("Failed to fetch booking invoices:", error);
     } finally {
@@ -306,6 +307,22 @@ export default function ProviderBookings() {
     totalEarnings: bookings.reduce((sum, b) => sum + b.netEarnings, 0),
     totalCommission: bookings.reduce((sum, b) => sum + b.commission, 0),
   }), [bookings]);
+
+  const formatInr = (amount: number) =>
+    `₹${Number(amount || 0).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const getPlatformFeeBreakup = (commission: number) => {
+    const taxable = Number(commission || 0);
+    const gst = Math.round(taxable * 0.18 * 100) / 100;
+    return {
+      taxable,
+      gst,
+      total: Math.round((taxable + gst) * 100) / 100,
+    };
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -427,7 +444,6 @@ export default function ProviderBookings() {
     setSelectedStatusForUpdate("");
     setStatusUpdateNote("");
     setDeliveryOtp("");
-    setInvoiceMode("AUTO");
     setProviderInvoiceFile(null);
     setOfflinePaid(false);
     setStatusUpdateDialogOpen(true);
@@ -449,16 +465,7 @@ export default function ProviderBookings() {
         selectedStatusForUpdate === "DELIVERED" ? deliveryOtp.trim() : undefined;
       // If moving to OUT_FOR_DELIVERY, handle invoice options
       if (selectedStatusForUpdate === "OUT_FOR_DELIVERY") {
-        if (invoiceMode === "UPLOAD") {
-          if (!providerInvoiceFile) {
-            toast({
-              title: "Invoice required",
-              description: "Please upload your service invoice file.",
-              variant: "destructive",
-            });
-            setActionLoading(null);
-            return;
-          }
+        if (providerInvoiceFile) {
           // Upload provider invoice first
           const uploadRes = await api.bookings.uploadProviderInvoice(
             selectedBooking.id,
@@ -482,7 +489,7 @@ export default function ProviderBookings() {
         selectedStatusForUpdate,
         statusUpdateNote.trim() || undefined,
         otpValue || undefined,
-        selectedStatusForUpdate === "OUT_FOR_DELIVERY" ? invoiceMode : undefined,
+        selectedStatusForUpdate === "OUT_FOR_DELIVERY" && providerInvoiceFile ? "UPLOAD" : undefined,
         selectedStatusForUpdate === "DELIVERED" ? offlinePaid : undefined
       );
       if (response.success) {
@@ -495,7 +502,6 @@ export default function ProviderBookings() {
         setStatusUpdateNote("");
         setSelectedBooking(null);
         setDeliveryOtp("");
-        setInvoiceMode("AUTO");
         setProviderInvoiceFile(null);
         setOfflinePaid(false);
         fetchBookings(); // Refresh bookings
@@ -688,7 +694,7 @@ export default function ProviderBookings() {
   };
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
+    <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
           <div>
@@ -700,7 +706,7 @@ export default function ProviderBookings() {
             </p>
           </div>
           <Button variant="outline" size="sm" className="text-xs md:text-sm self-start sm:self-auto">
-            <Download className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+            <Download className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
             <span className="hidden sm:inline">Export Report</span>
             <span className="sm:hidden">Export</span>
           </Button>
@@ -712,19 +718,19 @@ export default function ProviderBookings() {
         {/* Search and Filters - Only showing paid bookings */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="flex flex-col tablet:flex-row gap-4 tablet:items-center">
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search paid bookings..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-12"
                 />
               </div>
               {statusFilter !== "all" && (
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-48">
+                  <SelectTrigger className="w-full tablet:w-48">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -791,7 +797,7 @@ export default function ProviderBookings() {
                         const isProviderUpload = type === 'PROVIDER_UPLOAD';
 
                         const label = isCommission
-                          ? 'My Invoice (Commission)'
+                          ? 'My Invoice (Provider Platform Fee)'
                           : isPlatformFee
                             ? 'Platform Fee Invoice'
                             : isProviderUpload
@@ -800,16 +806,21 @@ export default function ProviderBookings() {
                                 ? 'Tax Invoice'
                                 : 'Invoice';
 
-                        const handleDownload = () => {
+                        const handleOpenInvoice = async () => {
                           if (isProviderUpload && invoice.providerInvoiceFileUrl) {
                             // Open provider-uploaded invoice directly from its URL (S3)
                             window.open(invoice.providerInvoiceFileUrl, '_blank');
                             return;
                           }
-                          api.invoices.downloadPdf(
-                            invoice._id,
-                            `Invoice-${(invoice.invoiceNumber || 'invoice').replace(/\//g, '-')}.pdf`
-                          );
+                          try {
+                            await api.invoices.viewPdf({ _id: invoice._id, pdfUrl: invoice.pdfUrl });
+                          } catch (error: any) {
+                            toast({
+                              title: "Error",
+                              description: error?.message || "Failed to open invoice",
+                              variant: "destructive",
+                            });
+                          }
                         };
 
                         return (
@@ -823,11 +834,11 @@ export default function ProviderBookings() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 shrink-0"
-                                onClick={handleDownload}
-                                title="Download invoice"
-                                aria-label="Download invoice"
+                                onClick={handleOpenInvoice}
+                                title="Open invoice in new tab"
+                                aria-label="Open invoice in new tab"
                               >
-                                <Download className="h-4 w-4" />
+                                <ExternalLink className="h-4 w-4" />
                               </Button>
                             </CardContent>
                           </Card>
@@ -909,15 +920,35 @@ export default function ProviderBookings() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <Card>
                       <CardContent className="pt-4 md:pt-6">
-                        <p className="text-xs md:text-sm text-muted-foreground mb-1">Base Price (incl. 18% GST)</p>
-                        <p className="text-xl md:text-2xl font-bold">₹{((selectedBooking.amount ?? selectedBooking.totalAmount ?? 0) * 1.18).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        <p className="text-xs text-muted-foreground mt-1">Base: ₹{(selectedBooking.amount ?? selectedBooking.totalAmount ?? 0).toLocaleString()} + GST</p>
+                        <p className="text-xs md:text-sm text-muted-foreground mb-1">
+                          Base Price
+                        </p>
+                        <p className="text-xl md:text-2xl font-bold">
+                          ₹{(selectedBooking.amount || selectedBooking.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          GST not included
+                        </p>
                       </CardContent>
                     </Card>
                     <Card>
                       <CardContent className="pt-4 md:pt-6">
-                        <p className="text-xs md:text-sm text-muted-foreground mb-1">Platform Fee ({selectedBooking.commissionRate}%)</p>
-                        <p className="text-xl md:text-2xl font-bold text-warning">₹{Number(selectedBooking.commission).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        {(() => {
+                          const platformFee = getPlatformFeeBreakup(selectedBooking.commission);
+                          return (
+                            <>
+                              <p className="text-xs md:text-sm text-muted-foreground mb-1">
+                                Platform Fee
+                              </p>
+                              <p className="text-xl md:text-2xl font-bold text-warning">
+                                {formatInr(platformFee.total)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Taxable: {formatInr(platformFee.taxable)} + GST 18%: {formatInr(platformFee.gst)}
+                              </p>
+                            </>
+                          );
+                        })()}
                       </CardContent>
                     </Card>
                     <Card className="col-span-1 sm:col-span-2">
@@ -1097,80 +1128,21 @@ export default function ProviderBookings() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Service Invoice Option <span className="text-destructive">*</span>
+                        Service Invoice File (Optional)
                       </label>
-                      <div className="flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setInvoiceMode("AUTO")}
-                          className={`flex items-start gap-2 rounded-md border p-3 text-left text-sm ${
-                            invoiceMode === "AUTO"
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-muted"
-                          }`}
-                        >
-                          <div className="mt-0.5">
-                            <div
-                              className={`h-3 w-3 rounded-full border ${
-                                invoiceMode === "AUTO"
-                                  ? "border-primary bg-primary"
-                                  : "border-muted-foreground"
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <p className="font-medium">Auto-generate invoice</p>
-                            <p className="text-xs text-muted-foreground">
-                              Platform will generate GST-compliant service invoice for the buyer (recommended).
-                            </p>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setInvoiceMode("UPLOAD")}
-                          className={`flex items-start gap-2 rounded-md border p-3 text-left text-sm ${
-                            invoiceMode === "UPLOAD"
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-muted"
-                          }`}
-                        >
-                          <div className="mt-0.5">
-                            <div
-                              className={`h-3 w-3 rounded-full border ${
-                                invoiceMode === "UPLOAD"
-                                  ? "border-primary bg-primary"
-                                  : "border-muted-foreground"
-                              }`}
-                            />
-                          </div>
-                          <div>
-                            <p className="font-medium">Upload my own invoice</p>
-                            <p className="text-xs text-muted-foreground">
-                              Upload your own service invoice (PDF or image). Platform fee invoice will still be generated automatically.
-                            </p>
-                          </div>
-                        </button>
-                      </div>
+                      <input
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setProviderInvoiceFile(file);
+                        }}
+                        className="w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-2 file:text-xs file:font-medium hover:file:bg-muted"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Optional. Max size 10MB. Allowed formats: PDF, JPG, PNG, WebP.
+                      </p>
                     </div>
-                    {invoiceMode === "UPLOAD" && (
-                      <div>
-                        <label className="text-sm font-medium mb-2 block">
-                          Service Invoice File <span className="text-destructive">*</span>
-                        </label>
-                        <input
-                          type="file"
-                          accept="application/pdf,image/jpeg,image/jpg,image/png,image/webp"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0] || null;
-                            setProviderInvoiceFile(file);
-                          }}
-                          className="w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-muted"
-                        />
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Max size 10MB. Allowed formats: PDF, JPG, PNG, WebP.
-                        </p>
-                      </div>
-                    )}
                   </div>
                 )}
                 <div>
@@ -1244,7 +1216,6 @@ export default function ProviderBookings() {
                   setStatusUpdateNote("");
                   setSelectedBooking(null);
                   setDeliveryOtp("");
-                  setInvoiceMode("AUTO");
                   setProviderInvoiceFile(null);
                   setOfflinePaid(false);
                 }}
@@ -1477,7 +1448,7 @@ function BookingsTable({
                   <div>
                     <p className="font-semibold">₹{booking.basePriceWithGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      Base: ₹{(booking.amount || 0).toLocaleString()} {booking.hasGST ? '+ 18% GST' : ''}
+                      Base price
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Net: ₹{booking.netEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1499,7 +1470,7 @@ function BookingsTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     {/* Show Accept/Reject buttons for PENDING_PROVIDER status */}
                     {(booking.status === "PENDING_PROVIDER" || booking.status === "new") && onAccept && onReject ? (
                       <>
@@ -1508,7 +1479,7 @@ function BookingsTable({
                           size="sm"
                           onClick={() => onAccept(booking.id)}
                           disabled={actionLoading === booking.id}
-                          className="h-8 gap-1.5 text-green-600 border-green-200 hover:text-green-700 hover:bg-green-50"
+                          className="h-8 gap-2 text-green-600 border-green-200 hover:text-green-700 hover:bg-green-50"
                           title="Accept Booking"
                         >
                           {actionLoading === booking.id ? (
@@ -1523,7 +1494,7 @@ function BookingsTable({
                           size="sm"
                           onClick={() => onReject(booking)}
                           disabled={actionLoading === booking.id}
-                          className="h-8 gap-1.5 text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50"
+                          className="h-8 gap-2 text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50"
                           title="Reject Booking"
                         >
                           {actionLoading === booking.id ? (
@@ -1551,7 +1522,7 @@ function BookingsTable({
                         size="sm"
                         onClick={() => onUpdateStatus(booking)}
                         disabled={actionLoading === booking.id}
-                        className="h-8 gap-1.5 text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50"
+                        className="h-8 gap-2 text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50"
                         title="Update Status"
                       >
                         {actionLoading === booking.id ? (
@@ -1576,7 +1547,7 @@ function BookingsTable({
                         size="sm"
                         onClick={() => onRequestModification(booking)}
                         disabled={actionLoading === booking.id}
-                        className="h-8 gap-1.5 text-purple-600 border-purple-200 hover:text-purple-700 hover:bg-purple-50"
+                        className="h-8 gap-2 text-purple-600 border-purple-200 hover:text-purple-700 hover:bg-purple-50"
                         title="Request Modification"
                       >
                         <AlertCircle className="h-3.5 w-3.5" />
