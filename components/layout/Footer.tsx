@@ -297,7 +297,7 @@ export function Footer() {
                 Imagineering India
               </span>
               <span className="caption text-muted-foreground">
-                Integrated Construction Solutions Platform
+                One Point Solution For All The Construction M3
               </span>
             </div>
           </div>
