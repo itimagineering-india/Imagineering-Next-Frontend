@@ -65,6 +65,9 @@ export function Header() {
 
  const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
+  const [b2bCategories, setB2bCategories] = useState<Array<{ slug: string; name: string; subcategories?: string[] }>>([]);
+  const [activeB2bCategorySlug, setActiveB2bCategorySlug] = useState<string | null>(null);
+  const [activeB2bSubcategory, setActiveB2bSubcategory] = useState<string | null>(null);
  const [headerCategories, setHeaderCategories] = useState<Array<{ _id?: string; id?: string; name: string; slug: string; subcategories?: string[] }>>([]);
  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
  const [typedHeadline, setTypedHeadline] = useState("");
@@ -114,18 +117,70 @@ export function Header() {
   }
  };
 
+  const getB2BCategoryIcon = (slug: string) => {
+    switch (slug) {
+      case "construction-material":
+      case "construction-materials":
+        return <Building2 className="h-6 w-6" />;
+      case "electrical-lightening":
+      case "electrical-lighting":
+        return <Zap className="h-6 w-6" />;
+      case "hardware-senitary":
+      case "hardware":
+        return <Briefcase className="h-6 w-6" />;
+      case "furniture":
+        return <Briefcase className="h-6 w-6" />;
+      case "furniture-hardware":
+        return <Briefcase className="h-6 w-6" />;
+      default:
+        return <Building2 className="h-6 w-6" />;
+    }
+  };
+
  // Fetch categories from backend (with subcategories)
  useEffect(() => {
   let mounted = true;
-  api.categories.getAll(false, { includeSubcategories: true }).then((res) => {
+  api.categories.getAll(false, { includeSubcategories: true, admin: true }).then((res) => {
    if (!mounted) return;
    if (res.success && res.data) {
     const cats = (res.data as { categories?: any[] }).categories || [];
     const normalized = Array.isArray(cats) ? cats : [];
-    setHeaderCategories(normalized);
+    const activeCategoriesForExplore = normalized.filter((c: any) => c?.isActive !== false);
+
+       // B2B categories come from admin-configured categories (subcategories too),
+       // even if they are not active yet.
+       // We filter by category name to keep this UI aligned with what admins add in the Categories admin panel.
+       const b2bNameSet = new Set([
+        "construction material",
+        "construction materials",
+        "electrical & lighting",
+        "electrical & lightening",
+        "furniture",
+        "furniture & hardware",
+        "furniture and hardware",
+        "hardware and senitary",
+        "hardware",
+       ]);
+       const filteredB2b = normalized.filter((c: any) => {
+        const name = (c?.name ?? "").toString().toLowerCase().replace(/\s+/g, " ").trim();
+        const interactionType = (c?.interactionType ?? "").toString();
+        const matchesName =
+         b2bNameSet.has(name) ||
+         // Allow minor formatting differences (e.g. electrical-lighting vs electrical & lighting).
+         name.replace(/&/g, "").trim() === "electrical lighting" ||
+         name.replace(/&/g, "").trim() === "electrical lightening";
+
+        // Only show categories that admins marked for purchase flow.
+        return matchesName && (!interactionType || interactionType === "PURCHASE_ONLY");
+       });
+       setB2bCategories(filteredB2b);
+       setActiveB2bCategorySlug(filteredB2b[0]?.slug ?? null);
+       setActiveB2bSubcategory(null);
+
+       setHeaderCategories(activeCategoriesForExplore);
     const firstWithSubs =
-     normalized.find((c: any) => Array.isArray(c?.subcategories) && c.subcategories.length > 0) ||
-     normalized[0];
+     activeCategoriesForExplore.find((c: any) => Array.isArray(c?.subcategories) && c.subcategories.length > 0) ||
+     activeCategoriesForExplore[0];
     if (!activeCategorySlug && firstWithSubs?.slug) {
      setActiveCategorySlug(firstWithSubs.slug);
     }
@@ -689,6 +744,116 @@ export function Header() {
          </div>
         </NavigationMenuContent>
        </NavigationMenuItem>
+          <NavigationMenuItem key="browse-b2b-services">
+            <NavigationMenuTrigger className="bg-transparent">B2B Services</NavigationMenuTrigger>
+            <NavigationMenuContent>
+              <div className="w-[min(92vw,980px)] rounded-2xl bg-white shadow-xl border border-slate-100 overflow-hidden">
+                <div className="flex h-[360px]">
+                  {/* Left: B2B categories list */}
+                  <div className="w-64 border-r border-slate-100 bg-white">
+                    <div className="px-4 pt-3 pb-2">
+                      <p className="caption subtitle text-slate-500">Browse by category</p>
+                    </div>
+                    <div className="max-h-[310px] overflow-y-auto pb-2">
+                      {b2bCategories.map((category) => {
+                        const isActive = activeB2bCategorySlug === category.slug;
+                        return (
+                          <button
+                            key={category.slug}
+                            type="button"
+                            onMouseEnter={() => {
+                              setActiveB2bCategorySlug(category.slug);
+                              setActiveB2bSubcategory(null);
+                            }}
+                            className={cn(
+                              "flex w-full items-center gap-3 px-4 py-3 body text-slate-800 cursor-pointer transition-colors",
+                              "border-l-4 border-transparent hover:bg-slate-50",
+                              isActive && "bg-red-50 border-red-500 subtitle"
+                            )}
+                          >
+                            <span className="inline-flex h-6 w-6 items-center justify-center">
+                              {getB2BCategoryIcon(category.slug)}
+                            </span>
+                            <span className="truncate">{category.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Right: B2B subcategories panel */}
+                  <div className="flex-1 min-w-0 w-[min(62vw,700px)]">
+                  {(() => {
+                    if (b2bCategories.length === 0) return null;
+                    const active =
+                      b2bCategories.find((c) => c.slug === activeB2bCategorySlug) || b2bCategories[0];
+                      const subs = Array.isArray(active?.subcategories) ? active.subcategories : [];
+                      const effectiveActiveSub =
+                        activeB2bSubcategory && subs.includes(activeB2bSubcategory)
+                          ? activeB2bSubcategory
+                          : subs[0] || null;
+
+                      return (
+                        <div className="flex h-full flex-col px-6 py-6">
+                          {/* Chips */}
+                          <div className="mt-1 flex-1 overflow-y-auto pr-2">
+                            {subs.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-3">
+                                {subs.map((sub) => {
+                                  const isChipActive = effectiveActiveSub === sub;
+                                  return (
+                                    <button
+                                      key={`${active.slug}-${sub}`}
+                                      type="button"
+                                      onMouseEnter={() => setActiveB2bSubcategory(sub)}
+                                      onFocus={() => setActiveB2bSubcategory(sub)}
+                                      onClick={() => {
+                                        const params = new URLSearchParams();
+                                        params.set("category", active.slug);
+                                        params.set("subcategory", sub);
+                                        router.push(`/b2b-services?${params.toString()}`);
+                                      }}
+                                      className={cn(
+                                        "inline-flex items-center justify-center w-full rounded-lg border px-4 py-3 caption leading-snug text-center transition-all duration-150",
+                                        isChipActive
+                                          ? "border-red-500 bg-red-500 text-white shadow-sm"
+                                          : "border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:bg-red-500 hover:text-white hover:border-red-500 hover:shadow-sm"
+                                      )}
+                                    >
+                                      <span className="whitespace-normal break-words">{sub}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="flex h-full items-center justify-center px-6 text-center">
+                                <p className="caption text-slate-500">
+                                  Explore all B2B services in{" "}
+                                  <span className="subtitle text-slate-700">{active.name}</span>.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bottom View All row */}
+                          {subs.length > 0 && (
+                            <div className="mt-4 border-t border-slate-100 pt-4 flex justify-center">
+                              <Link
+                                href={`/b2b-services?category=${active.slug}`}
+                                className="inline-flex items-center caption text-red-500 hover:text-red-600 hover:underline"
+                              >
+                                View All {active.name} <span className="ml-1">→</span>
+                              </Link>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
       </NavigationMenuList>
      </NavigationMenu>
 
@@ -877,6 +1042,9 @@ export function Header() {
          <LocationSearchInline onClose={() => setIsOpen(false)} className="p-0" />
         ) : null}
        </div>
+       <Link href="/b2b-services" className="subtitle" onClick={() => setIsOpen(false)}>
+        B2B Services
+       </Link>
        <Link href="/about" className="subtitle" onClick={() => setIsOpen(false)}>
         {t("common:about")}
        </Link>
