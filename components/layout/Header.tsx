@@ -45,9 +45,13 @@ import {
  HomesIcon,
 } from "@/components/home/CategoryIcons";
 
+const IMAGIMITRA_DOWNLOAD_URL =
+ "https://play.google.com/store/apps/details?id=com.imagineeringindia.imagimitra";
+
 export function Header() {
  const mainHeadline = "ONE POINT SOLUTION FOR ALL THE CONSTRUCTION M3";
  const { t } = useTranslation(["header", "common"]);
+ const [showImagiMitraBar, setShowImagiMitraBar] = useState(true);
  const [isOpen, setIsOpen] = useState(false);
  const [searchQuery, setSearchQuery] = useState("");
  const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -85,6 +89,15 @@ export function Header() {
 
   return () => window.clearInterval(timer);
  }, [mainHeadline]);
+
+ useEffect(() => {
+  const onScroll = () => {
+   setShowImagiMitraBar(window.scrollY < 8);
+  };
+  onScroll();
+  window.addEventListener("scroll", onScroll, { passive: true });
+  return () => window.removeEventListener("scroll", onScroll);
+ }, []);
 
  const getExploreCategoryIcon = (slug: string) => {
   switch (slug) {
@@ -535,6 +548,32 @@ export function Header() {
 
  return (
   <header className="sticky top-0 z-50 w-full max-w-full overflow-x-clip overflow-y-visible border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+   {pathname === "/" ? (
+    <div
+     className={cn(
+      "w-full border-b bg-primary text-primary-foreground transition-all duration-300 ease-out overflow-hidden",
+      showImagiMitraBar ? "max-h-20 opacity-100" : "max-h-0 opacity-0"
+     )}
+    >
+     <div className="flex w-full min-w-0 max-w-full flex-col items-center justify-center gap-2 px-2 py-2 text-center sm:flex-row sm:gap-3 sm:px-3 md:px-4 lg:px-5 2xl:px-6">
+      <p className="caption text-primary-foreground/90">
+       <span className="inline-flex items-center rounded-full border border-primary-foreground/25 bg-primary-foreground/10 px-2.5 py-1 text-xs font-semibold tracking-wide text-primary-foreground">
+        ImagiMitra
+       </span>{" "}
+       <span className="hidden sm:inline">—</span>{" "}
+       The provider app to manage leads, bookings, and business growth.
+      </p>
+      <a
+       href={IMAGIMITRA_DOWNLOAD_URL}
+       target="_blank"
+       rel="noopener noreferrer"
+       className="shrink-0 inline-flex items-center justify-center rounded-full bg-primary-foreground px-4 py-1.5 text-xs font-semibold text-primary shadow-sm transition hover:-translate-y-[1px] hover:shadow-md"
+      >
+       Download
+      </a>
+     </div>
+    </div>
+   ) : null}
    <div className="flex h-auto min-h-14 w-full min-w-0 max-w-full items-center justify-between gap-2 px-2 py-2 sm:min-h-16 sm:px-3 md:px-4 lg:px-5 sm:py-3 sm:gap-3 2xl:px-6">
     {/* Logo — full flex width on mobile; cap width md–lg for tablet */}
     <Link
