@@ -19,11 +19,19 @@ import {
  DropdownMenuSeparator,
  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+ Dialog,
+ DialogContent,
+ DialogDescription,
+ DialogHeader,
+ DialogTitle,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap } from "lucide-react";
+import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap, Mic, MicOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
+import { parseHeaderSearchQuery } from "@/lib/searchNavigation";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -58,9 +66,14 @@ export function Header() {
  const [suggestions, setSuggestions] = useState<any[]>([]);
  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
  const [showSuggestions, setShowSuggestions] = useState(false);
+ const [isListening, setIsListening] = useState(false);
+ const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+ const [voiceTranscript, setVoiceTranscript] = useState("");
  const searchRef = useRef<HTMLDivElement>(null);
  const searchInputRef = useRef<HTMLInputElement>(null);
  const suggestionsAbortRef = useRef<AbortController | null>(null);
+ const speechRecognitionRef = useRef<any>(null);
+ const voiceShouldSubmitRef = useRef(false);
  const pathname = usePathname();
  const router = useRouter();
  const { toast } = useToast();
@@ -97,6 +110,12 @@ export function Header() {
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
   return () => window.removeEventListener("scroll", onScroll);
+ }, []);
+
+ useEffect(() => {
+  return () => {
+   speechRecognitionRef.current?.abort?.();
+  };
  }, []);
 
  const getExploreCategoryIcon = (slug: string) => {
@@ -358,42 +377,33 @@ export function Header() {
   return user.name[0].toUpperCase();
  };
 
- const handleSearch = async (e?: React.FormEvent) => {
+ const handleSearch = async (e?: React.FormEvent, queryOverride?: string) => {
   if (e) e.preventDefault();
   setShowSuggestions(false);
 
-  const q = searchQuery.trim();
+  const q = (queryOverride ?? searchQuery).trim();
   const params = new URLSearchParams();
   if (q) {
-   params.set("q", q);
+   const parsed = parseHeaderSearchQuery(q);
+   params.set("q", parsed.keyword);
    // Only when searching (non-empty), default to Services view
    params.set("view", "services");
-   // Simple intent parsing (rule-based)
-   const qLower = q.toLowerCase();
 
-   // Sort intent
-   if (/\b(best|top)\b/.test(qLower)) {
+   if (parsed.sort === "best") {
     params.set("sort", "best");
-   } else if (/\b(cheap|cheapest|lowest)\b/.test(qLower)) {
+   } else if (parsed.sort === "price_low") {
     params.set("sort", "price_low");
    }
 
-   // Price intent: under/below 500
-   const priceMatch = qLower.match(/\b(under|below)\s*₹?\s*(\d{1,7})\b/);
-   if (priceMatch?.[2]) {
-    params.set("maxPrice", priceMatch[2]);
+   if (parsed.maxPrice) {
+    params.set("maxPrice", parsed.maxPrice);
    }
 
-   // Nearby intent: near me / nearby / within X km
-   const withinMatch = qLower.match(/\bwithin\s*(\d{1,3})\s*(km|kms)\b/);
-   const wantsNearby =
-    /\b(near me|nearby|around me)\b/.test(qLower) || !!withinMatch;
-   if (withinMatch?.[1]) {
-    params.set("radiusKm", withinMatch[1]);
+   if (parsed.radiusKm) {
+    params.set("radiusKm", parsed.radiusKm);
    }
 
-   if (wantsNearby) {
-    // Only auto “nearby” if query implies it
+   if (parsed.nearby) {
     const cached = getCachedLocation();
     if (cached) {
      params.set("lat", String(cached.lat));
@@ -407,10 +417,8 @@ export function Header() {
     }
    }
 
-   // Location phrase: "in Indore" / "at Jabalpur"
-   const locMatch = qLower.match(/\b(in|at)\s+([a-z][a-z\s]{1,40})$/);
-   if (locMatch?.[2]) {
-    params.set("locationText", locMatch[2].trim());
+   if (parsed.locationText) {
+    params.set("locationText", parsed.locationText);
    }
   } else {
    // If user is not searching, don't force Services view.
@@ -426,6 +434,87 @@ export function Header() {
   setSearchQuery("");
  };
 
+ const handleVoiceSearch = () => {
+  const SpeechRecognition =
+   typeof window !== "undefined" &&
+   ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  if (!SpeechRecognition) {
+   toast({
+    title: "Voice search not supported",
+    description: "Please use Chrome or another browser that supports speech search.",
+    variant: "destructive",
+   });
+   return;
+  }
+
+  if (isListening) {
+   voiceShouldSubmitRef.current = true;
+   speechRecognitionRef.current?.stop?.();
+   setIsListening(false);
+   return;
+  }
+
+  voiceShouldSubmitRef.current = true;
+  setVoiceTranscript("");
+  setVoiceModalOpen(true);
+  const recognition = new SpeechRecognition();
+  speechRecognitionRef.current = recognition;
+  recognition.lang = "hi-IN";
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+
+  let finalTranscript = "";
+  recognition.onstart = () => {
+   setIsListening(true);
+   setShowSuggestions(false);
+  };
+  recognition.onresult = (event: any) => {
+   const transcript = Array.from(event.results || [])
+    .map((result: any) => result?.[0]?.transcript || "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+   if (transcript) {
+    finalTranscript = transcript;
+    setSearchQuery(transcript);
+    setVoiceTranscript(transcript);
+   }
+  };
+  recognition.onerror = (event: any) => {
+   if (!voiceShouldSubmitRef.current && event?.error === "aborted") {
+    return;
+   }
+   voiceShouldSubmitRef.current = false;
+   setIsListening(false);
+   setVoiceModalOpen(false);
+   toast({
+    title: "Could not hear clearly",
+    description: "Please try again or type your search.",
+    variant: "destructive",
+   });
+  };
+  recognition.onend = () => {
+   setIsListening(false);
+   const spokenQuery = finalTranscript.trim();
+   if (voiceShouldSubmitRef.current && spokenQuery) {
+    setVoiceModalOpen(false);
+    handleSearch(undefined, spokenQuery);
+   }
+   voiceShouldSubmitRef.current = false;
+  };
+  recognition.start();
+ };
+
+ const handleVoiceModalOpenChange = (open: boolean) => {
+  setVoiceModalOpen(open);
+  if (!open && isListening) {
+   voiceShouldSubmitRef.current = false;
+   speechRecognitionRef.current?.abort?.();
+   setIsListening(false);
+  }
+ };
+
  const searchForm = (onSubmitExtra?: () => void, onSuggestionSelect?: () => void) => (
   <form
    onSubmit={(e) => {
@@ -435,51 +524,71 @@ export function Header() {
    className="flex items-center flex-1 min-w-0 max-w-full"
   >
    <div className="relative w-full" ref={searchRef}>
-    <button
-     type="submit"
-     className="absolute left-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:left-2 lg:h-8 lg:w-8"
-     aria-label="Search"
-     title="Search"
-    >
-     <Search className="h-3.5 w-3.5 shrink-0 lg:h-4 lg:w-4" />
-    </button>
-    <Input
-     ref={searchInputRef}
-     type="text"
-     aria-label="Search services"
-     placeholder={placeholders[placeholderIndex]}
-     value={searchQuery}
-     onChange={(e) => {
-      setSearchQuery(e.target.value);
-      setShowSuggestions(true);
-     }}
-     onFocus={() => {
-      if (suggestions.length > 0) {
+    <div className="flex h-11 w-full min-w-0 items-center gap-1.5 rounded-2xl border border-primary/20 bg-background px-2 py-1.5 shadow-[0_10px_30px_rgba(37,99,235,0.18)] ring-1 ring-primary/10 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/25 lg:h-12 lg:px-3">
+     <button
+      type="submit"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+      aria-label="Search"
+      title="Search"
+     >
+      <Search className="h-4 w-4 shrink-0" />
+     </button>
+     <Input
+      ref={searchInputRef}
+      type="text"
+      aria-label="Search services"
+      placeholder="What are you looking for today?"
+      value={searchQuery}
+      onChange={(e) => {
+       setSearchQuery(e.target.value);
        setShowSuggestions(true);
-      }
-     }}
-     onKeyDown={(e) => {
-      if (e.key === "Escape") {
-       setShowSuggestions(false);
-      }
-     }}
-     className="h-8 pl-9 pr-9 lg:h-9 lg:pl-11 lg:pr-11 w-full min-w-0 max-w-full lg:w-80 placeholder:transition-all placeholder:duration-500 body"
-    />
-    {searchQuery && (
+      }}
+      onFocus={() => {
+       if (suggestions.length > 0) {
+        setShowSuggestions(true);
+       }
+      }}
+      onKeyDown={(e) => {
+       if (e.key === "Escape") {
+        setShowSuggestions(false);
+       }
+      }}
+      className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-sm font-medium shadow-none outline-none placeholder:text-muted-foreground/80 focus-visible:ring-0 focus-visible:ring-offset-0"
+     />
+     {searchQuery && (
+      <button
+       type="button"
+       onClick={() => {
+        setSearchQuery("");
+        setSuggestions([]);
+        setShowSuggestions(false);
+       }}
+       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
+       aria-label="Clear search"
+       title="Clear search"
+      >
+       <X className="h-4 w-4" />
+      </button>
+     )}
      <button
       type="button"
-      onClick={() => {
-       setSearchQuery("");
-       setSuggestions([]);
-       setShowSuggestions(false);
-      }}
-      className="absolute right-1.5 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground lg:right-2 lg:h-8 lg:w-8"
-      aria-label="Clear search"
-      title="Clear search"
+      onClick={handleVoiceSearch}
+      className={cn(
+       "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/5 text-primary shadow-sm ring-1 ring-primary/10 transition hover:bg-primary hover:text-primary-foreground",
+       isListening && "animate-pulse bg-primary text-primary-foreground ring-4 ring-primary/20"
+      )}
+      aria-label={isListening ? "Stop voice search" : "Search by voice"}
+      title={isListening ? "Listening..." : "Search by voice"}
      >
-      <X className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+      {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
      </button>
-    )}
+     <Button
+      type="submit"
+      className="h-8 shrink-0 rounded-xl bg-blue-600 px-5 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] transition hover:bg-blue-700 lg:h-9 lg:px-7"
+     >
+      Search
+     </Button>
+    </div>
 
     {/* Search Suggestions Dropdown */}
     {showSuggestions && searchQuery.trim().length >= 2 && (
@@ -548,6 +657,73 @@ export function Header() {
 
  return (
   <header className="sticky top-0 z-50 w-full max-w-full overflow-x-clip overflow-y-visible border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+   <Dialog open={voiceModalOpen} onOpenChange={handleVoiceModalOpenChange}>
+    <DialogContent className="max-w-md overflow-hidden border-primary/15 p-0 shadow-2xl">
+     <div className="relative bg-gradient-to-br from-primary/15 via-background to-background p-6">
+      <div className="absolute right-6 top-6 h-16 w-16 rounded-full bg-primary/10 blur-2xl" />
+      <DialogHeader className="relative space-y-2 text-center">
+       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 ring-8 ring-primary/5">
+        <div
+         className={cn(
+          "flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg",
+          isListening && "animate-pulse"
+         )}
+        >
+         <Mic className="h-7 w-7" />
+        </div>
+       </div>
+       <DialogTitle className="text-center">Voice Search</DialogTitle>
+       <DialogDescription className="text-center">
+        {isListening
+         ? "Listening... speak in Hindi, English, or Hinglish."
+         : "Preparing your voice search."}
+       </DialogDescription>
+      </DialogHeader>
+
+      <div className="relative mt-5 rounded-2xl border bg-background/85 p-4 shadow-sm backdrop-blur">
+       <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="caption text-muted-foreground">You said</span>
+        <span
+         className={cn(
+          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+          isListening ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+         )}
+        >
+         {isListening ? "Listening" : "Ready"}
+        </span>
+       </div>
+       <p className="min-h-14 text-center text-lg font-semibold leading-snug text-foreground">
+        {voiceTranscript || "Try saying “reta near me” or “cement Indore me”"}
+       </p>
+      </div>
+
+      <div className="relative mt-4 flex flex-wrap justify-center gap-2">
+       {["Sand near me", "सस्ती ईंट", "Raj mistri"].map((example) => (
+        <span
+         key={example}
+         className="rounded-full border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground"
+        >
+         {example}
+        </span>
+       ))}
+      </div>
+
+      <div className="relative mt-5 flex justify-center">
+       <Button
+        type="button"
+        variant={isListening ? "destructive" : "secondary"}
+        onClick={() => {
+         speechRecognitionRef.current?.stop?.();
+         setIsListening(false);
+         setVoiceModalOpen(false);
+        }}
+       >
+        {isListening ? "Stop listening" : "Close"}
+       </Button>
+      </div>
+     </div>
+    </DialogContent>
+   </Dialog>
    {pathname === "/" ? (
     <div
      className={cn(
@@ -578,26 +754,26 @@ export function Header() {
     {/* Logo — full flex width on mobile; cap width md–lg for tablet */}
     <Link
      href="/"
-     className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[min(100%,13rem)] md:max-w-[min(100%,16rem)] lg:max-w-none lg:flex-none lg:shrink-0"
+     className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[15rem] md:max-w-[18rem] lg:w-[18rem] lg:max-w-none lg:flex-none lg:shrink-0"
     >
      <img 
       src="https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png" 
       alt="Imagineering India Logo" 
       className="h-7 w-7 shrink-0 object-contain sm:h-8 sm:w-8 md:h-10 md:w-10"
      />
-     <div className="min-w-0 flex-1">
+     <div className="min-w-0 flex-1 overflow-hidden">
       <span className="block truncate text-sm font-semibold leading-tight text-foreground sm:text-base sm:font-medium">
        Imagineering India
       </span>
       {/* div avoids globals `span { font-size: 16px }` wiping out small tagline text */}
       <div
-       className="mt-0.5 max-w-full text-muted-foreground max-sm:truncate max-sm:whitespace-nowrap sm:whitespace-normal sm:line-clamp-2 sm:break-words sm:tracking-wide"
+       className="mt-0.5 h-3 max-w-full whitespace-nowrap text-muted-foreground"
        title={mainHeadline}
        style={{
-        fontSize: "clamp(7px, 2.4vw, 9px)",
-        lineHeight: 1.2,
+        fontSize: "clamp(6px, 0.58vw, 7.5px)",
+        lineHeight: 1,
         fontWeight: 700,
-        letterSpacing: "0.04em",
+        letterSpacing: "0.025em",
         textTransform: "uppercase",
        }}
       >
@@ -897,7 +1073,7 @@ export function Header() {
      </NavigationMenu>
 
      {/* Search Bar - In Navigation (Desktop) */}
-     <div className="w-80 shrink-0">
+     <div className="w-[30rem] shrink-0">
       {searchForm()}
      </div>
 
