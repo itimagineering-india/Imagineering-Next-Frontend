@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
 import { ServiceCard } from "@/components/ServiceCard";
 import { FilterPanel, FilterState } from "@/components/FilterPanel";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { List, SlidersHorizontal, Map as MapIcon, MapPin, Share2, Heart, Navigation, Loader2, Star, Briefcase } from "lucide-react";
+import { List, SlidersHorizontal, Map as MapIcon, MapPin, Navigation, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +22,7 @@ import { useServices } from "@/hooks/useServices";
 import { isBrowseMapAvailable } from "@/lib/publicMaps";
 import { BrowseMap, type ServiceMarker, type ProviderMarker } from "@/components/map/BrowseMap";
 import { countPlottableMapMarkers } from "@/utils/mapMarkerCount";
+import { ProvidersBrowseList } from "@/components/services/ProvidersList";
 
 import type { CitySeoContent } from "@/constants/citySeoContent";
 import { CitySeoSections } from "@/components/seo/CitySeoSections";
@@ -114,6 +114,10 @@ export default function Services(props: ServicesProps = {}) {
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providersError, setProvidersError] = useState<string | null>(null);
   const [providersPagination, setProvidersPagination] = useState<any>(null);
+  const providersBrowseNextPageRef = useRef(2);
+  const [extraBrowseProviders, setExtraBrowseProviders] = useState<any[]>([]);
+  const [isLoadingMoreProviders, setIsLoadingMoreProviders] = useState(false);
+  const [providersBrowseHasMore, setProvidersBrowseHasMore] = useState(true);
 
   const queryParam = searchParams?.get("q") || "";
   const categoryParam = searchParams?.get("category") || "";
@@ -145,6 +149,19 @@ export default function Services(props: ServicesProps = {}) {
 
   const maxPriceParam = searchParams?.get("maxPrice");
   const sortParam = searchParams?.get("sort") || "";
+  const radiusKmParam = searchParams?.get("radiusKm");
+
+  /** Keyword search with explicit lat/lng in URL (e.g. "near me") — not bootstrap GPS alone. */
+  const hasSearchGeoIntent =
+    Boolean(queryParam.trim()) &&
+    latParam &&
+    lngParam &&
+    Number.isFinite(parseFloat(latParam)) &&
+    Number.isFinite(parseFloat(lngParam));
+  const searchRadiusKm = (() => {
+    const parsed = radiusKmParam ? Number(radiusKmParam) : NaN;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : mapRadiusKm;
+  })();
 
   // Keep browseMode in sync with URL + localStorage
   useEffect(() => {
@@ -302,7 +319,9 @@ export default function Services(props: ServicesProps = {}) {
     Number.isFinite(tileLngForMap);
 
   const servicesParams = useMemo(() => {
-    const usePreciseGeo = hasCoordsForTileForMap;
+    const isKeywordSearch = Boolean(queryParam.trim());
+    /** Browse uses GPS tile; keyword search uses geo only when URL has lat/lng (near-me intent). */
+    const usePreciseGeo = hasCoordsForTileForMap && (!isKeywordSearch || hasSearchGeoIntent);
     const params: any = {
       page: viewMode === "map" ? 1 : currentPage,
       ...(viewMode !== "map" ? { limit: BROWSE_PAGE_SIZE } : {}),
@@ -377,7 +396,7 @@ export default function Services(props: ServicesProps = {}) {
     if (usePreciseGeo) {
       params.lat = tileLatForMap!;
       params.lng = tileLngForMap!;
-      params.radiusKm = mapRadiusKm;
+      params.radiusKm = searchRadiusKm;
       params.precise = 1;
     }
 
@@ -427,12 +446,17 @@ export default function Services(props: ServicesProps = {}) {
     maxPriceParam,
     sortParam,
     locationGateReady,
+    hasSearchGeoIntent,
+    searchRadiusKm,
     mapRadiusKm,
   ]);
 
   // Reset UI pagination when the query context changes
   useEffect(() => {
     setCurrentPage(1);
+    setExtraBrowseProviders([]);
+    providersBrowseNextPageRef.current = 2;
+    setProvidersBrowseHasMore(true);
   }, [
     queryParam,
     categoryParam,
@@ -446,6 +470,8 @@ export default function Services(props: ServicesProps = {}) {
     filters.rating,
     filters.priceRange,
     sortBy,
+    viewMode,
+    browseMode,
   ]);
 
 
@@ -463,11 +489,97 @@ export default function Services(props: ServicesProps = {}) {
 
   const servicesLoading = !locationGateReady || isLoading;
 
+  const loadMoreProvidersBrowse = useCallback(async () => {
+    if (viewMode === "map" || browseMode !== "providers") return;
+    if (providersLoading || isLoadingMoreProviders || !providersBrowseHasMore) return;
+    setIsLoadingMoreProviders(true);
+    try {
+      const page = providersBrowseNextPageRef.current;
+      const categorySlug =
+        (filters.category && filters.category.length > 0 ? filters.category[0] : "") ||
+        categoryParam ||
+        undefined;
+      const locationLat = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : NaN);
+      const locationLng = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : NaN);
+      const shouldUseProviderGeo = hasSearchGeoIntent || !queryParam.trim();
+      const hasLocation =
+        shouldUseProviderGeo && Number.isFinite(locationLat) && Number.isFinite(locationLng);
+
+      const resp = await api.providers.getAll({
+        categorySlug,
+        subcategory:
+          (filters.subcategory && filters.subcategory.length > 0 ? filters.subcategory[0] : "") ||
+          subcategoryParam ||
+          undefined,
+        q: queryParam || undefined,
+        page,
+        limit: BROWSE_PAGE_SIZE,
+        ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm } : {}),
+      });
+
+      if (resp.success && resp.data) {
+        const batch = (resp.data as { providers?: any[] }).providers || [];
+        const pag = (resp as any).pagination;
+        setExtraBrowseProviders((prev) => {
+          const seen = new Set<string>(providers.map((x: any) => String(x._id ?? x.user?._id ?? x.id)));
+          prev.forEach((x: any) => seen.add(String(x._id ?? x.user?._id ?? x.id)));
+          const out = [...prev];
+          for (const item of batch) {
+            const id = String(item._id ?? item.user?._id ?? item.id);
+            if (seen.has(id)) continue;
+            seen.add(id);
+            out.push(item);
+          }
+          return out;
+        });
+        providersBrowseNextPageRef.current = page + 1;
+        if (pag && typeof pag.pages === "number" && typeof pag.page === "number") {
+          if (pag.page >= pag.pages) setProvidersBrowseHasMore(false);
+        } else if (batch.length < BROWSE_PAGE_SIZE) {
+          setProvidersBrowseHasMore(false);
+        }
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not load more providers";
+      toast({
+        title: "Error",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingMoreProviders(false);
+    }
+  }, [
+    viewMode,
+    browseMode,
+    providersLoading,
+    isLoadingMoreProviders,
+    providersBrowseHasMore,
+    filters.category,
+    filters.subcategory,
+    categoryParam,
+    subcategoryParam,
+    queryParam,
+    userLocation,
+    latParam,
+    lngParam,
+    fixedLat,
+    fixedLng,
+    hasSearchGeoIntent,
+    searchRadiusKm,
+    mapRadiusKm,
+    providers,
+    toast,
+  ]);
+
   // Fetch providers when in Providers browse mode
   useEffect(() => {
     let isCancelled = false;
     const fetchProviders = async () => {
       if (browseMode !== "providers") return;
+      setExtraBrowseProviders([]);
+      providersBrowseNextPageRef.current = 2;
+      setProvidersBrowseHasMore(true);
       setProvidersLoading(true);
       setProvidersError(null);
       try {
@@ -478,7 +590,10 @@ export default function Services(props: ServicesProps = {}) {
 
         const locationLat = fixedLat ?? userLocation?.lat ?? (latParam ? parseFloat(latParam) : NaN);
         const locationLng = fixedLng ?? userLocation?.lng ?? (lngParam ? parseFloat(lngParam) : NaN);
-        const hasLocation = Number.isFinite(locationLat) && Number.isFinite(locationLng);
+        const shouldUseProviderGeo = hasSearchGeoIntent || !queryParam.trim();
+        const hasLocation =
+          shouldUseProviderGeo && Number.isFinite(locationLat) && Number.isFinite(locationLng);
+        const isMap = viewMode === "map";
 
         const resp = await api.providers.getAll({
           categorySlug,
@@ -487,23 +602,37 @@ export default function Services(props: ServicesProps = {}) {
             subcategoryParam ||
             undefined,
           q: queryParam || undefined,
-          ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm: mapRadiusKm } : {}),
+          ...(!isMap ? { page: 1, limit: BROWSE_PAGE_SIZE } : {}),
+          ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm } : {}),
+          ...(isMap && hasLocation ? { mapMarkers: 1 as const } : {}),
         });
 
         if (isCancelled) return;
         if (resp.success && resp.data) {
           const list = (resp.data as any).providers || [];
+          const pag = (resp as any).pagination;
           setProviders(list);
-          setProvidersPagination((resp as any).pagination || (resp as any).data?.pagination || null);
+          setProvidersPagination(pag || (resp as any).data?.pagination || null);
+          if (!isMap) {
+            if (pag && typeof pag.pages === "number" && typeof pag.page === "number") {
+              setProvidersBrowseHasMore(pag.page < pag.pages);
+            } else {
+              setProvidersBrowseHasMore(list.length >= BROWSE_PAGE_SIZE);
+            }
+          } else {
+            setProvidersBrowseHasMore(false);
+          }
         } else {
           setProviders([]);
           setProvidersPagination(null);
+          setProvidersBrowseHasMore(false);
           setProvidersError((resp as any)?.error?.message || "Failed to load providers");
         }
       } catch (e: any) {
         if (isCancelled) return;
         setProviders([]);
         setProvidersPagination(null);
+        setProvidersBrowseHasMore(false);
         setProvidersError(e?.message || "Failed to load providers");
       } finally {
         if (!isCancelled) setProvidersLoading(false);
@@ -526,7 +655,10 @@ export default function Services(props: ServicesProps = {}) {
     lngParam,
     fixedLat,
     fixedLng,
+    hasSearchGeoIntent,
+    searchRadiusKm,
     mapRadiusKm,
+    viewMode,
   ]);
   
   // Debug log
@@ -893,11 +1025,16 @@ export default function Services(props: ServicesProps = {}) {
     });
   }, [filteredServices, viewMode, getServiceCoordinates]);
 
+  const providersForBrowseList = useMemo(() => {
+    if (viewMode === "map") return providers;
+    return [...providers, ...extraBrowseProviders];
+  }, [viewMode, providers, extraBrowseProviders]);
+
   // Providers filtering (client-side search)
   const filteredProviders = useMemo(() => {
     const q = (queryParam || "").trim().toLowerCase();
-    if (!q) return providers;
-    return (providers || []).filter((p: any) => {
+    if (!q) return providersForBrowseList;
+    return (providersForBrowseList || []).filter((p: any) => {
       const businessName = (p?.businessName || "").toString().toLowerCase();
       const userName = (p?.user?.name || "").toString().toLowerCase();
       const categoryName = (p?.primaryCategory?.name || "").toString().toLowerCase();
@@ -915,7 +1052,7 @@ export default function Services(props: ServicesProps = {}) {
         locationKey.includes(q)
       );
     });
-  }, [providers, queryParam]);
+  }, [providersForBrowseList, queryParam]);
 
   /** Providers browse: nearest first when we have a reference point */
   const providersOrdered = useMemo(() => {
@@ -1606,109 +1743,31 @@ export default function Services(props: ServicesProps = {}) {
                   </div>
                 ) : providersOrdered.length > 0 ? (
                   <>
-                    <div
-                      className={
-                        viewMode === "grid"
-                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 lg:gap-6"
-                          : "space-y-3 md:space-y-4"
-                      }
-                    >
-                      {providersOrdered.map((p: any, index: number) => {
-                        const name = p?.businessName || p?.user?.name || "Provider";
-                        const addr = p?.businessAddress || p?.user?.location || {};
-                        const coords = getProviderCoordinates(p);
-                        const fullLocation = [addr.address, addr.city, addr.state]
-                          .filter(Boolean)
-                          .map((v: any) => String(v).trim())
-                          .filter(Boolean)
-                          .join(", ");
-                        const distanceKm =
-                          currentUserLocation && coords
-                            ? calculateDistance(currentUserLocation.lat, currentUserLocation.lng, coords.lat, coords.lng)
-                            : null;
-                        return (
-                          <Card
-                            key={p._id}
-                            className="overflow-hidden hover:shadow-md transition-shadow"
-                          >
-                            <Link
-                              href={
-                                p?.isFallbackProfile
-                                  ? `/services?provider=${encodeURIComponent(
-                                      p?.user?._id || p?._id
-                                    )}&view=services`
-                                  : `/provider/${p?.slug || p._id}`
-                              }
-                              className={
-                                viewMode === "list"
-                                  ? "flex items-center gap-3 sm:gap-4 p-3 sm:p-4"
-                                  : "block"
-                              }
-                            >
-                              <div
-                                className={
-                                  viewMode === "list"
-                                    ? "w-16 h-16 sm:w-20 sm:h-20 rounded-md overflow-hidden bg-muted flex items-center justify-center flex-shrink-0"
-                                    : "w-full aspect-[4/3] bg-muted flex items-center justify-center"
-                                }
-                              >
-                                {p?.businessLogo ? (
-                                  <img
-                                    src={p.businessLogo}
-                                    alt={name}
-                                    className="w-full h-full object-cover"
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <div className="text-xs text-muted-foreground">Business</div>
-                                )}
-                              </div>
-                              <CardContent
-                                className={
-                                  viewMode === "list"
-                                    ? "space-y-1 px-0 py-0 flex-1 min-w-0"
-                                    : "p-3 space-y-1"
-                                }
-                              >
-                                <div className="text-sm font-semibold line-clamp-2">{name}</div>
-                                <div className="text-xs text-muted-foreground line-clamp-1">
-                                  {fullLocation || "Location"}
-                                </div>
-                                {distanceKm !== null && Number.isFinite(distanceKm) && (
-                                  <div className="text-[11px] text-muted-foreground">
-                                    {distanceKm.toFixed(1)} km away
-                                  </div>
-                                )}
-                                {typeof p?.serviceCount === "number" && (
-                                  <div className="text-[11px] text-muted-foreground">
-                                    {p.serviceCount} services
-                                  </div>
-                                )}
-                                
-                                {/* Rating and Experience */}
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  {/* Rating */}
-                                  <div className="flex items-center gap-0.5">
-                                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                    <span className="text-[11px] font-medium">
-                                      {p?.averageRating ? p.averageRating.toFixed(1) : '4.5'}
-                                    </span>
-                                  </div>
-                                  
-                                  {/* Experience */}
-                                  {p?.yearsOfExperience && (
-                                    <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
-                                      <Briefcase className="h-3 w-3" />
-                                      <span>{p.yearsOfExperience}+ yrs</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Link>
-                          </Card>
-                        );
-                      })}
-                    </div>
+                    <ProvidersBrowseList
+                      providers={providersOrdered}
+                      viewMode={viewMode === "list" ? "list" : "grid"}
+                      userLat={currentUserLocation?.lat}
+                      userLng={currentUserLocation?.lng}
+                      onLoadMore={loadMoreProvidersBrowse}
+                      hasMore={providersBrowseHasMore}
+                      isLoadingMore={isLoadingMoreProviders}
+                    />
+                    <p className="mt-3 text-center text-xs text-muted-foreground">
+                      Showing {providersOrdered.length} providers
+                      {providersBrowseHasMore ? " · Scroll to load more" : ""}
+                    </p>
+                    {providersBrowseHasMore && !isLoadingMoreProviders && (
+                      <div className="flex justify-center mt-3">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void loadMoreProvidersBrowse()}
+                        >
+                          Load more
+                        </Button>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-10">
@@ -1717,7 +1776,7 @@ export default function Services(props: ServicesProps = {}) {
                       Try changing filters or switch to Services view.
                     </p>
                     <div className="flex gap-2 justify-center">
-                      <Button variant="outline" onClick={() => setBrowseMode("services")}>
+                      <Button variant="outline" onClick={() => setBrowseModeAndPersist("services")}>
                         View Services
                       </Button>
                       <Button
