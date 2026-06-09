@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { ConditionalSiteLayout } from "@/components/layout/ConditionalSiteLayout";
 import { BASE_URL } from "@/lib/constants";
 
 const LOGO_URL = "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png";
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-plus-jakarta-sans",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
@@ -43,7 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-white text-slate-900 flex flex-col antialiased">
+      <body className={`${plusJakartaSans.variable} ${plusJakartaSans.className} min-h-screen bg-white text-slate-900 flex flex-col antialiased`}>
         <Providers>
           <ConditionalSiteLayout>{children}</ConditionalSiteLayout>
         </Providers>
