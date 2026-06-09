@@ -26,32 +26,32 @@ export function CustomFields({ fields, className }: CustomFieldsProps) {
             {field.value ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium">Yes</span>
+                <span className="text-sm font-semibold">Yes</span>
               </>
             ) : (
               <>
                 <XCircle className="h-4 w-4 text-red-600" />
-                <span className="text-sm font-medium">No</span>
+                <span className="text-sm font-semibold">No</span>
               </>
             )}
           </div>
         );
       case 'number':
         return (
-          <span className="text-sm font-semibold text-foreground">
+          <span className="text-sm font-semibold tabular-nums text-foreground">
             {typeof field.value === 'number' ? field.value.toLocaleString() : field.value}
           </span>
         );
       case 'select':
         return (
-          <Badge variant="secondary" className="text-sm">
+          <Badge variant="secondary" className="text-sm font-semibold">
             {String(field.value)}
           </Badge>
         );
       case 'text':
       default:
         return (
-          <span className="text-sm text-foreground">
+          <span className="text-sm leading-6 text-foreground">
             {String(field.value)}
           </span>
         );
@@ -61,16 +61,16 @@ export function CustomFields({ fields, className }: CustomFieldsProps) {
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle className="text-lg">Additional Details</CardTitle>
+        <CardTitle className="text-xl font-bold tracking-[-0.02em]">Additional Details</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {fields.map((field, index) => (
             <div key={index} className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-[0.12em]">
                 {field.label}
               </label>
-              <div className="pt-1">
+              <div className="pt-1 tabular-nums">
                 {renderFieldValue(field)}
               </div>
             </div>
