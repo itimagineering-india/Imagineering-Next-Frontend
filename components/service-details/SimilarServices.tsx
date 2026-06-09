@@ -44,7 +44,7 @@ export function SimilarServices({
         <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
           {title}
         </h2>
-        <Button variant="ghost" asChild className="hover:bg-primary/5">
+        <Button variant="secondary" asChild className="hover:bg-primary/5">
           <Link href="/services" className="flex items-center gap-1">
             View All
             <ChevronRight className="h-4 w-4" />
@@ -71,16 +71,16 @@ export function SimilarServices({
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   </div>
-                  <CardContent className="p-1.5 sm:p-2 space-y-1">
+                  <CardContent className="space-y-2 p-3">
                     <div className="flex items-start justify-between gap-1">
-                      <Badge variant="outline" className="text-[8px] px-1 py-0 leading-tight">
+                      <Badge variant="secondary" className="px-2 py-0 leading-tight">
                         {service.category}
                       </Badge>
                       <div className="text-right">
-                        <p className="font-bold text-[10px] sm:text-xs">
+                        <p className="text-sm font-bold">
                           ₹{service.price.toLocaleString()}
                         </p>
-                        <p className="text-[8px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {service.priceType === "hourly" && "/hr"}
                           {service.priceType === "daily" && "/day"}
                           {service.priceType === "fixed" && "fixed"}
@@ -99,22 +99,22 @@ export function SimilarServices({
                       </div>
                     </div>
 
-                    <h3 className="font-semibold text-[10px] sm:text-xs line-clamp-2 leading-tight">{service.title}</h3>
+                    <h3 className="line-clamp-2 text-sm font-semibold leading-tight">{service.title}</h3>
 
-                    <div className="flex items-center gap-0.5 text-[9px]">
-                      <Star className="h-2 w-2 fill-warning text-warning" />
+                    <div className="flex items-center gap-1 text-xs">
+                      <Star className="h-3 w-3 fill-warning text-warning" />
                       <span className="font-medium">{service.rating}</span>
                       <span className="text-muted-foreground">
                         ({service.reviewCount})
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
-                      <MapPin className="h-2 w-2" />
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
                       <span className="line-clamp-1">{service.location}</span>
                     </div>
 
-                    <p className="text-[9px] text-muted-foreground line-clamp-1">
+                    <p className="line-clamp-1 text-xs text-muted-foreground">
                       by {service.providerName}
                     </p>
                   </CardContent>
