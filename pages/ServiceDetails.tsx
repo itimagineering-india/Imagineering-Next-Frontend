@@ -8,10 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight, Home, Share2, Heart, Star, MapPin, MessageCircle, CheckCircle2, Loader2, Phone } from "lucide-react";
+import { ChevronRight, Home, Share2, Heart, Star, MapPin, CheckCircle2 } from "lucide-react";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useBuyerPremium } from "@/hooks/useBuyerPremium";
 import {
   ServiceGallery,
   ServiceDescription,
@@ -62,6 +61,85 @@ const priceTypeLabels: Record<string, string> = {
   negotiable: "",
 };
 
+const EXCLUDED_METADATA_KEYS = new Set([
+  "title",
+  "description",
+  "price",
+  "priceType",
+  "images",
+  "image",
+  "category",
+  "subcategory",
+  "location",
+]);
+
+function toReadableFieldLabel(key: string): string {
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function inferFieldType(value: unknown): "text" | "number" | "boolean" | "select" {
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "number") return "number";
+  return "text";
+}
+
+/** Build display rows from Service.metadata (e.g. construction materials from admin/app). */
+function metadataToCustomFields(metadata: unknown): Array<{
+  label: string;
+  value: string | number | boolean;
+  type: "text" | "number" | "boolean" | "select";
+}> {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return [];
+
+  const out: Array<{
+    label: string;
+    value: string | number | boolean;
+    type: "text" | "number" | "boolean" | "select";
+  }> = [];
+
+  for (const [key, rawValue] of Object.entries(metadata as Record<string, unknown>)) {
+    if (EXCLUDED_METADATA_KEYS.has(key)) continue;
+    if (rawValue === null || rawValue === undefined) continue;
+
+    if (typeof rawValue === "string") {
+      const v = rawValue.trim();
+      if (!v) continue;
+      out.push({ label: toReadableFieldLabel(key), value: v, type: "select" });
+      continue;
+    }
+
+    if (typeof rawValue === "number" || typeof rawValue === "boolean") {
+      out.push({ label: toReadableFieldLabel(key), value: rawValue, type: inferFieldType(rawValue) });
+      continue;
+    }
+
+    if (Array.isArray(rawValue)) {
+      const joined = rawValue
+        .map((item) => (item == null ? "" : String(item).trim()))
+        .filter(Boolean)
+        .join(", ");
+      if (joined) {
+        out.push({ label: toReadableFieldLabel(key), value: joined, type: "text" });
+      }
+      continue;
+    }
+
+    if (typeof rawValue === "object") {
+      const serialized = JSON.stringify(rawValue);
+      if (serialized && serialized !== "{}") {
+        out.push({ label: toReadableFieldLabel(key), value: serialized, type: "text" });
+      }
+    }
+  }
+
+  return out;
+}
+
 interface ServiceData {
   id: string;
   slug?: string;
@@ -109,6 +187,7 @@ interface ServiceData {
     value: string | number | boolean;
     type: 'text' | 'number' | 'boolean' | 'select';
   }>;
+  metadata?: Record<string, unknown>;
 }
 
 export default function ServiceDetails() {
@@ -241,7 +320,11 @@ export default function ServiceDetails() {
             deliveryTime: serviceData.deliveryTime || "Contact for details",
             tags: serviceData.tags || [],
             featured: serviceData.featured || false,
-            customFields: serviceData.customFields || [],
+            metadata: serviceData.metadata,
+            customFields:
+              serviceData.customFields && serviceData.customFields.length > 0
+                ? serviceData.customFields
+                : metadataToCustomFields(serviceData.metadata),
           };
           
           setService(transformedService);
@@ -329,79 +412,6 @@ export default function ServiceDetails() {
     setBookingId(null);
     setRequestModalOpen(true);
   }, [isAuthenticated, service, actualId, router, toast, canBook]);
-
-  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
-
-  const handleCallNow = useCallback(() => {
-    const buyerPlansPath = "/subscriptions/buyer";
-
-    if (!isAuthenticated) {
-      router.push(buyerPlansPath);
-      return;
-    }
-
-    if (buyerSubLoading) {
-      return;
-    }
-
-    if (!isBuyerPremium) {
-      router.push(buyerPlansPath);
-      return;
-    }
-    const raw = service?.provider?.phone?.trim();
-    if (!raw) {
-      toast({
-        title: "Phone unavailable",
-        description: "This provider has not shared a phone number yet.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const dial = raw.replace(/[^\d+]/g, "");
-    if (!dial) {
-      toast({
-        title: "Invalid number",
-        description: "Could not start a call from this number.",
-        variant: "destructive",
-      });
-      return;
-    }
-    window.location.href = `tel:${dial}`;
-  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, router, toast, service?.provider?.phone]);
-
-  const handleOpenChat = useCallback(() => {
-    if (!isAuthenticated) {
-      const currentPath = `/service/${actualId}`;
-      router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
-      toast({
-        title: "Login Required",
-        description: "Please login to chat with the provider",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (buyerSubLoading) {
-      return;
-    }
-    if (!isBuyerPremium) {
-      toast({
-        title: "Subscription Required",
-        description: "Please subscribe to a buyer plan to chat with providers.",
-        variant: "destructive",
-      });
-      router.push("/subscriptions/buyer");
-      return;
-    }
-    const providerUserId = service?.provider?._id;
-    const providerName = service?.provider?.name || service?.provider?.businessName;
-    if (!providerUserId) return;
-    const params = new URLSearchParams({
-      providerId: String(providerUserId),
-      ...(service?.id && { serviceId: String(service.id) }),
-      ...(providerName && { name: String(providerName) }),
-    });
-    router.push(`/chat?${params.toString()}`);
-  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, actualId, router, toast, service?.provider, service?.id]);
 
   const handleSubmitRequest = useCallback(async (data: {
     date: Date;
@@ -701,16 +711,16 @@ export default function ServiceDetails() {
                 </div>
 
                 {/* Title */}
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground leading-tight">
+                <h1 className="text-[28px] font-bold leading-[1.12] tracking-[-0.035em] text-foreground sm:text-4xl lg:text-[42px]">
                   {service.title}
                 </h1>
 
                 {/* Rating & Location */}
                 <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-warning text-warning" />
-                      <span className="font-semibold text-base">{service.rating.toFixed(1)}</span>
+                      <span className="text-base font-semibold tabular-nums">{service.rating.toFixed(1)}</span>
                     </div>
                     <span className="text-muted-foreground">
                       ({service.reviewCount} {service.reviewCount === 1 ? 'review' : 'reviews'})
@@ -740,7 +750,7 @@ export default function ServiceDetails() {
                       <div className="flex items-center gap-2">
                         <Link 
                           href={`/provider/${service.provider.slug || service.provider._id}`}
-                          className="font-semibold hover:text-primary transition-colors truncate"
+                          className="truncate text-base font-bold tracking-[-0.01em] transition-colors hover:text-primary lg:text-lg"
                         >
                           {service.provider.businessName || service.provider.name}
                         </Link>
@@ -748,7 +758,7 @@ export default function ServiceDetails() {
                           <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="truncate text-xs font-medium text-muted-foreground">
                         {service.provider.businessName ? "Business" : service.provider.name ? "Service Provider" : "Provider"}
                       </p>
                     </div>
@@ -759,25 +769,25 @@ export default function ServiceDetails() {
                 {showPricing && (
                   <Card className="border border-primary/20 bg-primary/5 shadow-sm">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground mb-1">Price</p>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Price</p>
                       <div className="flex flex-wrap items-baseline gap-2">
                         {service.mrp != null && service.mrp > 0 && (
-                          <span className="text-lg sm:text-xl font-semibold text-muted-foreground line-through">
+                          <span className="text-lg font-semibold tabular-nums text-muted-foreground line-through sm:text-xl">
                             ₹{service.mrp.toLocaleString()}
                             {priceTypeLabels[service.priceType] ? ` ${priceTypeLabels[service.priceType]}` : ""}
                           </span>
                         )}
-                        <span className="text-3xl sm:text-4xl font-bold text-primary">
+                        <span className="text-4xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">
                           ₹{service.price.toLocaleString()}
                         </span>
                         {priceTypeLabels[service.priceType] && (
-                          <span className="text-lg sm:text-xl font-semibold text-foreground">
+                          <span className="text-lg font-semibold text-foreground sm:text-xl">
                             {priceTypeLabels[service.priceType]}
                           </span>
                         )}
                       </div>
                       {service.priceType === "negotiable" && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">
                           Price is negotiable
                         </p>
                       )}
@@ -787,8 +797,8 @@ export default function ServiceDetails() {
                 {!showPricing && (
                   <Card className="border bg-muted/60 shadow-sm">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground mb-1">Pricing</p>
-                      <p className="text-base font-medium text-foreground">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pricing</p>
+                      <p className="text-2xl font-bold tracking-[-0.02em] text-foreground">
                         Contact for quotation
                       </p>
                     </CardContent>
@@ -860,46 +870,6 @@ export default function ServiceDetails() {
                           {isAuthenticated ? primaryCTA : "Login to Continue"}
                         </Button>
                       )}
-                      <Button
-                        type="button"
-                        onClick={handleCallNow}
-                        variant="outline"
-                        className="w-full h-11 border-2 border-red-600 bg-red-600 text-white hover:bg-red-700 hover:border-red-700 hover:text-white"
-                        size="lg"
-                        disabled={isAuthenticated && buyerSubLoading}
-                      >
-                        {isAuthenticated && buyerSubLoading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Checking subscription…
-                          </>
-                        ) : (
-                          <>
-                            <Phone className="h-4 w-4 mr-2" />
-                            Call Now
-                          </>
-                        )}
-                      </Button>
-                      {/* Chat - platform-only contact (OLX style) */}
-                      <Button
-                        onClick={handleOpenChat}
-                        variant="outline"
-                        className="w-full h-11 border-2"
-                        size="lg"
-                        disabled={isAuthenticated && buyerSubLoading}
-                      >
-                        {isAuthenticated && buyerSubLoading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Checking subscription…
-                          </>
-                        ) : (
-                          <>
-                            <MessageCircle className="h-4 w-4 mr-2" />
-                            Chat with Provider
-                          </>
-                        )}
-                      </Button>
                       {helperText && (
                         <p className="text-xs text-muted-foreground text-center">
                           {helperText}
