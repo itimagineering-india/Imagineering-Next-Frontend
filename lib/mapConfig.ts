@@ -27,15 +27,6 @@ export function isMapProviderConfigured(): boolean {
   return isGoogleMapsConfigured();
 }
 
-/** @deprecated Use isGoogleMapsConfigured */
-export function isMapboxConfigured(): boolean {
-  return isGoogleMapsConfigured();
-}
-
-export function getMapboxToken(): string {
-  return getGoogleMapsApiKey();
-}
-
 type GoogleMapsNs = typeof google.maps & {
   importLibrary?: (name: string) => Promise<unknown>;
 };
