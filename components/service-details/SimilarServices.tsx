@@ -39,7 +39,7 @@ export function SimilarServices({
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="min-w-0 overflow-x-clip space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
           {title}
@@ -52,16 +52,16 @@ export function SimilarServices({
         </Button>
       </div>
 
-      <Carousel className="w-full">
+      <Carousel className="w-full max-w-full overflow-x-clip">
         <CarouselContent className="-ml-2 md:-ml-4">
           {services.map((service) => (
             <CarouselItem
               key={service.id}
-              className="pl-2 md:pl-4 basis-1/3 lg:basis-1/6"
+              className="basis-3/4 pl-2 sm:basis-1/2 md:pl-4 lg:basis-1/4 xl:basis-1/5"
             >
               <Link href={`/service/${service.slug || service.id}`}>
-                <Card className="h-full hover:shadow-lg transition-all duration-300 cursor-pointer border hover:border-primary/30 group">
-                  <div className="aspect-square overflow-hidden rounded-t-lg relative">
+                <Card className="group h-full cursor-pointer overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-rose-50/60 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-rose-50">
                     <img
                       src={service.image}
                       alt={service.title}
@@ -71,13 +71,13 @@ export function SimilarServices({
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   </div>
-                  <CardContent className="space-y-2 p-3">
-                    <div className="flex items-start justify-between gap-1">
-                      <Badge variant="secondary" className="px-2 py-0 leading-tight">
+                  <CardContent className="space-y-3 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <Badge variant="outline" className="rounded-full px-2 py-0.5 leading-tight">
                         {service.category}
                       </Badge>
                       <div className="text-right">
-                        <p className="text-sm font-bold">
+                        <p className="text-sm font-bold text-primary lg:text-base">
                           ₹{service.price.toLocaleString()}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -99,32 +99,35 @@ export function SimilarServices({
                       </div>
                     </div>
 
-                    <h3 className="line-clamp-2 text-sm font-semibold leading-tight">{service.title}</h3>
+                    <h3 className="line-clamp-2 min-h-[40px] text-sm font-semibold leading-tight lg:text-[15px]">{service.title}</h3>
 
-                    <div className="flex items-center gap-1 text-xs">
-                      <Star className="h-3 w-3 fill-warning text-warning" />
+                    <div className="flex items-center gap-1 text-xs lg:text-sm">
+                      <Star className="h-2 w-2 fill-warning text-warning" />
                       <span className="font-medium">{service.rating}</span>
                       <span className="text-muted-foreground">
                         ({service.reviewCount})
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground lg:text-sm">
                       <MapPin className="h-3 w-3" />
                       <span className="line-clamp-1">{service.location}</span>
                     </div>
 
-                    <p className="line-clamp-1 text-xs text-muted-foreground">
+                    <p className="line-clamp-1 text-xs text-muted-foreground lg:text-sm">
                       by {service.providerName}
                     </p>
+                    <div className="flex h-8 w-full items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-xs font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-white lg:text-sm">
+                      Quick View
+                    </div>
                   </CardContent>
                 </Card>
               </Link>
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious />
-        <CarouselNext />
+        <CarouselPrevious className="left-2 hidden sm:inline-flex xl:-left-12" />
+        <CarouselNext className="right-2 hidden sm:inline-flex xl:-right-12" />
       </Carousel>
     </div>
   );
