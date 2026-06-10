@@ -21,6 +21,7 @@ interface FilterPanelProps {
   onFilterChange?: (filters: FilterState) => void;
   className?: string;
   categories?: Array<{ _id: string; name: string; slug: string; subcategories?: string[] }>;
+  value?: FilterState;
   /** When false, hides "Verified providers only" (browse shows all providers). Default true. */
   showVerifiedOnlyFilter?: boolean;
 }
@@ -50,30 +51,62 @@ const deliveryOptions = [
 const providersCache: { data: Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>; timestamp: number } | null = null;
 const PROVIDERS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
+const DEFAULT_FILTERS: FilterState = {
+  category: [],
+  subcategory: [],
+  priceRange: [0, 5000],
+  rating: 0,
+  deliveryTime: [],
+  verified: false,
+  featured: false,
+  provider: undefined,
+  location: undefined,
+  sortBy: "relevance",
+};
+
+const arraysEqual = (a: unknown[], b: unknown[]) =>
+  a.length === b.length && a.every((item, index) => item === b[index]);
+
+const filtersEqual = (a: FilterState, b: FilterState) =>
+  arraysEqual(a.category, b.category) &&
+  arraysEqual(a.subcategory, b.subcategory) &&
+  arraysEqual(a.priceRange, b.priceRange) &&
+  arraysEqual(a.deliveryTime, b.deliveryTime) &&
+  a.rating === b.rating &&
+  a.verified === b.verified &&
+  a.featured === b.featured &&
+  a.provider === b.provider &&
+  a.location === b.location &&
+  a.sortBy === b.sortBy;
+
 export function FilterPanel({
   onFilterChange,
   className,
   categories = [],
+  value,
   showVerifiedOnlyFilter = true,
 }: FilterPanelProps) {
   const [providers, setProviders] = useState<Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>>([]);
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [hasFetchedProviders, setHasFetchedProviders] = useState(false);
 
-  const [filters, setFilters] = useState<FilterState>({
-    category: [],
-    subcategory: [],
-    priceRange: [0, 5000],
-    rating: 0,
-    deliveryTime: [],
-    verified: false,
-    featured: false,
-    provider: undefined,
-    location: undefined,
-    sortBy: "relevance",
-  });
+  const [filters, setFilters] = useState<FilterState>(value ?? DEFAULT_FILTERS);
 
   const [openAccordions, setOpenAccordions] = useState<string[]>(["category", "price", "rating"]);
+
+  useEffect(() => {
+    if (!value) return;
+    setFilters((prev) => (filtersEqual(prev, value) ? prev : value));
+  }, [value]);
+
+  useEffect(() => {
+    setOpenAccordions((prev) => {
+      if (filters.category.length > 0) {
+        return prev.includes("subcategory") ? prev : [...prev, "subcategory"];
+      }
+      return prev.filter((item) => item !== "subcategory");
+    });
+  }, [filters.category]);
 
   // Lazy fetch providers - only when accordion is opened (no limit – fetch all for dropdown)
   const fetchProviders = async (categorySlug?: string) => {
@@ -111,8 +144,8 @@ export function FilterPanel({
           timestamp: Date.now(),
         }));
       }
-    } catch (error) {
-      console.error("Failed to load providers:", error);
+    } catch {
+      setProviders([]);
     } finally {
       setIsLoadingProviders(false);
     }
@@ -168,18 +201,7 @@ export function FilterPanel({
   };
 
   const clearFilters = () => {
-    const defaultFilters: FilterState = {
-      category: [],
-      subcategory: [],
-      priceRange: [0, 5000],
-      rating: 0,
-      deliveryTime: [],
-      verified: false,
-      featured: false,
-      provider: undefined,
-      location: undefined,
-      sortBy: "relevance",
-    };
+    const defaultFilters: FilterState = { ...DEFAULT_FILTERS };
     setFilters(defaultFilters);
     onFilterChange?.(defaultFilters);
   };
@@ -225,7 +247,7 @@ export function FilterPanel({
             className="ml-auto text-xs h-7 border-primary/50 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
           >
             Clear all
-            <Badge variant="secondary" className="ml-1.5 text-[10px]">
+            <Badge variant="secondary" className="ml-2 text-[10px]">
               {activeFilterCount}
             </Badge>
           </Button>
@@ -234,7 +256,7 @@ export function FilterPanel({
 
       <Accordion 
         type="multiple" 
-        defaultValue={["category", "price", "rating"]} 
+        value={openAccordions}
         className="space-y-0"
         onValueChange={(value) => {
           setOpenAccordions(value);
@@ -246,7 +268,7 @@ export function FilterPanel({
       >
         {/* Categories */}
         <AccordionItem value="category" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">Category</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">Category</AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {categories.length > 0 ? (
@@ -287,7 +309,7 @@ export function FilterPanel({
         {/* Subcategories - Only show if categories are selected */}
         {filters.category.length > 0 && (
           <AccordionItem value="subcategory" className="border-b">
-            <AccordionTrigger className="py-2.5 text-sm">Subcategory</AccordionTrigger>
+            <AccordionTrigger className="py-3 text-sm">Subcategory</AccordionTrigger>
             <AccordionContent className="!pb-2 !pt-0">
               <div className="space-y-1.5 pt-1">
                 {(() => {
@@ -339,7 +361,7 @@ export function FilterPanel({
 
         {/* Top Providers */}
         <AccordionItem value="provider" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">
+          <AccordionTrigger className="py-3 text-sm">
             Top Provider
           </AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
@@ -383,7 +405,7 @@ export function FilterPanel({
 
         {/* Price Range */}
         <AccordionItem value="price" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">Price Range</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">Price Range</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-3 pt-1 min-h-[120px]">
               <Slider
@@ -428,7 +450,7 @@ export function FilterPanel({
 
         {/* Rating */}
         <AccordionItem value="rating" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">Minimum Rating</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">Minimum Rating</AccordionTrigger>
           <AccordionContent>
             <div className="flex gap-2 pt-1">
               {[4, 4.5, 4.8].map((r) => (
@@ -448,7 +470,7 @@ export function FilterPanel({
 
         {/* Delivery Time */}
         <AccordionItem value="delivery" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">Delivery Time</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">Delivery Time</AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {deliveryOptions.map((option) => (
@@ -473,7 +495,7 @@ export function FilterPanel({
 
         {/* Verified (optional) + Featured */}
         <AccordionItem value="verified" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">
+          <AccordionTrigger className="py-3 text-sm">
             {showVerifiedOnlyFilter ? "Provider Status" : "Highlights"}
           </AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
@@ -514,7 +536,7 @@ export function FilterPanel({
 
         {/* Sort By */}
         <AccordionItem value="sort" className="border-b">
-          <AccordionTrigger className="py-2.5 text-sm">Sort By</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">Sort By</AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {[
