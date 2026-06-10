@@ -1,11 +1,12 @@
 "use client";
-import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CartCheckoutModal } from "@/components/cart/CartCheckoutModal";
+import { CartOffersModal } from "@/components/cart/CartOffersModal";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,11 @@ export async function getServerSideProps() { return { props: {} }; }
 
 const DEBOUNCE_MS = 500;
 
+type CouponValidationData = {
+  usageId?: string | null;
+  discountAmount?: number;
+};
+
 export default function CartPage() {
   const { cart, totals, updateQuantity, removeFromCart, clearCart, isRefreshing, loading } = useCart();
   const [openCheckout, setOpenCheckout] = useState(false);
@@ -23,23 +29,14 @@ export default function CartPage() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponUsageId, setCouponUsageId] = useState<string | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
+  const [offersOpen, setOffersOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
-  const items = cart?.items || [];
+  const items = useMemo(() => cart?.items ?? [], [cart?.items]);
   const [inputQuantities, setInputQuantities] = useState<Record<string, number | string>>({});
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
-
-  // Sync input quantities when cart items change; skip the row currently being edited to avoid overwriting typing
-  useEffect(() => {
-    const next: Record<string, number | string> = {};
-    items.forEach((it) => {
-      const id = String(it.service?._id ?? it.service);
-      if (id !== editingServiceId) next[id] = it.quantity;
-    });
-    setInputQuantities((prev) => ({ ...prev, ...next }));
-  }, [items, editingServiceId]);
 
   const flushQtyDebounce = useCallback(
     (serviceId: string) => {
@@ -60,7 +57,8 @@ export default function CartPage() {
       const qty = parseFloat(value);
       if (!Number.isNaN(qty) && qty > 0) {
         flushQtyDebounce(serviceId);
-        debounceRefs.current[sid] = setTimeout(() => updateQuantity(serviceId, qty), DEBOUNCE_MS);
+        const rounded = Math.max(1, Math.round(qty));
+        debounceRefs.current[sid] = setTimeout(() => updateQuantity(serviceId, rounded), DEBOUNCE_MS);
       }
     },
     [updateQuantity, flushQtyDebounce]
@@ -73,6 +71,7 @@ export default function CartPage() {
       
       let qty = typeof currentInput === 'string' ? parseFloat(currentInput) : currentInput;
       if (Number.isNaN(qty) || qty <= 0) qty = 1;
+      else qty = Math.max(1, Math.round(qty));
       
       const item = items.find((i) => String(i.service?._id ?? i.service) === String(serviceId));
       if (item && item.quantity !== qty) updateQuantity(serviceId, qty);
@@ -86,6 +85,10 @@ export default function CartPage() {
 
   const subtotal = useMemo(() => totals?.subtotal || 0, [totals]);
   const platformFee = useMemo(() => totals?.platformFee || 0, [totals]);
+  const platformFeeGst = useMemo(() => {
+    if (typeof totals?.platformFeeGst === 'number') return totals.platformFeeGst;
+    return Math.round(platformFee * 0.18 * 100) / 100;
+  }, [totals, platformFee]);
   const gst = useMemo(() => totals?.gst || 0, [totals]);
   const totalAmount = useMemo(() => {
     const total = subtotal + platformFee + gst - (couponDiscount || 0);
@@ -103,7 +106,7 @@ export default function CartPage() {
         type: "booking",
       });
       if (response.success && response.data) {
-        const data = response.data as any;
+        const data = response.data as CouponValidationData;
         setCouponUsageId(data.usageId || null);
         setCouponDiscount(data.discountAmount || 0);
         toast({
@@ -113,10 +116,10 @@ export default function CartPage() {
       } else {
         throw new Error(response.error?.message || "Invalid coupon");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setCouponUsageId(null);
       setCouponDiscount(0);
-      setCouponError(error.message || "Failed to apply coupon");
+      setCouponError(error instanceof Error ? error.message : "Failed to apply coupon");
     } finally {
       setCouponApplying(false);
     }
@@ -211,7 +214,11 @@ export default function CartPage() {
                   const serviceId = item.service?._id ?? item.service;
                   const sid = String(serviceId);
                   // Use item.quantity when not editing this row so +/- never flicker; use input only while typing
-                  const displayQty = editingServiceId === sid ? (inputQuantities[sid] ?? item.quantity) : (typeof item.quantity === 'number' ? item.quantity.toFixed(1) : item.quantity);
+                  const qtyInt = Math.max(1, Math.round(Number(item.quantity) || 1));
+                  const displayQty =
+                    editingServiceId === sid
+                      ? (inputQuantities[sid] ?? qtyInt)
+                      : qtyInt;
                   const qtyForTotal = item.quantity;
                   return (
                     <div 
@@ -224,7 +231,7 @@ export default function CartPage() {
                           ₹{item.price?.toLocaleString() || 0} {item.priceType && `/${item.priceType}`}
                         </p>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Quantity: {typeof displayQty === 'number' ? displayQty.toFixed(1) : displayQty}
+                          Quantity: {displayQty}
                         </p>
                       </div>
                       
@@ -235,12 +242,10 @@ export default function CartPage() {
                             size="icon"
                             className="h-8 w-8 sm:h-9 sm:w-9"
                             onClick={() => {
-                              if (item.quantity > 0.1) {
-                                const newQty = Math.round((item.quantity - 0.1) * 10) / 10;
-                                updateQuantity(serviceId, Math.max(0.1, newQty));
-                              }
+                              const q = Math.max(1, Math.round(Number(item.quantity) || 1));
+                              if (q > 1) updateQuantity(serviceId, q - 1);
                             }}
-                            disabled={loading || item.quantity <= 0.1}
+                            disabled={loading || qtyInt <= 1}
                             aria-label="Decrease quantity"
                             title="Decrease quantity"
                           >
@@ -248,10 +253,15 @@ export default function CartPage() {
                           </Button>
                           <Input
                             type="number"
-                            min={0.1}
+                            min={1}
                             value={displayQty}
-                            onFocus={() => setEditingServiceId(sid)}
-                            step="0.1"
+                            onFocus={() => {
+                              setEditingServiceId(sid);
+                              setInputQuantities((prev) =>
+                                prev[sid] === qtyInt ? prev : { ...prev, [sid]: qtyInt }
+                              );
+                            }}
+                            step={1}
                             onChange={(e) => {
                               handleQtyInputChange(serviceId, e.target.value);
                             }}
@@ -264,8 +274,8 @@ export default function CartPage() {
                             size="icon"
                             className="h-8 w-8 sm:h-9 sm:w-9"
                             onClick={() => {
-                              const newQty = Math.round((item.quantity + 0.1) * 10) / 10;
-                              updateQuantity(serviceId, newQty);
+                              const q = Math.max(1, Math.round(Number(item.quantity) || 1));
+                              updateQuantity(serviceId, q + 1);
                             }}
                             disabled={loading}
                             aria-label="Increase quantity"
@@ -311,12 +321,16 @@ export default function CartPage() {
                     <span className="font-medium">₹{subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm sm:text-base">
-                    <span className="text-muted-foreground">Platform Fee</span>
+                    <span className="text-muted-foreground">Platform fee (excl. GST)</span>
                     <span className="font-medium">₹{platformFee.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm sm:text-base">
-                    <span className="text-muted-foreground">GST (18% on subtotal)</span>
-                    <span className="font-medium">₹{gst.toLocaleString()}</span>
+                    <span className="text-muted-foreground">GST on platform fee (18%)</span>
+                    <span className="font-medium">₹{platformFeeGst.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground -mt-1">
+                    <span>Platform fee incl. GST</span>
+                    <span>₹{(platformFee + platformFeeGst).toLocaleString()}</span>
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-sm sm:text-base text-success">
@@ -344,11 +358,26 @@ export default function CartPage() {
                   </div>
                 </div>
 
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-9 text-xs sm:text-sm"
+                    onClick={() => setOffersOpen(true)}
+                  >
+                    View offers
+                  </Button>
+                </div>
+
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center gap-2">
                     <Input
                       value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
+                      onChange={(e) => {
+                        setCouponCode(e.target.value);
+                        setCouponError(null);
+                      }}
                       placeholder="Coupon code"
                       className="h-9"
                       disabled={couponApplying}
@@ -385,6 +414,15 @@ export default function CartPage() {
         )}
       </main>
 
+      <CartOffersModal
+        open={offersOpen}
+        onOpenChange={setOffersOpen}
+        onSelectCode={(code) => {
+          setCouponCode(code);
+          setCouponError(null);
+        }}
+      />
+
       {cart && (
         <CartCheckoutModal
           open={openCheckout}
@@ -394,7 +432,7 @@ export default function CartPage() {
           couponUsageId={couponUsageId}
           onSuccess={() => {
             setOpenCheckout(false);
-            router.push("/dashboard/buyer/orders");
+            router.push("/buyer/orders");
           }}
         />
       )}
