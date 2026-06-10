@@ -465,7 +465,7 @@ export default function WorkforceManagement() {
       helper: "Add workers, assign sites, transfer or delete records",
       stat: `${activeWorkers.length} active workers`,
       icon: Users,
-      image: "/images/workers.png",
+      image: "/Workforce/workers.png",
     },
     {
       value: "sites",
@@ -473,7 +473,7 @@ export default function WorkforceManagement() {
       helper: "Create projects and see active/completed site cards",
       stat: `${activeSites.length} open sites`,
       icon: Building2,
-      image: "/images/Site.png",
+      image: "/Workforce/Site.png",
     },
     {
       value: "attendance",
@@ -481,7 +481,7 @@ export default function WorkforceManagement() {
       helper: "Mark Present, Absent, or Half Day for today",
       stat: "Daily entry",
       icon: CalendarCheck,
-      image: "/images/Attendance.png",
+      image: "/Workforce/Attendance.png",
     },
     {
       value: "wages",
@@ -489,7 +489,7 @@ export default function WorkforceManagement() {
       helper: "View current month worker wages and site costs",
       stat: money(cards.monthlyLabourCost),
       icon: IndianRupee,
-      image: "/images/Wages.png",
+      image: "/Workforce/Wages.png",
     },
   ];
   const activeSectionCard = sectionCards.find((item) => item.value === activeSection);
