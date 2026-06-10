@@ -16,8 +16,8 @@ import { ConstructionMaterialsDynamicFields } from "./ConstructionMaterialsDynam
 interface DynamicFieldsRendererProps {
   categorySlug: string;
   subcategory: string;
-  dynamicData: Record<string, any>;
-  onFieldChange: (fieldName: string, value: any) => void;
+  dynamicData: Record<string, unknown>;
+  onFieldChange: (fieldName: string, value: unknown) => void;
   errors?: Record<string, string>;
 }
 
@@ -31,7 +31,7 @@ export function DynamicFieldsRenderer({
   if (!categorySlug || !subcategory) {
     return (
       <div className="p-4 rounded-lg border bg-muted/30">
-        <p className="text-sm text-muted-foreground">
+        <p className="caption">
           Select a category and subcategory to see dynamic fields
         </p>
       </div>
@@ -43,7 +43,7 @@ export function DynamicFieldsRenderer({
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="h-px flex-1 bg-border" />
-          <span className="text-sm font-medium text-muted-foreground">
+          <span className="caption">
             Additional Information
           </span>
           <div className="h-px flex-1 bg-border" />
@@ -63,7 +63,7 @@ export function DynamicFieldsRenderer({
   if (fields.length === 0) {
     return (
       <div className="p-4 rounded-lg border bg-muted/30">
-        <p className="text-sm text-muted-foreground">
+        <p className="caption">
           No additional fields required for this subcategory
         </p>
       </div>
@@ -71,7 +71,12 @@ export function DynamicFieldsRenderer({
   }
 
   const renderField = (field: FieldConfig) => {
-    const fieldValue = dynamicData[field.name] || "";
+    const rawFieldValue = dynamicData[field.name];
+    const fieldValue =
+      typeof rawFieldValue === "string" || typeof rawFieldValue === "number"
+        ? rawFieldValue
+        : "";
+    const stringFieldValue = String(fieldValue);
     const fieldError = errors?.[field.name];
     const hasError = !!fieldError;
 
@@ -104,7 +109,7 @@ export function DynamicFieldsRenderer({
               />
             )}
             {fieldError && (
-              <p className="text-sm text-destructive">{fieldError}</p>
+              <p className="caption text-destructive">{fieldError}</p>
             )}
           </div>
         );
@@ -120,7 +125,7 @@ export function DynamicFieldsRenderer({
               id={field.name}
               type="number"
               placeholder={field.placeholder}
-              value={fieldValue}
+              value={stringFieldValue}
               onChange={(e) => onFieldChange(field.name, e.target.value)}
               className={hasError ? "border-destructive" : ""}
               min={field.min}
@@ -128,7 +133,7 @@ export function DynamicFieldsRenderer({
               step="any"
             />
             {fieldError && (
-              <p className="text-sm text-destructive">{fieldError}</p>
+              <p className="caption text-destructive">{fieldError}</p>
             )}
           </div>
         );
@@ -141,7 +146,7 @@ export function DynamicFieldsRenderer({
               {field.required && <span className="text-destructive">*</span>}
             </Label>
             <Select
-              value={fieldValue}
+              value={stringFieldValue}
               onValueChange={(value) => onFieldChange(field.name, value)}
             >
               <SelectTrigger id={field.name} className={hasError ? "border-destructive" : ""}>
@@ -156,7 +161,7 @@ export function DynamicFieldsRenderer({
               </SelectContent>
             </Select>
             {fieldError && (
-              <p className="text-sm text-destructive">{fieldError}</p>
+              <p className="caption text-destructive">{fieldError}</p>
             )}
           </div>
         );
@@ -166,12 +171,12 @@ export function DynamicFieldsRenderer({
           <div key={field.name} className="flex items-center space-x-2">
             <Checkbox
               id={field.name}
-              checked={fieldValue === true || fieldValue === "true"}
+              checked={rawFieldValue === true || rawFieldValue === "true"}
               onCheckedChange={(checked) => onFieldChange(field.name, checked)}
             />
             <Label
               htmlFor={field.name}
-              className="text-sm font-normal cursor-pointer"
+              className="body cursor-pointer"
             >
               {field.label}
               {field.required && <span className="text-destructive">*</span>}
@@ -183,7 +188,7 @@ export function DynamicFieldsRenderer({
         );
 
       case "file": {
-        const fileValue = fieldValue;
+        const fileValue = rawFieldValue;
         const fileName = fileValue instanceof File ? fileValue.name : null;
         const existingUrl = field.name === 'resumeOrDocument' ? (dynamicData?.resumeUrl as string) : null;
         return (
@@ -203,10 +208,10 @@ export function DynamicFieldsRenderer({
               className={hasError ? "border-destructive" : ""}
             />
             {fileName && (
-              <p className="text-sm text-muted-foreground">{fileName}</p>
+              <p className="caption">{fileName}</p>
             )}
             {existingUrl && !fileName && (
-              <p className="text-sm text-muted-foreground">
+              <p className="caption">
                 Current document:{" "}
                 <a href={existingUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
                   View
@@ -214,14 +219,14 @@ export function DynamicFieldsRenderer({
               </p>
             )}
             {fieldError && (
-              <p className="text-sm text-destructive">{fieldError}</p>
+              <p className="caption text-destructive">{fieldError}</p>
             )}
           </div>
         );
       }
 
       case "multiselect":
-        const selectedValues = Array.isArray(fieldValue) ? fieldValue : [];
+        const selectedValues = Array.isArray(rawFieldValue) ? rawFieldValue : [];
         return (
           <div key={field.name} className="space-y-2">
             <Label>
@@ -243,7 +248,7 @@ export function DynamicFieldsRenderer({
                   />
                   <Label
                     htmlFor={`${field.name}-${option}`}
-                    className="text-sm font-normal cursor-pointer"
+                    className="body cursor-pointer"
                   >
                     {option}
                   </Label>
@@ -251,7 +256,7 @@ export function DynamicFieldsRenderer({
               ))}
             </div>
             {fieldError && (
-              <p className="text-sm text-destructive">{fieldError}</p>
+              <p className="caption text-destructive">{fieldError}</p>
             )}
           </div>
         );
@@ -265,7 +270,7 @@ export function DynamicFieldsRenderer({
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <div className="h-px flex-1 bg-border" />
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="caption">
           Additional Information
         </span>
         <div className="h-px flex-1 bg-border" />
