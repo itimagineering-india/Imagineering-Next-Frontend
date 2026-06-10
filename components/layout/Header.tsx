@@ -265,11 +265,10 @@ export function Header() {
     if (controller.signal.aborted) return;
     setSuggestions(allSuggestions);
     setShowSuggestions(allSuggestions.length > 0);
-   } catch (error: any) {
-    if (error?.name === 'AbortError') {
+   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
      return;
     }
-    console.error("Error fetching suggestions:", error);
     setSuggestions([]);
     setShowSuggestions(false);
    } finally {
