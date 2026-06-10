@@ -37,6 +37,31 @@ import {
 
 export async function getServerSideProps() { return { props: {} }; }
 
+const toSlug = (value: string): string =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const getSubcategoryLabel = (subcategory: unknown): string => {
+  if (typeof subcategory === "string") return subcategory.trim();
+  if (subcategory && typeof subcategory === "object") {
+    const item = subcategory as { name?: unknown; slug?: unknown };
+    return String(item.name ?? item.slug ?? "").trim();
+  }
+  return "";
+};
+
+const getSubcategorySlug = (subcategory: unknown): string => {
+  if (subcategory && typeof subcategory === "object") {
+    const item = subcategory as { slug?: unknown };
+    const slug = String(item.slug ?? "").trim();
+    if (slug) return slug;
+  }
+  return toSlug(getSubcategoryLabel(subcategory));
+};
+
 export interface ServicesCityIntro {
   title: string;
   description: string;
@@ -188,36 +213,55 @@ export default function Services(props: ServicesProps = {}) {
     router.replace(`${pathname}?${next.toString()}`);
   };
   
-  // Sync URL params to filter state on mount (only once when categories are loaded)
-  // Use a ref to track if we've already synced to prevent re-syncing when filters change
-  const hasSyncedUrlParams = useRef(false);
+  const resolveSubcategoryParam = useCallback(
+    (categorySlug: string, rawSubcategory: string) => {
+      const subcategory = rawSubcategory.trim();
+      if (!subcategory) return "";
+
+      const normalizedParam = toSlug(subcategory);
+      const categoriesToSearch = categorySlug
+        ? categories.filter((cat) => cat.slug === categorySlug)
+        : categories;
+
+      for (const category of categoriesToSearch) {
+        const subcategories = Array.isArray(category?.subcategories) ? category.subcategories : [];
+        for (const item of subcategories) {
+          const label = getSubcategoryLabel(item);
+          if (!label) continue;
+          const slug = getSubcategorySlug(item);
+          if (
+            subcategory === label ||
+            subcategory === slug ||
+            normalizedParam === slug ||
+            normalizedParam === toSlug(label)
+          ) {
+            return label;
+          }
+        }
+      }
+
+      return subcategory;
+    },
+    [categories]
+  );
   
   useEffect(() => {
-    if (categories.length === 0 || hasSyncedUrlParams.current) return;
-    
-    // Only sync if URL has category/subcategory params and filters are empty
-    // This ensures URL params are respected on initial load, but user can override with filters
-    if (categoryParam && filters.category.length === 0) {
-      setFilters(prev => ({
-        ...prev,
-        category: [categoryParam],
-      }));
-      hasSyncedUrlParams.current = true;
-    }
-    
-    if (subcategoryParam && filters.subcategory.length === 0) {
-      setFilters(prev => ({
-        ...prev,
-        subcategory: [subcategoryParam],
-      }));
-      hasSyncedUrlParams.current = true;
-    }
-    
-    // Mark as synced even if no params to prevent re-running
-    if (!categoryParam && !subcategoryParam) {
-      hasSyncedUrlParams.current = true;
-    }
-  }, [categories.length, categoryParam, subcategoryParam, filters.category.length, filters.subcategory.length]);
+    if (categories.length === 0) return;
+    const resolvedSubcategory = resolveSubcategoryParam(categoryParam, subcategoryParam);
+    setFilters((prev) => {
+      let next = prev;
+      if (categoryParam && prev.category[0] !== categoryParam) {
+        next = { ...prev, category: [categoryParam], subcategory: [] };
+      }
+      if (
+        resolvedSubcategory &&
+        (next.subcategory[0] !== resolvedSubcategory || next.subcategory.length !== 1)
+      ) {
+        next = { ...next, subcategory: [resolvedSubcategory] };
+      }
+      return next === prev ? prev : next;
+    });
+  }, [categories.length, categoryParam, subcategoryParam, resolveSubcategoryParam]);
 
   // Fetch categories from API (with caching and retry) - load immediately
   useEffect(() => {
@@ -277,7 +321,6 @@ export default function Services(props: ServicesProps = {}) {
           return;
         }
       } catch (error) {
-        console.error("Failed to fetch categories:", error);
         // Retry once on network errors
         if (attempt < 1 && (error as any)?.message?.includes('fetch')) {
           setTimeout(() => fetchCategories(attempt + 1), 1000);
@@ -661,21 +704,6 @@ export default function Services(props: ServicesProps = {}) {
     viewMode,
   ]);
   
-  // Debug log
-  useEffect(() => {
-    console.log('[Services] useServices hook state:', {
-      servicesCount: services.length,
-      isLoading,
-      servicesLoading,
-      locationGateReady,
-      error: servicesError,
-      params: servicesParams,
-      userLocation,
-      latParam,
-      lngParam,
-    });
-  }, [services.length, isLoading, servicesLoading, servicesError, servicesParams, locationGateReady, userLocation, latParam, lngParam]);
-
   // Show error toast if services fetch fails
   useEffect(() => {
     if (servicesError) {
@@ -1419,6 +1447,7 @@ export default function Services(props: ServicesProps = {}) {
             <aside className="hidden lg:block w-64 shrink-0">
               <FilterPanel 
                 showVerifiedOnlyFilter={false}
+                value={filters}
                 onFilterChange={(newFilters) => {
                   // Clear subcategories if categories are cleared
                   if (newFilters.category.length === 0 && filters.category.length > 0) {
@@ -1451,6 +1480,7 @@ export default function Services(props: ServicesProps = {}) {
                       <div className="flex-1 overflow-y-auto px-4 py-3">
                         <FilterPanel 
                           showVerifiedOnlyFilter={false}
+                          value={filters}
                           onFilterChange={(newFilters) => {
                             // Clear subcategories if categories are cleared
                             if (newFilters.category.length === 0 && filters.category.length > 0) {
