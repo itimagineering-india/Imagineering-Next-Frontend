@@ -116,10 +116,10 @@ function CategoryProviderCardComponent({
         />
         {!priority && (
           <Button
-            variant="ghost"
+            variant="icon"
             size="icon"
             className={cn(
-              "absolute top-1.5 md:top-2 right-1.5 md:right-2 h-6 w-6 md:h-7 md:w-7 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background",
+              "absolute top-2 md:top-2 right-1.5 md:right-2 h-6 w-6 md:h-7 md:w-7 rounded-full bg-background/90 backdrop-blur-sm hover:bg-background",
               isFavorite ? "text-destructive" : "hover:text-destructive"
             )}
             onClick={(e) => {
@@ -136,14 +136,17 @@ function CategoryProviderCardComponent({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
-        <h3 className="line-clamp-2 min-h-[2.5rem] text-xs font-semibold leading-snug text-foreground break-words transition-colors group-hover:text-primary md:min-h-[2.75rem] md:text-sm">
+        <h3
+          className="h-[2.05rem] overflow-hidden text-ellipsis break-words text-xs font-semibold leading-snug text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:h-[2.4rem] md:text-sm"
+          title={name}
+        >
           {name}
         </h3>
         <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground md:text-xs">
           {location}
         </p>
 
-        <div className="mt-1.5 flex min-w-0 items-start justify-between gap-1.5 md:mt-2">
+        <div className="mt-2 flex min-w-0 items-start justify-between gap-2 md:mt-2">
           <div className="min-w-0 flex-1 text-xs leading-tight text-foreground md:text-sm">
             {mrp != null && mrp > 0 && (
               <span className="mr-1 text-[10px] text-muted-foreground line-through md:text-xs">
