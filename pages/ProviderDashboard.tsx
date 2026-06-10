@@ -22,6 +22,7 @@ import {
 const DASHBOARD_ICONS = {
   businessProfile: "https://img.icons8.com/color/96/building.png",
   services: "https://img.icons8.com/color/96/briefcase.png",
+  workforce: "https://img.icons8.com/color/96/conference-call.png",
   hireLabour: "https://img.icons8.com/color/96/construction-worker.png",
   addOffer: "https://img.icons8.com/color/96/price-tag.png",
   requests: "https://img.icons8.com/color/96/document.png",
@@ -238,7 +239,7 @@ export default function ProviderDashboard() {
                         alt={banner.title}
                         className="w-full h-full object-cover object-center"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2.5 sm:p-4">
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 sm:p-4">
                         <p className="font-semibold text-white text-xs sm:text-base line-clamp-2">{banner.title}</p>
                       </div>
                     </a>
@@ -249,7 +250,7 @@ export default function ProviderDashboard() {
                         alt={banner.title}
                         className="w-full h-full object-cover object-center"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2.5 sm:p-4">
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 sm:p-4">
                         <p className="font-semibold text-white text-xs sm:text-base line-clamp-2">{banner.title}</p>
                       </div>
                     </>
@@ -279,7 +280,7 @@ export default function ProviderDashboard() {
                 >
                   <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
-                <div className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1 sm:gap-1.5">
+                <div className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1 sm:gap-2">
                   {banners.map((_, i) => (
                     <button
                       key={i}
@@ -366,7 +367,7 @@ export default function ProviderDashboard() {
                         id="provider-referral-code"
                         value={referralCode}
                         readOnly
-                        className="pr-10 text-sm"
+                        className="pr-12 text-sm"
                       />
                     </div>
                     <Button
@@ -426,6 +427,7 @@ export default function ProviderDashboard() {
           {[
              { label: "Business Profile", href: "/dashboard/provider/business-profile", icon: DASHBOARD_ICONS.businessProfile },
             { label: "My Services", href: "/dashboard/provider/services", icon: DASHBOARD_ICONS.services },
+            { label: "Workforce", href: "/dashboard/provider/workforce", icon: DASHBOARD_ICONS.workforce },
             { label: "Hire labour", href: "/dashboard/provider/manpower-crew", icon: DASHBOARD_ICONS.hireLabour },
             {
               label: "Add Offer",
@@ -446,7 +448,7 @@ export default function ProviderDashboard() {
             <Link
               key={item.label}
               href={item.href}
-              className="flex flex-col items-center gap-1.5 sm:gap-2 group"
+              className="flex flex-col items-center gap-2 sm:gap-2 group"
             >
               <div className="relative rounded-full h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-muted border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors">
                 <img src={item.icon} alt={item.label} className="h-5 w-5 sm:h-6 sm:w-6 object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -498,7 +500,7 @@ export default function ProviderDashboard() {
                           <AvatarFallback className="text-xs md:text-sm">{request.client.name[0]}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                          <div className="flex flex-wrap items-center gap-2 md:gap-2">
                             <p className="font-medium text-sm md:text-base truncate">{request.title}</p>
                             {request.status === "new" && (
                               <Badge className="bg-success text-success-foreground text-[10px] md:text-xs shrink-0">
