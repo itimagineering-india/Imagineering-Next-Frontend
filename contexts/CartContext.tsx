@@ -24,6 +24,10 @@ type CartTotals = {
   subtotal: number;
   total: number;
   platformFee?: number;
+  /** GST on service subtotal @ 18% */
+  serviceGst?: number;
+  /** GST on platform fee base @ 18% */
+  platformFeeGst?: number;
   gst?: number;
   tax?: number;
   discount?: number;
