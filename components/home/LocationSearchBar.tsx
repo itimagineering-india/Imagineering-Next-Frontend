@@ -38,8 +38,8 @@ export function LocationSearchBar() {
         if (response.success && response.data) {
           setCategories((response.data as any).categories || []);
         }
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
+      } catch {
+        setCategories([]);
       }
     };
     fetchCategories();
@@ -62,8 +62,7 @@ export function LocationSearchBar() {
         } else {
           setAvailableSubcategories([]);
         }
-      } catch (error) {
-        console.error("Failed to fetch subcategories:", error);
+      } catch {
         setAvailableSubcategories([]);
       }
     };
