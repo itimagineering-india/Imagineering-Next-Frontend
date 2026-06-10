@@ -1,11 +1,13 @@
 /**
- * Mapbox — default for **public** maps & geocoding (browse maps, home search, buyer flows).
- * **Provider dashboard** (main `src` app) and **admin panel** (`admin-frontend`) prefer **Google Maps**
- * for address search; see `useGeocoderByPolicy` in `src/hooks/useGeocoderByPolicy.ts`.
+ * Mapbox — public site maps & geocoding (browse maps, home search, service preview).
  */
 
 export function getMapboxAccessToken(): string {
-  return (import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || "").trim();
+  const v =
+    typeof process !== "undefined" && process.env?.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
+      ? String(process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN)
+      : "";
+  return v.trim();
 }
 
 export function isMapboxConfigured(): boolean {
