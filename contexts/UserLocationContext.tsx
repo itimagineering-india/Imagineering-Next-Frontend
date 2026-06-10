@@ -69,9 +69,7 @@ function saveToStorage(loc: UserLocation | null) {
 }
 
 export function UserLocationProvider({ children }: { children: React.ReactNode }) {
-  const [userLocation, setUserLocationState] = useState<UserLocation | null>(() =>
-    typeof window !== "undefined" ? loadFromStorage() : null
-  );
+  const [userLocation, setUserLocationState] = useState<UserLocation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,7 +103,7 @@ export function UserLocationProvider({ children }: { children: React.ReactNode }
         try {
           const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { "User-Agent": "ServiceSphere/1.0" } }
+            { headers: { "User-Agent": "ImagineeringIndia/1.0" } }
           );
           const data = await res.json();
           const addr = data?.address;
@@ -140,12 +138,15 @@ export function UserLocationProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const cached = loadFromStorage();
-    if (cached) {
-      setUserLocationState(cached);
-      return;
-    }
-    fetchLocation();
+    const timer = window.setTimeout(() => {
+      const cached = loadFromStorage();
+      if (cached) {
+        setUserLocationState(cached);
+        return;
+      }
+      fetchLocation();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchLocation]);
 
   const value = useMemo(
