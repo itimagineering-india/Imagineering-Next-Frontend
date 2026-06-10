@@ -2193,8 +2193,36 @@ export const api = {
         `/api/workforce/workers${qs ? `?${qs}` : ''}`
       );
     },
+    searchImportCandidates: (params?: { q?: string; page?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.q) q.set('q', params.q);
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      const qs = q.toString();
+      return apiRequest<{
+        candidates: Array<{
+          userId: string;
+          providerId: string;
+          displayName: string;
+          phone?: string;
+          avatar?: string;
+          city?: string;
+          state?: string;
+          categoryLabel?: string;
+          subcategories?: string[];
+          experienceYears?: number;
+          dailyRate?: number | null;
+          alreadyImported?: boolean;
+        }>;
+      }>(`/api/workforce/import-candidates${qs ? `?${qs}` : ''}`);
+    },
     createWorker: (data: Record<string, unknown>) =>
       apiRequest<{ success: boolean; data: { worker: any } }>('/api/workforce/workers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    importWorker: (data: Record<string, unknown>) =>
+      apiRequest<{ success: boolean; data: { worker: any } }>('/api/workforce/workers/import', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
