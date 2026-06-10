@@ -1,5 +1,7 @@
 /** Pure geo helpers for Services browse page (no React deps). */
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- geo payloads from API */
+
 const TILE_KEY_RE = /^(-?\d+)_(-?\d+)$/;
 
 /**
@@ -48,7 +50,6 @@ export function getServiceCoordinates(service: any): { lat: number; lng: number 
       return { lat: parsedLat, lng: parsedLng };
     }
   }
-  // GeoJSON fallback: location.geo.coordinates = [lng, lat]
   const geoCoords = service?.location?.geo?.coordinates;
   if (Array.isArray(geoCoords) && geoCoords.length >= 2) {
     const geoLng = Number(geoCoords[0]);
@@ -57,7 +58,6 @@ export function getServiceCoordinates(service: any): { lat: number; lng: number 
       return { lat: geoLat, lng: geoLng };
     }
   }
-  // Some payloads may send raw GeoJSON-like coordinates on location.coordinates: [lng, lat]
   if (Array.isArray(coords) && coords.length >= 2) {
     const rawLng = Number(coords[0]);
     const rawLat = Number(coords[1]);
