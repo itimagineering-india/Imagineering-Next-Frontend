@@ -2167,6 +2167,133 @@ export const api = {
     },
   },
 
+  /** Premium contractor Workforce Management. */
+  workforce: {
+    access: () =>
+      apiRequest<{ success: boolean; data: { eligible: boolean; reason?: string | null; categoryAllowed?: boolean; entitled?: boolean } }>(
+        '/api/workforce/access'
+      ),
+    dashboard: (params?: { date?: string; month?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.date) q.set('date', params.date);
+      if (params?.month) q.set('month', params.month);
+      const qs = q.toString();
+      return apiRequest<{ success: boolean; data: any }>(`/api/workforce/dashboard${qs ? `?${qs}` : ''}`);
+    },
+    listWorkers: (params?: { page?: number; limit?: number; status?: string; role?: string; siteId?: string; q?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.status) q.set('status', params.status);
+      if (params?.role) q.set('role', params.role);
+      if (params?.siteId) q.set('siteId', params.siteId);
+      if (params?.q) q.set('q', params.q);
+      const qs = q.toString();
+      return apiRequest<{ success: boolean; data: { workers: any[] }; pagination?: any }>(
+        `/api/workforce/workers${qs ? `?${qs}` : ''}`
+      );
+    },
+    createWorker: (data: Record<string, unknown>) =>
+      apiRequest<{ success: boolean; data: { worker: any } }>('/api/workforce/workers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateWorker: (id: string, data: Record<string, unknown>) =>
+      apiRequest<{ success: boolean; data: { worker: any } }>(`/api/workforce/workers/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    deactivateWorker: (id: string) =>
+      apiRequest<{ success: boolean; data: { worker: any } }>(`/api/workforce/workers/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+    listSites: (params?: { page?: number; limit?: number; status?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.page) q.set('page', String(params.page));
+      if (params?.limit) q.set('limit', String(params.limit));
+      if (params?.status) q.set('status', params.status);
+      const qs = q.toString();
+      return apiRequest<{ success: boolean; data: { sites: any[] }; pagination?: any }>(
+        `/api/workforce/sites${qs ? `?${qs}` : ''}`
+      );
+    },
+    createSite: (data: Record<string, unknown>) =>
+      apiRequest<{ success: boolean; data: { site: any } }>('/api/workforce/sites', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateSite: (id: string, data: Record<string, unknown>) =>
+      apiRequest<{ success: boolean; data: { site: any } }>(`/api/workforce/sites/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    deleteSite: (id: string) =>
+      apiRequest<{ success: boolean; data: { site: any } }>(`/api/workforce/sites/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }),
+    updateSiteStatus: (id: string, status: string) =>
+      apiRequest<{ success: boolean; data: { site: any } }>(
+        `/api/workforce/sites/${encodeURIComponent(id)}/status`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        }
+      ),
+    assignWorkers: (siteId: string, workerIds: string[]) =>
+      apiRequest<{ success: boolean; data: { assignedCount: number; skippedCount: number } }>(
+        `/api/workforce/sites/${encodeURIComponent(siteId)}/assignments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ workerIds }),
+        }
+      ),
+    removeWorkerFromSite: (siteId: string, workerId: string) =>
+      apiRequest<{ success: boolean; data: { worker: any } }>(
+        `/api/workforce/sites/${encodeURIComponent(siteId)}/assignments/${encodeURIComponent(workerId)}`,
+        { method: 'DELETE' }
+      ),
+    transferWorker: (workerId: string, toSiteId: string) =>
+      apiRequest<{ success: boolean; data: { assignedCount: number; skippedCount: number } }>(
+        `/api/workforce/workers/${encodeURIComponent(workerId)}/transfer`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ toSiteId }),
+        }
+      ),
+    attendanceToday: (date?: string) =>
+      apiRequest<{ success: boolean; data: any }>(
+        `/api/workforce/attendance/today${date ? `?date=${encodeURIComponent(date)}` : ''}`
+      ),
+    upsertAttendance: (data: { date: string; entries: Array<{ workerId: string; status: string; siteId?: string; notes?: string }> }) =>
+      apiRequest<{ success: boolean; data: any }>('/api/workforce/attendance/daily', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    monthlyWages: (month?: string) =>
+      apiRequest<{ success: boolean; data: any }>(
+        `/api/workforce/wages/monthly${month ? `?month=${encodeURIComponent(month)}` : ''}`
+      ),
+    wageEntries: (params?: { month?: string; workerId?: string; type?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.month) q.set('month', params.month);
+      if (params?.workerId) q.set('workerId', params.workerId);
+      if (params?.type) q.set('type', params.type);
+      const qs = q.toString();
+      return apiRequest<{ success: boolean; data: any }>(`/api/workforce/wages/entries${qs ? `?${qs}` : ''}`);
+    },
+    createWageEntry: (data: Record<string, unknown>) =>
+      apiRequest<{ success: boolean; data: { entry: any } }>('/api/workforce/wages/entries', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    siteCosts: (month?: string) =>
+      apiRequest<{ success: boolean; data: any }>(
+        `/api/workforce/wages/site-costs${month ? `?month=${encodeURIComponent(month)}` : ''}`
+      ),
+    distribution: () =>
+      apiRequest<{ success: boolean; data: any }>('/api/workforce/assignments/distribution'),
+  },
+
   // User requirements (submit → admin quotes → approve)
   requirements: {
     create: (data: {
