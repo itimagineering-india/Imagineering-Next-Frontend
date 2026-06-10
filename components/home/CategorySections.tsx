@@ -10,14 +10,36 @@ import { CardSkeleton } from "./CardSkeleton";
 interface CategorySection {
   title: string;
   categorySlug: string;
-  services: any[];
+  services: NormalizedService[];
 }
 
-// SPEED TEST: 1x1 gray pixel (data URL) - zero network, instant load for comparison
-const DUMMY_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='180' viewBox='0 0 240 180'%3E%3Crect fill='%23e2e8f0' width='240' height='180'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14' font-family='sans-serif'%3EService%3C/text%3E%3C/svg%3E";
+type ApiService = {
+  id?: string;
+  _id?: string;
+  name?: string;
+  title?: string;
+  images?: string[];
+  image?: string;
+  location?: string | {
+    city?: string;
+    address?: string;
+  } | null;
+  price?: number | string | null;
+  mrp?: number | string | null;
+  priceLabel?: string;
+  rating?: number | string | null;
+  reviewCount?: number | string | null;
+};
 
-// Normalize service from API (id/_id, name/title, location string/object)
-function normalizeService(s: any): {
+type ApiCategoryGroup = {
+  category?: {
+    name?: string;
+    slug?: string;
+  };
+  services?: ApiService[];
+};
+
+type NormalizedService = {
   id: string;
   name: string;
   image: string;
@@ -27,7 +49,13 @@ function normalizeService(s: any): {
   priceLabel: string;
   rating: number;
   reviewCount: number;
-} {
+};
+
+// SPEED TEST: 1x1 gray pixel (data URL) - zero network, instant load for comparison
+const DUMMY_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='180' viewBox='0 0 240 180'%3E%3Crect fill='%23e2e8f0' width='240' height='180'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14' font-family='sans-serif'%3EService%3C/text%3E%3C/svg%3E";
+
+// Normalize service from API (id/_id, name/title, location string/object)
+function normalizeService(s: ApiService): NormalizedService {
   const id = s?.id ?? s?._id ?? "";
   const name = s?.name ?? s?.title ?? "Service";
   const image =
@@ -54,6 +82,8 @@ function normalizeService(s: any): {
 
 export function CategorySections() {
   const { userLocation } = useUserLocation();
+  const userLat = userLocation?.lat;
+  const userLng = userLocation?.lng;
   const [sections, setSections] = useState<CategorySection[]>([]);
   const [initialLoad, setInitialLoad] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -76,34 +106,12 @@ export function CategorySections() {
     enabled: allServiceIds.length > 0,
   });
 
-  const favoritesByIdRef = useRef<Record<string, boolean>>({});
-  const prevFavoritesRef = useRef<Set<string>>(new Set());
-  const [favoritesVersion, setFavoritesVersion] = useState(0);
-
-  useEffect(() => {
-    const prev = prevFavoritesRef.current;
-    const next = favorites;
-
-    let changed = false;
-
-    next.forEach((id) => {
-      if (!prev.has(id)) {
-        favoritesByIdRef.current[id] = true;
-        changed = true;
-      }
+  const favoritesById = useMemo<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    favorites.forEach((id) => {
+      map[id] = true;
     });
-
-    prev.forEach((id) => {
-      if (!next.has(id)) {
-        delete favoritesByIdRef.current[id];
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      prevFavoritesRef.current = next;
-      setFavoritesVersion((v) => v + 1);
-    }
+    return map;
   }, [favorites]);
 
   const onToggleFavorite = useCallback((serviceId: string) => {
@@ -111,7 +119,6 @@ export function CategorySections() {
   }, [toggleFavorite]);
 
   const loadData = useCallback(async () => {
-    setLoadError(null);
     try {
       const params: {
         limit: number;
@@ -122,25 +129,25 @@ export function CategorySections() {
         radiusKm?: number;
       } = { limit: 6 };
       const hasCoords =
-        userLocation?.lat != null &&
-        userLocation?.lng != null &&
-        Number.isFinite(userLocation.lat) &&
-        Number.isFinite(userLocation.lng);
+        userLat != null &&
+        userLng != null &&
+        Number.isFinite(userLat) &&
+        Number.isFinite(userLng);
       if (hasCoords) {
-        params.tile = `${Math.floor(userLocation.lat)}_${Math.floor(userLocation.lng)}`;
+        params.tile = `${Math.floor(userLat)}_${Math.floor(userLng)}`;
       }
       const res = await api.services.getByCategories(params);
       if (!res?.success) {
         const msg =
-          (res as any)?.error?.message ||
+          (res as { error?: { message?: string } })?.error?.message ||
           "Failed to load categories. Please try again.";
         setLoadError(msg);
         setInitialLoad(false);
         return;
       }
 
-      const rawCategories = (res.data as any)?.categories ?? [];
-      const categories: CategorySection[] = rawCategories.map((cat: any) => ({
+      const rawCategories = ((res.data as { categories?: ApiCategoryGroup[] } | undefined)?.categories) ?? [];
+      const categories: CategorySection[] = rawCategories.map((cat) => ({
         title: cat.category?.name ?? "Unknown",
         categorySlug: cat.category?.slug ?? "",
         services: (cat.services ?? []).map(normalizeService),
@@ -149,15 +156,14 @@ export function CategorySections() {
       setSections(categories);
       setLoadError(null);
       setInitialLoad(false);
-    } catch (error: any) {
-      console.error("[CategorySections] Failed to load:", error);
+    } catch (error: unknown) {
       setLoadError(
-        error?.message ||
+        (error instanceof Error ? error.message : "") ||
           "Cannot load categories. Check if the backend server is running."
       );
       setInitialLoad(false);
     }
-  }, [userLocation?.lat, userLocation?.lng]);
+  }, [userLat, userLng]);
 
   useEffect(() => {
     const el = sectionRef.current;
@@ -167,22 +173,18 @@ export function CategorySections() {
         if (entries[0].isIntersecting && !viewTriggeredRef.current) {
           viewTriggeredRef.current = true;
           setHasEnteredView(true);
+          void loadData();
         }
       },
       { rootMargin: "100px", threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!hasEnteredView) return;
-    void loadData();
-  }, [hasEnteredView, loadData]);
+  }, [loadData]);
 
   if (!hasEnteredView) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-10 bg-white" aria-label="Categories">
+      <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-label="Categories">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
           <div className="min-h-[240px] flex items-center justify-center text-slate-500 text-sm" aria-hidden="true">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-2xl mx-auto">
@@ -198,7 +200,7 @@ export function CategorySections() {
 
   if (initialLoad && sections.length === 0 && !loadError) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-10 bg-white" aria-busy="true" aria-label="Loading categories">
+      <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-busy="true" aria-label="Loading categories">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-6">
           <div className="py-3 md:py-4">
             <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
@@ -221,7 +223,7 @@ export function CategorySections() {
 
   if (loadError) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-10 bg-white">
+      <section ref={sectionRef} className="py-8 md:py-12 bg-white">
         <div className="mx-auto max-w-7xl px-4 text-center">
           <p className="text-slate-600 mb-4">{loadError}</p>
           <button
@@ -241,7 +243,7 @@ export function CategorySections() {
 
   if (!initialLoad && sections.length === 0) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-10 bg-white">
+      <section ref={sectionRef} className="py-8 md:py-12 bg-white">
         <div className="mx-auto max-w-7xl px-4 text-center text-slate-600">
           No categories available
         </div>
@@ -250,7 +252,7 @@ export function CategorySections() {
   }
 
   return (
-    <section ref={sectionRef} className="py-8 md:py-10 bg-white">
+    <section ref={sectionRef} className="py-8 md:py-12 bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-6">
         {sections.map((section, sectionIndex) => (
           <CategoryScrollSection
@@ -259,8 +261,8 @@ export function CategorySections() {
             categorySlug={section.categorySlug}
             services={section.services}
             prioritizeImages={sectionIndex === 0}
-            favoritesById={favoritesByIdRef.current}
-            favoritesVersion={favoritesVersion}
+            favoritesById={favoritesById}
+            favoritesVersion={favorites.size}
             onToggleFavorite={onToggleFavorite}
           />
         ))}
