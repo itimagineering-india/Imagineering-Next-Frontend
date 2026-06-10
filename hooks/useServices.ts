@@ -18,6 +18,12 @@ interface ServicesQueryParams {
   limit?: number;
   sort?: string;
   q?: string;
+  compact?: string | number;
+  mapMarkers?: string | number;
+  precise?: string | number;
+  radiusKm?: number;
+  tile?: string;
+  provider?: string;
 }
 
 // Allow null to indicate "waiting for dependencies"
@@ -159,15 +165,15 @@ export function useServices(
     paramsRef.current = stableParams;
   }, [stableParams]);
 
+  useEffect(() => {
+    if (stableParams === null && immediate) {
+      setIsLoading(true);
+    }
+  }, [stableParams, immediate]);
+
   const fetchServices = useCallback(async (isRetry = false): Promise<void> => {
-    console.log('[useServices] fetchServices called', { 
-      params: paramsRef.current, 
-      isRetry 
-    });
-    
     // Skip if params are null
     if (paramsRef.current === null) {
-      console.log('[useServices] Skipping fetch - params are null');
       return;
     }
     
@@ -215,10 +221,7 @@ export function useServices(
         }
       }, 190000);
 
-      // Create API request promise
-      console.log('[useServices] Making API call with params:', cleanedParams);
       const response = await api.services.getAll(cleanedParams as any) as any;
-      console.log('[useServices] API call completed, response type:', typeof response, 'response:', response);
       
       // Clear timeout if request completed
       if (timeoutId) {
@@ -228,30 +231,13 @@ export function useServices(
 
       // Check if request was aborted (params changed)
       if (controller.signal.aborted) {
-        console.log('[useServices] Request was aborted');
         return;
       }
-
-      // Log full response for debugging
-      console.log('[useServices] API response received', {
-        success: response?.success,
-        hasData: !!response?.data,
-        servicesCount: response?.data?.services?.length || 0,
-        pagination: response?.pagination,
-        error: response?.error,
-        responseKeys: response ? Object.keys(response) : [],
-        fullResponse: response
-      });
 
       if (response.success && response.data) {
         const servicesData = (response.data as any).services || [];
         const totalCount = response.pagination?.total || servicesData.length;
-        
-        console.log('[useServices] Services fetched successfully', { 
-          count: servicesData.length, 
-          total: totalCount 
-        });
-        
+
         const data: ServicesData = {
           services: servicesData,
           total: totalCount,
@@ -271,7 +257,6 @@ export function useServices(
         // Update cache
         servicesCache.set(key, { data, timestamp: Date.now() });
       } else {
-        console.error('[useServices] API response not successful', response);
         throw new Error(response.error?.message || 'Failed to fetch services');
       }
     } catch (err: any) {
@@ -280,21 +265,11 @@ export function useServices(
         clearTimeout(timeoutId);
       }
       
-      console.error('[useServices] Error in fetchServices:', {
-        error: err,
-        errorMessage: err?.message,
-        errorName: err?.name,
-        isAborted: controller.signal.aborted,
-        params: paramsRef.current,
-      });
-      
       // Don't set error if request was aborted - but preserve services if they were already set
       if (controller.signal.aborted || err.name === 'AbortError') {
-        console.log('[useServices] Request was aborted, skipping error handling');
         // If we already set services in this fetch call, don't clear them
         // This handles the case where a new request aborts an old one that already succeeded
         if (servicesSetInCurrentFetchRef.current || responseProcessed) {
-          console.log('[useServices] Request aborted but services already set, preserving them');
           setIsLoading(false);
           return;
         }
@@ -313,14 +288,12 @@ export function useServices(
       if (isTimeout) {
         // If response was already processed, don't clear services
         if (responseProcessed) {
-          console.log('[useServices] Timeout/Abort occurred but response was already processed, keeping services');
           setIsLoading(false);
           return;
         }
         
         if (!isRetry && !controller.signal.aborted) {
           // Retry once on timeout with longer delay for large datasets
-          console.log('[useServices] Timeout occurred, retrying with longer delay...');
           await new Promise(resolve => setTimeout(resolve, 2000));
           return fetchServices(true);
         }
@@ -359,7 +332,6 @@ export function useServices(
           preserveServicesOnFetchError(err) && prev > 0 ? prev : 0
         );
       } else {
-        console.log('[useServices] Error occurred but response was already processed, keeping services');
         setIsLoading(false);
       }
     } finally {
@@ -382,35 +354,24 @@ export function useServices(
 
   // Fetch when params change (with debounce if specified)
   useEffect(() => {
-    console.log('[useServices] useEffect triggered', {
-      immediate,
-      debounceMs,
-      params: paramsRef.current,
-    });
-    
     // Skip if params are null (waiting for dependencies like categories to load)
     if (paramsRef.current === null) {
-      console.log('[useServices] Skipping fetch - params are null (waiting for dependencies)');
       return;
     }
     
     // Skip if not immediate and this is the first render
     if (!immediate) {
-      console.log('[useServices] Skipping fetch - immediate is false');
       return;
     }
 
-    console.log('[useServices] Calling fetch', { debounceMs });
     if (debounceMs > 0) {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
       debounceTimerRef.current = setTimeout(() => {
-        console.log('[useServices] Debounced fetch executing');
         fetchServices();
       }, debounceMs);
     } else {
-      console.log('[useServices] Immediate fetch executing');
       fetchServices();
     }
 
