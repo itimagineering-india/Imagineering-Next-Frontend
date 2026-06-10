@@ -88,6 +88,21 @@ type WorkforceAccess = {
   entitled?: boolean;
 };
 
+type ImportCandidate = {
+  userId: string;
+  providerId: string;
+  displayName: string;
+  phone?: string;
+  avatar?: string;
+  city?: string;
+  state?: string;
+  categoryLabel?: string;
+  subcategories?: string[];
+  experienceYears?: number;
+  dailyRate?: number | null;
+  alreadyImported?: boolean;
+};
+
 type DashboardData = {
   cards?: DashboardCards;
   distribution?: unknown;
@@ -158,6 +173,11 @@ export default function WorkforceManagement() {
   const [saving, setSaving] = useState(false);
   const [wageEntryOpen, setWageEntryOpen] = useState(false);
   const [createWorkerOpen, setCreateWorkerOpen] = useState(false);
+  const [importWorkerOpen, setImportWorkerOpen] = useState(false);
+  const [importSearch, setImportSearch] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const [importCandidates, setImportCandidates] = useState<ImportCandidate[]>([]);
+  const [selectedImportCandidate, setSelectedImportCandidate] = useState<ImportCandidate | null>(null);
   const [createSiteOpen, setCreateSiteOpen] = useState(false);
   const [editingSiteId, setEditingSiteId] = useState("");
 
@@ -168,6 +188,12 @@ export default function WorkforceManagement() {
     dailyWage: "",
     joiningDate: today,
     status: "Active",
+  });
+
+  const [importForm, setImportForm] = useState({
+    role: "Labour",
+    dailyWage: "",
+    joiningDate: today,
   });
 
   const [siteForm, setSiteForm] = useState({
@@ -249,6 +275,64 @@ export default function WorkforceManagement() {
       await loadData();
     } catch {
       toast({ title: "Could not add worker", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const searchImportCandidates = async () => {
+    setImportLoading(true);
+    try {
+      const response = await api.workforce.searchImportCandidates({
+        q: importSearch.trim(),
+        limit: 20,
+      });
+      if (response.success && response.data) {
+        setImportCandidates(response.data.candidates || []);
+      } else {
+        setImportCandidates([]);
+        toast({
+          title: response.error?.message || "Could not find registered workers",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      setImportCandidates([]);
+      toast({ title: "Could not find registered workers", variant: "destructive" });
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const importSelectedWorker = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedImportCandidate) {
+      toast({ title: "Select a worker to import", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await api.workforce.importWorker({
+        userId: selectedImportCandidate.userId,
+        role: importForm.role,
+        dailyWage: Number(importForm.dailyWage) || selectedImportCandidate.dailyRate || 0,
+        joiningDate: importForm.joiningDate,
+      });
+      if (!response.success) {
+        throw new Error(response.error?.message || "Could not import worker");
+      }
+      setImportWorkerOpen(false);
+      setSelectedImportCandidate(null);
+      setImportSearch("");
+      setImportCandidates([]);
+      setImportForm({ role: "Labour", dailyWage: "", joiningDate: today });
+      toast({ title: "Worker imported" });
+      await loadData();
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "Could not import worker",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -613,7 +697,127 @@ export default function WorkforceManagement() {
           <Tabs value={activeSection} className="space-y-4">
 
         <TabsContent value="workers" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Dialog open={importWorkerOpen} onOpenChange={setImportWorkerOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Import Worker
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Import Registered Worker</DialogTitle>
+                  <DialogDescription>
+                    Search manpower providers already registered on Imagineering India and add them to your workforce directory.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      placeholder="Search by name, phone, city, or skill"
+                      value={importSearch}
+                      onChange={(event) => setImportSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          searchImportCandidates();
+                        }
+                      }}
+                    />
+                    <Button type="button" onClick={searchImportCandidates} disabled={importLoading}>
+                      {importLoading ? "Searching..." : "Search"}
+                    </Button>
+                  </div>
+
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {importCandidates.map((candidate) => {
+                      const selected = selectedImportCandidate?.userId === candidate.userId;
+                      return (
+                        <button
+                          key={candidate.userId}
+                          type="button"
+                          disabled={candidate.alreadyImported}
+                          onClick={() => {
+                            setSelectedImportCandidate(candidate);
+                            setImportForm((form) => ({
+                              ...form,
+                              dailyWage: candidate.dailyRate ? String(candidate.dailyRate) : form.dailyWage,
+                            }));
+                          }}
+                          className={`w-full rounded-lg border p-3 text-left transition ${
+                            selected ? "border-primary bg-primary/5" : "hover:border-primary/40"
+                          } ${candidate.alreadyImported ? "cursor-not-allowed opacity-60" : ""}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-medium">{candidate.displayName}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {[candidate.categoryLabel, candidate.city, candidate.state].filter(Boolean).join(" · ") ||
+                                  "Registered worker"}
+                              </p>
+                              {candidate.subcategories && candidate.subcategories.length > 0 && (
+                                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                                  {candidate.subcategories.join(", ")}
+                                </p>
+                              )}
+                            </div>
+                            <div className="shrink-0 text-right text-xs text-muted-foreground">
+                              {candidate.alreadyImported ? (
+                                <Badge variant="secondary">Imported</Badge>
+                              ) : (
+                                <>
+                                  {candidate.experienceYears ? <p>{candidate.experienceYears}+ yrs</p> : null}
+                                  {candidate.dailyRate ? <p>{money(candidate.dailyRate)}</p> : null}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {!importLoading && importCandidates.length === 0 && (
+                      <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                        Search registered manpower workers to import.
+                      </div>
+                    )}
+                  </div>
+
+                  <form onSubmit={importSelectedWorker} className="grid gap-3 border-t pt-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select value={importForm.role} onValueChange={(role) => setImportForm((form) => ({ ...form, role }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{WORKER_ROLES.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Daily Wage</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="Daily wage"
+                        value={importForm.dailyWage}
+                        onChange={(event) => setImportForm((form) => ({ ...form, dailyWage: event.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Joining Date</Label>
+                      <Input
+                        type="date"
+                        value={importForm.joiningDate}
+                        onChange={(event) => setImportForm((form) => ({ ...form, joiningDate: event.target.value }))}
+                      />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <Button type="submit" disabled={saving || !selectedImportCandidate}>
+                        Import Selected Worker
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </DialogContent>
+            </Dialog>
             <Dialog open={createWorkerOpen} onOpenChange={setCreateWorkerOpen}>
               <DialogTrigger asChild>
                 <Button>
