@@ -1,21 +1,38 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useParams, usePathname, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronRight, Home, Share2, Heart, Star, MapPin, CheckCircle2 } from "lucide-react";
+import {
+  BadgeCheck,
+  BadgePercent,
+  Boxes,
+  Building2,
+  ChevronRight,
+  Clock3,
+  CreditCard,
+  Heart,
+  Home,
+  MapPin,
+  MapPinned,
+  PackageCheck,
+  ReceiptText,
+  Share2,
+  ShieldCheck,
+  Star,
+  Truck,
+} from "lucide-react";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBuyerPremium } from "@/hooks/useBuyerPremium";
 import {
   ServiceGallery,
-  ServiceDescription,
   ProviderCard,
-  PricingBox,
   MapPreview,
   DynamicBookingModal,
   Reviews,
@@ -24,11 +41,8 @@ import {
   ServiceDetailSkeleton,
 } from "@/components/service-details";
 import {
-  getServiceInteractionType,
   shouldShowPricing,
   canBookDirectly,
-  getPrimaryCTAText,
-  getSecondaryCTAText,
   getHelperText,
   type ServiceWithInteraction,
 } from "@/lib/interactionType";
@@ -109,7 +123,7 @@ function metadataToCustomFields(metadata: unknown): Array<{
     if (typeof rawValue === "string") {
       const v = rawValue.trim();
       if (!v) continue;
-      out.push({ label: toReadableFieldLabel(key), value: v, type: "select" });
+      out.push({ label: toReadableFieldLabel(key), value: v, type: "text" });
       continue;
     }
 
@@ -167,9 +181,15 @@ interface ServiceData {
     location?: any;
     verified?: boolean;
     rating?: number;
+    experience?: number;
+    yearsOfExperience?: number;
+    experienceYears?: number;
+    completedJobs?: number;
+    trustBadges?: string[];
   };
   location?: {
     address: string;
+    area?: string;
     city: string;
     state: string;
     coordinates?: {
@@ -208,7 +228,9 @@ export default function ServiceDetails() {
   const [error, setError] = useState<string | null>(null);
   const [similarServices, setSimilarServices] = useState<any[]>([]);
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const latestActualIdRef = useRef(actualId);
+  latestActualIdRef.current = actualId;
 
   // Open modal after login redirect (auth handled globally via AuthProvider)
   useEffect(() => {
@@ -221,13 +243,18 @@ export default function ServiceDetails() {
   }, [isAuthenticated, searchParamsFromUrl, pathname, router]);
 
   // Cache configuration
-  const CACHE_KEY = `service_details_${actualId}`;
+  const CACHE_KEY = `service_details_v2_${actualId}`;
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
   // Fetch service data
   useEffect(() => {
+    const idForThisRun = actualId;
+    let cancelled = false;
+
+    const isStale = () => cancelled || latestActualIdRef.current !== idForThisRun;
+
     const fetchService = async () => {
-      if (!actualId) {
+      if (!idForThisRun) {
         setError("Service ID not found");
         setLoading(false);
         return;
@@ -242,6 +269,7 @@ export default function ServiceDetails() {
           
           if (age < CACHE_TTL) {
             console.log('[ServiceDetails] Using cached data (age:', Math.round(age / 1000), 'seconds)');
+            if (isStale()) return;
             setService(data.service);
             setIsSaved(data.isSaved || false);
             setSimilarServices(data.similarServices || []);
@@ -266,8 +294,9 @@ export default function ServiceDetails() {
     };
 
     const fetchServiceFresh = async () => {
-      if (!actualId) return;
+      if (!idForThisRun) return;
 
+      if (isStale()) return;
       setLoading(true);
       setError(null);
       
@@ -277,14 +306,22 @@ export default function ServiceDetails() {
         );
         
         // Fetch enriched service data (includes favorite status and similar services)
-        const apiPromise = api.services.getById(actualId);
+        const apiPromise = api.services.getById(idForThisRun);
         const response = await Promise.race([apiPromise, timeoutPromise]) as any;
+
+        if (isStale()) return;
         
         if (response.success && response.data) {
           const serviceData = response.data.service;
           const isFavoriteResult = response.data.isFavorite || false;
           const similarServicesResult = response.data.similarServices || [];
           
+          const providerExperience =
+            serviceData.provider?.yearsOfExperience ??
+            serviceData.provider?.experienceYears ??
+            serviceData.provider?.experience ??
+            0;
+
           // Transform API response
           const transformedService: ServiceData = {
             id: serviceData._id || serviceData.id,
@@ -304,6 +341,7 @@ export default function ServiceDetails() {
             itemType: serviceData.itemType,
             provider: {
               _id: serviceData.provider?._id || "",
+              slug: serviceData.provider?.slug,
               name: serviceData.provider?.name || "Provider",
               businessName: serviceData.provider?.businessName,
               email: serviceData.provider?.email,
@@ -313,6 +351,11 @@ export default function ServiceDetails() {
               location: serviceData.provider?.location,
               verified: serviceData.provider?.verified,
               rating: serviceData.provider?.rating,
+              experience: Number(providerExperience) || 0,
+              yearsOfExperience: Number(providerExperience) || 0,
+              experienceYears: Number(providerExperience) || 0,
+              completedJobs: serviceData.provider?.completedJobs,
+              trustBadges: serviceData.provider?.trustBadges,
             },
             location: serviceData.location,
             rating: serviceData.rating || 0,
@@ -333,7 +376,9 @@ export default function ServiceDetails() {
 
           // Redirect to slug URL when visiting by id (for SEO-friendly URLs)
           const slug = serviceData.slug;
-          if (slug && actualId === (serviceData._id || serviceData.id)) {
+          const serviceIdVal = serviceData._id || serviceData.id;
+          const isIdParam = /^[a-fA-F0-9]{24}$/.test(idForThisRun || "");
+          if (slug && isIdParam && idForThisRun === serviceIdVal?.toString?.()) {
             router.replace(`/service/${slug}`, { scroll: false });
           }
 
@@ -351,18 +396,21 @@ export default function ServiceDetails() {
             console.warn('[ServiceDetails] Failed to cache data:', cacheError);
           }
         } else {
-          setError("Service not found");
+          if (!isStale()) setError("Service not found");
         }
       } catch (error: any) {
         console.error("Error fetching service:", error);
-        setError(error.message || "Failed to load service details. Please try again.");
+        if (!isStale()) setError(error.message || "Failed to load service details. Please try again.");
       } finally {
-        setLoading(false);
+        if (!isStale()) setLoading(false);
       }
     };
 
     fetchService();
-  }, [actualId, CACHE_KEY]);
+    return () => {
+      cancelled = true;
+    };
+  }, [actualId, CACHE_KEY, router]);
 
   // Memoized computed values (must be before handlers that use them)
   // Safe defaults when service is not loaded yet
@@ -378,18 +426,72 @@ export default function ServiceDetails() {
     return { category: service.category };
   }, [service]);
   
-  const interactionType = useMemo(() => getServiceInteractionType(serviceWithInteraction), [serviceWithInteraction]);
   const showPricing = useMemo(() => shouldShowPricing(serviceWithInteraction), [serviceWithInteraction]);
   const canBook = useMemo(() => canBookDirectly(serviceWithInteraction), [serviceWithInteraction]);
-  const primaryCTA = useMemo(() => getPrimaryCTAText(serviceWithInteraction), [serviceWithInteraction]);
-  const secondaryCTA = useMemo(() => getSecondaryCTAText(serviceWithInteraction), [serviceWithInteraction]);
   const helperText = useMemo(() => getHelperText(serviceWithInteraction), [serviceWithInteraction]);
+
+  const fieldValue = useCallback((labels: string[]) => {
+    const fields = service?.customFields || [];
+    const normalizedLabels = labels.map((label) => label.toLowerCase());
+    const found = fields.find((field) => {
+      const label = String(field.label || "").toLowerCase();
+      return normalizedLabels.some((candidate) => label.includes(candidate));
+    });
+    if (!found || found.value === null || found.value === undefined) return "";
+    return String(found.value).trim();
+  }, [service?.customFields]);
+
+  const availability = useMemo(() => {
+    const raw = fieldValue(["availability", "stock status", "material availability"]).toLowerCase();
+    if (raw.includes("out")) return "Out of Stock";
+    if (raw.includes("limited") || raw.includes("low")) return "Limited Stock";
+    if (raw.includes("stock") || raw.includes("available")) return "In Stock";
+    return "In Stock";
+  }, [fieldValue]);
+
+  const deliveryTime = useMemo(
+    () => fieldValue(["delivery time", "estimated delivery"]) || service?.deliveryTime || "Contact supplier",
+    [fieldValue, service?.deliveryTime]
+  );
+  const deliveryCharges = useMemo(
+    () => fieldValue(["delivery charges", "delivery charge"]) || "Contact supplier",
+    [fieldValue]
+  );
+  const deliveryOption = useMemo(
+    () => fieldValue(["delivery option", "delivery available"]) || "Delivery Available",
+    [fieldValue]
+  );
+  const loadingSupport = useMemo(
+    () => fieldValue(["loading unloading", "loading", "unloading"]) || "Ask supplier",
+    [fieldValue]
+  );
+  const serviceRadius = useMemo(
+    () => fieldValue(["radius", "service radius", "delivery radius"]) || "15 km",
+    [fieldValue]
+  );
+
+  const trustBadges = useMemo(() => {
+    if (!service) return [];
+    const badges = [
+      service.provider.verified ? { label: "Business Verified", icon: BadgeCheck, className: "bg-blue-50 text-blue-700 border-blue-200" } : null,
+      fieldValue(["gst", "gst invoice"]) ? { label: "GST Verified", icon: ReceiptText, className: "bg-emerald-50 text-emerald-700 border-emerald-200" } : null,
+      deliveryOption.toLowerCase().includes("available") ? { label: "Delivery Available", icon: Truck, className: "bg-orange-50 text-orange-700 border-orange-200" } : null,
+      deliveryTime.toLowerCase().includes("same day") ? { label: "Same Day Delivery", icon: Clock3, className: "bg-purple-50 text-purple-700 border-purple-200" } : null,
+      loadingSupport && !loadingSupport.toLowerCase().includes("ask") ? { label: "Loading Included", icon: PackageCheck, className: "bg-indigo-50 text-indigo-700 border-indigo-200" } : null,
+      { label: "Trusted Supplier", icon: ShieldCheck, className: "bg-slate-50 text-slate-700 border-slate-200" },
+    ];
+    return badges.filter(Boolean) as Array<{ label: string; icon: typeof ShieldCheck; className: string }>;
+  }, [deliveryOption, deliveryTime, fieldValue, loadingSupport, service]);
+
+  const redirectToLogin = useCallback(() => {
+    const currentPath = `${pathname || `/service/${actualId}`}${searchParamsFromUrl?.toString() ? `?${searchParamsFromUrl.toString()}` : ""}`;
+    router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+  }, [actualId, pathname, router, searchParamsFromUrl]);
 
   // Memoized handlers
   const handleRequestViaPlatform = useCallback(() => {
     if (!isAuthenticated) {
-      const currentPath = `/service/${actualId}`;
-      router.push(`/login?redirect=${encodeURIComponent(currentPath)}&openModal=true`);
+      redirectToLogin();
       toast({
         title: "Login Required",
         description: "Please login to request this service",
@@ -411,7 +513,42 @@ export default function ServiceDetails() {
     
     setBookingId(null);
     setRequestModalOpen(true);
-  }, [isAuthenticated, service, actualId, router, toast, canBook]);
+  }, [isAuthenticated, service, toast, canBook, redirectToLogin]);
+
+  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
+
+  const handleOpenChat = useCallback(() => {
+    if (!isAuthenticated) {
+      redirectToLogin();
+      toast({
+        title: "Login Required",
+        description: "Please login to chat with the provider",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (buyerSubLoading) {
+      return;
+    }
+    if (!isBuyerPremium) {
+      toast({
+        title: "Subscription Required",
+        description: "Please subscribe to a buyer plan to chat with providers.",
+        variant: "destructive",
+      });
+      router.push("/subscriptions/buyer");
+      return;
+    }
+    const providerUserId = service?.provider?._id;
+    const providerName = service?.provider?.name || service?.provider?.businessName;
+    if (!providerUserId) return;
+    const params = new URLSearchParams({
+      providerId: String(providerUserId),
+      ...(service?.id && { serviceId: String(service.id) }),
+      ...(providerName && { name: String(providerName) }),
+    });
+    router.push(`/chat?${params.toString()}`);
+  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, router, toast, service?.provider, service?.id, redirectToLogin]);
 
   const handleSubmitRequest = useCallback(async (data: {
     date: Date;
@@ -637,12 +774,11 @@ export default function ServiceDetails() {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-        <main className="flex-1">
-          <div className="container px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
-            {/* Breadcrumbs */}
-            <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-              <Link href="/" className="hover:text-foreground transition-colors flex items-center gap-1">
+    <div className="min-h-screen max-w-full overflow-x-clip flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
+        <main className="min-w-0 flex-1 overflow-x-clip">
+          <div className="container max-w-full overflow-x-clip px-3 pb-28 pt-4 sm:px-4 sm:py-6 md:px-6 md:py-8 lg:pb-8">
+            <nav className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 text-xs text-muted-foreground sm:mb-6 sm:text-sm">
+              <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
                 <Home className="h-3.5 w-3.5" />
                 Home
               </Link>
@@ -651,342 +787,355 @@ export default function ServiceDetails() {
                 Services
               </Link>
               <ChevronRight className="h-4 w-4" />
-              <span className="text-foreground font-medium truncate max-w-[200px] sm:max-w-none">
+              <span className="max-w-[180px] truncate font-medium text-foreground sm:max-w-none">
                 {service.title}
               </span>
             </nav>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-8">
-              {/* Left: Image Gallery */}
-              <div className="space-y-4">
-                <div className="relative">
-                  <ServiceGallery images={service.images} />
-                  {/* Action Buttons */}
-                  <div className="absolute top-3 right-3 flex gap-2 z-10">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-9 w-9 rounded-full shadow-md hover:shadow-lg transition-all bg-background/90 backdrop-blur-sm"
-                      onClick={handleShare}
-                      aria-label="Share this service"
-                      title="Share this service"
-                    >
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-9 w-9 rounded-full shadow-md hover:shadow-lg transition-all bg-background/90 backdrop-blur-sm"
-                      onClick={handleToggleFavorite}
-                      aria-label={isSaved ? "Remove from favorites" : "Add to favorites"}
-                      title={isSaved ? "Remove from favorites" : "Add to favorites"}
-                    >
-                      <Heart className={`h-4 w-4 ${isSaved ? "fill-destructive text-destructive" : ""}`} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Product Info & CTA */}
-              <div className="lg:sticky lg:top-6 lg:self-start space-y-6">
-                {/* Category Badges */}
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className="text-sm">{categoryName}</Badge>
-                  {service.subcategory && (
-                    <Badge variant="secondary" className="text-sm bg-primary/10 text-primary">
-                      {service.subcategory}
-                    </Badge>
-                  )}
-                  {service.itemType && (
-                    <Badge variant="outline" className="text-sm">
-                      {service.itemType}
-                    </Badge>
-                  )}
-                  {service.featured && (
-                    <Badge variant="default" className="text-sm">
-                      Featured
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Title */}
-                <h1 className="text-[28px] font-bold leading-[1.12] tracking-[-0.035em] text-foreground sm:text-4xl lg:text-[42px]">
-                  {service.title}
-                </h1>
-
-                {/* Rating & Location */}
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-warning text-warning" />
-                      <span className="text-base font-semibold tabular-nums">{service.rating.toFixed(1)}</span>
-                    </div>
-                    <span className="text-muted-foreground">
-                      ({service.reviewCount} {service.reviewCount === 1 ? 'review' : 'reviews'})
-                    </span>
-                  </div>
-                  {service.location && (
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                      <span>
-                        {service.location.city || service.location.address}
-                        {service.location.state && `, ${service.location.state}`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Provider Info */}
-                <Card className="border bg-card/60 shadow-sm">
-                  <CardContent className="flex items-center gap-3 p-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={service.provider.avatar} />
-                      <AvatarFallback>
-                        {service.provider.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Link 
-                          href={`/provider/${service.provider.slug || service.provider._id}`}
-                          className="truncate text-base font-bold tracking-[-0.01em] transition-colors hover:text-primary lg:text-lg"
-                        >
-                          {service.provider.businessName || service.provider.name}
-                        </Link>
-                        {service.provider.verified && (
-                          <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
-                        )}
-                      </div>
-                      <p className="truncate text-xs font-medium text-muted-foreground">
-                        {service.provider.businessName ? "Business" : service.provider.name ? "Service Provider" : "Provider"}
-                      </p>
+            <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:gap-8">
+              <div className="min-w-0 space-y-4 sm:space-y-5">
+                <Card className="overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-rose-50/40 to-orange-50/40 shadow-sm">
+                  <CardContent className="relative p-2 sm:p-3">
+                    <ServiceGallery images={service.images} />
+                    <div className="absolute right-3 top-3 z-10 flex gap-2 sm:right-5 sm:top-5">
+                      <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full bg-background/90 shadow-md backdrop-blur-sm sm:h-9 sm:w-9" onClick={handleShare}>
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full bg-background/90 shadow-md backdrop-blur-sm sm:h-9 sm:w-9" onClick={handleToggleFavorite}>
+                        <Heart className={`h-4 w-4 ${isSaved ? "fill-destructive text-destructive" : ""}`} />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
+              </div>
 
-                {/* Price */}
-                {showPricing && (
-                  <Card className="border border-primary/20 bg-primary/5 shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Price</p>
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        {service.mrp != null && service.mrp > 0 && (
-                          <span className="text-lg font-semibold tabular-nums text-muted-foreground line-through sm:text-xl">
-                            ₹{service.mrp.toLocaleString()}
-                            {priceTypeLabels[service.priceType] ? ` ${priceTypeLabels[service.priceType]}` : ""}
-                          </span>
-                        )}
-                        <span className="text-4xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">
-                          ₹{service.price.toLocaleString()}
-                        </span>
-                        {priceTypeLabels[service.priceType] && (
-                          <span className="text-lg font-semibold text-foreground sm:text-xl">
-                            {priceTypeLabels[service.priceType]}
-                          </span>
-                        )}
-                      </div>
-                      {service.priceType === "negotiable" && (
-                        <p className="mt-1 text-xs font-medium text-muted-foreground">
-                          Price is negotiable
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-                {!showPricing && (
-                  <Card className="border bg-muted/60 shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pricing</p>
-                      <p className="text-2xl font-bold tracking-[-0.02em] text-foreground">
-                        Contact for quotation
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
+              <aside className="min-w-0 space-y-4 lg:sticky lg:top-6 lg:self-start">
+                <Card className="rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-rose-50/70 shadow-lg shadow-primary/5">
+                  <CardContent className="space-y-4 p-4 sm:space-y-5 sm:p-6">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="rounded-full px-3 py-1">{categoryName}</Badge>
+                      {service.subcategory && <Badge className="rounded-full bg-primary/10 px-3 py-1 text-primary hover:bg-primary/10">{service.subcategory}</Badge>}
+                      <Badge
+                        className={`rounded-full px-3 py-1 ${
+                          availability === "Out of Stock"
+                            ? "bg-red-50 text-red-700 hover:bg-red-50"
+                            : availability === "Limited Stock"
+                              ? "bg-amber-50 text-amber-700 hover:bg-amber-50"
+                              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {availability}
+                      </Badge>
+                    </div>
 
-                {/* CTA & Quick Info */}
-                <Card className="border bg-card shadow-sm">
-                  <CardContent className="space-y-4 p-4">
-                    {/* CTA Buttons */}
                     <div className="space-y-3">
-                      {canBook ? (
-                        <>
-                          {interactionType === "PURCHASE_ONLY" ? (
-                            // No Book Now - show Add to Cart below when showPricing
-                            isAuthenticated ? null : (
-                              <Button
-                                onClick={handleRequestViaPlatform}
-                                className="w-full h-12 text-base font-semibold"
-                                size="lg"
-                              >
-                                Login to Continue
-                              </Button>
-                            )
-                          ) : (
-                            <Button
-                              onClick={handleRequestViaPlatform}
-                              className="w-full h-12 text-base font-semibold"
-                              size="lg"
-                            >
-                              {isAuthenticated ? primaryCTA : "Login to Continue"}
-                            </Button>
-                          )}
-                          {secondaryCTA && secondaryCTA !== "Book Now" && showPricing && (
-                            isAuthenticated ? (
-                              <AddToCartButton
-                                serviceId={service.id}
-                                providerName={service.provider?.name}
-                                label={secondaryCTA}
-                                onAdded={() => router.push("/cart")}
-                                className="w-full h-11 border-2"
-                              />
-                            ) : (
-                              <Button
-                                onClick={handleRequestViaPlatform}
-                                variant="outline"
-                                className="w-full h-11 border-2"
-                                size="lg"
-                              >
-                                Login to Continue
-                              </Button>
-                            )
-                          )}
-                          {showPricing && (
-                            <AddToCartButton
-                              serviceId={service.id}
-                              providerName={service.provider?.name}
-                              label="Add to Cart"
-                              className="w-full h-11"
-                            />
-                          )}
-                        </>
-                      ) : (
-                        <Button
-                          onClick={handleRequestViaPlatform}
-                          className="w-full h-12 text-base font-semibold"
-                          size="lg"
-                        >
-                          {isAuthenticated ? primaryCTA : "Login to Continue"}
-                        </Button>
-                      )}
-                      {helperText && (
-                        <p className="text-xs text-muted-foreground text-center">
-                          {helperText}
-                        </p>
-                      )}
+                      <h1 className="text-2xl font-bold leading-[1.14] tracking-[-0.035em] text-foreground sm:text-4xl lg:text-[42px]">{service.title}</h1>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground sm:text-sm lg:text-base">
+                        <span className="inline-flex items-center gap-1 font-semibold tabular-nums text-foreground">
+                          <Star className="h-4 w-4 fill-warning text-warning" />
+                          {service.rating.toFixed(1)}
+                        </span>
+                        <span>({service.reviewCount} {service.reviewCount === 1 ? "review" : "reviews"})</span>
+                        {service.location && (
+                          <span className="inline-flex min-w-0 items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            <span className="truncate">{service.location.city || service.location.address}{service.location.state ? `, ${service.location.state}` : ""}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Quick Info */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-muted/50 rounded-lg text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Delivery Time</p>
-                        <p className="text-sm font-semibold">{service.deliveryTime}</p>
-                      </div>
-                      {service.provider.rating && (
-                        <div className="p-3 bg-muted/50 rounded-lg text-center">
-                          <p className="text-xs text-muted-foreground mb-1">Provider Rating</p>
-                          <p className="text-sm font-semibold">{service.provider.rating.toFixed(1)}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {trustBadges.map((badge) => {
+                        const Icon = badge.icon;
+                        return (
+                          <span key={badge.label} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold lg:text-sm ${badge.className}`}>
+                            <Icon className="h-3.5 w-3.5" />
+                            {badge.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+
+                    <Card className="rounded-2xl border-primary/20 bg-gradient-to-br from-primary/15 via-rose-50 to-amber-50 shadow-sm">
+                      <CardContent className="space-y-3 p-3 sm:p-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground lg:text-sm">Current Price</p>
+                          {showPricing ? (
+                            <div className="mt-1 flex flex-wrap items-end gap-2">
+                              {service.mrp != null && service.mrp > service.price && (
+                                <span className="text-lg font-semibold tabular-nums text-muted-foreground line-through">₹{service.mrp.toLocaleString()}</span>
+                              )}
+                              <span className="min-w-0 break-words text-3xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">₹{service.price.toLocaleString()}</span>
+                              <span className="pb-1 text-base font-semibold text-foreground sm:text-lg">{priceTypeLabels[service.priceType] || "/unit"}</span>
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-foreground">Contact for quotation</p>
+                          )}
                         </div>
-                      )}
+                        <div className="rounded-2xl border border-white/70 bg-white/85 p-3 shadow-sm">
+                          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                            <div>
+                              <p className="text-sm font-bold tracking-[-0.01em] text-foreground">Offers & EMI Plans</p>
+                              <p className="text-xs font-medium text-muted-foreground">Check available benefits before purchase</p>
+                            </div>
+                            <Badge className="w-fit rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-50">Available</Badge>
+                          </div>
+                          <div className="grid gap-2 text-sm sm:grid-cols-2">
+                            {[
+                              { label: "Bulk order offer", value: "Best price on quantity orders", icon: BadgePercent },
+                              { label: "EMI plans", value: "Available on eligible orders", icon: CreditCard },
+                              { label: "GST invoice", value: "Ask supplier for invoice support", icon: ReceiptText },
+                              { label: "Secure checkout", value: "Add to cart and confirm order", icon: ShieldCheck },
+                            ].map((offer) => {
+                              const Icon = offer.icon;
+                              return (
+                                <div key={offer.label} className="flex gap-2 rounded-xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-2.5 sm:p-3">
+                                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                    <Icon className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{offer.label}</p>
+                                    <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">{offer.value}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/80 via-white to-emerald-50/60 shadow-sm">
+                      <CardContent className="space-y-4 p-3 sm:p-4">
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-11 w-11 border bg-background sm:h-12 sm:w-12">
+                            <AvatarImage src={service.provider.avatar} />
+                            <AvatarFallback>{service.provider.name.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link href={`/provider/${service.provider.slug || service.provider._id}`} className="text-base font-bold leading-snug tracking-[-0.01em] text-foreground hover:text-primary lg:text-lg">
+                                {service.provider.businessName || service.provider.name}
+                              </Link>
+                              {service.provider.verified && <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50">Verified</Badge>}
+                            </div>
+                            <div className="mt-2 grid grid-cols-1 gap-2 text-xs font-medium text-muted-foreground sm:grid-cols-2 lg:text-sm">
+                              <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> Fast response</span>
+                              <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> Trusted supplier</span>
+                              <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5" /> {(service.provider.rating ?? service.rating).toFixed(1)} Rating</span>
+                              <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {service.location?.city || "India"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <Button variant="outline" asChild>
+                            <Link href={`/provider/${service.provider.slug || service.provider._id}`}>View Supplier Profile</Link>
+                          </Button>
+                          <Button onClick={handleOpenChat} disabled={isAuthenticated && buyerSubLoading}>Contact Supplier</Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="hidden space-y-2 lg:block">
+                      {showPricing && <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label="Add to Cart" className="h-12 w-full text-base font-semibold" />}
+                      {helperText && <p className="text-center text-xs text-muted-foreground lg:text-sm">{helperText}</p>}
                     </div>
                   </CardContent>
                 </Card>
-              </div>
+              </aside>
             </div>
 
-            {/* Tabs Section */}
-            <div className="mb-8">
-              <Tabs defaultValue="description" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
-                  <TabsTrigger value="description">Description</TabsTrigger>
-                  <TabsTrigger value="reviews">
-                    Reviews ({service.reviewCount})
-                  </TabsTrigger>
-                  <TabsTrigger value="location">Location</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="description" className="mt-6">
-                  <ServiceDescription
-                    description={service.description}
-                    included={[]}
-                    notIncluded={[]}
-                    availability={service.deliveryTime}
-                  />
-                  
-                  {/* Custom Fields - Dynamic Section */}
-                  {service.customFields && service.customFields.length > 0 && (
-                    <div className="mt-6">
-                      <CustomFields fields={service.customFields} />
+            <div className="mt-6 space-y-4 md:hidden">
+              <Card className="rounded-2xl border-primary/10 bg-gradient-to-br from-white to-slate-50 shadow-sm">
+                <CardHeader className="p-4">
+                  <CardTitle className="text-xl font-bold tracking-[-0.02em]">About this Product</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 p-4 pt-0">
+                  <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground">{service.description}</p>
+                  {service.tags?.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {service.tags.map((tag, index) => <Badge key={index} variant="outline" className="rounded-full">{tag}</Badge>)}
                     </div>
                   )}
-                  
-                  {/* Tags */}
-                  {service.tags && service.tags.length > 0 && (
-                    <div className="mt-6">
-                      <Card>
-                        <CardContent className="p-6">
-                          <h3 className="text-lg font-semibold mb-4">Tags</h3>
-                          <div className="flex flex-wrap gap-2">
-                            {service.tags.map((tag, index) => (
-                              <Badge key={index} variant="outline">
-                                {tag}
-                              </Badge>
-                            ))}
+                </CardContent>
+              </Card>
+
+              <section className="space-y-3">
+                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">Specifications</h2>
+                {service.customFields?.length ? (
+                  <CustomFields fields={service.customFields} />
+                ) : (
+                  <Card className="rounded-2xl bg-gradient-to-br from-white to-slate-50"><CardContent className="p-4 text-sm text-muted-foreground">No specifications added yet.</CardContent></Card>
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">Delivery Information</h2>
+                <div className="grid gap-3">
+                  {[
+                    { label: "Delivery Radius", value: serviceRadius, icon: MapPinned },
+                    { label: "Delivery Time", value: deliveryTime, icon: Clock3 },
+                    { label: "Loading / Unloading", value: loadingSupport, icon: PackageCheck },
+                    { label: "Delivery Charges", value: deliveryCharges, icon: ReceiptText },
+                    { label: "Available Locations", value: service.location ? `${service.location.city || service.location.address}${service.location.state ? `, ${service.location.state}` : ""}` : "Contact supplier", icon: MapPin },
+                    { label: "Stock Status", value: availability, icon: Boxes },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Card key={item.label} className="rounded-2xl border-primary/10 bg-gradient-to-br from-white via-primary/5 to-sky-50/70 shadow-sm">
+                        <CardContent className="flex items-start gap-3 p-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                            <Icon className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium tracking-wide text-muted-foreground">{item.label}</p>
+                            <p className="mt-1 break-words text-sm font-semibold tabular-nums text-foreground">{item.value}</p>
                           </div>
                         </CardContent>
                       </Card>
-                    </div>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="reviews" className="mt-6">
-                  <Reviews
-                    serviceId={service.id}
-                    averageRating={service.rating}
-                    totalReviews={service.reviewCount}
-                    reviews={[]}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="location" className="mt-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {service.location?.coordinates && (
-                      <MapPreview
-                        location={{
-                          address: service.location.address,
-                          area: (service.location as any).area || service.location.city || "",
-                          city: service.location.city,
-                          coordinates: service.location.coordinates,
-                        }}
-                        serviceRadius={15}
-                      />
-                    )}
-                    <ProviderCard
-                      provider={{
-                        id: service.provider._id,
-                        name: service.provider.name,
-                        avatar: service.provider.avatar,
-                        isVerified: !!service.provider.verified,
-                        experience: (service.provider as any).experience ?? 0,
-                        completedJobs: (service.provider as any).completedJobs ?? 0,
-                        rating: service.provider.rating ?? service.rating,
-                        trustBadges: (service.provider as any).trustBadges,
+                    );
+                  })}
+                </div>
+                <div className="grid gap-4">
+                  {service.location?.coordinates && (
+                    <MapPreview
+                      location={{
+                        address: service.location.address,
+                        area: service.location.area || service.location.city || "",
+                        city: service.location.city,
+                        coordinates: service.location.coordinates,
                       }}
-                      onSave={handleToggleFavorite}
-                      isSaved={isSaved}
+                      serviceRadius={15}
                     />
-                  </div>
-                </TabsContent>
-              </Tabs>
+                  )}
+                  <ProviderCard
+                    provider={{
+                      id: service.provider._id,
+                      name: service.provider.name,
+                      avatar: service.provider.avatar,
+                      isVerified: !!service.provider.verified,
+                      experience: service.provider.experience ?? 0,
+                      completedJobs: service.provider.completedJobs ?? 0,
+                      rating: service.provider.rating ?? service.rating,
+                      trustBadges: service.provider.trustBadges,
+                    }}
+                    onSave={handleToggleFavorite}
+                    isSaved={isSaved}
+                  />
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">Reviews</h2>
+                <Reviews serviceId={service.id} averageRating={service.rating} totalReviews={service.reviewCount} reviews={[]} />
+              </section>
             </div>
 
-            {/* Similar Services */}
+            <Tabs defaultValue="overview" className="mt-6 hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-white via-slate-50 to-rose-50/50 p-2 shadow-sm sm:mt-8 sm:p-4 md:block">
+              <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white/80 p-1 shadow-inner md:grid-cols-4 lg:w-auto">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="specifications">Specifications</TabsTrigger>
+                <TabsTrigger value="delivery">Delivery Information</TabsTrigger>
+                <TabsTrigger value="reviews">Reviews</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="mt-5">
+                <Card className="rounded-2xl border-primary/10 bg-gradient-to-br from-white to-slate-50 shadow-sm">
+                  <CardHeader className="p-4 sm:p-6"><CardTitle className="text-xl font-bold tracking-[-0.02em] lg:text-2xl">About this Product</CardTitle></CardHeader>
+                  <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
+                    <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground sm:text-base lg:text-[17px] lg:leading-8">{service.description}</p>
+                    {service.tags?.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {service.tags.map((tag, index) => <Badge key={index} variant="outline" className="rounded-full">{tag}</Badge>)}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="specifications" className="mt-5">
+                {service.customFields?.length ? (
+                  <CustomFields fields={service.customFields} />
+                ) : (
+                  <Card className="rounded-2xl bg-gradient-to-br from-white to-slate-50"><CardContent className="p-6 text-sm text-muted-foreground">No specifications added yet.</CardContent></Card>
+                )}
+              </TabsContent>
+
+              <TabsContent value="delivery" className="mt-5">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    { label: "Delivery Radius", value: serviceRadius, icon: MapPinned },
+                    { label: "Delivery Time", value: deliveryTime, icon: Clock3 },
+                    { label: "Loading / Unloading", value: loadingSupport, icon: PackageCheck },
+                    { label: "Delivery Charges", value: deliveryCharges, icon: ReceiptText },
+                    { label: "Available Locations", value: service.location ? `${service.location.city || service.location.address}${service.location.state ? `, ${service.location.state}` : ""}` : "Contact supplier", icon: MapPin },
+                    { label: "Stock Status", value: availability, icon: Boxes },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Card key={item.label} className="rounded-2xl border-primary/10 bg-gradient-to-br from-white via-primary/5 to-sky-50/70 shadow-sm">
+                        <CardContent className="p-4 sm:p-5">
+                          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                            <Icon className="h-6 w-6 text-primary" />
+                          </div>
+                          <p className="text-sm font-medium tracking-wide text-muted-foreground lg:text-base">{item.label}</p>
+                          <p className="mt-1 text-sm font-semibold tabular-nums text-foreground lg:text-base">{item.value}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+                <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                  {service.location?.coordinates && (
+                    <MapPreview
+                      location={{
+                        address: service.location.address,
+                        area: service.location.area || service.location.city || "",
+                        city: service.location.city,
+                        coordinates: service.location.coordinates,
+                      }}
+                      serviceRadius={15}
+                    />
+                  )}
+                  <ProviderCard
+                    provider={{
+                      id: service.provider._id,
+                      name: service.provider.name,
+                      avatar: service.provider.avatar,
+                      isVerified: !!service.provider.verified,
+                      experience: service.provider.experience ?? 0,
+                      completedJobs: service.provider.completedJobs ?? 0,
+                      rating: service.provider.rating ?? service.rating,
+                      trustBadges: service.provider.trustBadges,
+                    }}
+                    onSave={handleToggleFavorite}
+                    isSaved={isSaved}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="reviews" className="mt-5">
+                <Reviews serviceId={service.id} averageRating={service.rating} totalReviews={service.reviewCount} reviews={[]} />
+              </TabsContent>
+            </Tabs>
+
             {similarServices.length > 0 && (
-              <SimilarServices services={similarServices} />
+              <div className="mt-10 min-w-0 overflow-x-clip">
+                <SimilarServices services={similarServices} title="Similar Products" />
+              </div>
             )}
           </div>
         </main>
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
+          <div>
+            {showPricing ? (
+              <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label="Add to Cart" className="h-11 w-full text-sm font-semibold" />
+            ) : (
+              <Button onClick={handleRequestViaPlatform} className="h-11 w-full text-sm font-semibold">Enquire Now</Button>
+            )}
+          </div>
+        </div>
 
         {/* Request Modal */}
         {service && (
