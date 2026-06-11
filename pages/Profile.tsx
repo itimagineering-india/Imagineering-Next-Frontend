@@ -269,7 +269,7 @@ const Profile = () => {
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
             {
               headers: {
-                'User-Agent': 'ServiceSphere/1.0',
+                'User-Agent': 'ImagineeringIndia/1.0',
               },
             }
           );
@@ -604,7 +604,7 @@ const Profile = () => {
                 <div className="min-w-0 flex-1">
                   <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground truncate">{user.name || "User"}</h1>
                   <p className="text-xs sm:text-sm text-muted-foreground">Buyer • {user.location?.city || "Not set"}</p>
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+                  <div className="flex flex-wrap gap-2 sm:gap-2 mt-2 sm:mt-2">
                     {isBuyerPremium ? (
                       <Badge className="bg-amber-100 text-amber-900 border-amber-200 text-xs">Buyer Premium</Badge>
                     ) : (
@@ -684,7 +684,7 @@ const Profile = () => {
                             id="buyer-referral-code"
                             value={referralCode}
                             readOnly
-                            className="pr-10 text-sm"
+                            className="pr-12 text-sm"
                           />
                         </div>
                         <Button
@@ -746,7 +746,7 @@ const Profile = () => {
               <Link
                 key={item.label}
                 href={item.href}
-                className="flex flex-col items-center gap-1.5 sm:gap-2 group"
+                className="flex flex-col items-center gap-2 sm:gap-2 group"
               >
                 <div className="rounded-full h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-muted border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors">
                   <item.icon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground group-hover:text-primary" />
@@ -758,7 +758,7 @@ const Profile = () => {
                 key={item.label}
                 type="button"
                 onClick={item.onClick}
-                className="flex flex-col items-center gap-1.5 sm:gap-2 group"
+                className="flex flex-col items-center gap-2 sm:gap-2 group"
               >
                 <div className="rounded-full h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-muted border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors">
                   <item.icon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground group-hover:text-primary" />
@@ -894,7 +894,7 @@ const Profile = () => {
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 text-sm text-muted-foreground p-4 sm:p-6 pt-0">
                 <div className="grid gap-2 sm:gap-3">
-                  <div className="p-2.5 sm:p-3 rounded-xl border bg-muted/30">
+                  <div className="p-3 sm:p-3 rounded-xl border bg-muted/30">
                     <div className="text-xs text-muted-foreground mb-1">Location</div>
                     <div className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
                       <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
@@ -903,14 +903,14 @@ const Profile = () => {
                         : "Not set"}</span>
                     </div>
                   </div>
-                  <div className="p-2.5 sm:p-3 rounded-xl border bg-muted/30">
+                  <div className="p-3 sm:p-3 rounded-xl border bg-muted/30">
                     <div className="text-xs text-muted-foreground mb-1">Email</div>
                     <div className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
                       <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
                       <span className="truncate">{user.email || (user as { phone?: string }).phone || "Not set"}</span>
                     </div>
                   </div>
-                  <div className="p-2.5 sm:p-3 rounded-xl border bg-muted/30">
+                  <div className="p-3 sm:p-3 rounded-xl border bg-muted/30">
                     <div className="text-xs text-muted-foreground mb-1">Phone</div>
                     <div className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
                       <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
@@ -918,7 +918,7 @@ const Profile = () => {
                     </div>
                   </div>
                   {user.verified && (
-                    <div className="p-2.5 sm:p-3 rounded-xl border bg-muted/30">
+                    <div className="p-3 sm:p-3 rounded-xl border bg-muted/30">
                       <div className="text-xs text-muted-foreground mb-1">Verification</div>
                       <div className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-2">
                         <ShieldCheck className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
@@ -1098,7 +1098,7 @@ const Profile = () => {
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, name: e.target.value })
                   }
-                  className="pl-9 text-sm sm:text-base h-9 sm:h-10"
+                  className="pl-12 text-sm sm:text-base h-9 sm:h-10"
                 />
               </div>
             </div>
@@ -1144,7 +1144,7 @@ const Profile = () => {
                           location: { ...editFormData.location, city: e.target.value },
                         })
                       }
-                      className="pl-9 w-full text-sm sm:text-base h-9 sm:h-10"
+                      className="pl-12 w-full text-sm sm:text-base h-9 sm:h-10"
                     />
                   </div>
                 </div>
@@ -1222,7 +1222,7 @@ const Profile = () => {
                   type="email"
                   value={userData?.email || ""}
                   disabled
-                  className="pl-9 bg-muted cursor-not-allowed text-sm sm:text-base h-9 sm:h-10"
+                  className="pl-12 bg-muted cursor-not-allowed text-sm sm:text-base h-9 sm:h-10"
                 />
               </div>
               <p className="text-xs text-muted-foreground">
@@ -1240,7 +1240,7 @@ const Profile = () => {
                   type="tel"
                   value={userData?.phone || ""}
                   disabled
-                  className="pl-9 bg-muted cursor-not-allowed text-sm sm:text-base h-9 sm:h-10"
+                  className="pl-12 bg-muted cursor-not-allowed text-sm sm:text-base h-9 sm:h-10"
                 />
               </div>
               <p className="text-xs text-muted-foreground">
