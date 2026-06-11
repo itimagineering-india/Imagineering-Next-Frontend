@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const OPEN_DELAY_MS = 2000;
 
@@ -37,7 +38,7 @@ function FieldCard({
   return (
     <div
       className={cn(
-        "rounded-[12px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/30 sm:p-5",
+        "rounded-[14px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/30 sm:p-6",
         className,
       )}
     >
@@ -48,6 +49,7 @@ function FieldCard({
 
 /** Shown each time the home page mounts — compact requirement form for Imagineering India (guest-friendly). */
 export function HomeRequirementPopup() {
+  const { t } = useTranslation("home");
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -73,7 +75,7 @@ export function HomeRequirementPopup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const t = title.trim();
+    const reqTitle = title.trim();
     const d = description.trim();
     const loc = location.trim();
     const digits = phone.replace(/\D/g, "");
@@ -84,26 +86,26 @@ export function HomeRequirementPopup() {
           ? digits.slice(-10)
           : digits;
 
-    if (t.length < 5 || d.length < 20) {
+    if (reqTitle.length < 5 || d.length < 20) {
       toast({
-        title: "Please add more detail",
-        description: "Title must be at least 5 characters and description at least 20 characters.",
+        title: t("requirementPopup.validationDetailTitle"),
+        description: t("requirementPopup.validationDetailDescription"),
         variant: "destructive",
       });
       return;
     }
     if (loc.length < 3) {
       toast({
-        title: "Location required",
-        description: "Enter where you need the service (area, city, or full address).",
+        title: t("requirementPopup.validationLocationTitle"),
+        description: t("requirementPopup.validationLocationDescription"),
         variant: "destructive",
       });
       return;
     }
     if (mobile.length !== 10 || !/^[6-9]\d{9}$/.test(mobile)) {
       toast({
-        title: "Valid mobile number",
-        description: "Enter a 10-digit Indian mobile number (starts with 6–9).",
+        title: t("requirementPopup.validationPhoneTitle"),
+        description: t("requirementPopup.validationPhoneDescription"),
         variant: "destructive",
       });
       return;
@@ -112,15 +114,15 @@ export function HomeRequirementPopup() {
     setIsSubmitting(true);
     try {
       const res = await api.requirements.create({
-        title: t,
+        title: reqTitle,
         description: d,
         contactPhone: mobile,
         location: loc,
       });
       if (res.success) {
         toast({
-          title: "Requirement submitted",
-          description: "We will review and contact you soon.",
+          title: t("requirementPopup.successTitle"),
+          description: t("requirementPopup.successDescription"),
         });
         setTitle("");
         setDescription("");
@@ -133,15 +135,15 @@ export function HomeRequirementPopup() {
         }
       } else {
         toast({
-          title: "Could not submit",
-          description: res.error?.message || "Please try again.",
+          title: t("requirementPopup.failedTitle"),
+          description: res.error?.message || t("requirementPopup.failedDescription"),
           variant: "destructive",
         });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Please try again.";
       toast({
-        title: "Error",
+        title: t("requirementPopup.errorTitle"),
         description: message,
         variant: "destructive",
       });
@@ -159,7 +161,7 @@ export function HomeRequirementPopup() {
       }}
     >
       <DialogContent className="flex max-h-[min(92vh,calc(100dvh-1.5rem))] w-[calc(100vw-1.5rem)] max-w-lg flex-col gap-0 overflow-hidden border-0 p-0 shadow-xl sm:w-full sm:rounded-2xl">
-        <div className="shrink-0 bg-gradient-to-br from-slate-50 via-slate-50 to-sky-100/70 px-4 pb-4 pt-5 pr-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/35 sm:px-6 sm:pb-5 sm:pr-14 sm:pt-6">
+        <div className="shrink-0 bg-gradient-to-br from-slate-50 via-slate-50 to-sky-100/70 px-4 pb-4 pt-6 pr-12 dark:from-slate-950 dark:via-slate-900 dark:to-sky-950/35 sm:px-6 sm:pb-6 sm:pr-16 sm:pt-6">
           <DialogHeader className="space-y-2 text-left">
             <div className="flex items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
@@ -167,18 +169,17 @@ export function HomeRequirementPopup() {
               </span>
               <div className="min-w-0 flex-1 space-y-1">
                 <DialogTitle className="text-xl font-bold leading-tight tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">
-                  Submit your requirement
+                  {t("requirementPopup.title")}
                 </DialogTitle>
               </div>
             </div>
             <DialogDescription className="text-left text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Tell Imagineering India what you need — we will follow up with a quote. Add your mobile and location so we
-              can reach you.
+              {t("requirementPopup.description")}
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6">
           <form
             onSubmit={handleSubmit}
             className="space-y-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:space-y-5"
@@ -186,16 +187,16 @@ export function HomeRequirementPopup() {
             <FieldCard>
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  What you need
+                  {t("requirementPopup.titleLabel")}
                 </span>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="home-req-title" className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                  Short title *
+                  {t("requirementPopup.titleLabel")} *
                 </Label>
                 <Input
                   id="home-req-title"
-                  placeholder="e.g. Office renovation, electrical work"
+                  placeholder={t("requirementPopup.titlePlaceholder")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   autoComplete="off"
@@ -211,18 +212,18 @@ export function HomeRequirementPopup() {
                     <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden />
                   </span>
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Mobile *
+                    {t("requirementPopup.phoneLabel")} *
                   </span>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="home-req-phone" className="sr-only">
-                    Mobile number
+                    {t("requirementPopup.phoneLabel")}
                   </Label>
                   <Input
                     id="home-req-phone"
                     type="tel"
                     inputMode="numeric"
-                    placeholder="10-digit number"
+                    placeholder={t("requirementPopup.phonePlaceholder")}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     autoComplete="tel"
@@ -238,16 +239,16 @@ export function HomeRequirementPopup() {
                     <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden />
                   </span>
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Location *
+                    {t("requirementPopup.locationLabel")} *
                   </span>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="home-req-location" className="sr-only">
-                    Location or service area
+                    {t("requirementPopup.locationLabel")}
                   </Label>
                   <Input
                     id="home-req-location"
-                    placeholder="City, area, pin code…"
+                    placeholder={t("requirementPopup.locationPlaceholder")}
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     autoComplete="street-address"
@@ -260,22 +261,24 @@ export function HomeRequirementPopup() {
             <FieldCard>
               <div className="mb-3 flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Details *
+                  {t("requirementPopup.descriptionLabel")} *
                 </span>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="home-req-desc" className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                  Describe the work
+                  {t("requirementPopup.descriptionLabel")}
                 </Label>
                 <Textarea
                   id="home-req-desc"
-                  placeholder="Scope, timeline, budget range, access, materials…"
+                  placeholder={t("requirementPopup.descriptionPlaceholder")}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
                   className={textareaClass}
                 />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">At least 20 characters helps us quote accurately.</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {t("requirementPopup.validationDetailDescription")}
+                </p>
               </div>
             </FieldCard>
 
@@ -288,12 +291,12 @@ export function HomeRequirementPopup() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    Submitting…
+                    {t("requirementPopup.submitting")}
                   </>
                 ) : (
                   <>
                     <Send className="h-5 w-5" />
-                    Submit requirement
+                    {t("requirementPopup.submit")}
                   </>
                 )}
               </Button>
