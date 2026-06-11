@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/contexts/UserLocationContext";
+import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
 import { LocationSearchInline } from "./LocationSearchInline";
 import { useTranslation } from "react-i18next";
 import {
@@ -58,7 +59,7 @@ const IMAGIMITRA_DOWNLOAD_URL =
 
 export function Header() {
  const mainHeadline = "ONE POINT SOLUTION FOR ALL THE CONSTRUCTION M3";
- const { t } = useTranslation(["header", "common"]);
+ const { t } = useTranslation(["header", "common", "services"]);
  const [showImagiMitraBar, setShowImagiMitraBar] = useState(true);
  const [isOpen, setIsOpen] = useState(false);
  const [searchQuery, setSearchQuery] = useState("");
@@ -841,7 +842,7 @@ export function Header() {
            <div className="w-64 border-r border-slate-100 bg-white">
             <div className="px-4 pt-3 pb-2">
              <p className="caption subtitle text-slate-500">
-              Browse by category
+              {t("services:browseByCategory")}
              </p>
             </div>
             <div className="max-h-[310px] overflow-y-auto pb-2">
@@ -929,7 +930,7 @@ export function Header() {
                 ) : (
                  <div className="flex h-full items-center justify-center px-6 text-center">
                   <p className="caption text-slate-500">
-                   Explore all services in{""}
+                   {t("header:exploreServices")}{" "}
                    <span className="subtitle text-slate-700">
                     {active.name}
                    </span>
@@ -946,7 +947,7 @@ export function Header() {
                   href={`/services?category=${active.slug}`}
                   className="inline-flex items-center caption text-red-500 hover:text-red-600 hover:underline"
                  >
-                  View All {active.name} <span className="ml-1">→</span>
+                  {t("services:viewAll")} {active.name} <span className="ml-1">→</span>
                  </Link>
                 </div>
                )}
@@ -959,14 +960,14 @@ export function Header() {
         </NavigationMenuContent>
        </NavigationMenuItem>
           <NavigationMenuItem key="browse-b2b-services">
-            <NavigationMenuTrigger className="bg-transparent">B2B Services</NavigationMenuTrigger>
+            <NavigationMenuTrigger className="bg-transparent">{t("services:b2bServices")}</NavigationMenuTrigger>
             <NavigationMenuContent>
               <div className="w-[min(92vw,980px)] rounded-2xl bg-white shadow-xl border border-slate-100 overflow-hidden">
                 <div className="flex h-[360px]">
                   {/* Left: B2B categories list */}
                   <div className="w-64 border-r border-slate-100 bg-white">
                     <div className="px-4 pt-3 pb-2">
-                      <p className="caption subtitle text-slate-500">Browse by category</p>
+                      <p className="caption subtitle text-slate-500">{t("services:browseByCategory")}</p>
                     </div>
                     <div className="max-h-[310px] overflow-y-auto pb-2">
                       {b2bCategories.map((category) => {
@@ -1056,7 +1057,7 @@ export function Header() {
                                 href={`/b2b-services?category=${active.slug}`}
                                 className="inline-flex items-center caption text-red-500 hover:text-red-600 hover:underline"
                               >
-                                View All {active.name} <span className="ml-1">→</span>
+                                {t("services:viewAll")} {active.name} <span className="ml-1">→</span>
                               </Link>
                             </div>
                           )}
@@ -1089,6 +1090,7 @@ export function Header() {
 
     {/* Desktop Actions */}
     <div className="hidden lg:flex items-center gap-3">
+     <LanguageSwitcher />
      <CartIcon />
      {!isAuthLoading && (
       <>
@@ -1125,13 +1127,13 @@ export function Header() {
           <DropdownMenuItem asChild>
            <Link href="/chat" className="flex items-center cursor-pointer">
             <MessageSquare className="mr-2 h-4 w-4" />
-            Messages
+            {t("services:messages")}
            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
            <Link href="/requirement/submit" className="flex items-center cursor-pointer">
             <FileText className="mr-2 h-4 w-4" />
-            Get a quote
+            {t("services:getQuote")}
            </Link>
           </DropdownMenuItem>
           {user.role === "buyer" && (
@@ -1139,25 +1141,25 @@ export function Header() {
             <DropdownMenuItem asChild>
              <Link href="/dashboard/buyer/orders" className="flex items-center cursor-pointer">
               <LayoutDashboard className="mr-2 h-4 w-4" />
-              My orders
+              {t("services:myOrders")}
              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
              <Link href="/dashboard/buyer/requirements" className="flex items-center cursor-pointer">
               <FileText className="mr-2 h-4 w-4" />
-              My requirements
+              {t("services:myRequirements")}
              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
              <Link href="/dashboard/buyer/job-posts/new" className="flex items-center cursor-pointer">
               <Briefcase className="mr-2 h-4 w-4" />
-              Post a job
+              {t("services:postJob")}
              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
              <Link href="/dashboard/buyer/job-posts" className="flex items-center cursor-pointer">
               <FileText className="mr-2 h-4 w-4" />
-              My job posts
+              {t("services:myJobPosts")}
              </Link>
             </DropdownMenuItem>
            </>
@@ -1168,7 +1170,7 @@ export function Header() {
              <DropdownMenuItem asChild>
               <Link href="/jobs" className="flex items-center cursor-pointer">
                <Briefcase className="mr-2 h-4 w-4" />
-               Browse jobs
+               {t("services:browseJobs")}
               </Link>
              </DropdownMenuItem>
             )}
@@ -1176,7 +1178,7 @@ export function Header() {
              <DropdownMenuItem asChild>
               <Link href="/dashboard/provider/manpower-crew" className="flex items-center cursor-pointer">
                <Users className="mr-2 h-4 w-4" />
-               Hire labour
+               {t("services:hireLabour")}
               </Link>
              </DropdownMenuItem>
             )}
@@ -1215,8 +1217,8 @@ export function Header() {
       type="button"
       variant="search"
       onClick={() => router.push("/search")}
-      aria-label="Open search"
-      title="Search"
+      aria-label={t("common:search")}
+      title={t("common:search")}
      >
       <Search className="h-5 w-5 text-muted-foreground" />
      </Button>
@@ -1225,8 +1227,8 @@ export function Header() {
        <Button 
         variant="icon" 
         size="icon"
-        aria-label="Open menu"
-        title="Open menu"
+        aria-label={t("header:exploreServices")}
+        title={t("header:exploreServices")}
        >
         <Menu className="h-5 w-5" />
        </Button>
@@ -1236,6 +1238,7 @@ export function Header() {
        Imagineering India — {t("header:exploreServices")} and account menu
       </SheetTitle>
       <nav className="flex flex-col gap-4 mt-8">
+       <LanguageSwitcher compact />
        <Link href="/services" className="subtitle" onClick={() => setIsOpen(false)}>
         {t("header:exploreServices")}
        </Link>
@@ -1248,7 +1251,7 @@ export function Header() {
          >
           <MapPin className="h-4 w-4 shrink-0" />
           <span className="truncate">
-           {userLocation.city || (userLocation.address?.split(",")[0]) || "Services near you"}
+           {userLocation.city || (userLocation.address?.split(",")[0]) || t("services:servicesNearYou")}
           </span>
          </Link>
         )}
@@ -1257,7 +1260,7 @@ export function Header() {
         ) : null}
        </div>
        <Link href="/b2b-services" className="subtitle" onClick={() => setIsOpen(false)}>
-        B2B Services
+        {t("services:b2bServices")}
        </Link>
        <Link href="/about" className="subtitle" onClick={() => setIsOpen(false)}>
         {t("common:about")}
@@ -1295,14 +1298,14 @@ export function Header() {
             className="subtitle"
             onClick={() => setIsOpen(false)}
            >
-            Messages
+            {t("services:messages")}
            </Link>
            <Link
             href="/requirement/submit"
             className="subtitle"
             onClick={() => setIsOpen(false)}
            >
-            Get a quote
+            {t("services:getQuote")}
            </Link>
            {user.role === "buyer" && (
             <>
@@ -1311,28 +1314,28 @@ export function Header() {
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
-              My orders
+              {t("services:myOrders")}
              </Link>
              <Link
               href="/dashboard/buyer/requirements"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
-              My requirements
+              {t("services:myRequirements")}
              </Link>
              <Link
               href="/dashboard/buyer/job-posts/new"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
-              Post a job
+              {t("services:postJob")}
              </Link>
              <Link
               href="/dashboard/buyer/job-posts"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
-              My job posts
+              {t("services:myJobPosts")}
              </Link>
             </>
            )}
@@ -1344,7 +1347,7 @@ export function Header() {
                className="subtitle"
                onClick={() => setIsOpen(false)}
               >
-               Browse jobs
+               {t("services:browseJobs")}
               </Link>
              )}
              {user.role === "provider" && (
@@ -1353,7 +1356,7 @@ export function Header() {
                className="subtitle"
                onClick={() => setIsOpen(false)}
               >
-               Hire labour
+               {t("services:hireLabour")}
               </Link>
              )}
              <Link
