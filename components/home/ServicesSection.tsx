@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 import { ServicePlaceholderCard, serviceCategories } from "./ServicePlaceholderCard";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
@@ -24,6 +25,7 @@ const DISPLAY_ORDER = [
 
 export function ServicesSection() {
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.1 });
+  const { t } = useTranslation("home");
 
   const ordered = DISPLAY_ORDER.map((slug) => serviceCategories.find((c) => c.slug === slug)).filter(
     (c): c is NonNullable<typeof c> => c != null
@@ -45,17 +47,17 @@ export function ServicesSection() {
           }`}
         >
           <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3rem] xl:text-[3.25rem] 2xl:text-[3.5rem] font-bold tracking-tight mb-3 smallTablet:mb-4">
-            <span className="text-foreground">Our </span>
-            <span className="text-[hsl(var(--red-accent))]">Services</span>
+            <span className="text-foreground">{t("services.our")} </span>
+            <span className="text-[hsl(var(--red-accent))]">{t("services.title")}</span>
           </h2>
           <p className="text-muted-foreground text-sm smallTablet:text-base max-w-2xl mx-auto leading-relaxed">
-            Discover a wide range of professional services across multiple categories.
+            {t("services.description")}
           </p>
         </div>
 
-        {/* Mobile / tablet: single grid */}
+        {/* Mobile / tablet: three cards per row */}
         <div
-          className={`laptop:hidden lg:hidden grid grid-cols-2 mobile:grid-cols-3 gap-2 smallTablet:gap-4 transition-all duration-700 ${
+          className={`laptop:hidden lg:hidden grid grid-cols-3 gap-1.5 sm:gap-3 smallTablet:gap-4 transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
           style={{ transitionDelay: "120ms" }}
@@ -128,7 +130,7 @@ export function ServicesSection() {
             href={`/services?${buildServicesBrowseQuery("")}`}
             className="inline-flex items-center justify-center rounded-xl bg-[hsl(var(--red-accent))] px-10 smallTablet:px-12 py-4 text-sm smallTablet:text-base font-semibold text-[hsl(var(--red-accent-foreground))] shadow-lg shadow-md/20 transition hover:brightness-110 hover:shadow-xl hover:shadow-md/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--red-accent))] focus-visible:ring-offset-2"
           >
-            View All Services
+            {t("services.viewAll")}
           </Link>
         </div>
       </div>
