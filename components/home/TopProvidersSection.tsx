@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Award, CheckCircle2 } from "lucide-react";
 import api from "@/lib/api-client";
+import { useTranslation } from "react-i18next";
 
 interface TopProvider {
   id: string;
@@ -80,6 +81,7 @@ const normalizeProviders = (items: Array<TopProvider | ProviderApiItem>) => {
 };
 
 export function TopProvidersSection() {
+  const { t } = useTranslation("home");
   const [providers, setProviders] = useState<TopProvider[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasEnteredView, setHasEnteredView] = useState(false);
@@ -148,13 +150,13 @@ export function TopProvidersSection() {
       <div className="container mx-auto px-4 sm:px-6 md:px-6 lg:px-8 max-w-7xl">
         <div className="text-center mb-4 sm:mb-6 md:mb-8">
           <h2 className="text-xl sm:text-3xl md:text-4xl lg:text-4xl font-bold mt-2">
-            <span className="text-foreground">Our </span>
+            <span className="text-foreground">{t("topProviders.our")} </span>
             <span className="text-[hsl(var(--red-accent))] bg-gradient-to-r from-[hsl(var(--red-accent))] to-primary bg-clip-text text-transparent">
-              Top Providers
+              {t("topProviders.title")}
             </span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-4 mt-2">
-            Trusted professionals with verified profiles and great service.
+            {t("topProviders.description")}
           </p>
         </div>
 
@@ -218,11 +220,11 @@ export function TopProvidersSection() {
                             {provider.topRated ? (
                               <Badge variant="secondary" className="text-[9px] sm:text-[10px] gap-1">
                                 <Award className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-                                Top Rated
+                                {t("topProviders.topRated")}
                               </Badge>
                             ) : (
                               <span className="text-[10px] sm:text-[11px] text-muted-foreground">
-                                Top provider
+                                {t("topProviders.title")}
                               </span>
                             )}
                           </div>
@@ -236,7 +238,7 @@ export function TopProvidersSection() {
           </div>
         ) : (
           <div className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
-            No Provider found
+            {t("topProviders.empty")}
           </div>
         )}
       </div>
