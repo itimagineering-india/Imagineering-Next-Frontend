@@ -39,10 +39,10 @@ export function persistLanguage(lang: string): void {
   }
 }
 
-const stored = getStoredLang();
-
 i18n.use(initReactI18next).init({
-  lng: stored ?? "en",
+  // Keep the first client render identical to SSR. Stored language is applied
+  // after mount from Providers to avoid hydration text mismatches.
+  lng: "en",
   fallbackLng: "en",
   supportedLngs: ["en", "hi"],
   ns: ["common", "header", "footer"],
@@ -63,5 +63,12 @@ i18n.use(initReactI18next).init({
 i18n.on("languageChanged", (lng) => {
   persistLanguage(lng);
 });
+
+export function applyStoredLanguage(): void {
+  const stored = getStoredLang();
+  if (stored && i18n.language !== stored) {
+    void i18n.changeLanguage(stored);
+  }
+}
 
 export default i18n;
