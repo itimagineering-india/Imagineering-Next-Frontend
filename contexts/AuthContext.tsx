@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api, { getAuthToken, removeAuthToken } from "@/lib/api-client";
 import { disconnectChat } from "@/lib/chatService";
@@ -31,29 +31,29 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
-  const mounted = useRef(false);
 
   useEffect(() => {
-    mounted.current = true;
-    setToken(getAuthToken());
+    const tokenTimer = window.setTimeout(() => setToken(getAuthToken()), 0);
     const syncToken = () => setToken(getAuthToken());
-    window.addEventListener("auth-token-changed", syncToken);
-    window.addEventListener("storage", (e) => {
+    const handleStorage = (e: StorageEvent) => {
       if (e.key === "authToken" || e.key === "authCookieSession") syncToken();
-    });
+    };
+    window.addEventListener("auth-token-changed", syncToken);
+    window.addEventListener("storage", handleStorage);
     return () => {
-      mounted.current = false;
+      window.clearTimeout(tokenTimer);
       window.removeEventListener("auth-token-changed", syncToken);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
   const meQuery = useQuery<AuthUser>({
     queryKey: AUTH_ME_QUERY_KEY,
-    enabled: !!token && mounted.current,
+    enabled: !!token,
     queryFn: async () => {
       const res = await api.auth.getMe();
-      if (!res.success || !res.data) throw new Error((res as any).error?.message || "Failed to load user");
-      const payload = res.data as any;
+      if (!res.success || !res.data) throw new Error(res.error?.message || "Failed to load user");
+      const payload = res.data as { user?: AuthUser } & Record<string, unknown>;
       return payload.user ?? payload;
     },
     staleTime: 5 * 60 * 1000,
