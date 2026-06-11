@@ -12,10 +12,12 @@ import { useToast } from "@/hooks/use-toast";
 import { signUpWithEmail } from "@/lib/firebaseAuth";
 import api, { setAuthToken } from "@/lib/api-client";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
 export default function Signup() {
+  const { t } = useTranslation("staticPages");
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -271,7 +273,7 @@ export default function Signup() {
 
         toast({
           title: "Account created successfully!",
-          description: "Welcome to ServiceHub!",
+          description: "Welcome to Imagineering India!",
         });
 
         // Redirect to home
@@ -423,7 +425,7 @@ export default function Signup() {
       if (res.success && (res as { data?: { token?: string } }).data?.token) {
         const token = (res as { data: { token: string } }).data.token;
         setAuthToken(token);
-        toast({ title: "Account created!", description: "Welcome to ServiceHub!" });
+        toast({ title: "Account created!", description: "Welcome to Imagineering India!" });
         router.push("/");
       } else {
         const msg = (res as { error?: { message?: string } }).error?.message || "Signup failed";
@@ -447,9 +449,9 @@ export default function Signup() {
           <div className="w-full max-w-md">
           <Card className="border-0 shadow-none">
             <CardHeader className="space-y-1 px-0 pb-4 sm:pb-6 justify-start items-center">
-              <CardTitle className="text-xl sm:text-2xl font-bold">Create an account</CardTitle>
+              <CardTitle className="text-xl sm:text-2xl font-bold">{t("auth.createAccount")}</CardTitle>
               <CardDescription className="text-sm sm:text-base">
-                Join ServiceHub to connect with professionals
+                {t("auth.signup")}
               </CardDescription>
             </CardHeader>
             <CardContent className="px-0">
@@ -459,14 +461,14 @@ export default function Signup() {
                   onClick={() => { setSignupMode("phone"); setError(""); setStep("email"); setOtp(""); setOtpSent(false); setEmailVerified(false); setPhone(""); setPhoneAlreadyRegistered(false); }}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${signupMode === "phone" ? "bg-primary text-primary-foreground" : "bg-transparent"}`}
                 >
-                  Phone
+                  {t("auth.phone")}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setSignupMode("email"); setError(""); setStep("email"); setOtp(""); setOtpSent(false); setEmailVerified(false); }}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${signupMode === "email" ? "bg-primary text-primary-foreground" : "bg-transparent"}`}
                 >
-                  Email
+                  {t("auth.email")}
                 </button>
               </div>
 
@@ -592,7 +594,7 @@ export default function Signup() {
                             setPhoneChecking(false);
                           }
                         }}
-                        className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 h-10 sm:h-11 text-sm sm:text-base"
                         disabled={isSendingOTP}
                         maxLength={14}
                       />
@@ -624,7 +626,7 @@ export default function Signup() {
                         placeholder="name@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 h-10 sm:h-11 text-sm sm:text-base"
                         required
                         disabled={isSendingOTP}
                       />
@@ -827,7 +829,7 @@ export default function Signup() {
                         onChange={(e) =>
                           setFormData({ ...formData, name: e.target.value })
                         }
-                        className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 h-10 sm:h-11 text-sm sm:text-base"
                         required
                       />
                     </div>
@@ -846,7 +848,7 @@ export default function Signup() {
                           onChange={(e) =>
                             setFormData({ ...formData, phone: e.target.value })
                           }
-                          className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
+                          className="pl-12 h-10 sm:h-11 text-sm sm:text-base"
                           required
                           minLength={10}
                         />
@@ -868,7 +870,7 @@ export default function Signup() {
                         placeholder="Enter referral code if you have one"
                         value={referralCode}
                         onChange={(e) => setReferralCode(e.target.value.trim())}
-                        className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 h-10 sm:h-11 text-sm sm:text-base"
                       />
                     </div>
                   </div>
@@ -886,7 +888,7 @@ export default function Signup() {
                         onChange={(e) =>
                           setFormData({ ...formData, email: e.target.value })
                         }
-                        className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 h-10 sm:h-11 text-sm sm:text-base"
                         required
                       />
                     </div>
@@ -908,7 +910,7 @@ export default function Signup() {
                         onChange={(e) =>
                           setFormData({ ...formData, password: e.target.value })
                         }
-                        className="pl-9 pr-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 pr-12 h-10 sm:h-11 text-sm sm:text-base"
                         required={signupMode === "email"}
                         minLength={signupMode === "email" ? 6 : undefined}
                       />
@@ -945,7 +947,7 @@ export default function Signup() {
                         onChange={(e) =>
                           setFormData({ ...formData, confirmPassword: e.target.value })
                         }
-                        className="pl-9 pr-9 h-10 sm:h-11 text-sm sm:text-base"
+                        className="pl-12 pr-12 h-10 sm:h-11 text-sm sm:text-base"
                         required={signupMode === "email"}
                       />
                       <Button
