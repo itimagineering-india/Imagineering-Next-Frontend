@@ -98,6 +98,7 @@ export default function ProviderBusinessProfile() {
     businessPhone: "",
     businessEmail: "",
     website: "",
+    googleMapLink: "",
     gstRegistered: false,
     gstNumber: "",
     coordinates: { lat: "", lng: "" },
@@ -222,6 +223,7 @@ export default function ProviderBusinessProfile() {
             businessPhone: provider.businessPhone || "",
             businessEmail: provider.businessEmail || "",
             website: provider.website || "",
+            googleMapLink: provider.googleMapLink || "",
             gstRegistered: Boolean(provider.gstRegistered ?? (provider.gstNumber && String(provider.gstNumber).trim())),
             gstNumber: provider.gstNumber || "",
             coordinates: {
@@ -268,6 +270,7 @@ export default function ProviderBusinessProfile() {
       if (businessProfile.businessPhone) updateData.businessPhone = businessProfile.businessPhone.trim();
       if (businessProfile.businessEmail) updateData.businessEmail = businessProfile.businessEmail.trim().toLowerCase();
       if (businessProfile.website) updateData.website = businessProfile.website.trim();
+      if (businessProfile.googleMapLink) updateData.googleMapLink = businessProfile.googleMapLink.trim();
       updateData.gstRegistered = Boolean(businessProfile.gstRegistered);
       if (businessProfile.gstRegistered && businessProfile.gstNumber?.trim()) {
         updateData.gstNumber = businessProfile.gstNumber.trim().toUpperCase();
@@ -803,6 +806,20 @@ export default function ProviderBusinessProfile() {
                     value={businessProfile.website}
                     onChange={(e) => setBusinessProfile({ ...businessProfile, website: e.target.value })}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="google-map-link">Google Map Link (Directions)</Label>
+                  <Input
+                    id="google-map-link"
+                    type="url"
+                    placeholder="https://maps.google.com/?q=..."
+                    value={businessProfile.googleMapLink}
+                    onChange={(e) => setBusinessProfile({ ...businessProfile, googleMapLink: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Paste the Google Maps share link so customers can open directions.
+                  </p>
                 </div>
 
                 <Separator />
