@@ -47,6 +47,7 @@ import {
   type ServiceWithInteraction,
 } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
+import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -211,6 +212,7 @@ interface ServiceData {
 }
 
 export default function ServiceDetails() {
+  const { t } = useTranslation("serviceDetails");
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : params?.id?.[0];
   const serviceId = typeof params?.serviceId === "string" ? params.serviceId : params?.serviceId?.[0];
@@ -762,10 +764,10 @@ export default function ServiceDetails() {
     return (
       <main className="flex-1 flex items-center justify-center min-h-[50vh]">
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold">Service Not Found</h1>
+          <h1 className="text-2xl font-bold">{t("serviceNotFound", "Service Not Found")}</h1>
           <p className="text-muted-foreground">{error || "The service you're looking for doesn't exist."}</p>
           <Button onClick={() => router.push("/services")}>
-            Back to Services
+            {t("backToServices", "Back to Services")}
           </Button>
         </div>
       </main>
@@ -870,7 +872,9 @@ export default function ServiceDetails() {
                               <span className="pb-1 text-base font-semibold text-foreground sm:text-lg">{priceTypeLabels[service.priceType] || "/unit"}</span>
                             </div>
                           ) : (
-                            <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-foreground">Contact for quotation</p>
+                            <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-foreground">
+                              {t("contactForQuotation", "Contact for quotation")}
+                            </p>
                           )}
                         </div>
                         <div className="rounded-2xl border border-white/70 bg-white/85 p-3 shadow-sm">
@@ -918,7 +922,7 @@ export default function ServiceDetails() {
                               <Link href={`/provider/${service.provider.slug || service.provider._id}`} className="text-base font-bold leading-snug tracking-[-0.01em] text-foreground hover:text-primary lg:text-lg">
                                 {service.provider.businessName || service.provider.name}
                               </Link>
-                              {service.provider.verified && <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50">Verified</Badge>}
+                              {service.provider.verified && <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50">{t("verified", "Verified")}</Badge>}
                             </div>
                             <div className="mt-2 grid grid-cols-1 gap-2 text-xs font-medium text-muted-foreground sm:grid-cols-2 lg:text-sm">
                               <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> Fast response</span>
@@ -930,15 +934,19 @@ export default function ServiceDetails() {
                         </div>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           <Button variant="outline" asChild>
-                            <Link href={`/provider/${service.provider.slug || service.provider._id}`}>View Supplier Profile</Link>
+                            <Link href={`/provider/${service.provider.slug || service.provider._id}`}>
+                              {t("viewSupplierProfile", "View Supplier Profile")}
+                            </Link>
                           </Button>
-                          <Button onClick={handleOpenChat} disabled={isAuthenticated && buyerSubLoading}>Contact Supplier</Button>
+                          <Button onClick={handleOpenChat} disabled={isAuthenticated && buyerSubLoading}>
+                            {t("contactSupplier", "Contact Supplier")}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
 
                     <div className="hidden space-y-2 lg:block">
-                      {showPricing && <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label="Add to Cart" className="h-12 w-full text-base font-semibold" />}
+                      {showPricing && <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-12 w-full text-base font-semibold" />}
                       {helperText && <p className="text-center text-xs text-muted-foreground lg:text-sm">{helperText}</p>}
                     </div>
                   </CardContent>
@@ -962,7 +970,7 @@ export default function ServiceDetails() {
               </Card>
 
               <section className="space-y-3">
-                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">Specifications</h2>
+                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">{t("specifications")}</h2>
                 {service.customFields?.length ? (
                   <CustomFields fields={service.customFields} />
                 ) : (
@@ -971,7 +979,7 @@ export default function ServiceDetails() {
               </section>
 
               <section className="space-y-3">
-                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">Delivery Information</h2>
+                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">{t("deliveryInfo")}</h2>
                 <div className="grid gap-3">
                   {[
                     { label: "Delivery Radius", value: serviceRadius, icon: MapPinned },
@@ -1027,17 +1035,17 @@ export default function ServiceDetails() {
               </section>
 
               <section className="space-y-3">
-                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">Reviews</h2>
+                <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">{t("reviews")}</h2>
                 <Reviews serviceId={service.id} averageRating={service.rating} totalReviews={service.reviewCount} reviews={[]} />
               </section>
             </div>
 
             <Tabs defaultValue="overview" className="mt-6 hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-white via-slate-50 to-rose-50/50 p-2 shadow-sm sm:mt-8 sm:p-4 md:block">
               <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white/80 p-1 shadow-inner md:grid-cols-4 lg:w-auto">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="specifications">Specifications</TabsTrigger>
-                <TabsTrigger value="delivery">Delivery Information</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
+                <TabsTrigger value="specifications">{t("specifications")}</TabsTrigger>
+                <TabsTrigger value="delivery">{t("deliveryInfo")}</TabsTrigger>
+                <TabsTrigger value="reviews">{t("reviews")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="mt-5">
@@ -1130,9 +1138,11 @@ export default function ServiceDetails() {
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
           <div>
             {showPricing ? (
-              <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label="Add to Cart" className="h-11 w-full text-sm font-semibold" />
+              <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-11 w-full text-sm font-semibold" />
             ) : (
-              <Button onClick={handleRequestViaPlatform} className="h-11 w-full text-sm font-semibold">Enquire Now</Button>
+              <Button onClick={handleRequestViaPlatform} className="h-11 w-full text-sm font-semibold">
+                {t("enquireNow", "Enquire Now")}
+              </Button>
             )}
           </div>
         </div>
