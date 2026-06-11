@@ -18,13 +18,30 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { isPublicLocationSearchConfigured } from "@/lib/publicMaps";
+import { useTranslation } from "react-i18next";
+
+type CategoryOption = {
+  _id?: string;
+  id?: string;
+  slug: string;
+  name?: string;
+};
+
+type CategoriesResponse = {
+  categories?: CategoryOption[];
+};
+
+type SubcategoriesResponse = {
+  subcategories?: unknown[];
+};
 
 export function LocationSearchBar() {
+  const { t } = useTranslation("home");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
   const [location, setLocation] = useState<string>("");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [availableSubcategories, setAvailableSubcategories] = useState<string[]>([]);
   const router = useRouter();
   const { toast } = useToast();
@@ -36,7 +53,7 @@ export function LocationSearchBar() {
       try {
         const response = await api.categories.getAll();
         if (response.success && response.data) {
-          setCategories((response.data as any).categories || []);
+          setCategories((response.data as CategoriesResponse).categories || []);
         }
       } catch {
         setCategories([]);
@@ -55,9 +72,11 @@ export function LocationSearchBar() {
       try {
         const response = await api.categories.getSubcategories(selectedCategory);
         if (response.success) {
-          const subcategories = (response.data as any)?.subcategories || [];
+          const subcategories = (response.data as SubcategoriesResponse)?.subcategories || [];
           setAvailableSubcategories(
-            Array.isArray(subcategories) ? subcategories.filter(Boolean) : []
+            Array.isArray(subcategories)
+              ? subcategories.filter((subcat): subcat is string => typeof subcat === "string" && subcat.trim().length > 0)
+              : []
           );
         } else {
           setAvailableSubcategories([]);
@@ -96,7 +115,7 @@ export function LocationSearchBar() {
   const onGeoError = (error: string) => {
     setIsGettingLocation(false);
     toast({
-      title: "Location Access Failed",
+      title: t("search.locationFailedTitle"),
       description: error,
       variant: "destructive",
       duration: 5000,
@@ -120,9 +139,9 @@ export function LocationSearchBar() {
   });
 
   const getDisplayCategory = () => {
-    if (!selectedCategory) return "Services";
+    if (!selectedCategory) return t("search.services");
     const category = categories.find((c) => c.slug === selectedCategory);
-    return category?.name || "Services";
+    return category?.name || t("search.services");
   };
 
   const handleSearch = () => {
@@ -131,8 +150,8 @@ export function LocationSearchBar() {
     
     if (!resolvedLocation.trim()) {
       toast({
-        title: "Location Required",
-        description: "Please enter a location or use your current location to search for services.",
+        title: t("search.locationRequiredTitle"),
+        description: t("search.locationRequiredDescription"),
         variant: "destructive",
       });
       return;
@@ -140,8 +159,8 @@ export function LocationSearchBar() {
     
     if (!selectedCategory) {
       toast({
-        title: "Category Required",
-        description: "Please select a category to search for services.",
+        title: t("search.categoryRequiredTitle"),
+        description: t("search.categoryRequiredDescription"),
         variant: "destructive",
       });
       return;
@@ -204,10 +223,10 @@ export function LocationSearchBar() {
               type="text"
               placeholder={
                 !isPublicLocationSearchConfigured()
-                  ? "Location search unavailable"
+                  ? t("search.locationUnavailable")
                   : isLoaded
-                    ? "Enter a location or postal code *"
-                    : "Type to search — loads when needed"
+                    ? t("search.locationPlaceholder")
+                    : t("search.lazyLocationPlaceholder")
               }
               className="pl-9 md:pl-10 pr-9 md:pr-10 h-10 md:h-12 text-xs md:text-sm lg:text-base w-full border-input"
               value={location}
@@ -251,7 +270,7 @@ export function LocationSearchBar() {
               <Select value={selectedCategory} onValueChange={handleCategoryChange}>
                 <SelectTrigger className="h-10 md:h-12 text-xs md:text-sm lg:text-base w-full">
                   <Grid3X3 className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Category *" />
+                  <SelectValue placeholder={t("search.categoryPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
@@ -267,10 +286,10 @@ export function LocationSearchBar() {
                 <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
                   <SelectTrigger className="h-10 md:h-12 text-xs md:text-sm lg:text-base w-full">
                     <Grid3X3 className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Subcategory" />
+                    <SelectValue placeholder={t("search.subcategoryPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Subcategories</SelectItem>
+                    <SelectItem value="all">{t("filters.allSubcategories", { ns: "services" })}</SelectItem>
                     {availableSubcategories.map((subcat) => (
                       <SelectItem key={subcat} value={subcat}>
                         {subcat}
@@ -291,14 +310,14 @@ export function LocationSearchBar() {
                 {isGettingLocation ? (
                   <>
                     <Loader2 className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Getting Location...</span>
-                    <span className="sm:hidden">Getting...</span>
+                    <span className="hidden sm:inline">{t("search.gettingLocation")}</span>
+                    <span className="sm:hidden">{t("search.gettingLocation")}</span>
                   </>
                 ) : (
                   <>
                     <MapPin className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-                    <span className="hidden sm:inline">Use Location</span>
-                    <span className="sm:hidden">Location</span>
+                    <span className="hidden sm:inline">{t("search.useCurrentLocation")}</span>
+                    <span className="sm:hidden">{t("search.locationPlaceholder")}</span>
                   </>
                 )}
               </Button>
@@ -310,9 +329,9 @@ export function LocationSearchBar() {
                 disabled={!isSearchEnabled()}
               >
                 <Search className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-                <span className="hidden lg:inline">Search for {getDisplayCategory()}</span>
-                <span className="hidden md:inline lg:hidden">Search</span>
-                <span className="md:hidden">Search</span>
+                <span className="hidden lg:inline">{t("search.search")} {getDisplayCategory()}</span>
+                <span className="hidden md:inline lg:hidden">{t("search.search")}</span>
+                <span className="md:hidden">{t("search.search")}</span>
               </Button>
             </div>
           </div>
