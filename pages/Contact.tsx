@@ -29,34 +29,14 @@ import {
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import ChatWidget from "@/components/chat/ChatWidget";
 import contactHeroImage from "@/assets/contactusbanner.jpeg";
+import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
 const contactMethods = [
-  {
-    icon: Mail,
-    title: "Email Us",
-    description: "Our team will respond within 24 hours",
-    contact: "it.imagineering@gmail.com",
-    action: "mailto:it.imagineering@gmail.com",
-    gradient: "from-blue-500 to-cyan-500",
-  },
-  {
-    icon: Phone,
-    title: "Call Us",
-    description: "Mon-Fri from 8am to 6pm EST",
-    contact: "+91 9876543212",
-    action: "tel:+919876543212",
-    gradient: "from-green-500 to-emerald-500",
-  },
-  {
-    icon: MessageSquare,
-    title: "Live Chat",
-    description: "Chat with us instantly",
-    contact: "Start a conversation",
-    action: "#chat",
-    gradient: "from-purple-500 to-pink-500",
-  },
+  { icon: Mail, titleKey: "contact.emailUs", descriptionKey: "contact.emailDesc", contact: "it.imagineering@gmail.com", action: "mailto:it.imagineering@gmail.com", gradient: "from-blue-500 to-cyan-500" },
+  { icon: Phone, titleKey: "contact.callUs", descriptionKey: "contact.callDesc", contact: "+91 9876543212", action: "tel:+919876543212", gradient: "from-green-500 to-emerald-500" },
+  { icon: MessageSquare, titleKey: "contact.liveChat", descriptionKey: "contact.chatDesc", contactKey: "contact.startConversation", action: "#chat", gradient: "from-purple-500 to-pink-500" },
 ];
 
 const socialLinks = [
@@ -67,6 +47,7 @@ const socialLinks = [
 ];
 
 export default function Contact() {
+  const { t } = useTranslation("staticPages");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -77,10 +58,10 @@ export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const chatWidgetRef = useRef<{ openChat: () => void }>(null);
 
-  const heroAnimation = useScrollAnimation();
-  const methodsAnimation = useScrollAnimation();
-  const formAnimation = useScrollAnimation();
-  const infoAnimation = useScrollAnimation();
+  const { ref: heroRef, isVisible: heroVisible } = useScrollAnimation();
+  const { ref: methodsRef, isVisible: methodsVisible } = useScrollAnimation();
+  const { ref: formRef, isVisible: formVisible } = useScrollAnimation();
+  const { ref: infoRef, isVisible: infoVisible } = useScrollAnimation();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,20 +90,20 @@ export default function Contact() {
 
           {/* Decorative Elements */}
           <div className="absolute top-20 left-10 w-48 h-48 sm:w-72 sm:h-72 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-64 h-64 sm:w-96 sm:h-96 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-12 right-10 w-64 h-64 sm:w-96 sm:h-96 bg-white/5 rounded-full blur-3xl" />
 
           <div
-            ref={heroAnimation.ref}
-            className={`container relative z-10 px-4 sm:px-6 transition-all duration-700 ${heroAnimation.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+            ref={heroRef}
+            className={`container relative z-10 px-4 sm:px-6 transition-all duration-700 ${heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
           >
             <div className="mx-auto max-w-3xl text-center">
-              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/20 backdrop-blur-sm text-white/90 text-xs sm:text-sm mb-4 sm:mb-6">
+              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-full bg-white/20 backdrop-blur-sm text-white/90 text-xs sm:text-sm mb-4 sm:mb-6">
                 <Headphones className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>We're here to help</span>
+                <span>{t("contact.eyebrow")}</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 px-2">Get in Touch</h1>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 px-2">{t("contact.title")}</h1>
               <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/90 max-w-2xl mx-auto px-4">
-                Have a question or need help? We're here to assist you. Choose the best way to reach us below.
+                {t("contact.description")}
               </p>
             </div>
           </div>
@@ -132,12 +113,12 @@ export default function Contact() {
         <section className="py-8 sm:py-12 -mt-8 sm:-mt-12 md:-mt-16 relative z-20">
           <div className="container px-4 sm:px-6">
             <div
-              ref={methodsAnimation.ref}
-              className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto transition-all duration-700 delay-200 ${methodsAnimation.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+              ref={methodsRef}
+              className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto transition-all duration-700 delay-200 ${methodsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
             >
               {contactMethods.map((method, index) => (
                 <a
-                  key={method.title}
+                  key={method.titleKey}
                   href={method.action}
                   onClick={(e) => {
                     if (method.action === "#chat") {
@@ -157,14 +138,14 @@ export default function Contact() {
 
                     <CardContent className="relative pt-6 sm:pt-8 pb-6 sm:pb-8 px-4 sm:px-6 text-center">
                       <div
-                        className={`mx-auto mb-4 sm:mb-5 flex h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 items-center justify-center rounded-xl sm:rounded-2xl bg-gradient-to-br ${method.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-500`}
+                        className={`mx-auto mb-4 sm:mb-6 flex h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 items-center justify-center rounded-xl sm:rounded-2xl bg-gradient-to-br ${method.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-500`}
                       >
                         <method.icon className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8" />
                       </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1.5 sm:mb-2">{method.title}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">{method.description}</p>
+                      <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2 sm:mb-2">{t(method.titleKey)}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">{t(method.descriptionKey)}</p>
                       <span className="inline-flex items-center gap-2 text-primary font-semibold text-sm sm:text-base group-hover:gap-3 transition-all duration-300">
-                        <span className="break-all">{method.contact}</span>
+                        <span className="break-all">{method.contactKey ? t(method.contactKey) : method.contact}</span>
                         <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                       </span>
                     </CardContent>
@@ -176,35 +157,35 @@ export default function Contact() {
         </section>
 
         {/* Contact Form Section */}
-        <section className="py-8 sm:py-12 md:py-16 lg:py-24 bg-muted/30">
+        <section className="py-8 sm:py-12 md:py-16 lg:py-16 bg-muted/30">
           <div className="container px-4 sm:px-6">
             <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 max-w-6xl mx-auto">
               {/* Form */}
               <div
-                ref={formAnimation.ref}
-                className={`transition-all duration-700 delay-300 ${formAnimation.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                ref={formRef}
+                className={`transition-all duration-700 delay-300 ${formVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
               >
                 <Card className="border-0 shadow-2xl overflow-hidden">
                   <div className="bg-gradient-to-r from-primary to-primary/80 p-4 sm:p-6">
                     <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3">
                       <Send className="h-5 w-5 sm:h-6 sm:w-6" />
-                      Send Us a Message
+                      {t("contact.sendMessage")}
                     </h2>
-                    <p className="text-white/80 mt-1 text-xs sm:text-sm">We'll get back to you as soon as possible</p>
+                    <p className="text-white/80 mt-1 text-xs sm:text-sm">{t("contact.sendDescription")}</p>
                   </div>
                   <CardContent className="p-4 sm:p-6 md:p-8">
                     <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
                       <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="name" className="text-xs sm:text-sm font-medium">
-                            Your Name
+                            {t("contact.yourName")}
                           </Label>
                           <div className="relative">
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                             <Input
                               id="name"
                               placeholder="John Doe"
-                              className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors"
+                              className="pl-12 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors"
                               value={formData.name}
                               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                               required
@@ -213,7 +194,7 @@ export default function Contact() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="email" className="text-xs sm:text-sm font-medium">
-                            Email Address
+                            {t("contact.emailAddress")}
                           </Label>
                           <div className="relative">
                             <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
@@ -221,7 +202,7 @@ export default function Contact() {
                               id="email"
                               type="email"
                               placeholder="john@example.com"
-                              className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors"
+                              className="pl-12 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors"
                               value={formData.email}
                               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                               required
@@ -233,7 +214,7 @@ export default function Contact() {
                       <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="category" className="text-xs sm:text-sm font-medium">
-                            Category
+                            {t("contact.category")}
                           </Label>
                           <div className="relative">
                             <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground z-10" />
@@ -241,8 +222,8 @@ export default function Contact() {
                               value={formData.category}
                               onValueChange={(value) => setFormData({ ...formData, category: value })}
                             >
-                              <SelectTrigger className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20">
-                                <SelectValue placeholder="Select category" />
+                              <SelectTrigger className="pl-12 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20">
+                                <SelectValue placeholder={t("contact.category")} />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="general">General Inquiry</SelectItem>
@@ -256,14 +237,14 @@ export default function Contact() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="subject" className="text-xs sm:text-sm font-medium">
-                            Subject
+                            {t("contact.subject")}
                           </Label>
                           <div className="relative">
                             <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                             <Input
                               id="subject"
-                              placeholder="How can we help?"
-                              className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors"
+                              placeholder={t("contact.subject")}
+                              className="pl-12 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors"
                               value={formData.subject}
                               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                               required
@@ -274,15 +255,15 @@ export default function Contact() {
 
                       <div className="space-y-2">
                         <Label htmlFor="message" className="text-xs sm:text-sm font-medium">
-                          Message
+                          {t("contact.message")}
                         </Label>
                         <div className="relative">
                           <MessageCircle className="absolute left-3 top-3 sm:top-4 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                           <Textarea
                             id="message"
-                            placeholder="Tell us more about your inquiry..."
+                            placeholder={t("contact.message")}
                             rows={5}
-                            className="pl-9 sm:pl-10 pt-3 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors resize-none"
+                            className="pl-12 sm:pl-12 pt-3 text-sm sm:text-base border-muted-foreground/20 focus:border-primary transition-colors resize-none"
                             value={formData.message}
                             onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                             required
@@ -298,12 +279,12 @@ export default function Contact() {
                         {isSubmitting ? (
                           <span className="flex items-center gap-2">
                             <span className="h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Sending...
+                            {t("contact.submitting")}
                           </span>
                         ) : (
                           <span className="flex items-center gap-2">
                             <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            Send Message
+                            {t("contact.submit")}
                           </span>
                         )}
                       </Button>
@@ -314,8 +295,8 @@ export default function Contact() {
 
               {/* Info Section */}
               <div
-                ref={infoAnimation.ref}
-                className={`space-y-4 sm:space-y-6 transition-all duration-700 delay-400 ${infoAnimation.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                ref={infoRef}
+                className={`space-y-4 sm:space-y-6 transition-all duration-700 delay-400 ${infoVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
               >
                 <div className="mb-6 sm:mb-8">
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-3 sm:mb-4">We'd Love to Hear From You</h2>
@@ -336,7 +317,7 @@ export default function Contact() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="font-bold text-foreground text-base sm:text-lg">Our Office</h3>
-                          <p className="text-muted-foreground mt-1.5 sm:mt-2 leading-relaxed text-sm sm:text-base">
+                          <p className="text-muted-foreground mt-2 sm:mt-2 leading-relaxed text-sm sm:text-base">
                             123 Kolar, Bhopal
                             <br />
                             Madhya Pradesh, India
@@ -360,7 +341,7 @@ export default function Contact() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="font-bold text-foreground text-base sm:text-lg">Business Hours</h3>
-                          <div className="text-muted-foreground mt-1.5 sm:mt-2 space-y-1 text-xs sm:text-sm">
+                          <div className="text-muted-foreground mt-2 sm:mt-2 space-y-1 text-xs sm:text-sm">
                             <p className="flex flex-col sm:flex-row sm:justify-between sm:gap-8">
                               <span>Monday - Friday:</span>
                               <span className="font-medium text-foreground">8:00 AM - 6:00 PM</span>
@@ -391,7 +372,7 @@ export default function Contact() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="font-bold text-foreground text-base sm:text-lg">Global Support</h3>
-                          <p className="text-muted-foreground mt-1.5 sm:mt-2 text-sm sm:text-base">
+                          <p className="text-muted-foreground mt-2 sm:mt-2 text-sm sm:text-base">
                             We serve customers worldwide with support in multiple languages and time zones.
                           </p>
                         </div>
@@ -404,7 +385,7 @@ export default function Contact() {
                 <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-primary/10 rounded-full blur-2xl" />
                   <div className="relative">
-                    <h3 className="font-bold text-foreground text-base sm:text-lg mb-1.5 sm:mb-2">Need Immediate Help?</h3>
+                    <h3 className="font-bold text-foreground text-base sm:text-lg mb-2 sm:mb-2">Need Immediate Help?</h3>
                     <p className="text-muted-foreground mb-3 sm:mb-4 text-xs sm:text-sm">
                       Pro and Business subscribers have access to priority support and live chat with dedicated account
                       managers.
