@@ -14,10 +14,12 @@ import api, { setAuthToken } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { AUTH_ME_QUERY_KEY } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
 export default function Login() {
+  const { t } = useTranslation("staticPages");
   const [authMode, setAuthMode] = useState<"email" | "phone">("phone");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -215,9 +217,9 @@ export default function Login() {
         <div className="w-full max-w-md">
           <Card className="border-0 shadow-none">
             <CardHeader className="space-y-1 px-0 justify-start items-center">
-              <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
+              <CardTitle className="text-2xl font-bold">{t("auth.welcomeBack")}</CardTitle>
               <CardDescription>
-                Sign in to your account to continue
+                {t("auth.login")}
               </CardDescription>
             </CardHeader>
             <CardContent className="px-0">
@@ -227,21 +229,21 @@ export default function Login() {
                   onClick={() => { setAuthMode("phone"); setError(""); setPhoneOtpSent(false); setOtp(""); }}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${authMode === "phone" ? "bg-primary text-primary-foreground" : "bg-transparent"}`}
                 >
-                  Phone
+                  {t("auth.phone")}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setAuthMode("email"); setError(""); setPhoneOtpSent(false); setOtp(""); }}
                   className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${authMode === "email" ? "bg-primary text-primary-foreground" : "bg-transparent"}`}
                 >
-                  Email
+                  {t("auth.email")}
                 </button>
               </div>
 
               {authMode === "phone" ? (
                 <form onSubmit={phoneOtpSent ? handleLoginWithPhone : handleSendPhoneOTP} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone number</Label>
+                    <Label htmlFor="phone">{t("auth.phone")}</Label>
                     <div className="relative">
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -250,7 +252,7 @@ export default function Login() {
                         placeholder="10-digit mobile number"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="pl-9"
+                        className="pl-12"
                         disabled={phoneOtpSent}
                         maxLength={14}
                       />
@@ -290,13 +292,13 @@ export default function Login() {
                   </Button>
                   <p className="text-sm text-muted-foreground text-center">
                     No account?{" "}
-                    <Link href="/signup" className="text-primary hover:underline">Sign up</Link>
+                    <Link href="/signup" className="text-primary hover:underline">{t("auth.signup")}</Link>
                   </p>
                 </form>
               ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t("auth.email")}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -305,7 +307,7 @@ export default function Login() {
                       placeholder="name@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="pl-9"
+                      className="pl-12"
                       required
                     />
                   </div>
@@ -313,12 +315,12 @@ export default function Login() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">{t("auth.password")}</Label>
                     <Link
                       href="/forgot-password"
                       className="text-sm text-primary hover:underline"
                     >
-                      Forgot password?
+                      {t("auth.forgotPassword")}
                     </Link>
                   </div>
                   <div className="relative">
@@ -329,7 +331,7 @@ export default function Login() {
                       placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="pl-9 pr-9"
+                      className="pl-12 pr-12"
                       required
                     />
                     <Button
@@ -353,7 +355,7 @@ export default function Login() {
                 <div className="flex items-center space-x-2">
                   <Checkbox id="remember" />
                   <Label htmlFor="remember" className="text-sm font-normal">
-                    Remember me for 30 days
+                    {t("auth.rememberMe")}
                   </Label>
                 </div>
 
@@ -364,16 +366,16 @@ export default function Login() {
                 )}
 
                 <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoading ? t("auth.continue") : t("auth.login")}
                 </Button>
               </form>
               )}
             </CardContent>
             <CardFooter className="px-0">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?{" "}
+                {t("auth.noAccount")}{" "}
                 <Link href="/signup" className="text-primary hover:underline">
-                  Sign up
+                  {t("auth.signup")}
                 </Link>
               </p>
             </CardFooter>
