@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -80,6 +81,7 @@ interface ServicesProps {
 }
 
 export default function Services(props: ServicesProps = {}) {
+  const { t } = useTranslation("services");
   const { fixedLocationText, fixedLat, fixedLng, cityIntro, seoContent } = props;
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -749,32 +751,27 @@ export default function Services(props: ServicesProps = {}) {
     }
     const headline =
       browseMode === "services"
-        ? "Loading services…"
-        : "Loading providers…";
-    const t = toast({
+        ? t("map.loadingServices", "Loading services")
+        : t("map.loadingProviders", "Loading providers");
+    const loadingToast = toast({
       title: (
-        <span className="flex w-full flex-col items-center gap-4 py-1 text-center">
+        <span className="flex items-center gap-2 text-sm font-medium">
           <Loader2
-            className="h-12 w-12 shrink-0 animate-spin text-primary"
+            className="h-4 w-4 shrink-0 animate-spin text-primary"
             aria-hidden
           />
-          <span className="text-base font-semibold leading-tight">{headline}</span>
-        </span>
-      ),
-      description: (
-        <span className="block text-center text-sm text-muted-foreground">
-          Plotting markers on the map
+          <span>{headline}</span>
         </span>
       ),
       duration: 0,
       className:
-        "fixed left-1/2 top-1/2 z-[200] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 border border-border/80 bg-background/95 p-6 shadow-2xl backdrop-blur-md " +
-        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 " +
-        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 " +
-        "sm:bottom-auto sm:right-auto [&>button]:hidden",
+        "fixed bottom-5 left-1/2 z-[200] w-auto min-w-0 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-border/80 bg-background/90 px-4 py-2 shadow-lg backdrop-blur-md " +
+        "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-2 " +
+        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-2 " +
+        "sm:bottom-6 sm:right-auto [&>button]:hidden",
     });
-    mapMarkersLoadingToastRef.current = t.id;
-  }, [viewMode, browseMode, servicesLoading, providersLoading, toast, dismissToast]);
+    mapMarkersLoadingToastRef.current = loadingToast.id;
+  }, [viewMode, browseMode, servicesLoading, providersLoading, toast, dismissToast, t]);
 
   // Show loading toast when filters change (but not on initial mount)
   useEffect(() => {
@@ -1385,8 +1382,8 @@ export default function Services(props: ServicesProps = {}) {
             <DialogTitle className="flex items-center gap-2 pr-8">
               <MapPin className="h-5 w-5 shrink-0 text-primary" />
               {locationNudgeKind === "no_api"
-                ? "Location not available in this browser"
-                : "Turn on location for better results"}
+                ? t("location.noApiTitle", "Location not available in this browser")
+                : t("location.promptTitle", "Turn on location for better results")}
             </DialogTitle>
             <DialogDescription className="text-left space-y-2 pt-1">
               {locationNudgeKind === "no_api" ? (
@@ -1412,17 +1409,17 @@ export default function Services(props: ServicesProps = {}) {
               onClick={() => setLocationNudgeOpen(false)}
               disabled={locationRetryLoading}
             >
-              {locationNudgeKind === "no_api" ? "Got it" : "Continue without location"}
+              {locationNudgeKind === "no_api" ? t("location.gotIt", "Got it") : t("location.continueWithout", "Continue without location")}
             </Button>
             {locationNudgeKind === "gps_failed" && (
               <Button type="button" onClick={() => void handleRetryLocationFromDialog()} disabled={locationRetryLoading}>
                 {locationRetryLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Getting location…
+                    {t("location.getting", "Getting location...")}
                   </>
                 ) : (
-                  "Try again"
+                  t("location.tryAgain", "Try again")
                 )}
               </Button>
             )}
@@ -1470,12 +1467,12 @@ export default function Services(props: ServicesProps = {}) {
                     <SheetTrigger asChild>
                       <Button variant="outline" size="sm" className="lg:hidden shrink-0">
                         <SlidersHorizontal className="h-4 w-4 mr-1.5 sm:mr-2" />
-                        <span className="hidden xs:inline">Filters</span>
+                        <span className="hidden xs:inline">{t("filters.title", "Filters")}</span>
                       </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="w-80 p-0 flex flex-col">
                       <SheetHeader className="px-4 py-3 border-b space-y-0 text-left">
-                        <SheetTitle className="text-base font-semibold">Filters</SheetTitle>
+                        <SheetTitle className="text-base font-semibold">{t("filters.title", "Filters")}</SheetTitle>
                       </SheetHeader>
                       <div className="flex-1 overflow-y-auto px-4 py-3">
                         <FilterPanel 
@@ -1523,7 +1520,7 @@ export default function Services(props: ServicesProps = {}) {
                           setCurrentPage(1);
                         }}
                       >
-                        Providers
+                        {t("providers", "Providers")}
                       </Button>
                       <Button
                         variant={browseMode === "services" ? "secondary" : "ghost"}
@@ -1534,7 +1531,7 @@ export default function Services(props: ServicesProps = {}) {
                           setCurrentPage(1);
                         }}
                       >
-                        Services
+                        {t("services", "Services")}
                       </Button>
                     </div>
                   )}
@@ -1546,8 +1543,8 @@ export default function Services(props: ServicesProps = {}) {
                       size="icon"
                       className="rounded-r-none"
                       onClick={() => setViewMode("map")}
-                      title="Map View"
-                      aria-label="Switch to map view"
+                      title={t("mapView", "Map View")}
+                      aria-label={t("switchToMapView", "Switch to map view")}
                     >
                       <MapIcon className="h-4 w-4" />
                     </Button>
@@ -1556,8 +1553,8 @@ export default function Services(props: ServicesProps = {}) {
                       size="icon"
                       className="rounded-l-none"
                       onClick={() => setViewMode("list")}
-                      title="List View"
-                      aria-label="Switch to list view"
+                      title={t("listView", "List View")}
+                      aria-label={t("switchToListView", "Switch to list view")}
                     >
                       <List className="h-4 w-4" />
                     </Button>
@@ -1573,8 +1570,8 @@ export default function Services(props: ServicesProps = {}) {
                     {isLocationLoading && (
                       <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                         <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                        <span className="hidden sm:inline">Getting your location...</span>
-                        <span className="sm:hidden">Getting location...</span>
+                        <span className="hidden sm:inline">{t("location.gettingYourLocation", "Getting your location...")}</span>
+                        <span className="sm:hidden">{t("location.getting", "Getting location...")}</span>
                       </div>
                     )}
                     
@@ -1600,8 +1597,8 @@ export default function Services(props: ServicesProps = {}) {
                       className="text-xs sm:text-sm"
                     >
                       <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                      <span className="hidden sm:inline">Center on My Location</span>
-                      <span className="sm:hidden">My Location</span>
+                      <span className="hidden sm:inline">{t("location.centerOnMyLocation", "Center on My Location")}</span>
+                      <span className="sm:hidden">{t("location.myLocation", "My Location")}</span>
                     </Button>
                   </div>
                   
@@ -1620,7 +1617,7 @@ export default function Services(props: ServicesProps = {}) {
                               setViewMode("map");
                             }}
                           >
-                            Providers
+                            {t("providers", "Providers")}
                           </Button>
                           <Button
                             type="button"
@@ -1632,7 +1629,7 @@ export default function Services(props: ServicesProps = {}) {
                               setCurrentPage(1);
                             }}
                           >
-                            Services
+                            {t("services", "Services")}
                           </Button>
                         </div>
                       </div>
@@ -1665,12 +1662,12 @@ export default function Services(props: ServicesProps = {}) {
                               {mapPlottedMarkerCount}{" "}
                               {browseMode === "services"
                                 ? mapPlottedMarkerCount === 1
-                                  ? "service"
-                                  : "services"
+                                  ? t("service", "service")
+                                  : t("servicesLower", "services")
                                 : mapPlottedMarkerCount === 1
-                                  ? "provider"
-                                  : "providers"}{" "}
-                              on map
+                                  ? t("provider", "provider")
+                                  : t("providersLower", "providers")}{" "}
+                              {t("onMap", "on map")}
                             </Badge>
                           </div>
                         )}
