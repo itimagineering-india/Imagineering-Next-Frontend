@@ -209,7 +209,7 @@ export default function ProviderBusinessProfile() {
                 ? [provider.primarySubcategory]
                 : [],
             yearsOfExperience: provider.yearsOfExperience?.toString() || "",
-            businessDescription: (provider.bio || "").slice(0, 250),
+            businessDescription: (provider.bio || "").slice(0, 500),
             businessLogo: provider.businessLogo || "",
             coverImage: provider.coverImage || "",
             businessAddress: {
@@ -474,12 +474,12 @@ export default function ProviderBusinessProfile() {
                     placeholder="Describe your business, services, and expertise..."
                     value={businessProfile.businessDescription}
                     onChange={(e) =>
-                      setBusinessProfile({ ...businessProfile, businessDescription: e.target.value.slice(0, 250) })
+                      setBusinessProfile({ ...businessProfile, businessDescription: e.target.value.slice(0, 500) })
                     }
                     rows={4}
-                    maxLength={250}
+                    maxLength={500}
                   />
-                  <p className="text-xs text-muted-foreground">{businessProfile.businessDescription.length}/250</p>
+                  <p className="text-xs text-muted-foreground">{businessProfile.businessDescription.length}/500</p>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -657,7 +657,7 @@ export default function ProviderBusinessProfile() {
                           ? "Start typing address or click 'Fetch Location'"
                           : "Loading location services..."
                       }
-                      className="pl-10"
+                      className="pl-12"
                       disabled={!isLocationLoaded}
                       value={businessProfile.businessAddress.address}
                       onChange={(e) => {
