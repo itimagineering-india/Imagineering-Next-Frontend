@@ -1,5 +1,4 @@
-"use client";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { memo, useState, useRef } from "react";
 import { Heart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,18 +24,7 @@ interface CategoryProviderCardProps {
 // Card display width ~180px; request 240 for 1.3x density
 const CARD_IMAGE_WIDTH = 240;
 
-// Get API origin for our own uploads (e.g. /uploads/ or full API URL)
-function getApiOrigin(): string {
-  try {
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
-    if (base && typeof base === "string") {
-      return new URL(base).origin;
-    }
-  } catch {
-    /* ignore */
-  }
-  return "http://localhost:5000";
-}
+import { getApiBaseForImages } from "@/lib/api";
 
 // Optimize image URL: our API uploads, Unsplash; data URLs left as-is
 const optimizeImageUrl = (url: string, width: number = CARD_IMAGE_WIDTH): string => {
@@ -45,7 +33,7 @@ const optimizeImageUrl = (url: string, width: number = CARD_IMAGE_WIDTH): string
   // Data URLs (base64) – cannot add params; use as-is
   if (url.startsWith("data:")) return url;
 
-  const apiOrigin = getApiOrigin();
+  const apiOrigin = getApiBaseForImages();
   const isOwnUpload =
     (apiOrigin && url.startsWith(apiOrigin + "/")) ||
     url.startsWith("/uploads/");
@@ -83,16 +71,18 @@ function CategoryProviderCardComponent({
   const fallbackImage = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=240&q=75&auto=format&fit=crop";
   const [loaded, setLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  // Keep card UI minimal: favorite state is controlled by parent via `isFavorite`
 
   return (
     <Link
-      href={`/service/${id}`}
+      to={`/services/${id}`}
       className={cn(
         "group flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/40 transition-all duration-300 hover:shadow-md hover:ring-primary/20 md:rounded-xl",
         className
       )}
       style={{ contentVisibility: "auto" }}
     >
+      {/* Image — fixed aspect; never shrink */}
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
         <img
           ref={imgRef}
@@ -135,6 +125,7 @@ function CategoryProviderCardComponent({
         )}
       </div>
 
+      {/* Body: flex column so CTA stays bottom-aligned across cards */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
         <h3
           className="h-[2.05rem] overflow-hidden text-ellipsis break-words text-xs font-semibold leading-snug text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:h-[2.4rem] md:text-sm"
