@@ -80,6 +80,7 @@ interface BusinessProfile {
   businessPhone: string;
   businessEmail: string;
   website: string;
+  googleMapLink: string;
   businessLogo?: string;
 }
 
@@ -111,6 +112,7 @@ export default function ProviderProfileSettings() {
     businessPhone: "",
     businessEmail: "",
     website: "",
+    googleMapLink: "",
   });
 
   // Password State
@@ -183,7 +185,7 @@ export default function ProviderProfileSettings() {
 
         // Fetch provider business data
         const providerRes = await api.providers.getByUserId((u as any).id ?? (u as any)._id ?? "");
-        const providerData = providerRes.data as { provider?: { _id?: string; businessName?: string; tagline?: string; bio?: string; yearsOfExperience?: number; businessPhone?: string; businessEmail?: string; website?: string; businessLogo?: string } } | undefined;
+        const providerData = providerRes.data as { provider?: { _id?: string; businessName?: string; tagline?: string; bio?: string; yearsOfExperience?: number; businessPhone?: string; businessEmail?: string; website?: string; googleMapLink?: string; businessLogo?: string } } | undefined;
         if (providerRes.success && providerData?.provider) {
           const p = providerData.provider;
           setProviderId(p._id ?? null);
@@ -195,6 +197,7 @@ export default function ProviderProfileSettings() {
             businessPhone: p.businessPhone || "",
             businessEmail: p.businessEmail || "",
             website: p.website || "",
+            googleMapLink: p.googleMapLink || "",
             businessLogo: p.businessLogo,
           });
         }
@@ -624,6 +627,15 @@ export default function ProviderProfileSettings() {
                       value={business.website}
                       onChange={(e) => setBusiness({ ...business, website: e.target.value })}
                       placeholder="https://yourwebsite.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="google-map-link">Google Map Link</Label>
+                    <Input
+                      id="google-map-link"
+                      value={business.googleMapLink}
+                      onChange={(e) => setBusiness({ ...business, googleMapLink: e.target.value })}
+                      placeholder="https://maps.google.com/?q=..."
                     />
                   </div>
                 </div>
