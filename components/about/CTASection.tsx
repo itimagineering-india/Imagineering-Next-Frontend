@@ -3,12 +3,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Search, UserPlus } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+import { useTranslation } from "react-i18next";
 
 const CTASection = () => {
+  const { t } = useTranslation("staticPages");
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.3 });
 
   return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-16 bg-background">
       <div 
         ref={ref}
         className={`container mx-auto px-4 sm:px-6 text-center transition-all duration-700 ${
@@ -16,10 +18,10 @@ const CTASection = () => {
         }`}
       >
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-3 sm:mb-4">
-          Ready to Get Started?
+          {t("about.ctaTitle", "Ready to Get Started?")}
         </h2>
         <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto mb-6 sm:mb-8">
-          Join thousands of satisfied customers and trusted providers on our platform today.
+          {t("about.ctaDescription", "Join thousands of satisfied customers and trusted providers on our platform today.")}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
           <Button 
@@ -30,7 +32,7 @@ const CTASection = () => {
             <Link href="/services">
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
               <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 relative z-10 group-hover:rotate-12 transition-transform duration-300" />
-              <span className="relative z-10">Find Services Near You</span>
+              <span className="relative z-10">{t("about.findServices", "Find Services Near You")}</span>
             </Link>
           </Button>
           <Button 
@@ -41,7 +43,7 @@ const CTASection = () => {
           >
             <Link href="/signup?type=provider">
               <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300" />
-              Become a Provider
+              {t("about.becomeProvider", "Become a Provider")}
             </Link>
           </Button>
         </div>
