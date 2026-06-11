@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { X, Star, CheckCircle2, Sparkles, Users } from "lucide-react";
 import api from "@/lib/api-client";
+import { useTranslation } from "react-i18next";
 
 interface FilterPanelProps {
   onFilterChange?: (filters: FilterState) => void;
@@ -39,12 +40,16 @@ export interface FilterState {
   sortBy?: string;
 }
 
+type ProviderListResponse = {
+  providers?: Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>;
+};
+
 const deliveryOptions = [
-  { value: "1day", label: "Up to 1 day" },
-  { value: "3days", label: "Up to 3 days" },
-  { value: "7days", label: "Up to 7 days" },
-  { value: "14days", label: "Up to 14 days" },
-  { value: "30days", label: "Up to 30 days" },
+  { value: "1day", labelKey: "filters.upTo1Day" },
+  { value: "3days", labelKey: "filters.upTo3Days" },
+  { value: "7days", labelKey: "filters.upTo7Days" },
+  { value: "14days", labelKey: "filters.upTo14Days" },
+  { value: "30days", labelKey: "filters.upTo30Days" },
 ];
 
 // Cache for providers list
@@ -86,6 +91,7 @@ export function FilterPanel({
   value,
   showVerifiedOnlyFilter = true,
 }: FilterPanelProps) {
+  const { t } = useTranslation("services");
   const [providers, setProviders] = useState<Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>>([]);
   const [isLoadingProviders, setIsLoadingProviders] = useState(false);
   const [hasFetchedProviders, setHasFetchedProviders] = useState(false);
@@ -134,7 +140,7 @@ export function FilterPanel({
         categorySlug ? { categorySlug } : {}
       );
       if (response.success && response.data) {
-        const providersData = (response.data as any).providers || [];
+        const providersData = (response.data as ProviderListResponse).providers || [];
         setProviders(providersData);
         setHasFetchedProviders(true);
         
@@ -246,7 +252,7 @@ export function FilterPanel({
             onClick={clearFilters}
             className="ml-auto text-xs h-7 border-primary/50 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
           >
-            Clear all
+            {t("filters.clearAll")}
             <Badge variant="secondary" className="ml-2 text-[10px]">
               {activeFilterCount}
             </Badge>
@@ -268,7 +274,7 @@ export function FilterPanel({
       >
         {/* Categories */}
         <AccordionItem value="category" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">Category</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">{t("filters.category")}</AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {categories.length > 0 ? (
@@ -300,7 +306,7 @@ export function FilterPanel({
                   ))}
                 </RadioGroup>
               ) : (
-                <p className="text-sm text-muted-foreground py-2">No categories available</p>
+                <p className="text-sm text-muted-foreground py-2">{t("filters.noCategories")}</p>
               )}
             </div>
           </AccordionContent>
@@ -309,7 +315,7 @@ export function FilterPanel({
         {/* Subcategories - Only show if categories are selected */}
         {filters.category.length > 0 && (
           <AccordionItem value="subcategory" className="border-b">
-            <AccordionTrigger className="py-3 text-sm">Subcategory</AccordionTrigger>
+            <AccordionTrigger className="py-3 text-sm">{t("filters.subcategory")}</AccordionTrigger>
             <AccordionContent className="!pb-2 !pt-0">
               <div className="space-y-1.5 pt-1">
                 {(() => {
@@ -350,7 +356,7 @@ export function FilterPanel({
                     ))
                   ) : (
                     <p className="text-sm text-muted-foreground py-2">
-                      No subcategories available for selected categories
+                      {t("filters.noSubcategories")}
                     </p>
                   );
                 })()}
@@ -362,12 +368,12 @@ export function FilterPanel({
         {/* Top Providers */}
         <AccordionItem value="provider" className="border-b">
           <AccordionTrigger className="py-3 text-sm">
-            Top Provider
+            {t("filters.topProvider")}
           </AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {isLoadingProviders ? (
-                <p className="text-sm text-muted-foreground py-2">Loading providers...</p>
+                <p className="text-sm text-muted-foreground py-2">{t("filters.loadingProviders")}</p>
               ) : providers.length > 0 ? (
                 <RadioGroup
                   value={filters.provider || ""}
@@ -397,7 +403,7 @@ export function FilterPanel({
                   })}
                 </RadioGroup>
               ) : (
-                <p className="text-sm text-muted-foreground py-2">No providers available</p>
+                <p className="text-sm text-muted-foreground py-2">{t("filters.noProviders")}</p>
               )}
             </div>
           </AccordionContent>
@@ -405,7 +411,7 @@ export function FilterPanel({
 
         {/* Price Range */}
         <AccordionItem value="price" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">Price Range</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">{t("filters.priceRange")}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-3 pt-1 min-h-[120px]">
               <Slider
@@ -428,9 +434,9 @@ export function FilterPanel({
                     ])
                   }
                   className="w-24"
-                  placeholder="Min"
+                  placeholder={t("filters.min")}
                 />
-                <span className="text-muted-foreground">to</span>
+                <span className="text-muted-foreground">{t("filters.to")}</span>
                 <Input
                   type="number"
                   value={filters.priceRange[1]}
@@ -441,7 +447,7 @@ export function FilterPanel({
                     ])
                   }
                   className="w-24"
-                  placeholder="Max"
+                  placeholder={t("filters.max")}
                 />
               </div>
             </div>
@@ -450,7 +456,7 @@ export function FilterPanel({
 
         {/* Rating */}
         <AccordionItem value="rating" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">Minimum Rating</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">{t("filters.minimumRating")}</AccordionTrigger>
           <AccordionContent>
             <div className="flex gap-2 pt-1">
               {[4, 4.5, 4.8].map((r) => (
@@ -470,7 +476,7 @@ export function FilterPanel({
 
         {/* Delivery Time */}
         <AccordionItem value="delivery" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">Delivery Time</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">{t("filters.deliveryTime")}</AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {deliveryOptions.map((option) => (
@@ -485,7 +491,7 @@ export function FilterPanel({
                     htmlFor={option.value}
                     className="text-sm font-normal cursor-pointer"
                   >
-                    {option.label}
+                    {t(option.labelKey)}
                   </Label>
                 </div>
               ))}
@@ -496,7 +502,7 @@ export function FilterPanel({
         {/* Verified (optional) + Featured */}
         <AccordionItem value="verified" className="border-b">
           <AccordionTrigger className="py-3 text-sm">
-            {showVerifiedOnlyFilter ? "Provider Status" : "Highlights"}
+            {showVerifiedOnlyFilter ? t("filters.providerStatus") : t("filters.highlights")}
           </AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-2 pt-1">
@@ -512,7 +518,7 @@ export function FilterPanel({
                   />
                   <Label htmlFor="verified" className="text-sm font-normal cursor-pointer flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-primary" />
-                    Verified providers only
+                    {t("filters.verifiedOnly")}
                   </Label>
                 </div>
               )}
@@ -527,7 +533,7 @@ export function FilterPanel({
                 />
                 <Label htmlFor="featured" className="text-sm font-normal cursor-pointer flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-warning" />
-                  Featured services only
+                  {t("filters.featuredOnly")}
                 </Label>
               </div>
             </div>
@@ -536,14 +542,14 @@ export function FilterPanel({
 
         {/* Sort By */}
         <AccordionItem value="sort" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">Sort By</AccordionTrigger>
+          <AccordionTrigger className="py-3 text-sm">{t("filters.sortBy")}</AccordionTrigger>
           <AccordionContent className="!pb-2 !pt-0">
             <div className="space-y-1.5 pt-1">
               {[
-                { value: "relevance", label: "Nearest first" },
-                { value: "rating", label: "Highest Rated" },
-                { value: "price-low", label: "Price: Low to High" },
-                { value: "price-high", label: "Price: High to Low" },
+                { value: "relevance", label: t("filters.nearestFirst") },
+                { value: "rating", label: t("filters.highestRated") },
+                { value: "price-low", label: t("filters.priceLowHigh") },
+                { value: "price-high", label: t("filters.priceHighLow") },
               ].map((option) => (
                 <div key={option.value} className="flex items-center space-x-2 py-0.5">
                   <Checkbox
