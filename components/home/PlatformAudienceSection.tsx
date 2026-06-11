@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 
 const USER_BANNER =
   "https://dwkazjggpovin.cloudfront.net/banners/ChatGPT Image Mar 16, 2026, 06_28_56 PM.png";
@@ -10,16 +11,19 @@ const USER_APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com
 const PROVIDER_APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.imagineeringindia.imagimitra";
 
 export function PlatformAudienceSection() {
+  const { t } = useTranslation("home");
+  const userBenefits = t("audience.usersBenefits", { returnObjects: true }) as string[];
+  const providerBenefits = t("audience.providersBenefits", { returnObjects: true }) as string[];
+
   return (
     <section className="border-y border-border/80 bg-muted/20">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:px-8 md:py-16">
         <div className="mb-8 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold">
-            Find Services or Grow Your Business
+            {t("audience.heading")}
           </h2>
           <p className="text-muted-foreground mt-3 max-w-2xl text-sm sm:text-base">
-            Choose the experience that fits your goal: hire trusted professionals with
-            Imagineering India or grow as a provider with Imagimitra.
+            {t("audience.description")}
           </p>
         </div>
 
@@ -33,23 +37,23 @@ export function PlatformAudienceSection() {
             />
             <div className="p-6 sm:p-8 space-y-4">
               <p className="text-xs font-semibold tracking-wide text-primary uppercase">
-                For Users
+                {t("audience.usersLabel")}
               </p>
-              <h3 className="text-2xl font-bold">Imagineering India</h3>
+              <h3 className="text-2xl font-bold">{t("audience.usersTitle")}</h3>
               <p className="text-sm text-muted-foreground">
-                Find verified services near you in minutes.
+                {t("audience.usersDescription")}
               </p>
               <ul className="space-y-2 text-sm text-foreground/90">
-                <li>Verified providers for every major category</li>
-                <li>Trusted services with clear ratings and reviews</li>
-                <li>Fast booking with quick response options</li>
+                {userBenefits.map((benefit) => (
+                  <li key={benefit}>{benefit}</li>
+                ))}
               </ul>
               <div className="pt-1 flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/services"
                   className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  Explore Services
+                  {t("audience.exploreServices")}
                 </Link>
                 <a
                   href={USER_APP_DOWNLOAD_URL}
@@ -57,7 +61,7 @@ export function PlatformAudienceSection() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg border border-border px-6 py-3 text-sm font-medium hover:bg-accent transition-colors"
                 >
-                  Download App (Play Store)
+                  {t("audience.downloadApp")}
                 </a>
               </div>
             </div>
@@ -72,23 +76,23 @@ export function PlatformAudienceSection() {
             />
             <div className="p-6 sm:p-8 space-y-4">
               <p className="text-xs font-semibold tracking-wide text-primary uppercase">
-                For Providers
+                {t("audience.providersLabel")}
               </p>
-              <h3 className="text-2xl font-bold">Imagimitra</h3>
+              <h3 className="text-2xl font-bold">{t("audience.providersTitle")}</h3>
               <p className="text-sm text-muted-foreground">
-                Get more work and manage your provider growth in one app.
+                {t("audience.providersDescription")}
               </p>
               <ul className="space-y-2 text-sm text-foreground/90">
-                <li>Verified provider profile for trust and visibility</li>
-                <li>Smart lead and booking management tools</li>
-                <li>Faster customer response and conversion flow</li>
+                {providerBenefits.map((benefit) => (
+                  <li key={benefit}>{benefit}</li>
+                ))}
               </ul>
               <div className="pt-1 flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/signup?role=provider"
                   className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  Join as Provider
+                  {t("audience.joinProvider")}
                 </Link>
                 <a
                   href={PROVIDER_APP_DOWNLOAD_URL}
@@ -96,7 +100,7 @@ export function PlatformAudienceSection() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center w-full sm:w-auto rounded-lg border border-border px-6 py-3 text-sm font-medium hover:bg-accent transition-colors"
                 >
-                  Download App (Play Store)
+                  {t("audience.downloadApp")}
                 </a>
               </div>
             </div>
