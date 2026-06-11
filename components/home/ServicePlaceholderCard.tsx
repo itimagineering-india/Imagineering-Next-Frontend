@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
 import {
   ContractorsIcon,
@@ -94,6 +95,7 @@ interface ServicePlaceholderCardProps {
 }
 
 export function ServicePlaceholderCard({ index, size = "default" }: ServicePlaceholderCardProps) {
+  const { t } = useTranslation("home");
   const category = serviceCategories[index];
 
   const servicesHref = useMemo(
@@ -104,7 +106,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   if (!category) {
     return (
         <div className="aspect-square bg-slate-100 rounded-xl transition-all duration-300 hover:shadow-lg hover:-translate-y-2 cursor-pointer flex items-center justify-center border border-slate-200">
-        <span className="text-slate-400 text-xs font-medium">Coming Soon</span>
+        <span className="text-slate-400 text-xs font-medium">{t("services.comingSoon")}</span>
       </div>
     );
   }
@@ -134,10 +136,10 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   return (
     <Link href={servicesHref} className="block min-w-0">
       {/* flex-col + icon area must not use h-full or it steals space from the label on narrow cards */}
-      <div className="group relative aspect-square bg-white rounded-lg shadow-none transition-all duration-300 ease-out cursor-pointer flex flex-col items-stretch min-h-0 gap-1 px-1.5 py-2 sm:px-2 sm:py-2.5 border border-slate-200 overflow-hidden hover:border-transparent hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_10px_10px_-5px_rgba(0,0,0,0.04)] hover:-translate-y-1">
+      <div className="group relative aspect-square bg-white rounded-lg shadow-none transition-all duration-300 ease-out cursor-pointer flex flex-col items-stretch min-h-0 gap-1 px-2 py-2 sm:px-2 sm:py-3 border border-slate-200 overflow-hidden hover:border-transparent hover:shadow-md hover:-translate-y-1">
         {/* Image / icon — flex-1 + % width so icon scales with card */}
         {categoryImage ? (
-          <div className="relative z-10 flex flex-1 min-h-0 w-full items-center justify-center p-1 sm:p-1.5 transition-transform duration-300 group-hover:scale-[1.02]">
+          <div className="relative z-10 flex flex-1 min-h-0 w-full items-center justify-center p-1 sm:p-2 transition-transform duration-300 group-hover:scale-[1.02]">
             <div className="aspect-square w-[min(88%,_6.75rem)] sm:w-[min(82%,_8rem)] md:w-[min(78%,_9.5rem)] lg:w-[min(72%,_11rem)] max-w-full rounded-lg overflow-hidden shadow-sm group-hover:shadow-lg transition-shadow duration-300">
               <img
                 src={categoryImage}
@@ -149,7 +151,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
             </div>
           </div>
         ) : useCustomIcon ? (
-          <div className="relative z-10 flex flex-1 min-h-0 w-full items-center justify-center p-1 sm:p-1.5 transition-transform duration-300 group-hover:scale-[1.02]">
+          <div className="relative z-10 flex flex-1 min-h-0 w-full items-center justify-center p-1 sm:p-2 transition-transform duration-300 group-hover:scale-[1.02]">
             <div className="aspect-square w-[min(88%,_6.5rem)] sm:w-[min(82%,_7.5rem)] md:w-[min(78%,_9rem)] lg:w-[min(72%,_10rem)] flex items-center justify-center">
               <IconComponent className="h-full w-full" />
             </div>
