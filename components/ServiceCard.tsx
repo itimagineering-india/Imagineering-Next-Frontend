@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { withListImageParams } from "@/utils/serviceImageUrl";
 import { shouldShowPricing, type ServiceWithInteraction } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
+import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 
 export interface ServiceCardProps {
  id: string;
@@ -26,6 +27,9 @@ export interface ServiceCardProps {
  title: string;
  description: string;
  price: number;
+ priceMode?: "exact" | "range";
+ priceMin?: number;
+ priceMax?: number;
  priceType: string;
  image: string;
  provider: {
@@ -62,36 +66,15 @@ export interface ServiceCardProps {
  hideProviderDetails?: boolean;
 }
 
-const priceTypeLabels: Record<string, string> = {
- fixed: "",
- hourly: "/hr",
- daily: "/day",
- per_minute: "/min",
- per_article: "/article",
- monthly: "/mo",
- per_kg: "/kg",
- per_litre: "/litre",
- per_unit: "/unit",
- metric_ton: "/metric ton",
- per_sqft: "/sqft",
- per_sqm: "/sqm",
- per_load: "/load",
- per_trip: "/trip",
- per_cuft: "/cuft",
- per_cum: "/cum",
- per_metre: "/metre",
- per_bag: "/bag",
- lumpsum: "",
- per_project: "/project",
- negotiable: "",
-};
-
 function ServiceCardComponent({
  id,
  slug,
  title,
  description,
  price,
+ priceMode,
+ priceMin,
+ priceMax,
  priceType,
  image,
  provider,
@@ -112,8 +95,12 @@ function ServiceCardComponent({
  const showPricing = useMemo(() => shouldShowPricing(service), [service]);
  // On listing pages we always send user to details, so use a simple CTA label
  const ctaText = "View details";
- const priceLabel = useMemo(() => priceTypeLabels[priceType] || "", [priceType]);
- const formattedPrice = useMemo(() => price.toLocaleString(), [price]);
+ const formattedPrice = useMemo(
+  () => formatServicePrice({ price, priceMode, priceMin, priceMax, priceType }),
+  [price, priceMode, priceMin, priceMax, priceType]
+ );
+ const isRangePrice = isRangePricedService({ priceMode });
+ const canAddToCart = showPricing && !isRangePrice;
  const [isFavorite, setIsFavorite] = useState(false);
  const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
  const [hasCheckedFavorite, setHasCheckedFavorite] = useState(false);
@@ -215,7 +202,7 @@ function ServiceCardComponent({
    typeof window !== "undefined" ? window.location.origin + serviceUrl : serviceUrl;
   const details = [
    `Service: ${title}`,
-   showPricing ? `Price: ₹${formattedPrice}${priceLabel}` : "Price: Contact for pricing",
+   showPricing ? `Price: ${formattedPrice}` : "Price: Contact for pricing",
    provider?.businessName || provider?.name ? `Provider: ${provider.businessName || provider.name}` : null,
    `Link: ${serviceLink}`,
    "",
@@ -225,7 +212,7 @@ function ServiceCardComponent({
    .join("\n");
 
   return `https://wa.me/?text=${encodeURIComponent(details)}`;
- }, [serviceUrl, title, showPricing, formattedPrice, priceLabel, provider?.businessName, provider?.name]);
+ }, [serviceUrl, title, showPricing, formattedPrice, provider?.businessName, provider?.name]);
 
  const handleShare = () => {
   if (navigator.share) {
@@ -365,11 +352,9 @@ function ServiceCardComponent({
         <div className="text-left flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
          <span className="micro shrink-0">Price</span>
          <p className="listing-title leading-tight m-0">
-          ₹{formattedPrice}
-          <span className="caption text-muted-foreground ml-1">
-           {priceLabel}
-          </span>
+          {formattedPrice}
          </p>
+         {isRangePrice && <Badge variant="outline" className="text-[10px]">Enquiry only</Badge>}
         </div>
        ) : (
         <p className="caption ">Contact for pricing</p>
@@ -401,7 +386,7 @@ function ServiceCardComponent({
          </Button>
         )}
        </div>
-       {showPricing && (
+       {canAddToCart && (
         <AddToCartButton
          serviceId={id}
          providerName={provider?.name}
@@ -538,11 +523,9 @@ function ServiceCardComponent({
      <div className="w-full sm:w-auto">
       {!hideProviderDetails && <span className="caption">Price</span>}
       <p className="body text-foreground">
-       ₹{formattedPrice}
-       <span className="body body text-muted-foreground ml-1">
-        {priceLabel}
-       </span>
+       {formattedPrice}
       </p>
+      {isRangePrice && <Badge variant="outline" className="mt-1 text-[10px]">Enquiry only</Badge>}
      </div>
     ) : (
      <div className="w-full sm:w-auto caption">
@@ -574,7 +557,7 @@ function ServiceCardComponent({
        </Button>
       )}
      </div>
-     {showPricing && (
+     {canAddToCart && (
       <AddToCartButton
        serviceId={id}
        providerName={provider?.name}
@@ -597,6 +580,9 @@ const areEqual = (prevProps: ServiceCardProps, nextProps: ServiceCardProps) => {
   prevProps.title !== nextProps.title ||
   prevProps.description !== nextProps.description ||
   prevProps.price !== nextProps.price ||
+  prevProps.priceMode !== nextProps.priceMode ||
+  prevProps.priceMin !== nextProps.priceMin ||
+  prevProps.priceMax !== nextProps.priceMax ||
   prevProps.priceType !== nextProps.priceType ||
   prevProps.image !== nextProps.image ||
   prevProps.rating !== nextProps.rating ||
