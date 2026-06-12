@@ -1,9 +1,11 @@
-import { Link } from "react-router-dom";
+"use client";
+import Link from "next/link";
 import { memo, useState, useRef } from "react";
 import { Heart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
+import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 
 interface CategoryProviderCardProps {
   id: string;
@@ -11,6 +13,10 @@ interface CategoryProviderCardProps {
   image: string;
   location: string;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
+  priceType?: string;
   mrp?: number;
   priceLabel: string;
   rating: number;
@@ -24,7 +30,18 @@ interface CategoryProviderCardProps {
 // Card display width ~180px; request 240 for 1.3x density
 const CARD_IMAGE_WIDTH = 240;
 
-import { getApiBaseForImages } from "@/lib/api";
+// Get API origin for our own uploads (e.g. /uploads/ or full API URL)
+function getApiOrigin(): string {
+  try {
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+    if (base && typeof base === "string") {
+      return new URL(base).origin;
+    }
+  } catch {
+    /* ignore */
+  }
+  return "http://localhost:5000";
+}
 
 // Optimize image URL: our API uploads, Unsplash; data URLs left as-is
 const optimizeImageUrl = (url: string, width: number = CARD_IMAGE_WIDTH): string => {
@@ -33,7 +50,7 @@ const optimizeImageUrl = (url: string, width: number = CARD_IMAGE_WIDTH): string
   // Data URLs (base64) – cannot add params; use as-is
   if (url.startsWith("data:")) return url;
 
-  const apiOrigin = getApiBaseForImages();
+  const apiOrigin = getApiOrigin();
   const isOwnUpload =
     (apiOrigin && url.startsWith(apiOrigin + "/")) ||
     url.startsWith("/uploads/");
@@ -58,8 +75,11 @@ function CategoryProviderCardComponent({
   image,
   location,
   price,
+  priceMode,
+  priceMin,
+  priceMax,
+  priceType,
   mrp,
-  priceLabel,
   rating,
   reviewCount,
   className,
@@ -71,18 +91,18 @@ function CategoryProviderCardComponent({
   const fallbackImage = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=240&q=75&auto=format&fit=crop";
   const [loaded, setLoaded] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
-  // Keep card UI minimal: favorite state is controlled by parent via `isFavorite`
+  const isRangePrice = isRangePricedService({ priceMode });
+  const formattedPrice = formatServicePrice({ price, priceMode, priceMin, priceMax, priceType });
 
   return (
     <Link
-      to={`/services/${id}`}
+      href={`/service/${id}`}
       className={cn(
         "group flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/40 transition-all duration-300 hover:shadow-md hover:ring-primary/20 md:rounded-xl",
         className
       )}
       style={{ contentVisibility: "auto" }}
     >
-      {/* Image — fixed aspect; never shrink */}
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
         <img
           ref={imgRef}
@@ -125,7 +145,6 @@ function CategoryProviderCardComponent({
         )}
       </div>
 
-      {/* Body: flex column so CTA stays bottom-aligned across cards */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
         <h3
           className="h-[2.05rem] overflow-hidden text-ellipsis break-words text-xs font-semibold leading-snug text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:h-[2.4rem] md:text-sm"
@@ -139,14 +158,13 @@ function CategoryProviderCardComponent({
 
         <div className="mt-2 flex min-w-0 items-start justify-between gap-2 md:mt-2">
           <div className="min-w-0 flex-1 text-xs leading-tight text-foreground md:text-sm">
-            {mrp != null && mrp > 0 && (
+            {!isRangePrice && mrp != null && mrp > 0 && (
               <span className="mr-1 text-[10px] text-muted-foreground line-through md:text-xs">
                 ₹{mrp.toLocaleString("en-IN")}
               </span>
             )}
             <span className="line-clamp-2 break-words font-bold">
-              ₹{price.toLocaleString("en-IN")}
-              <span className="font-normal text-muted-foreground"> {priceLabel}</span>
+              {formattedPrice}
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
@@ -166,13 +184,19 @@ function CategoryProviderCardComponent({
             e.stopPropagation();
           }}
         >
-          <AddToCartButton
-            serviceId={id}
-            providerName={name}
-            showQuantity={false}
-            label="Add to cart"
-            className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:px-3"
-          />
+          {isRangePrice ? (
+            <Button variant="outline" className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:px-3">
+              Enquire now
+            </Button>
+          ) : (
+            <AddToCartButton
+              serviceId={id}
+              providerName={name}
+              showQuantity={false}
+              label="Add to cart"
+              className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:px-3"
+            />
+          )}
         </div>
       </div>
     </Link>
