@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import {
   Carousel,
   CarouselContent,
@@ -21,6 +22,9 @@ interface SimilarService {
   rating: number;
   reviewCount: number;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
   priceType: "hourly" | "daily" | "fixed" | "monthly" | "per_minute" | "per_article" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip";
   location: string;
 }
@@ -78,24 +82,11 @@ export function SimilarServices({
                       </Badge>
                       <div className="text-right">
                         <p className="text-sm font-bold text-primary lg:text-base">
-                          ₹{service.price.toLocaleString()}
+                          {formatServicePrice(service)}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {service.priceType === "hourly" && "/hr"}
-                          {service.priceType === "daily" && "/day"}
-                          {service.priceType === "fixed" && "fixed"}
-                          {service.priceType === "monthly" && "/month"}
-                          {service.priceType === "per_minute" && "/min"}
-                          {service.priceType === "per_article" && "/article"}
-                          {service.priceType === "per_kg" && "/kg"}
-                          {service.priceType === "per_litre" && "/litre"}
-                          {service.priceType === "per_unit" && "/unit"}
-                          {service.priceType === "metric_ton" && "/metric ton"}
-                          {service.priceType === "per_sqft" && "/sqft"}
-                          {service.priceType === "per_sqm" && "/sqm"}
-                          {service.priceType === "per_load" && "/load"}
-                          {service.priceType === "per_trip" && "/trip"}
-                        </p>
+                        {isRangePricedService(service) && (
+                          <Badge variant="outline" className="mt-1 text-[10px]">Enquiry</Badge>
+                        )}
                       </div>
                     </div>
 
