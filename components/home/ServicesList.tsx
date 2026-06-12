@@ -22,6 +22,10 @@ type Service = {
   image: string;
   location: string;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
+  priceType?: string;
   mrp?: number;
   priceLabel: string;
   rating: number;
