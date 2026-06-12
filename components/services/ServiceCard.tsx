@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Image as ImageIcon, MapPin, Crown, Star, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Edit, Trash2, MapPin, Crown, Star, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 
 interface Service {
  _id: string;
@@ -14,6 +15,9 @@ interface Service {
  };
  subcategory?: string;
  price: number;
+ priceMode?: "exact" | "range";
+ priceMin?: number;
+ priceMax?: number;
  priceType: string;
  image?: string;
  isActive: boolean;
@@ -75,8 +79,8 @@ export function ServiceCard({ service, onEdit, onDelete }: ServiceCardProps) {
       className="aspect-square w-full object-cover rounded-t-lg"
      />
     ) : (
-     <div className="h-40 sm:h-48 w-full bg-muted rounded-t-lg flex items-center justify-center">
-      <ImageIcon className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" />
+     <div className="flex h-40 w-full items-center justify-center rounded-t-lg bg-muted px-2 text-center text-sm text-muted-foreground sm:h-48">
+      No Image
      </div>
     )}
     {service.featured && (
@@ -103,24 +107,11 @@ export function ServiceCard({ service, onEdit, onDelete }: ServiceCardProps) {
       {service.category?.name || "Uncategorized"}
      </Badge>
      <p className="subtitle listing-title">
-      ₹{service.price.toLocaleString()}
-      <span className="caption ml-1">
-       {service.priceType === "hourly" && "/hr"}
-       {service.priceType === "daily" && "/day"}
-       {service.priceType === "fixed" && "fixed"}
-       {service.priceType === "monthly" && "/mo"}
-       {service.priceType === "per_minute" && "/min"}
-       {service.priceType === "per_article" && "/article"}
-       {service.priceType === "per_kg" && "/kg"}
-       {service.priceType === "per_litre" && "/litre"}
-       {service.priceType === "per_unit" && "/unit"}
-       {service.priceType === "metric_ton" && "/metric ton"}
-       {service.priceType === "per_sqft" && "/sqft"}
-       {service.priceType === "per_sqm" && "/sqm"}
-       {service.priceType === "per_load" && "/load"}
-       {service.priceType === "per_trip" && "/trip"}
-      </span>
+      {formatServicePrice(service)}
      </p>
+     {isRangePricedService(service) && (
+      <Badge variant="outline" className="text-[10px]">Enquiry only</Badge>
+     )}
     </div>
 
     {service.location && (
