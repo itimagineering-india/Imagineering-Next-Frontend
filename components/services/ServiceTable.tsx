@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Image as ImageIcon, MapPin, Crown, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 
 interface Service {
   _id: string;
@@ -25,6 +26,9 @@ interface Service {
   };
   subcategory?: string;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
   priceType: string;
   image?: string;
   images?: string[];
@@ -166,28 +170,10 @@ export function ServiceTable({ services, onEdit, onDelete }: ServiceTableProps) 
                   </TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-semibold">
-                        ₹{service.price.toLocaleString()}
-                      </p>
-                    <p className="text-xs text-muted-foreground">
-                      {service.priceType === "hourly" && "/ hour"}
-                      {service.priceType === "daily" && "/ day"}
-                      {service.priceType === "fixed" && "fixed"}
-                      {service.priceType === "monthly" && "/ month"}
-                      {service.priceType === "per_minute" && "/ minute"}
-                      {service.priceType === "per_article" && "/ article"}
-                      {service.priceType === "per_kg" && "/ kg"}
-                      {service.priceType === "per_litre" && "/ litre"}
-                      {service.priceType === "per_unit" && "/ unit"}
-                      {service.priceType === "metric_ton" && "/ metric ton"}
-                      {service.priceType === "per_sqft" && "/ sqft"}
-                      {service.priceType === "per_sqm" && "/ sqm"}
-                      {service.priceType === "per_load" && "/ load"}
-                      {service.priceType === "per_trip" && "/ trip"}
-                      {service.priceType === "lumpsum" && "lumsum"}
-                      {service.priceType === "per_project" && "/ project"}
-                      {service.priceType === "negotiable" && "negotiable"}
-                    </p>
+                      <p className="font-semibold">{formatServicePrice(service)}</p>
+                      {isRangePricedService(service) && (
+                        <Badge variant="outline" className="mt-1 text-[10px]">Enquiry only</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -303,28 +289,10 @@ export function ServiceTable({ services, onEdit, onDelete }: ServiceTableProps) 
                 {/* Price */}
                 <div className="flex items-center justify-between pt-2 border-t">
                   <div>
-                    <p className="font-semibold text-base">
-                      ₹{service.price.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {service.priceType === "hourly" && "/ hour"}
-                      {service.priceType === "daily" && "/ day"}
-                      {service.priceType === "fixed" && "fixed"}
-                      {service.priceType === "monthly" && "/ month"}
-                      {service.priceType === "per_minute" && "/ minute"}
-                      {service.priceType === "per_article" && "/ article"}
-                      {service.priceType === "per_kg" && "/ kg"}
-                      {service.priceType === "per_litre" && "/ litre"}
-                      {service.priceType === "per_unit" && "/ unit"}
-                      {service.priceType === "metric_ton" && "/ metric ton"}
-                      {service.priceType === "per_sqft" && "/ sqft"}
-                      {service.priceType === "per_sqm" && "/ sqm"}
-                      {service.priceType === "per_load" && "/ load"}
-                      {service.priceType === "per_trip" && "/ trip"}
-                      {service.priceType === "lumpsum" && "lumsum"}
-                      {service.priceType === "per_project" && "/ project"}
-                      {service.priceType === "negotiable" && "negotiable"}
-                    </p>
+                    <p className="font-semibold text-base">{formatServicePrice(service)}</p>
+                    {isRangePricedService(service) && (
+                      <Badge variant="outline" className="mt-1 text-[10px]">Enquiry only</Badge>
+                    )}
                   </div>
                   {service.location && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
