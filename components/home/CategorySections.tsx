@@ -25,6 +25,10 @@ type ApiService = {
     address?: string;
   } | null;
   price?: number | string | null;
+  priceMode?: "exact" | "range";
+  priceMin?: number | string | null;
+  priceMax?: number | string | null;
+  priceType?: string;
   mrp?: number | string | null;
   priceLabel?: string;
   rating?: number | string | null;
@@ -45,6 +49,10 @@ type NormalizedService = {
   image: string;
   location: string;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
+  priceType?: string;
   mrp?: number;
   priceLabel: string;
   rating: number;
@@ -73,6 +81,10 @@ function normalizeService(s: ApiService): NormalizedService {
     image: String(image),
     location,
     price: Number(s?.price) || 0,
+    priceMode: s?.priceMode,
+    priceMin: s?.priceMin != null ? Number(s.priceMin) : undefined,
+    priceMax: s?.priceMax != null ? Number(s.priceMax) : undefined,
+    priceType: s?.priceType,
     mrp: s?.mrp != null ? Number(s.mrp) : undefined,
     priceLabel: s?.priceLabel ?? "/ project",
     rating: Number(s?.rating) ?? 0,
