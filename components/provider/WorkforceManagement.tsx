@@ -143,6 +143,25 @@ function money(value: unknown): string {
   return `Rs. ${amount.toLocaleString("en-IN")}`;
 }
 
+function formatDate(value?: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function getSiteDelayDays(site: Site): number {
+  if (!site.expectedEndDate || site.status === "Completed") return 0;
+  const endDate = new Date(site.expectedEndDate);
+  if (Number.isNaN(endDate.getTime())) return 0;
+
+  const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime();
+  const now = new Date();
+  const todayDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  return Math.max(0, Math.floor((todayDay - endDay) / 86400000));
+}
+
 function siteIdOf(worker: Worker): string {
   if (!worker.currentSite) return "";
   return typeof worker.currentSite === "string" ? worker.currentSite : worker.currentSite._id;
@@ -172,7 +191,6 @@ export default function WorkforceManagement() {
   const [wageEntries, setWageEntries] = useState<WageEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [wageEntryOpen, setWageEntryOpen] = useState(false);
-  const [createWorkerOpen, setCreateWorkerOpen] = useState(false);
   const [importWorkerOpen, setImportWorkerOpen] = useState(false);
   const [importSearch, setImportSearch] = useState("");
   const [importLoading, setImportLoading] = useState(false);
@@ -180,15 +198,6 @@ export default function WorkforceManagement() {
   const [selectedImportCandidate, setSelectedImportCandidate] = useState<ImportCandidate | null>(null);
   const [createSiteOpen, setCreateSiteOpen] = useState(false);
   const [editingSiteId, setEditingSiteId] = useState("");
-
-  const [workerForm, setWorkerForm] = useState({
-    fullName: "",
-    mobileNumber: "",
-    role: "Labour",
-    dailyWage: "",
-    joiningDate: today,
-    status: "Active",
-  });
 
   const [importForm, setImportForm] = useState({
     role: "Labour",
@@ -260,25 +269,6 @@ export default function WorkforceManagement() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  const createWorker = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await api.workforce.createWorker({
-        ...workerForm,
-        dailyWage: Number(workerForm.dailyWage) || 0,
-      });
-      setWorkerForm({ fullName: "", mobileNumber: "", role: "Labour", dailyWage: "", joiningDate: today, status: "Active" });
-      setCreateWorkerOpen(false);
-      toast({ title: "Worker added" });
-      await loadData();
-    } catch {
-      toast({ title: "Could not add worker", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const searchImportCandidates = async () => {
     setImportLoading(true);
@@ -546,7 +536,7 @@ export default function WorkforceManagement() {
     {
       value: "workers",
       label: "Workers",
-      helper: "Add workers, assign sites, transfer or delete records",
+      helper: "Import registered workers, assign sites, transfer or delete records",
       stat: `${activeWorkers.length} active workers`,
       icon: Users,
       image: "/Workforce/workers.png",
@@ -818,58 +808,6 @@ export default function WorkforceManagement() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Dialog open={createWorkerOpen} onOpenChange={setCreateWorkerOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Worker
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create Worker</DialogTitle>
-                  <DialogDescription>Add a worker to your workforce directory.</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={createWorker} className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Full Name</Label>
-                    <Input placeholder="Full name" value={workerForm.fullName} onChange={(e) => setWorkerForm((f) => ({ ...f, fullName: e.target.value }))} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Mobile Number</Label>
-                    <Input placeholder="Mobile number" value={workerForm.mobileNumber} onChange={(e) => setWorkerForm((f) => ({ ...f, mobileNumber: e.target.value }))} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Select value={workerForm.role} onValueChange={(role) => setWorkerForm((f) => ({ ...f, role }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{WORKER_ROLES.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Daily Wage</Label>
-                    <Input type="number" min="0" placeholder="Daily wage" value={workerForm.dailyWage} onChange={(e) => setWorkerForm((f) => ({ ...f, dailyWage: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Joining Date</Label>
-                    <Input type="date" value={workerForm.joiningDate} onChange={(e) => setWorkerForm((f) => ({ ...f, joiningDate: e.target.value }))} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select value={workerForm.status} onValueChange={(status) => setWorkerForm((f) => ({ ...f, status }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Button type="submit" className="w-full sm:w-auto" disabled={saving}>Create Worker</Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
           </div>
 
           <Card>
@@ -1075,7 +1013,11 @@ export default function WorkforceManagement() {
             </Dialog>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {sites.map((site) => (
+            {sites.map((site) => {
+              const delayDays = getSiteDelayDays(site);
+              const expectedDate = formatDate(site.expectedEndDate);
+
+              return (
               <Card key={site._id}>
                 {editingSiteId === site._id ? (
                   <form onSubmit={saveSiteEdit}>
@@ -1139,12 +1081,25 @@ export default function WorkforceManagement() {
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <CardTitle className="text-base">{site.siteName}</CardTitle>
-                        <Badge variant={site.status === "Active" ? "default" : "secondary"}>{site.status}</Badge>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant={site.status === "Active" ? "default" : "secondary"}>{site.status}</Badge>
+                          {delayDays > 0 && (
+                            <Badge variant="destructive">Delayed by {delayDays} day{delayDays === 1 ? "" : "s"}</Badge>
+                          )}
+                        </div>
                       </div>
                       <CardDescription>{site.clientName || "No client name"}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       <p>{[site.location?.address, site.location?.city].filter(Boolean).join(", ") || "Location not set"}</p>
+                      {expectedDate && (
+                        <div className={delayDays > 0 ? "rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive" : "rounded-lg border p-3 text-muted-foreground"}>
+                          <p className="font-medium">Expected completion: {expectedDate}</p>
+                          {delayDays > 0 && (
+                            <p className="text-xs">Site completion date has passed. Follow up with the team to reduce delay.</p>
+                          )}
+                        </div>
+                      )}
                       <p className="text-muted-foreground">{site.workerCount || 0} assigned workers</p>
                       <div className="space-y-2">
                         <Select value={site.status} onValueChange={(status) => changeSiteStatus(site._id, status)}>
@@ -1166,7 +1121,8 @@ export default function WorkforceManagement() {
                   </>
                 )}
               </Card>
-            ))}
+            );
+            })}
           </div>
         </TabsContent>
 
