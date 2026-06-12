@@ -47,34 +47,10 @@ import {
   type ServiceWithInteraction,
 } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
+import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
-
-// Price type labels mapping
-const priceTypeLabels: Record<string, string> = {
-  fixed: "",
-  hourly: "/hr",
-  daily: "/day",
-  per_minute: "/min",
-  per_article: "/article",
-  monthly: "/mo",
-  per_kg: "/kg",
-  per_litre: "/litre",
-  per_unit: "/unit",
-  metric_ton: "/metric ton",
-  per_sqft: "/sqft",
-  per_sqm: "/sqm",
-  per_load: "/load",
-  per_trip: "/trip",
-  per_cuft: "/cuft",
-  per_cum: "/cum",
-  per_metre: "/metre",
-  per_bag: "/bag",
-  lumpsum: "",
-  per_project: "/project",
-  negotiable: "",
-};
 
 const EXCLUDED_METADATA_KEYS = new Set([
   "title",
@@ -161,6 +137,9 @@ interface ServiceData {
   title: string;
   description: string;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
   mrp?: number;
   priceType: string;
   images: string[];
@@ -331,6 +310,9 @@ export default function ServiceDetails() {
             title: serviceData.title || "Untitled Service",
             description: serviceData.description || "No description available.",
             price: serviceData.price || 0,
+            priceMode: serviceData.priceMode || "exact",
+            priceMin: serviceData.priceMin,
+            priceMax: serviceData.priceMax,
             mrp: serviceData.mrp,
             priceType: serviceData.priceType || "fixed",
             images: serviceData.images && serviceData.images.length > 0 
@@ -431,6 +413,15 @@ export default function ServiceDetails() {
   const showPricing = useMemo(() => shouldShowPricing(serviceWithInteraction), [serviceWithInteraction]);
   const canBook = useMemo(() => canBookDirectly(serviceWithInteraction), [serviceWithInteraction]);
   const helperText = useMemo(() => getHelperText(serviceWithInteraction), [serviceWithInteraction]);
+  const formattedServicePrice = useMemo(
+    () => (service ? formatServicePrice(service) : ""),
+    [service]
+  );
+  const isRangePrice = useMemo(
+    () => (service ? isRangePricedService(service) : false),
+    [service]
+  );
+  const canAddToCart = showPricing && !isRangePrice;
 
   const fieldValue = useCallback((labels: string[]) => {
     const fields = service?.customFields || [];
@@ -865,11 +856,11 @@ export default function ServiceDetails() {
                           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground lg:text-sm">Current Price</p>
                           {showPricing ? (
                             <div className="mt-1 flex flex-wrap items-end gap-2">
-                              {service.mrp != null && service.mrp > service.price && (
+                              {!isRangePrice && service.mrp != null && service.mrp > service.price && (
                                 <span className="text-lg font-semibold tabular-nums text-muted-foreground line-through">₹{service.mrp.toLocaleString()}</span>
                               )}
-                              <span className="min-w-0 break-words text-3xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">₹{service.price.toLocaleString()}</span>
-                              <span className="pb-1 text-base font-semibold text-foreground sm:text-lg">{priceTypeLabels[service.priceType] || "/unit"}</span>
+                              <span className="min-w-0 break-words text-3xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">{formattedServicePrice}</span>
+                              {isRangePrice && <Badge variant="outline" className="mb-1">Enquiry only</Badge>}
                             </div>
                           ) : (
                             <p className="mt-1 text-2xl font-bold tracking-[-0.02em] text-foreground">
@@ -946,7 +937,13 @@ export default function ServiceDetails() {
                     </Card>
 
                     <div className="hidden space-y-2 lg:block">
-                      {showPricing && <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-12 w-full text-base font-semibold" />}
+                      {canAddToCart ? (
+                        <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-12 w-full text-base font-semibold" />
+                      ) : showPricing ? (
+                        <Button onClick={handleRequestViaPlatform} className="h-12 w-full text-base font-semibold">
+                          {t("enquireNow", "Enquire Now")}
+                        </Button>
+                      ) : null}
                       {helperText && <p className="text-center text-xs text-muted-foreground lg:text-sm">{helperText}</p>}
                     </div>
                   </CardContent>
@@ -1137,7 +1134,7 @@ export default function ServiceDetails() {
         </main>
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
           <div>
-            {showPricing ? (
+            {canAddToCart ? (
               <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-11 w-full text-sm font-semibold" />
             ) : (
               <Button onClick={handleRequestViaPlatform} className="h-11 w-full text-sm font-semibold">
