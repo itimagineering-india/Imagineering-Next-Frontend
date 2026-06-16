@@ -59,7 +59,10 @@ export function AdminSimpleServiceForm({
     description: "",
     category: "",
     subcategory: "",
+    priceMode: "exact" as "exact" | "range",
     price: "",
+    priceMin: "",
+    priceMax: "",
     priceType: "fixed" as "fixed" | "hourly" | "daily" | "per_minute" | "per_article" | "monthly" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip" | "lumpsum" | "per_project" | "negotiable",
     deliveryTime: "",
     images: [] as string[],
@@ -111,7 +114,10 @@ export function AdminSimpleServiceForm({
         description: "",
         category: "",
         subcategory: "",
+        priceMode: "exact",
         price: "",
+        priceMin: "",
+        priceMax: "",
         priceType: "fixed",
         deliveryTime: "",
         images: [],
@@ -188,10 +194,21 @@ export function AdminSimpleServiceForm({
       });
       return;
     }
-    if (!formData.title || !formData.description || !formData.category || !formData.price || !formData.deliveryTime) {
+    if (!formData.title || !formData.description || !formData.category || !formData.deliveryTime) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    const min = parseFloat(formData.priceMin);
+    const max = parseFloat(formData.priceMax);
+    const exact = parseFloat(formData.price);
+    if (formData.priceMode === "range" ? (!Number.isFinite(min) || min <= 0 || !Number.isFinite(max) || max < min) : (!Number.isFinite(exact) || exact <= 0)) {
+      toast({
+        title: "Error",
+        description: formData.priceMode === "range" ? "Please enter a valid price range" : "Please enter a valid price",
         variant: "destructive",
       });
       return;
@@ -217,7 +234,9 @@ export function AdminSimpleServiceForm({
         description: formData.description,
         category: formData.category,
         subcategory: formData.subcategory || "",
-        price: parseFloat(formData.price),
+        priceMode: formData.priceMode,
+        price: formData.priceMode === "range" ? min : exact,
+        ...(formData.priceMode === "range" && { priceMin: min, priceMax: max }),
         priceType: formData.priceType,
         deliveryTime: formData.deliveryTime,
         provider: formData.provider,
@@ -393,17 +412,48 @@ export function AdminSimpleServiceForm({
             )}
 
             {/* Price and Price Type */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Price (₹) *</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  placeholder="0"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                />
+            <div className="space-y-2">
+              <Label>Price Option *</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: "exact" as const, label: "Exact Price" },
+                  { value: "range" as const, label: "Price Range" },
+                ].map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant={formData.priceMode === option.value ? "default" : "outline"}
+                    onClick={() => setFormData({ ...formData, priceMode: option.value })}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {formData.priceMode === "range" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="priceMin">Min Price (₹) *</Label>
+                    <Input id="priceMin" type="number" placeholder="0" value={formData.priceMin} onChange={(e) => setFormData({ ...formData, priceMin: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="priceMax">Max Price (₹) *</Label>
+                    <Input id="priceMax" type="number" placeholder="0" value={formData.priceMax} onChange={(e) => setFormData({ ...formData, priceMax: e.target.value })} />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price (₹) *</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    placeholder="0"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="priceType">Price Type *</Label>
                 <Select
