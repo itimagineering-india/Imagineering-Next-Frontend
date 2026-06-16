@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useBuyerPremium } from "@/hooks/useBuyerPremium";
 import {
   ServiceGallery,
   ProviderCard,
@@ -211,6 +210,7 @@ export default function ServiceDetails() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const latestActualIdRef = useRef(actualId);
+  const enquiryLeadCreatedRef = useRef<string | null>(null);
   latestActualIdRef.current = actualId;
 
   // Open modal after login redirect (auth handled globally via AuthProvider)
@@ -508,9 +508,39 @@ export default function ServiceDetails() {
     setRequestModalOpen(true);
   }, [isAuthenticated, service, toast, canBook, redirectToLogin]);
 
-  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
+  const buildServiceEnquiryMessage = useCallback(() => {
+    if (!service) {
+      return "Hi, I want to know more about this item.";
+    }
 
-  const handleOpenChat = useCallback(() => {
+    const categoryName =
+      typeof service.category === "string" ? service.category : service.category?.name;
+    const locationText = [
+      service.location?.area,
+      service.location?.city,
+      service.location?.state,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const shortDescription = service.description?.trim()
+      ? service.description.trim().slice(0, 220)
+      : "";
+
+    return [
+      "Hi, I want to know more about this item.",
+      "",
+      `Service: ${service.title}`,
+      showPricing && formattedServicePrice ? `Price: ${formattedServicePrice}` : "",
+      categoryName ? `Category: ${categoryName}` : "",
+      service.subcategory ? `Subcategory: ${service.subcategory}` : "",
+      locationText ? `Location: ${locationText}` : "",
+      shortDescription ? `Details: ${shortDescription}${service.description.length > 220 ? "..." : ""}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }, [formattedServicePrice, service, showPricing]);
+
+  const handleOpenChat = useCallback(async (prefillEnquiry = false) => {
     if (!isAuthenticated) {
       redirectToLogin();
       toast({
@@ -520,28 +550,43 @@ export default function ServiceDetails() {
       });
       return;
     }
-    if (buyerSubLoading) {
-      return;
-    }
-    if (!isBuyerPremium) {
-      toast({
-        title: "Subscription Required",
-        description: "Please subscribe to a buyer plan to chat with providers.",
-        variant: "destructive",
-      });
-      router.push("/subscriptions/buyer");
-      return;
-    }
     const providerUserId = service?.provider?._id;
     const providerName = service?.provider?.name || service?.provider?.businessName;
     if (!providerUserId) return;
+    const enquiryMessage = prefillEnquiry ? buildServiceEnquiryMessage() : "";
+    if (prefillEnquiry && service?.id && enquiryLeadCreatedRef.current !== service.id) {
+      try {
+        await api.leads.createServiceEnquiry({
+          serviceId: service.id,
+          message: enquiryMessage,
+        });
+        enquiryLeadCreatedRef.current = service.id;
+      } catch {
+        // Chat should still open even if lead persistence fails.
+      }
+    }
     const params = new URLSearchParams({
       providerId: String(providerUserId),
       ...(service?.id && { serviceId: String(service.id) }),
       ...(providerName && { name: String(providerName) }),
+      ...(prefillEnquiry && { message: enquiryMessage }),
     });
+    try {
+      sessionStorage.setItem(
+        "ii_pending_chat_intent",
+        JSON.stringify({
+          providerId: String(providerUserId),
+          serviceId: service?.id ? String(service.id) : "",
+          name: providerName ? String(providerName) : "",
+          message: prefillEnquiry ? enquiryMessage : "",
+          createdAt: Date.now(),
+        })
+      );
+    } catch {
+      // URL params are still enough when session storage is unavailable.
+    }
     router.push(`/chat?${params.toString()}`);
-  }, [isAuthenticated, buyerSubLoading, isBuyerPremium, router, toast, service?.provider, service?.id, redirectToLogin]);
+  }, [buildServiceEnquiryMessage, isAuthenticated, router, toast, service?.provider, service?.id, redirectToLogin]);
 
   const handleSubmitRequest = useCallback(async (data: {
     date: Date;
@@ -929,7 +974,7 @@ export default function ServiceDetails() {
                               {t("viewSupplierProfile", "View Supplier Profile")}
                             </Link>
                           </Button>
-                          <Button onClick={handleOpenChat} disabled={isAuthenticated && buyerSubLoading}>
+                          <Button onClick={() => handleOpenChat()}>
                             {t("contactSupplier", "Contact Supplier")}
                           </Button>
                         </div>
@@ -939,8 +984,12 @@ export default function ServiceDetails() {
                     <div className="hidden space-y-2 lg:block">
                       {canAddToCart ? (
                         <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-12 w-full text-base font-semibold" />
+                      ) : showPricing && isRangePrice ? (
+                        <Button onClick={() => handleOpenChat(true)} className="h-12 w-full text-base font-semibold">
+                          {t("enquireNow", "Enquire Now")}
+                        </Button>
                       ) : showPricing ? (
-                        <Button onClick={handleRequestViaPlatform} className="h-12 w-full text-base font-semibold">
+                        <Button onClick={() => handleOpenChat(true)} className="h-12 w-full text-base font-semibold">
                           {t("enquireNow", "Enquire Now")}
                         </Button>
                       ) : null}
@@ -1136,8 +1185,12 @@ export default function ServiceDetails() {
           <div>
             {canAddToCart ? (
               <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-11 w-full text-sm font-semibold" />
+            ) : showPricing && isRangePrice ? (
+              <Button onClick={() => handleOpenChat(true)} className="h-11 w-full text-sm font-semibold">
+                {t("enquireNow", "Enquire Now")}
+              </Button>
             ) : (
-              <Button onClick={handleRequestViaPlatform} className="h-11 w-full text-sm font-semibold">
+              <Button onClick={() => handleOpenChat(true)} className="h-11 w-full text-sm font-semibold">
                 {t("enquireNow", "Enquire Now")}
               </Button>
             )}
