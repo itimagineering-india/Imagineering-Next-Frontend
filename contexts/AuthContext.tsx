@@ -7,6 +7,7 @@ import { disconnectChat } from "@/lib/chatService";
 
 export type AuthUser = {
   _id?: string;
+  id?: string;
   name?: string;
   email?: string;
   phone?: string;
@@ -30,10 +31,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(() => getAuthToken());
 
   useEffect(() => {
-    const tokenTimer = window.setTimeout(() => setToken(getAuthToken()), 0);
     const syncToken = () => setToken(getAuthToken());
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "authToken" || e.key === "authCookieSession") syncToken();
@@ -41,7 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("auth-token-changed", syncToken);
     window.addEventListener("storage", handleStorage);
     return () => {
-      window.clearTimeout(tokenTimer);
       window.removeEventListener("auth-token-changed", syncToken);
       window.removeEventListener("storage", handleStorage);
     };
@@ -62,18 +61,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const value = useMemo<AuthContextValue>(
-    () => ({
-      user: token ? (meQuery.data ?? null) : null,
-      isAuthenticated: !!token && !!meQuery.data,
-      isLoading: !!token && meQuery.isLoading,
-      error: (meQuery.error as Error)?.message || null,
-      refresh: () => queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
-      logout: () => {
-        disconnectChat();
-        removeAuthToken();
-        queryClient.removeQueries({ queryKey: AUTH_ME_QUERY_KEY });
-      },
-    }),
+    () => {
+      const rawUser = token ? (meQuery.data ?? null) : null;
+      const user = rawUser
+        ? { ...rawUser, _id: rawUser._id ?? rawUser.id }
+        : null;
+
+      return {
+        user,
+        isAuthenticated: !!token && !!user,
+        isLoading: !!token && meQuery.isLoading,
+        error: (meQuery.error as Error)?.message || null,
+        refresh: () => queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
+        logout: () => {
+          disconnectChat();
+          removeAuthToken();
+          queryClient.removeQueries({ queryKey: AUTH_ME_QUERY_KEY });
+        },
+      };
+    },
     [token, meQuery.data, meQuery.isLoading, meQuery.error, queryClient]
   );
 
