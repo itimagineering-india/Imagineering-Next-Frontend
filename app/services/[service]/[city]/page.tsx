@@ -57,7 +57,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
   const cityName = city.replace(/-/g, " ");
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
+    <main className="mx-auto max-w-6xl px-4 py-12">
       <h1 className="text-3xl font-bold mb-4">
         {category.name} in {cityName}
       </h1>
@@ -83,7 +83,7 @@ export default async function Page({ params }: { params: Promise<Params> }) {
           <ul className="space-y-3">
             {services.map((s) => (
               <li key={s.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                <Link href={`/service/${s.slug || s.id}`} className="block">
+                <Link href={`/service/${s.slug || s.id}`} target="_blank" rel="noopener noreferrer" className="block">
                   <strong className="text-lg">{s.title}</strong>
                   {s.location?.city && (
                     <span className="text-gray-600 ml-2">– {s.location.city}</span>
