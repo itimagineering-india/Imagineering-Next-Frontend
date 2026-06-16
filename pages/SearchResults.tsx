@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { isBrowseMapAvailable } from "@/lib/publicMaps";
 import { BrowseMap, type ServiceMarker } from "@/components/map/BrowseMap";
+import { formatServicePrice } from "@/lib/formatServicePrice";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -52,6 +53,9 @@ type ServiceResult = {
   rating: number;
   reviewCount: number;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
   priceType: string;
   location?: {
     address: string;
@@ -370,6 +374,11 @@ export default function SearchResults() {
       address: addr || undefined,
       title: s.title,
       categoryName: s.category?.name,
+      price: s.price,
+      priceMode: s.priceMode,
+      priceMin: s.priceMin,
+      priceMax: s.priceMax,
+      priceType: s.priceType,
     };
   });
 
@@ -531,7 +540,9 @@ export default function SearchResults() {
                               <CardContent className="py-3 px-4 flex items-center justify-between gap-2">
                                 <span className="text-sm font-medium line-clamp-2">{s.title}</span>
                                 <Button size="sm" variant="outline" asChild>
-                                  <Link href={`/service/${s.slug || s._id}`}>View</Link>
+                                  <Link href={`/service/${s.slug || s._id}`} target="_blank" rel="noopener noreferrer">
+                                    View
+                                  </Link>
                                 </Button>
                               </CardContent>
                             </Card>
@@ -580,12 +591,7 @@ export default function SearchResults() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-foreground font-semibold text-lg">
-                          ₹{service.price}
-                          {service.priceType && (
-                            <span className="text-sm text-muted-foreground ml-1">
-                              /{service.priceType === "fixed" ? "project" : service.priceType}
-                            </span>
-                          )}
+                          {formatServicePrice(service)}
                         </span>
                         {service.location?.coordinates && (
                           <Button size="sm" variant="outline" className="gap-2">
@@ -602,6 +608,8 @@ export default function SearchResults() {
                         <Button variant="ghost" size="sm" className="px-2 text-primary" asChild>
                           <a
                             href={`/service/${service.slug || service._id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             onClick={() => handleSerpServiceNavigate(service._id, idx + 1)}
                           >
                             View Details
@@ -678,6 +686,8 @@ export default function SearchResults() {
                             <Button variant="ghost" size="sm" className="w-full mt-2" asChild>
                               <a
                                 href={`/service/${service.slug || service._id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 onClick={() => handleSerpServiceNavigate(service._id, idx + 1)}
                               >
                                 View Details
