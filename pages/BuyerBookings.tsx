@@ -37,7 +37,6 @@ import {
   Download,
   HelpCircle,
   Eye,
-  Trash2,
   FileText,
   ExternalLink,
 } from "lucide-react";
@@ -116,7 +115,6 @@ export default function BuyerBookings() {
   const [bookingInvoicesMap, setBookingInvoicesMap] = useState<Map<string, any[]>>(new Map()); // Map of bookingId -> all invoices for that booking
   const [downloadingInvoice, setDownloadingInvoice] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<string | null>(null);
-  const [deletingBookingId, setDeletingBookingId] = useState<string | null>(null);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTargetBooking, setCancelTargetBooking] = useState<Booking | null>(null);
@@ -295,38 +293,6 @@ export default function BuyerBookings() {
       });
     } finally {
       setDownloadingInvoice(null);
-    }
-  };
-
-  const handleDeleteBooking = async (bookingId: string) => {
-    if (!confirm("Are you sure you want to delete this pending booking?")) {
-      return;
-    }
-
-    setDeletingBookingId(bookingId);
-    try {
-      const response = await api.bookings.deletePending(bookingId);
-      if (response.success) {
-        toast({
-          title: "Deleted",
-          description: "Booking deleted successfully",
-        });
-        fetchBookings();
-      } else {
-        toast({
-          title: "Error",
-          description: response.error?.message || "Failed to delete booking",
-          variant: "destructive",
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete booking",
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingBookingId(null);
     }
   };
 
@@ -1135,21 +1101,6 @@ export default function BuyerBookings() {
                           <Eye className="h-4 w-4" />
                         </Button>
                         {/* Invoice download is now available inside booking details dialog */}
-                        {booking.paymentStatus?.toLowerCase() === "pending" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteBooking(booking._id)}
-                            disabled={deletingBookingId === booking._id}
-                            title="Delete Booking"
-                          >
-                            {deletingBookingId === booking._id ? (
-                              <Clock className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
                         {canCancelBooking(booking) && (
                           <Button
                             variant="destructive"
@@ -1265,21 +1216,6 @@ export default function BuyerBookings() {
                           <Eye className="h-4 w-4" />
                         </Button>
                             {/* Invoice download is now available inside booking details dialog */}
-                            {booking.paymentStatus?.toLowerCase() === "pending" && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDeleteBooking(booking._id)}
-                                disabled={deletingBookingId === booking._id}
-                                title="Delete Booking"
-                              >
-                                {deletingBookingId === booking._id ? (
-                                  <Clock className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            )}
                             {canCancelBooking(booking) && (
                               <Button
                                 variant="destructive"
