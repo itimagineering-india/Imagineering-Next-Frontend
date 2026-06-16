@@ -1978,6 +1978,12 @@ export const api = {
     }),
   },
   leads: {
+    createServiceEnquiry: (data: { serviceId: string; message?: string }) =>
+      apiRequest<{ id: string }>('/api/leads', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
     getAll: (params?: { type?: string; status?: string; search?: string; page?: number; limit?: number }) => {
       const queryParams = new URLSearchParams();
       if (params) {
