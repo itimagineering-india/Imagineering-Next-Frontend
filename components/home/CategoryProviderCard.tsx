@@ -97,6 +97,8 @@ function CategoryProviderCardComponent({
   return (
     <Link
       href={`/service/${id}`}
+      target="_blank"
+      rel="noopener noreferrer"
       className={cn(
         "group flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/40 transition-all duration-300 hover:shadow-md hover:ring-primary/20 md:rounded-xl",
         className
