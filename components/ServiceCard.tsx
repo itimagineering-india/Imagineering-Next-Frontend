@@ -231,7 +231,7 @@ function ServiceCardComponent({
   if (!hideProviderDetails) return;
   const target = e.target as HTMLElement;
   if (target.closest("a, button, [role='button'], input, select, textarea")) return;
-  window.location.href = serviceUrl;
+  window.open(serviceUrl, "_blank", "noopener,noreferrer");
  };
 
  if (viewMode === "list") {
@@ -247,6 +247,8 @@ function ServiceCardComponent({
     <div className="flex flex-row gap-3 sm:gap-4 p-3 sm:p-4 items-start">
      <Link
       href={serviceUrl}
+      target="_blank"
+      rel="noopener noreferrer"
       className="relative w-[88px] h-[88px] sm:w-32 sm:h-32 shrink-0 rounded-lg overflow-hidden block bg-muted"
      >
       {hasServiceImage ? (
@@ -283,7 +285,7 @@ function ServiceCardComponent({
      <div className="flex-1 min-w-0 flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
       <div className="flex-1 min-w-0 flex flex-col gap-2 sm:gap-2">
        <div className="flex gap-2 items-start justify-between min-w-0">
-        <Link href={serviceUrl} className="min-w-0 flex-1">
+        <Link href={serviceUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
          <h3 className="subtitle body min-w-0 overflow-hidden text-ellipsis break-words leading-snug line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] sm:leading-normal hover:text-primary transition-colors">
           {title}
          </h3>
@@ -365,7 +367,7 @@ function ServiceCardComponent({
        <div className={cn("grid gap-2 w-full", hideProviderDetails ? "grid-cols-1" : "grid-cols-2 md:grid-cols-1")}>
         {!hideProviderDetails && (
          <Button size="sm" asChild className="h-8 sm:h-9 w-full px-2 sm:px-3">
-          <Link href={serviceUrl}>{ctaText}</Link>
+          <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">{ctaText}</Link>
          </Button>
         )}
         {!hideProviderDetails && (
@@ -415,6 +417,8 @@ function ServiceCardComponent({
    <div className="relative">
     <Link
      href={serviceUrl}
+     target="_blank"
+     rel="noopener noreferrer"
      className="block aspect-square overflow-hidden bg-muted"
     >
      {hasServiceImage ? (
@@ -487,7 +491,7 @@ function ServiceCardComponent({
     )}
    >
     {/* Title */}
-    <Link href={serviceUrl}>
+    <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
      <h3 className="subtitle caption min-w-0 overflow-hidden text-ellipsis break-words text-foreground line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] hover:text-primary transition-colors">
       {title}
      </h3>
@@ -536,7 +540,7 @@ function ServiceCardComponent({
      <div className={cn("grid gap-2 w-full", hideProviderDetails ? "grid-cols-1" : "grid-cols-2")}>
       {!hideProviderDetails && (
        <Button size="sm" asChild className="w-full h-8 px-2 sm:px-3">
-        <Link href={serviceUrl}>{ctaText}</Link>
+        <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">{ctaText}</Link>
        </Button>
       )}
       {!hideProviderDetails && (
