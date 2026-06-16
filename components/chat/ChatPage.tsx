@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -21,8 +21,6 @@ import {
 import { MessageSquare, Send, ArrowLeft, Loader2, MoreVertical, Ban, Flag, UserX } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useBuyerPremium } from "@/hooks/useBuyerPremium";
-import { useProviderPremium } from "@/hooks/useProviderPremium";
 import {
   createOrGetConversation,
   getConversations,
@@ -38,17 +36,33 @@ import { formatDistanceToNow } from "date-fns";
 export default function Chat() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
-  const providerIdParam = searchParams?.get("providerId");
-  const serviceIdParam = searchParams?.get("serviceId");
-  const otherNameParam = searchParams?.get("name");
-  const { isPremium: isBuyerPremium, loading: buyerSubLoading } = useBuyerPremium();
-  const { isPremium: isProviderPremium, loading: providerSubLoading } = useProviderPremium();
-  const needsBuyerPlanToUseChat =
-    user?.role === "buyer" || (user?.role === "provider" && !!providerIdParam);
-  const isProviderWithoutSub = user?.role === "provider" && !providerSubLoading && !isProviderPremium;
-  const blockProviderMessagingForInbox =
-    isProviderWithoutSub && !(!!providerIdParam && isBuyerPremium);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const pendingChatIntent = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem("ii_pending_chat_intent");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as {
+        providerId?: string;
+        serviceId?: string;
+        name?: string;
+        message?: string;
+        createdAt?: number;
+      };
+      if (!parsed.providerId || Date.now() - Number(parsed.createdAt || 0) > 10 * 60 * 1000) {
+        sessionStorage.removeItem("ii_pending_chat_intent");
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, []);
+  const providerIdParam = searchParams?.get("providerId") || pendingChatIntent?.providerId || "";
+  const serviceIdParam = searchParams?.get("serviceId") || pendingChatIntent?.serviceId || "";
+  const otherNameParam = searchParams?.get("name") || pendingChatIntent?.name || "";
+  const draftMessageParam = searchParams?.get("message") || pendingChatIntent?.message || "";
+  const currentUserId = String(user?._id || user?.id || "");
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
@@ -68,6 +82,7 @@ export default function Chat() {
   const [blockedListOpen, setBlockedListOpen] = useState(false);
   const [unblockingId, setUnblockingId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const appliedDraftRef = useRef<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const { toast } = useToast();
 
@@ -84,17 +99,16 @@ export default function Chat() {
 
   // Open conversation from URL params
   useEffect(() => {
-    if (
-      !isAuthenticated ||
-      !user?._id ||
-      !providerIdParam ||
-      providerIdParam === user._id
-    )
+    if (authLoading || !isAuthenticated || !currentUserId || !providerIdParam) {
       return;
+    }
 
-    const requiresBuyerPlan =
-      user?.role === "buyer" || (user?.role === "provider" && !!providerIdParam);
-    if (requiresBuyerPlan && (buyerSubLoading || !isBuyerPremium)) return;
+    if (providerIdParam === currentUserId) {
+      setSelectedConv(null);
+      setOpeningConv(false);
+      setOpenError("You are logged in as this provider. Please use a different buyer account to send an enquiry.");
+      return;
+    }
 
     const openConversation = async () => {
       setOpeningConv(true);
@@ -107,7 +121,7 @@ export default function Chat() {
           return;
         }
         const conv = await createOrGetConversation(
-          (user._id ?? "") as string,
+          currentUserId,
           providerIdParam ?? "",
           serviceIdParam || undefined
         );
@@ -118,6 +132,15 @@ export default function Chat() {
         });
         if (otherNameParam) {
           setOtherNames((prev) => ({ ...prev, [providerIdParam]: otherNameParam }));
+        }
+        if (draftMessageParam && appliedDraftRef.current !== draftMessageParam) {
+          setInput((prev) => (prev.trim() ? prev : draftMessageParam));
+          appliedDraftRef.current = draftMessageParam;
+        }
+        try {
+          sessionStorage.removeItem("ii_pending_chat_intent");
+        } catch {
+          // ignore
         }
       } catch (e) {
         console.error("Failed to create conversation:", e);
@@ -132,52 +155,63 @@ export default function Chat() {
     openConversation();
   }, [
     isAuthenticated,
-    user?._id,
-    user?.role,
+    authLoading,
+    currentUserId,
     providerIdParam,
     serviceIdParam,
     otherNameParam,
-    buyerSubLoading,
-    isBuyerPremium,
+    draftMessageParam,
   ]);
 
   // Load conversations
   useEffect(() => {
-    if (!isAuthenticated || !user?._id) {
+    if (authLoading) return;
+    if (!isAuthenticated || !currentUserId) {
       setLoading(false);
       return;
     }
 
     let cancelled = false;
-    getConversations(user._id ?? "").then((list) => {
+    getConversations(currentUserId).then((list) => {
       if (cancelled) return;
       setConversations(list);
+      if (providerIdParam) {
+        const matchingConv = list.find(
+          (conv) =>
+            conv.buyerId === providerIdParam ||
+            conv.providerId === providerIdParam ||
+            (serviceIdParam && conv.serviceId === serviceIdParam)
+        );
+        if (matchingConv) {
+          setSelectedConv(matchingConv);
+        }
+      }
       setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, user?._id]);
+  }, [authLoading, currentUserId, isAuthenticated, providerIdParam, serviceIdParam]);
 
   // Fetch blocked users
   useEffect(() => {
-    if (!isAuthenticated || !user?._id) return;
+    if (authLoading || !isAuthenticated || !currentUserId) return;
     api.chat.getBlockedUsers().then((res) => {
       const list = res.success ? (res.data as { blockedUsers?: string[] } | undefined)?.blockedUsers : undefined;
       if (list) setBlockedUsers(new Set(list));
     }).catch(() => {});
-  }, [isAuthenticated, user?._id]);
+  }, [authLoading, currentUserId, isAuthenticated]);
 
   // Fetch names for other participants
   useEffect(() => {
-    if (!user?._id) return;
+    if (!currentUserId) return;
 
     const ids = new Set<string>();
     conversations.forEach((c) => {
-      ids.add(getOtherParticipant(c, user._id ?? ""));
+      ids.add(getOtherParticipant(c, currentUserId));
     });
     if (selectedConv) {
-      ids.add(getOtherParticipant(selectedConv, user._id ?? ""));
+      ids.add(getOtherParticipant(selectedConv, currentUserId));
     }
 
     ids.forEach((id) => {
@@ -196,7 +230,7 @@ export default function Chat() {
           setOtherNames((prev) => ({ ...prev, [id]: "User" }));
         });
     });
-  }, [conversations, selectedConv, user?._id]);
+  }, [conversations, currentUserId, selectedConv]);
 
   // Fetch names for blocked users (when blocked list is shown)
   useEffect(() => {
@@ -219,9 +253,9 @@ export default function Chat() {
     });
   }, [blockedListOpen, blockedUsers]);
 
-  // Subscribe to messages for selected conversation (provider inbox needs supplier plan unless buyer-side chat)
+  // Subscribe to messages for selected conversation.
   useEffect(() => {
-    if (!selectedConv?.id || blockProviderMessagingForInbox) {
+    if (!selectedConv?.id) {
       setMessages([]);
       return;
     }
@@ -230,16 +264,16 @@ export default function Chat() {
       setMessages(msgs);
     });
     return () => unsubscribe();
-  }, [selectedConv?.id, blockProviderMessagingForInbox]);
+  }, [selectedConv?.id]);
 
   const handleSend = async () => {
-    if (!input.trim() || !selectedConv || !user?._id || sending) return;
+    if (!input.trim() || !selectedConv || !currentUserId || sending) return;
 
     setSending(true);
     const textToSend = input.trim();
     setInput("");
     try {
-      const newMsg = await sendMessage(selectedConv.id, user._id ?? "", textToSend);
+      const newMsg = await sendMessage(selectedConv.id, currentUserId, textToSend);
       setMessages((prev) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
@@ -253,11 +287,11 @@ export default function Chat() {
   };
 
   const getOtherName = (conv: Conversation) => {
-    const otherId = getOtherParticipant(conv, user?._id || "");
+    const otherId = getOtherParticipant(conv, currentUserId);
     return otherNames[otherId] || "User";
   };
 
-  const otherUserId = selectedConv ? getOtherParticipant(selectedConv, user?._id || "") : null;
+  const otherUserId = selectedConv ? getOtherParticipant(selectedConv, currentUserId) : null;
 
   const handleBlock = async () => {
     if (!otherUserId || blocking) return;
@@ -324,37 +358,24 @@ export default function Chat() {
     }
   };
 
-  if (!isAuthenticated) {
-    router.push(`/login?redirect=${encodeURIComponent("/chat" + (providerIdParam ? `?providerId=${providerIdParam}` : ""))}`);
-    return null;
+  useEffect(() => {
+    if (authLoading || isAuthenticated) return;
+    const query = searchParams?.toString();
+    router.push(`/login?redirect=${encodeURIComponent(`/chat${query ? `?${query}` : ""}`)}`);
+  }, [authLoading, isAuthenticated, router, searchParams]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <main className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+        </main>
+      </div>
+    );
   }
 
-  if (needsBuyerPlanToUseChat) {
-    if (buyerSubLoading) {
-      return (
-        <div className="min-h-screen flex flex-col bg-background">
-          <main className="flex-1 flex items-center justify-center">
-            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-          </main>
-        </div>
-      );
-    }
-    if (!isBuyerPremium) {
-      return (
-        <div className="min-h-screen flex flex-col bg-background">
-          <main className="flex-1 container max-w-md mx-auto px-4 py-12 flex flex-col items-center justify-center text-center">
-            <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Subscription Required</h2>
-            <p className="text-muted-foreground mb-6">
-              Please subscribe to a buyer plan to chat with providers.
-            </p>
-            <Button onClick={() => router.push("/subscriptions/buyer")}>
-              View Subscription Plans
-            </Button>
-          </main>
-        </div>
-      );
-    }
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (
@@ -377,7 +398,7 @@ export default function Chat() {
         <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-180px)] sm:h-[calc(100vh-200px)] md:h-[calc(100vh-220px)] min-h-[320px] overflow-hidden">
           {/* Conversation list - hidden on mobile when chat is open */}
           <Card className={`overflow-hidden flex flex-col min-h-0 ${selectedConv && isMobile ? "hidden md:flex" : ""}`}>
-            <CardHeader className="py-2.5 sm:py-3 border-b shrink-0 space-y-2">
+            <CardHeader className="py-3 sm:py-3 border-b shrink-0 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-muted-foreground">
                   Your conversations
@@ -413,7 +434,7 @@ export default function Chat() {
               ) : (
                 <div className="divide-y">
                   {conversations
-                    .filter((conv) => !blockedUsers.has(getOtherParticipant(conv, user?._id || "")))
+                    .filter((conv) => !blockedUsers.has(getOtherParticipant(conv, currentUserId)))
                     .map((conv) => (
                     <button
                       key={conv.id}
@@ -432,7 +453,7 @@ export default function Chat() {
                         <p className="font-medium truncate">{getOtherName(conv)}</p>
                         {conv.lastMessage && (
                           <p className="text-xs text-muted-foreground truncate">
-                            {blockProviderMessagingForInbox ? "New message" : conv.lastMessage.text}
+                            {conv.lastMessage.text}
                           </p>
                         )}
                       </div>
@@ -452,20 +473,8 @@ export default function Chat() {
           {/* Message thread - hidden on mobile when no conversation selected */}
           <Card className={`overflow-hidden flex flex-col ${!selectedConv && isMobile ? "hidden" : ""}`}>
             {selectedConv ? (
-              blockProviderMessagingForInbox ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 min-h-0">
-                  <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
-                  <h2 className="text-lg font-semibold mb-2">Subscription Required</h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Someone has messaged you. Subscribe to view messages and respond to buyers.
-                  </p>
-                  <Button onClick={() => router.push("/subscriptions/supplier")}>
-                    View Subscription Plans
-                  </Button>
-                </div>
-              ) : (
               <>
-                <CardHeader className="py-2.5 sm:py-3 border-b flex flex-row items-center justify-between gap-2 sm:gap-3 shrink-0">
+                <CardHeader className="py-3 sm:py-3 border-b flex flex-row items-center justify-between gap-2 sm:gap-3 shrink-0">
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                     <Avatar className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
                       <AvatarFallback className="bg-primary/10 text-primary text-sm">
@@ -545,11 +554,11 @@ export default function Chat() {
                   {messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`flex ${msg.senderId === user?._id ? "justify-end" : "justify-start"}`}
+                      className={`flex ${msg.senderId === currentUserId ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 py-2 ${
-                          msg.senderId === user?._id
+                          msg.senderId === currentUserId
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted"
                         }`}
@@ -557,7 +566,7 @@ export default function Chat() {
                         <p className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                         <p
                           className={`text-[10px] mt-1 ${
-                            msg.senderId === user?._id
+                            msg.senderId === currentUserId
                               ? "text-primary-foreground/80"
                               : "text-muted-foreground"
                           }`}
@@ -596,7 +605,6 @@ export default function Chat() {
                   </Button>
                 </div>
               </>
-              )
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 min-h-0">
                 {openingConv ? (
