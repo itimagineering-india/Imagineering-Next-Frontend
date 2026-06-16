@@ -63,7 +63,7 @@ export function SimilarServices({
               key={service.id}
               className="basis-3/4 pl-2 sm:basis-1/2 md:pl-4 lg:basis-1/4 xl:basis-1/5"
             >
-              <Link href={`/service/${service.slug || service.id}`}>
+              <Link href={`/service/${service.slug || service.id}`} target="_blank" rel="noopener noreferrer">
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-rose-50/60 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg">
                   <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-rose-50">
                     <img
