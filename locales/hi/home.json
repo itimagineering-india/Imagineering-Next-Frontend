@@ -1,0 +1,83 @@
+{
+  "services": {
+    "our": "हमारी",
+    "title": "सेवाएं",
+    "description": "कई श्रेणियों में प्रोफेशनल सेवाओं की विस्तृत रेंज खोजें।",
+    "viewAll": "सभी सेवाएं देखें",
+    "comingSoon": "जल्द आ रहा है"
+  },
+  "topProviders": {
+    "our": "हमारे",
+    "title": "टॉप प्रोवाइडर",
+    "description": "वेरिफाइड प्रोफाइल और बेहतरीन सेवा वाले भरोसेमंद प्रोफेशनल।",
+    "verified": "वेरिफाइड",
+    "topRated": "टॉप रेटेड",
+    "viewProfile": "प्रोफाइल देखें",
+    "loading": "टॉप प्रोवाइडर लोड हो रहे हैं...",
+    "empty": "अभी कोई टॉप प्रोवाइडर उपलब्ध नहीं है।"
+  },
+  "audience": {
+    "heading": "सेवाएं खोजें या अपना व्यवसाय बढ़ाएं",
+    "description": "अपने लक्ष्य के अनुसार अनुभव चुनें: Imagineering India के साथ भरोसेमंद प्रोफेशनल हायर करें या Imagimitra के साथ प्रोवाइडर के रूप में बढ़ें।",
+    "usersLabel": "यूजर्स के लिए",
+    "usersTitle": "Imagineering India",
+    "usersDescription": "अपने आस-पास वेरिफाइड सेवाएं मिनटों में खोजें।",
+    "usersBenefits": [
+      "हर मुख्य श्रेणी के लिए वेरिफाइड प्रोवाइडर",
+      "स्पष्ट रेटिंग और रिव्यू के साथ भरोसेमंद सेवाएं",
+      "क्विक रिस्पॉन्स विकल्पों के साथ तेज बुकिंग"
+    ],
+    "exploreServices": "सेवाएं देखें",
+    "providersLabel": "प्रोवाइडर्स के लिए",
+    "providersTitle": "Imagimitra",
+    "providersDescription": "ज्यादा काम पाएं और अपनी प्रोवाइडर ग्रोथ एक ऐप में मैनेज करें।",
+    "providersBenefits": [
+      "भरोसा और विजिबिलिटी के लिए वेरिफाइड प्रोवाइडर प्रोफाइल",
+      "स्मार्ट लीड और बुकिंग मैनेजमेंट टूल्स",
+      "तेज ग्राहक रिस्पॉन्स और कन्वर्जन फ्लो"
+    ],
+    "joinProvider": "प्रोवाइडर बनें",
+    "downloadApp": "ऐप डाउनलोड करें (Play Store)"
+  },
+  "search": {
+    "locationUnavailable": "लोकेशन सर्च उपलब्ध नहीं है",
+    "locationPlaceholder": "लोकेशन या पिन कोड डालें *",
+    "lazyLocationPlaceholder": "टाइप करें — जरूरत पड़ने पर लोड होगा",
+    "categoryPlaceholder": "श्रेणी *",
+    "subcategoryPlaceholder": "उप-श्रेणी",
+    "useCurrentLocation": "वर्तमान लोकेशन इस्तेमाल करें",
+    "gettingLocation": "लोकेशन...",
+    "search": "खोजें",
+    "services": "सेवाएं",
+    "locationFailedTitle": "लोकेशन एक्सेस विफल",
+    "locationRequiredTitle": "लोकेशन जरूरी है",
+    "locationRequiredDescription": "सेवाएं खोजने के लिए लोकेशन डालें या वर्तमान लोकेशन इस्तेमाल करें।",
+    "categoryRequiredTitle": "श्रेणी जरूरी है",
+    "categoryRequiredDescription": "सेवाएं खोजने के लिए एक श्रेणी चुनें।"
+  },
+  "requirementPopup": {
+    "title": "अपनी जरूरत सबमिट करें",
+    "description": "Imagineering India को बताएं आपको क्या चाहिए — हम कोटेशन के साथ संपर्क करेंगे। मोबाइल और लोकेशन जोड़ें ताकि हम आपसे संपर्क कर सकें।",
+    "titleLabel": "जरूरत का शीर्षक",
+    "titlePlaceholder": "उदाहरण: टैरेस वॉटरप्रूफिंग चाहिए",
+    "descriptionLabel": "अपनी जरूरत बताएं",
+    "descriptionPlaceholder": "काम का दायरा, मात्रा, समय या जरूरी जानकारी लिखें।",
+    "phoneLabel": "मोबाइल नंबर",
+    "phonePlaceholder": "10 अंकों का मोबाइल नंबर",
+    "locationLabel": "लोकेशन",
+    "locationPlaceholder": "एरिया, शहर या पूरा पता",
+    "submit": "जरूरत सबमिट करें",
+    "submitting": "सबमिट हो रहा है...",
+    "validationDetailTitle": "कृपया और जानकारी जोड़ें",
+    "validationDetailDescription": "शीर्षक कम से कम 5 अक्षर और विवरण कम से कम 20 अक्षर का होना चाहिए।",
+    "validationLocationTitle": "लोकेशन जरूरी है",
+    "validationLocationDescription": "जहां सेवा चाहिए वह एरिया, शहर या पूरा पता डालें।",
+    "validationPhoneTitle": "मान्य मोबाइल नंबर",
+    "validationPhoneDescription": "6–9 से शुरू होने वाला 10 अंकों का भारतीय मोबाइल नंबर डालें।",
+    "successTitle": "जरूरत सबमिट हो गई",
+    "successDescription": "हम समीक्षा करके जल्द संपर्क करेंगे।",
+    "failedTitle": "सबमिट नहीं हो पाया",
+    "failedDescription": "कृपया फिर कोशिश करें।",
+    "errorTitle": "त्रुटि"
+  }
+}
