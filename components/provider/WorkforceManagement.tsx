@@ -581,10 +581,10 @@ export default function WorkforceManagement() {
       <div className="mx-auto max-w-3xl px-3 py-6 sm:px-6">
         <Card>
           <CardHeader>
-            <Badge className="w-fit" variant="secondary">Contractor Feature</Badge>
+            <Badge className="w-fit" variant="secondary">Provider Feature</Badge>
             <CardTitle>Workforce Management</CardTitle>
             <CardDescription>
-              {access.reason || "This feature is currently available for contractor providers."}
+              {access.reason || "This feature is available for provider accounts."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row">
