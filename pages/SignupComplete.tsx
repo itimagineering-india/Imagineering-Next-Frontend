@@ -19,19 +19,47 @@ interface SocialProfile {
   photoURL?: string;
 }
 
+type SocialProvider = "google" | "facebook";
+
+function getProviderKeys(provider: SocialProvider) {
+  return provider === "facebook"
+    ? { tempToken: "facebookTempToken", profile: "facebookProfile", label: "Facebook" }
+    : { tempToken: "googleTempToken", profile: "googleProfile", label: "Google" };
+}
+
 export default function SignupComplete() {
   const router = useRouter();
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<SocialProfile | null>(null);
+  const [provider, setProvider] = useState<SocialProvider>("google");
   const [role, setRole] = useState<"buyer" | "provider" | "">("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const providerParam = params.get("provider");
+    const resolvedProvider: SocialProvider =
+      providerParam === "facebook" ? "facebook" : "google";
+    const keys = getProviderKeys(resolvedProvider);
+
     try {
-      const storedProfile = sessionStorage.getItem("googleProfile");
+      let storedProfile = sessionStorage.getItem(keys.profile);
+      if (!storedProfile && resolvedProvider === "google") {
+        storedProfile = sessionStorage.getItem("facebookProfile");
+        if (storedProfile) {
+          setProvider("facebook");
+          const parsed: SocialProfile = JSON.parse(storedProfile);
+          if (!parsed.email) {
+            router.push("/login");
+            return;
+          }
+          setProfile(parsed);
+          return;
+        }
+      }
       if (!storedProfile) {
         router.push("/login");
         return;
@@ -41,6 +69,7 @@ export default function SignupComplete() {
         router.push("/login");
         return;
       }
+      setProvider(resolvedProvider);
       setProfile(parsed);
     } catch {
       router.push("/login");
@@ -51,8 +80,10 @@ export default function SignupComplete() {
     e.preventDefault();
     setError("");
 
+    const keys = getProviderKeys(provider);
+
     if (!profile) {
-      setError("Session expired. Please sign in with Google again.");
+      setError(`Session expired. Please sign in with ${keys.label} again.`);
       router.push("/login");
       return;
     }
@@ -67,9 +98,9 @@ export default function SignupComplete() {
       return;
     }
 
-    const tempToken = sessionStorage.getItem("googleTempToken") || "";
+    const tempToken = sessionStorage.getItem(keys.tempToken) || "";
     if (!tempToken) {
-      setError("Session expired. Please sign in with Google again.");
+      setError(`Session expired. Please sign in with ${keys.label} again.`);
       router.push("/login");
       return;
     }
@@ -77,7 +108,12 @@ export default function SignupComplete() {
     setIsSubmitting(true);
 
     try {
-      const response = await api.auth.googleCompleteSignup({
+      const completeSignup =
+        provider === "facebook"
+          ? api.auth.facebookCompleteSignup
+          : api.auth.googleCompleteSignup;
+
+      const response = await completeSignup({
         tempToken,
         role,
         acceptTerms: true,
@@ -102,8 +138,8 @@ export default function SignupComplete() {
       }
 
       // Cleanup temp data
-      sessionStorage.removeItem("googleTempToken");
-      sessionStorage.removeItem("googleProfile");
+      sessionStorage.removeItem(keys.tempToken);
+      sessionStorage.removeItem(keys.profile);
 
       toast({
         title: "Account created!",
@@ -216,8 +252,9 @@ export default function SignupComplete() {
                   type="button"
                   className="text-primary hover:underline"
                   onClick={() => {
-                    sessionStorage.removeItem("googleTempToken");
-                    sessionStorage.removeItem("googleProfile");
+                    const keys = getProviderKeys(provider);
+                    sessionStorage.removeItem(keys.tempToken);
+                    sessionStorage.removeItem(keys.profile);
                     router.push("/login");
                   }}
                 >
