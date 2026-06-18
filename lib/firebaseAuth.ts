@@ -6,7 +6,7 @@
  */
 import { signInWithPopup, signOut } from "firebase/auth";
 import api, { setAuthToken, removeAuthToken } from "./api-client";
-import { auth, googleProvider, isFirebaseAuthConfigured } from "./firebase";
+import { auth, googleProvider, facebookProvider, isFirebaseAuthConfigured } from "./firebase";
 
 const API_BASE =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) || "http://localhost:5000";
@@ -179,12 +179,112 @@ export async function signInWithGoogle(
 }
 
 export async function signInWithFacebook(
-  _role: "buyer" | "provider" = "buyer"
-): Promise<{ success: boolean; user?: AuthSessionUser; error?: string }> {
-  return {
-    success: false,
-    error: "Facebook sign-in is not available yet. Use Google, email, or phone.",
-  };
+  _role?: "buyer" | "provider"
+): Promise<{
+  success: boolean;
+  user?: AuthSessionUser;
+  error?: string;
+  isNewUser?: boolean;
+  userRole?: string;
+  needsSignupCompletion?: boolean;
+}> {
+  if (!isFirebaseAuthConfigured()) {
+    return {
+      success: false,
+      error: "Facebook sign-in is not configured. Set NEXT_PUBLIC_FIREBASE_* in your environment.",
+    };
+  }
+
+  try {
+    const credential = await signInWithPopup(auth, facebookProvider);
+    const user = credential.user;
+    const email =
+      user.email?.trim().toLowerCase() ||
+      user.providerData.find((p) => p.email)?.email?.trim().toLowerCase();
+    if (!email) {
+      await signOut(auth).catch(() => {});
+      return {
+        success: false,
+        error:
+          "Your Facebook account has no email address. Use another sign-in method or grant email permission.",
+      };
+    }
+
+    const firebaseToken = await user.getIdToken();
+    const res = await api.auth.facebookLogin({
+      firebaseUid: user.uid,
+      email,
+      name: user.displayName || undefined,
+      photoURL: user.photoURL || undefined,
+      emailVerified: user.emailVerified,
+      firebaseToken,
+    });
+
+    await signOut(auth).catch(() => {});
+
+    if (!res.success) {
+      const msg =
+        (res as { error?: { message?: string } }).error?.message || "Facebook sign-in failed";
+      return { success: false, error: msg };
+    }
+
+    const data = res.data as
+      | {
+          isNewUser?: boolean;
+          token?: string;
+          tempToken?: string;
+          user?: { role?: string; email?: string };
+          profile?: { email?: string; name?: string; photoURL?: string };
+        }
+      | undefined;
+
+    if (data?.isNewUser && data.tempToken && data.profile?.email) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("facebookTempToken", data.tempToken);
+        sessionStorage.setItem(
+          "facebookProfile",
+          JSON.stringify({
+            email: data.profile.email,
+            name: data.profile.name || data.profile.email.split("@")[0] || "User",
+            photoURL: data.profile.photoURL,
+          })
+        );
+      }
+      return { success: true, isNewUser: true, needsSignupCompletion: true };
+    }
+
+    const token = data?.token;
+    const role = data?.user?.role;
+    if (role === "admin") {
+      removeAuthToken();
+      return { success: false, error: "ADMIN_RESTRICTED" };
+    }
+    if (token) {
+      setAuthToken(token);
+      return {
+        success: true,
+        user: { email: data?.user?.email || email },
+        userRole: role,
+      };
+    }
+
+    return { success: false, error: "Unexpected response from server" };
+  } catch (e: unknown) {
+    const err = e as { code?: string; message?: string };
+    if (err?.code === "auth/popup-closed-by-user") {
+      return { success: false, error: "Sign-in cancelled" };
+    }
+    if (err?.code === "auth/unauthorized-domain") {
+      return {
+        success: false,
+        error: "This domain is not authorized. Please contact support or check Firebase Console settings.",
+      };
+    }
+    return {
+      success: false,
+      error: err?.message || "Facebook sign-in failed",
+    };
+  }
 }
 
 export async function signOutUser(): Promise<void> {
