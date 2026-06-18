@@ -8,19 +8,23 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import api, { type ApiResponse } from "@/lib/api-client";
-import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Briefcase, MapPin, Search, IndianRupee, Clock, LayoutDashboard } from "lucide-react";
-import { formatJobLocation } from "@/lib/utils";
+import { formatJobLocation, formatUserJobBudget, getUserJobPostedByLabel } from "@/lib/utils";
 
 interface UserJobPost {
   _id: string;
   title: string;
   description: string;
   category?: string;
+  categoryName?: string;
+  postedByName?: string;
+  buyer?: string | { _id?: string; name?: string; businessName?: string };
   location?: { address?: string; city?: string; state?: string };
   budgetMin?: number;
   budgetMax?: number;
+  wageAmount?: number;
+  salaryType?: "per_day" | "per_week" | "per_month";
   durationText?: string;
   status: "open" | "in_progress" | "completed" | "cancelled" | "expired";
   appliedCount?: number;
@@ -30,19 +34,12 @@ interface UserJobPost {
 type JobsResponse = ApiResponse<UserJobPost[]>;
 
 export default function UserJobList() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [jobs, setJobs] = useState<UserJobPost[]>([]);
   const [search, setSearch] = useState("");
   const [city, setCity] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!authLoading && (!isAuthenticated || user?.role !== "provider")) {
-      router.replace(`/login?redirect=${encodeURIComponent("/jobs")}`);
-    }
-  }, [authLoading, isAuthenticated, user, router]);
 
   const loadJobs = async () => {
     setIsLoading(true);
@@ -77,37 +74,15 @@ export default function UserJobList() {
   };
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.role === "provider") {
-      loadJobs();
-    }
+    loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, user?.role]);
+  }, []);
 
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     loadJobs();
   };
 
-  const formatBudget = (job: UserJobPost) => {
-    if (job.budgetMin && job.budgetMax) {
-      return `₹${job.budgetMin.toLocaleString()} – ₹${job.budgetMax.toLocaleString()}`;
-    }
-    if (job.budgetMin) {
-      return `From ₹${job.budgetMin.toLocaleString()}`;
-    }
-    if (job.budgetMax) {
-      return `Up to ₹${job.budgetMax.toLocaleString()}`;
-    }
-    return "Budget not specified";
-  };
-
-  if (authLoading || !isAuthenticated || user?.role !== "provider") {
-    return (
-      <div className="container px-4 py-16 flex justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -133,13 +108,13 @@ export default function UserJobList() {
         </section>
 
         <section>
-          <div className="rounded-xl border bg-card/80 backdrop-blur-sm p-3 md:p-4 lg:p-5 shadow-sm">
+          <div className="rounded-xl border bg-card/80 backdrop-blur-sm p-3 md:p-4 lg:p-6 shadow-sm">
             <form
               onSubmit={handleFilterSubmit}
               className="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_auto] gap-3 md:gap-4 items-end"
             >
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                   <Search className="h-3 w-3" />
                   Search
                 </label>
@@ -151,7 +126,7 @@ export default function UserJobList() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                   <MapPin className="h-3 w-3" />
                   City
                 </label>
@@ -171,7 +146,7 @@ export default function UserJobList() {
 
         <section className="space-y-4 md:space-y-5">
           {jobs.length === 0 && !isLoading && (
-            <div className="rounded-xl border bg-card/80 backdrop-blur-sm px-6 py-10 flex flex-col items-center text-center gap-2 shadow-sm">
+            <div className="rounded-xl border bg-card/80 backdrop-blur-sm px-6 py-12 flex flex-col items-center text-center gap-2 shadow-sm">
               <Briefcase className="h-10 w-10 text-muted-foreground mb-1" />
               <p className="text-sm md:text-base font-medium text-foreground">No open jobs right now</p>
               <p className="text-xs md:text-sm text-muted-foreground max-w-md">
@@ -180,25 +155,26 @@ export default function UserJobList() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {jobs.map((job) => {
               const locationStr = formatJobLocation(job.location);
+              const postedByLabel = getUserJobPostedByLabel(job);
               return (
                 <Card
                   key={job._id}
                   className="group cursor-pointer border bg-card/90 hover:bg-card transition-colors shadow-sm hover:shadow-md rounded-xl"
                   onClick={() => router.push(`/jobs/${job._id}`)}
                 >
-                  <CardContent className="p-4 md:p-5 space-y-3">
+                  <CardContent className="p-4 md:p-6 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <h2 className="text-sm md:text-base font-semibold line-clamp-2 group-hover:text-primary">
                           {job.title}
                         </h2>
                         <div className="flex flex-wrap items-start gap-2 text-[11px] md:text-xs text-muted-foreground">
-                          {job.category && (
+                          {postedByLabel && (
                             <Badge variant="outline" className="text-[10px] md:text-[11px]">
-                              {job.category}
+                              {postedByLabel}
                             </Badge>
                           )}
                           {locationStr && (
@@ -212,7 +188,7 @@ export default function UserJobList() {
                       <div className="text-right space-y-1">
                         <div className="inline-flex items-center gap-1 text-[11px] md:text-xs">
                           <IndianRupee className="h-3 w-3 text-muted-foreground" />
-                          <span>{formatBudget(job)}</span>
+                          <span>{formatUserJobBudget(job)}</span>
                         </div>
                         {job.durationText && (
                           <div className="inline-flex items-center gap-1 text-[11px] md:text-xs text-muted-foreground">
