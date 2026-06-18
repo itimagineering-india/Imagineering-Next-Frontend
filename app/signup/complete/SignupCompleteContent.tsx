@@ -7,8 +7,17 @@ import { apiClient, setAuthToken } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 
+type SocialProvider = "google" | "facebook";
+
+function getProviderKeys(provider: SocialProvider) {
+  return provider === "facebook"
+    ? { tempToken: "facebookTempToken", profile: "facebookProfile", label: "Facebook" }
+    : { tempToken: "googleTempToken", profile: "googleProfile", label: "Google" };
+}
+
 export default function SignupCompleteContent() {
   const [profile, setProfile] = useState<{ email: string; name: string; photoURL?: string } | null>(null);
+  const [provider, setProvider] = useState<SocialProvider>("google");
   const [role, setRole] = useState<"buyer" | "provider" | "">("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -21,8 +30,26 @@ export default function SignupCompleteContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const providerParam = searchParams?.get("provider");
+    const resolvedProvider: SocialProvider =
+      providerParam === "facebook" ? "facebook" : "google";
+    const keys = getProviderKeys(resolvedProvider);
+
     try {
-      const stored = sessionStorage.getItem("googleProfile");
+      const stored = sessionStorage.getItem(keys.profile);
+      if (!stored && resolvedProvider === "google") {
+        const fbStored = sessionStorage.getItem("facebookProfile");
+        if (fbStored) {
+          setProvider("facebook");
+          const parsed = JSON.parse(fbStored);
+          if (!parsed?.email) {
+            router.replace("/login");
+            return;
+          }
+          setProfile(parsed);
+          return;
+        }
+      }
       if (!stored) {
         router.replace("/login");
         return;
@@ -32,18 +59,21 @@ export default function SignupCompleteContent() {
         router.replace("/login");
         return;
       }
+      setProvider(resolvedProvider);
       setProfile(parsed);
     } catch {
       router.replace("/login");
     }
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
+    const keys = getProviderKeys(provider);
+
     if (!profile) {
-      setError("Session expired. Please sign in with Google again.");
+      setError(`Session expired. Please sign in with ${keys.label} again.`);
       router.replace("/login");
       return;
     }
@@ -58,16 +88,22 @@ export default function SignupCompleteContent() {
       return;
     }
 
-    const tempToken = typeof window !== "undefined" ? sessionStorage.getItem("googleTempToken") || "" : "";
+    const tempToken =
+      typeof window !== "undefined" ? sessionStorage.getItem(keys.tempToken) || "" : "";
     if (!tempToken) {
-      setError("Session expired. Please sign in with Google again.");
+      setError(`Session expired. Please sign in with ${keys.label} again.`);
       router.replace("/login");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const res = await apiClient.auth.googleCompleteSignup({
+      const completeSignup =
+        provider === "facebook"
+          ? apiClient.auth.facebookCompleteSignup
+          : apiClient.auth.googleCompleteSignup;
+
+      const res = await completeSignup({
         tempToken,
         role,
         acceptTerms: true,
@@ -77,8 +113,8 @@ export default function SignupCompleteContent() {
       if (res.success && (res as any).data?.token) {
         setAuthToken((res as any).data.token);
         if (typeof window !== "undefined") {
-          sessionStorage.removeItem("googleTempToken");
-          sessionStorage.removeItem("googleProfile");
+          sessionStorage.removeItem(keys.tempToken);
+          sessionStorage.removeItem(keys.profile);
         }
         await refresh();
         router.push(redirectUrl);
@@ -169,7 +205,7 @@ export default function SignupCompleteContent() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded-lg bg-[#111827] px-4 py-2.5 font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="w-full rounded-lg bg-[#111827] px-4 py-3 font-medium text-white hover:bg-gray-800 disabled:opacity-50"
         >
           {isSubmitting ? "Completing..." : "Complete signup"}
         </button>
