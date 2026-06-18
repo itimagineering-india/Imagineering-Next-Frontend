@@ -482,6 +482,30 @@ export const api = {
         body: JSON.stringify(payload),
       }),
 
+    facebookLogin: (payload: {
+      firebaseUid: string;
+      email: string;
+      name?: string;
+      photoURL?: string;
+      emailVerified?: boolean;
+      firebaseToken: string;
+    }) =>
+      apiRequest('/api/auth/facebook/login', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    facebookCompleteSignup: (payload: {
+      tempToken: string;
+      role: 'buyer' | 'provider';
+      acceptTerms: boolean;
+      name?: string;
+    }) =>
+      apiRequest('/api/auth/facebook/complete-signup', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
     // Phone OTP (Fast2SMS)
     checkPhoneAvailability: (phone: string) =>
       apiRequest<{ available: boolean; message?: string }>('/api/auth/check-phone-availability', {
@@ -2173,7 +2197,7 @@ export const api = {
     },
   },
 
-  /** Premium contractor Workforce Management. */
+  /** Provider Workforce Management. */
   workforce: {
     access: () =>
       apiRequest<{ success: boolean; data: { eligible: boolean; reason?: string | null; categoryAllowed?: boolean; entitled?: boolean } }>(
