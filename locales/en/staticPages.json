@@ -1,0 +1,63 @@
+{
+  "about": {
+    "title": "About Imagineering India",
+    "eyebrow": "Trusted service discovery for India",
+    "heroTitle": "Built to Make Finding Reliable Services Effortless",
+    "heroDescription": "Imagineering India connects businesses and individuals with verified service providers across construction, machinery, contractors, logistics, real estate, and allied services — all through a location-first, transparent, and execution-ready platform.",
+    "heroSubtext": "Whether it’s sourcing heavy equipment, hiring a contractor, arranging logistics, or finding project-ready infrastructure, we help you connect with the right provider, at the right location, at the right time.",
+    "exploreServices": "Explore services",
+    "whyTrust": "Why customers trust us",
+    "locationFirst": "Location-first matching across 50+ cities",
+    "verifiedPricing": "Verified providers & transparent pricing",
+    "smartSupport": "Human support plus smart automation",
+    "ctaTitle": "Ready to Get Started?",
+    "ctaDescription": "Join thousands of satisfied customers and trusted providers on our platform today.",
+    "findServices": "Find Services Near You",
+    "becomeProvider": "Become a Provider"
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "eyebrow": "We're here to help",
+    "description": "Have a question or need help? We're here to assist you. Choose the best way to reach us below.",
+    "sendMessage": "Send Us a Message",
+    "sendDescription": "We'll get back to you as soon as possible",
+    "yourName": "Your Name",
+    "emailAddress": "Email Address",
+    "subject": "Subject",
+    "category": "Category",
+    "message": "Message",
+    "submit": "Send Message",
+    "submitting": "Sending...",
+    "emailUs": "Email Us",
+    "emailDesc": "Our team will respond within 24 hours",
+    "callUs": "Call Us",
+    "callDesc": "Mon-Fri from 8am to 6pm IST",
+    "liveChat": "Live Chat",
+    "chatDesc": "Chat with us instantly",
+    "startConversation": "Start a conversation"
+  },
+  "help": {
+    "searchPlaceholder": "Search for help articles...",
+    "contactSupport": "Contact Support",
+    "title": "How Can We Help?",
+    "description": "Search our knowledge base or browse categories below",
+    "deleteAccount": "How to delete your account",
+    "browseByCategory": "Browse by Category",
+    "popularArticles": "Popular Articles",
+    "articles": "articles"
+  },
+  "auth": {
+    "login": "Login",
+    "signup": "Sign Up",
+    "welcomeBack": "Welcome back",
+    "createAccount": "Create your account",
+    "email": "Email",
+    "password": "Password",
+    "phone": "Phone",
+    "continue": "Continue",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "No account?",
+    "haveAccount": "Already have an account?"
+  }
+}
