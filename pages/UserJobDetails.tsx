@@ -23,21 +23,25 @@ import {
   Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
-import { formatJobLocation } from "@/lib/utils";
+import { formatJobLocation, formatUserJobBudget, getUserJobPostedByLabel } from "@/lib/utils";
 
 interface UserJobPost {
   _id: string;
   title: string;
   description: string;
   category?: string;
+  categoryName?: string;
+  postedByName?: string;
   location?: { city?: string; state?: string; address?: string };
   budgetMin?: number;
   budgetMax?: number;
+  wageAmount?: number;
+  salaryType?: "per_day" | "per_week" | "per_month";
   durationText?: string;
   status: "open" | "in_progress" | "completed" | "cancelled" | "expired";
   appliedCount?: number;
   createdAt: string;
-  buyer?: string | { _id?: string };
+  buyer?: string | { _id?: string; name?: string; businessName?: string };
 }
 
 interface JobApplication {
@@ -73,11 +77,14 @@ export default function UserJobDetails() {
   const [isContacting, setIsContacting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && (!isAuthenticated || user?.role !== "provider")) {
-      router.replace(`/login?redirect=${encodeURIComponent(`/jobs/${id || ""}`)}`);
-    }
-  }, [authLoading, isAuthenticated, user, router, id]);
+  const loginRedirect = `/login?redirect=${encodeURIComponent(`/jobs/${id || ""}`)}`;
+  const canApply = isAuthenticated && user?.role === "provider";
+
+  const requireProviderAuth = () => {
+    if (canApply) return true;
+    router.push(loginRedirect);
+    return false;
+  };
 
   const loadJob = async () => {
     if (!id) return;
@@ -117,28 +124,18 @@ export default function UserJobDetails() {
   };
 
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.role === "provider" && id) {
+    if (id) {
       loadJob();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, isAuthenticated, user?.role, id]);
+  }, [id, isAuthenticated, user?.role]);
 
-  const formatBudget = (p: UserJobPost) => {
-    if (p.budgetMin && p.budgetMax) {
-      return `₹${p.budgetMin.toLocaleString()} – ₹${p.budgetMax.toLocaleString()}`;
-    }
-    if (p.budgetMin) {
-      return `From ₹${p.budgetMin.toLocaleString()}`;
-    }
-    if (p.budgetMax) {
-      return `Up to ₹${p.budgetMax.toLocaleString()}`;
-    }
-    return "Budget not specified";
-  };
+  const formatBudget = formatUserJobBudget;
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!job || !id) return;
+    if (!requireProviderAuth()) return;
     if (!applyMessage.trim()) {
       toast({
         title: "Message required",
@@ -198,6 +195,7 @@ export default function UserJobDetails() {
 
   const handleContactBuyer = async () => {
     if (!job || !id) return;
+    if (!requireProviderAuth()) return;
     setIsContacting(true);
     try {
       const res = await api.userJobs.contactBuyer(id);
@@ -224,13 +222,6 @@ export default function UserJobDetails() {
     }
   };
 
-  if (authLoading || !isAuthenticated || user?.role !== "provider") {
-    return (
-      <div className="container px-4 py-16 flex justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -269,9 +260,9 @@ export default function UserJobDetails() {
                         <span>{job.title}</span>
                       </h1>
                       <div className="flex flex-wrap items-start gap-2 text-xs text-muted-foreground">
-                        {job.category && (
+                        {getUserJobPostedByLabel(job) && (
                           <Badge variant="outline" className="text-[11px]">
-                            {job.category}
+                            {getUserJobPostedByLabel(job)}
                           </Badge>
                         )}
                         {formatJobLocation(job.location) && (
@@ -336,6 +327,31 @@ export default function UserJobDetails() {
                               My Job Posts
                             </Link>
                             .
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    if (!authLoading && !isAuthenticated) {
+                      return (
+                        <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-center space-y-3">
+                          <p className="text-sm font-medium">Want to apply for this job?</p>
+                          <p className="text-xs text-muted-foreground">
+                            Sign in as a provider to submit your application and contact the buyer.
+                          </p>
+                          <Button onClick={() => router.push(loginRedirect)} className="h-9 md:h-10 text-xs md:text-sm">
+                            Login to apply
+                          </Button>
+                        </div>
+                      );
+                    }
+
+                    if (!authLoading && isAuthenticated && user?.role !== "provider") {
+                      return (
+                        <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-center">
+                          <p className="text-sm font-medium">Provider account required</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Only providers can apply to jobs posted by buyers.
                           </p>
                         </div>
                       );
@@ -414,7 +430,7 @@ export default function UserJobDetails() {
                                 <Lightbulb className="h-3 w-3" />
                                 Tap a suggestion to use it, or write your own
                               </p>
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-2">
                                 {[
                                   {
                                     label: "Experience + Available",
@@ -441,7 +457,7 @@ export default function UserJobDetails() {
                                     key={text}
                                     type="button"
                                     onClick={() => setApplyMessage(text)}
-                                    className="text-[10px] md:text-xs px-2.5 py-1.5 rounded-md border bg-muted/50 hover:bg-muted transition-colors whitespace-nowrap"
+                                    className="text-[10px] md:text-xs px-3 py-2 rounded-md border bg-muted/50 hover:bg-muted transition-colors whitespace-nowrap"
                                   >
                                     {label}
                                   </button>
