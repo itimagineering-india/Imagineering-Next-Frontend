@@ -1,0 +1,13 @@
+{
+  "providerNotFound": "Provider Not Found",
+  "browseServices": "Browse Services",
+  "services": "Services",
+  "experience": "Experience",
+  "jobsCompleted": "Jobs Completed",
+  "memberSince": "Member Since",
+  "searchServices": "Search services...",
+  "loadingServices": "Loading services...",
+  "clientReviews": "Client Reviews",
+  "noReviews": "No reviews yet.",
+  "portfolio": "Portfolio"
+}
