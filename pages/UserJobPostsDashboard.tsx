@@ -11,16 +11,19 @@ import { useToast } from "@/hooks/use-toast";
 import api, { type ApiResponse } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus, Briefcase, MapPin, IndianRupee, Clock } from "lucide-react";
-import { formatJobLocation } from "@/lib/utils";
+import { formatJobLocation, formatUserJobBudget, getUserJobCategoryLabel } from "@/lib/utils";
 
 interface UserJobPost {
   _id: string;
   title: string;
   description: string;
   category?: string;
+  categoryName?: string;
   location?: { city?: string; state?: string; address?: string };
   budgetMin?: number;
   budgetMax?: number;
+  wageAmount?: number;
+  salaryType?: "per_day" | "per_week" | "per_month";
   durationText?: string;
   status: "open" | "in_progress" | "completed" | "cancelled" | "expired";
   appliedCount?: number;
@@ -105,19 +108,6 @@ export default function UserJobPostsDashboard() {
     }
   };
 
-  const formatBudget = (job: UserJobPost) => {
-    if (job.budgetMin && job.budgetMax) {
-      return `₹${job.budgetMin.toLocaleString()} – ₹${job.budgetMax.toLocaleString()}`;
-    }
-    if (job.budgetMin) {
-      return `From ₹${job.budgetMin.toLocaleString()}`;
-    }
-    if (job.budgetMax) {
-      return `Up to ₹${job.budgetMax.toLocaleString()}`;
-    }
-    return "Budget not specified";
-  };
-
   const statusBadgeVariant: Record<
     UserJobPost["status"],
     "default" | "outline" | "secondary" | "destructive"
@@ -173,7 +163,7 @@ export default function UserJobPostsDashboard() {
 
         {jobs.length === 0 && !isLoading && (
           <Card>
-            <CardContent className="py-10 flex flex-col items-center text-center gap-2">
+            <CardContent className="py-12 flex flex-col items-center text-center gap-2">
               <Briefcase className="h-10 w-10 text-muted-foreground mb-1" />
               <p className="text-sm font-medium">No job posts yet</p>
               <p className="text-xs text-muted-foreground max-w-sm">
@@ -201,9 +191,9 @@ export default function UserJobPostsDashboard() {
                   <div className="space-y-1">
                     <CardTitle className="text-sm md:text-base">{job.title}</CardTitle>
                     <div className="flex flex-wrap items-start gap-2 text-xs text-muted-foreground">
-                      {job.category && (
+                      {getUserJobCategoryLabel(job) && (
                         <Badge variant="outline" className="text-[11px]">
-                          {job.category}
+                          {getUserJobCategoryLabel(job)}
                         </Badge>
                       )}
                       {formatJobLocation(job.location) && (
@@ -231,7 +221,7 @@ export default function UserJobPostsDashboard() {
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="inline-flex items-center gap-1 text-xs">
                     <IndianRupee className="h-3 w-3 text-muted-foreground" />
-                    <span>{formatBudget(job)}</span>
+                    <span>{formatUserJobBudget(job)}</span>
                   </div>
                   {job.durationText && (
                     <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
