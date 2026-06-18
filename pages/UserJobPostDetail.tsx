@@ -22,7 +22,7 @@ import {
   Loader2,
   CalendarCheck,
 } from "lucide-react";
-import { formatJobLocation } from "@/lib/utils";
+import { formatJobLocation, formatUserJobBudget, getUserJobCategoryLabel } from "@/lib/utils";
 import { format } from "date-fns";
 
 interface UserJobPost {
@@ -30,9 +30,12 @@ interface UserJobPost {
   title: string;
   description: string;
   category?: string;
+  categoryName?: string;
   location?: { city?: string; state?: string; address?: string };
   budgetMin?: number;
   budgetMax?: number;
+  wageAmount?: number;
+  salaryType?: "per_day" | "per_week" | "per_month";
   durationText?: string;
   status: "open" | "in_progress" | "completed" | "cancelled" | "expired";
   appliedCount?: number;
@@ -135,14 +138,7 @@ export default function UserJobPostDetail() {
     }
   };
 
-  const formatBudget = (p: UserJobPost) => {
-    if (p.budgetMin && p.budgetMax) {
-      return `₹${p.budgetMin.toLocaleString()} – ₹${p.budgetMax.toLocaleString()}`;
-    }
-    if (p.budgetMin) return `From ₹${p.budgetMin.toLocaleString()}`;
-    if (p.budgetMax) return `Up to ₹${p.budgetMax.toLocaleString()}`;
-    return "Budget not specified";
-  };
+  const formatBudget = formatUserJobBudget;
 
   const statusBadgeVariant: Record<string, "default" | "outline" | "secondary" | "destructive"> = {
     open: "default",
@@ -188,9 +184,9 @@ export default function UserJobPostDetail() {
               <div className="space-y-1">
                 <CardTitle className="text-lg md:text-xl">{job.title}</CardTitle>
                 <div className="flex flex-wrap items-start gap-2 text-sm text-muted-foreground">
-                  {job.category && (
+                  {getUserJobCategoryLabel(job) && (
                     <Badge variant="outline" className="text-xs">
-                      {job.category}
+                      {getUserJobCategoryLabel(job)}
                     </Badge>
                   )}
                   {formatJobLocation(job.location) && (
@@ -312,7 +308,7 @@ export default function UserJobPostDetail() {
                           </div>
                         </div>
                         {providerId && (
-                          <div className="flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 shrink-0 overflow-x-auto pb-1 sm:pb-0">
+                          <div className="flex flex-nowrap sm:flex-wrap gap-2 sm:gap-2 shrink-0 overflow-x-auto pb-1 sm:pb-0">
                             <Link href={`/provider/${providerId}`} className="shrink-0">
                               <Button size="sm" variant="outline" className="gap-1 sm:gap-2 text-xs sm:text-sm h-8">
                                 <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
