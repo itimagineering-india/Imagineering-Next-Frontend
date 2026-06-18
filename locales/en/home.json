@@ -1,0 +1,83 @@
+{
+  "services": {
+    "our": "Our",
+    "title": "Services",
+    "description": "Discover a wide range of professional services across multiple categories.",
+    "viewAll": "View All Services",
+    "comingSoon": "Coming Soon"
+  },
+  "topProviders": {
+    "our": "Our",
+    "title": "Top Providers",
+    "description": "Trusted professionals with verified profiles and great service.",
+    "verified": "Verified",
+    "topRated": "Top Rated",
+    "viewProfile": "View Profile",
+    "loading": "Loading top providers...",
+    "empty": "No top providers available yet."
+  },
+  "audience": {
+    "heading": "Find Services or Grow Your Business",
+    "description": "Choose the experience that fits your goal: hire trusted professionals with Imagineering India or grow as a provider with Imagimitra.",
+    "usersLabel": "For Users",
+    "usersTitle": "Imagineering India",
+    "usersDescription": "Find verified services near you in minutes.",
+    "usersBenefits": [
+      "Verified providers for every major category",
+      "Trusted services with clear ratings and reviews",
+      "Fast booking with quick response options"
+    ],
+    "exploreServices": "Explore Services",
+    "providersLabel": "For Providers",
+    "providersTitle": "Imagimitra",
+    "providersDescription": "Get more work and manage your provider growth in one app.",
+    "providersBenefits": [
+      "Verified provider profile for trust and visibility",
+      "Smart lead and booking management tools",
+      "Faster customer response and conversion flow"
+    ],
+    "joinProvider": "Join as Provider",
+    "downloadApp": "Download App (Play Store)"
+  },
+  "search": {
+    "locationUnavailable": "Location search unavailable",
+    "locationPlaceholder": "Enter a location or postal code *",
+    "lazyLocationPlaceholder": "Type to search — loads when needed",
+    "categoryPlaceholder": "Category *",
+    "subcategoryPlaceholder": "Subcategory",
+    "useCurrentLocation": "Use current location",
+    "gettingLocation": "Getting...",
+    "search": "Search",
+    "services": "Services",
+    "locationFailedTitle": "Location Access Failed",
+    "locationRequiredTitle": "Location Required",
+    "locationRequiredDescription": "Please enter a location or use your current location to search for services.",
+    "categoryRequiredTitle": "Category Required",
+    "categoryRequiredDescription": "Please select a category to search for services."
+  },
+  "requirementPopup": {
+    "title": "Submit your requirement",
+    "description": "Tell Imagineering India what you need — we will follow up with a quote. Add your mobile and location so we can reach you.",
+    "titleLabel": "Requirement title",
+    "titlePlaceholder": "Example: Need waterproofing for terrace",
+    "descriptionLabel": "Describe your requirement",
+    "descriptionPlaceholder": "Share scope, quantity, timeline, or any important details.",
+    "phoneLabel": "Mobile number",
+    "phonePlaceholder": "10-digit mobile number",
+    "locationLabel": "Location",
+    "locationPlaceholder": "Area, city, or full address",
+    "submit": "Submit requirement",
+    "submitting": "Submitting...",
+    "validationDetailTitle": "Please add more detail",
+    "validationDetailDescription": "Title must be at least 5 characters and description at least 20 characters.",
+    "validationLocationTitle": "Location required",
+    "validationLocationDescription": "Enter where you need the service (area, city, or full address).",
+    "validationPhoneTitle": "Valid mobile number",
+    "validationPhoneDescription": "Enter a 10-digit Indian mobile number (starts with 6–9).",
+    "successTitle": "Requirement submitted",
+    "successDescription": "We will review and contact you soon.",
+    "failedTitle": "Could not submit",
+    "failedDescription": "Please try again.",
+    "errorTitle": "Error"
+  }
+}
