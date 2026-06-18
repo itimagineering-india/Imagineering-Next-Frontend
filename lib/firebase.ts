@@ -36,6 +36,8 @@ if (getApps().length === 0) {
 export const auth: Auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const facebookProvider = new FacebookAuthProvider();
+facebookProvider.addScope("email");
+facebookProvider.addScope("public_profile");
 
 export function isFirebaseAuthConfigured(): boolean {
   return hasValidConfig;
