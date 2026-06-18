@@ -1,11 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Crown } from "lucide-react";
+import { Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -188,7 +186,7 @@ export default function ProviderEarnings() {
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" className="text-xs md:text-sm">
-              <Download className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+              <Download className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
               <span className="hidden sm:inline">Export</span>
               <span className="sm:hidden">Export</span>
             </Button>
@@ -199,43 +197,6 @@ export default function ProviderEarnings() {
         <EarningsSummaryCards
           earnings={earnings}
         />
-
-        {/* Premium Revenue Impact */}
-        <Card className="border-warning/20 bg-warning/5">
-          <CardHeader className="p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-              <div className="flex items-center gap-2">
-                <Crown className="h-4 w-4 md:h-5 md:w-5 text-warning" />
-                <CardTitle className="text-base md:text-lg">Premium Revenue Impact</CardTitle>
-              </div>
-              <Badge variant="outline" className="flex items-center gap-1 text-xs md:text-sm w-fit">
-                <Crown className="h-3 w-3 text-warning" />
-                Premium Feature
-              </Badge>
-            </div>
-            <CardDescription className="text-xs md:text-sm">
-              Additional revenue from premium subscriptions and direct leads
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Premium Revenue</p>
-                <p className="text-xl md:text-2xl font-bold">₹{earnings.premiumRevenue.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Direct Leads Bonus</p>
-                <p className="text-xl md:text-2xl font-bold">₹{(earnings.premiumRevenue * 0.3).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-xs md:text-sm text-muted-foreground">Total Premium Benefit</p>
-                <p className="text-xl md:text-2xl font-bold text-warning">
-                  ₹{(earnings.premiumRevenue * 1.3).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Tabs for different sections */}
         <Tabs defaultValue="transactions" className="space-y-3 md:space-y-4">
