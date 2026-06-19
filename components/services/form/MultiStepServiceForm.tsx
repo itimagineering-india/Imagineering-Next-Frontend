@@ -7,10 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+ Select,
+ SelectContent,
+ SelectItem,
+ SelectTrigger,
+ SelectValue,
+} from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, CheckCircle2, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CategorySelector } from "./CategorySelector";
 import { SubCategorySelector } from "./SubCategorySelector";
+import { ToolsServiceFields } from "./ToolsServiceFields";
 import { CommonFields } from "./CommonFields";
 import { DynamicFieldsRenderer } from "./DynamicFieldsRenderer";
 import { PricingSection } from "./PricingSection";
@@ -29,6 +37,13 @@ import {
 } from "@/lib/constructionMaterials";
 import { getManpowerServiceOfferPresetsForSubcategory } from "@/config/manpowerServiceOfferPresets";
 import api from "@/lib/api-client";
+import { getItemTypesForSubcategory, getSubcategoryNames } from "@/lib/categorySubcategories";
+import {
+ buildToolsServicePayload,
+ EMPTY_TOOLS_FIELDS,
+ isToolsCategory,
+ type ToolsServiceFieldsValue,
+} from "@/lib/toolsService";
 import { cn } from "@/lib/utils";
 import {
  buildWebServiceListingContextLines,
@@ -42,7 +57,7 @@ interface Category {
  _id: string;
  name: string;
  slug: string;
- subcategories?: string[];
+ subcategories?: unknown;
 }
 
 interface Location {
@@ -67,6 +82,7 @@ interface ServiceFormData {
  // Step 1
  category: string;
  subcategory: string;
+ itemType: string;
  
  // Step 2 - Common Fields
  title: string;
@@ -102,7 +118,9 @@ interface MultiStepServiceFormProps {
  onSuccess: () => void;
  editMode?: boolean;
  serviceId?: string; // Service ID for edit mode
- initialData?: Partial<ServiceFormData>;
+ initialData?: Partial<ServiceFormData> & {
+  toolsFields?: ToolsServiceFieldsValue;
+ };
  adminMode?: boolean; // Admin mode - allows selecting provider
  selectedProviderId?: string; // Provider ID for admin mode
  onProviderChange?: (providerId: string) => void; // Callback for provider selection
@@ -183,6 +201,7 @@ export function MultiStepServiceForm({
  const [formData, setFormData] = useState<ServiceFormData>({
   category: "",
   subcategory: "",
+  itemType: "",
   title: "",
   brandName: "",
   shortDescription: "",
@@ -212,6 +231,7 @@ export function MultiStepServiceForm({
  });
 
  const [errors, setErrors] = useState<Record<string, any>>({});
+ const [toolsFields, setToolsFields] = useState<ToolsServiceFieldsValue>(EMPTY_TOOLS_FIELDS);
 
  // Reset form when dialog closes or initialData changes
  useEffect(() => {
@@ -222,9 +242,11 @@ export function MultiStepServiceForm({
    setIsAiTitleLoading(false);
    setIsAiShortDescriptionLoading(false);
    setProviderBusinessAddress(undefined);
+   setToolsFields(EMPTY_TOOLS_FIELDS);
    setFormData({
     category: "",
     subcategory: "",
+    itemType: "",
     title: "",
     brandName: "",
     shortDescription: "",
@@ -258,6 +280,7 @@ export function MultiStepServiceForm({
    setFormData({
     category: initialData.category || "",
     subcategory: initialData.subcategory || "",
+    itemType: initialData.itemType || "",
     title: initialData.title || "",
     brandName: initialData.brandName || "",
     shortDescription: initialData.shortDescription || "",
@@ -288,6 +311,7 @@ export function MultiStepServiceForm({
    setErrors({});
    setAgreedToTerms(false);
    setManpowerCustomDraft("");
+   setToolsFields(initialData.toolsFields ?? EMPTY_TOOLS_FIELDS);
   }
  }, [open, initialData]);
 
@@ -410,9 +434,16 @@ export function MultiStepServiceForm({
  );
 
  const availableSubcategories = useMemo(() => {
-  if (!selectedCategory || !selectedCategory.subcategories) return [];
-  return Array.isArray(selectedCategory.subcategories) ? selectedCategory.subcategories.filter(Boolean) : [];
+  if (!selectedCategory?.subcategories) return [];
+  return getSubcategoryNames(selectedCategory.subcategories);
  }, [selectedCategory]);
+
+ const availableItemTypes = useMemo(() => {
+  if (!selectedCategory?.subcategories || !formData.subcategory) return [];
+  return getItemTypesForSubcategory(selectedCategory.subcategories, formData.subcategory);
+ }, [selectedCategory, formData.subcategory]);
+
+ const isTools = useMemo(() => isToolsCategory(selectedCategory), [selectedCategory]);
 
  const manpowerServiceOfferPresets = useMemo(() => {
   if (selectedCategory?.slug !== "manpower") return [];
@@ -851,7 +882,6 @@ export function MultiStepServiceForm({
    const servicePayload: any = {
     title: formData.title,
     description: fullDescription,
-    ...(formData.brandName?.trim() && { brandName: formData.brandName.trim() }),
     category: formData.category,
     subcategory: formData.subcategory || "",
     priceMode: formData.priceMode,
@@ -890,6 +920,19 @@ export function MultiStepServiceForm({
     const mt = resolveConstructionMaterialTypeKeyFromSubcategory(formData.subcategory || "");
     const meta = extractConstructionStrings(formData.dynamicData);
     servicePayload.metadata = buildConstructionMetadataPayload(mt, meta);
+   }
+
+   if (isTools) {
+    const toolsPayload = buildToolsServicePayload(toolsFields);
+    Object.assign(servicePayload, toolsPayload);
+    if (formData.itemType?.trim()) {
+     servicePayload.itemType = formData.itemType.trim();
+    }
+    if (editMode && !toolsPayload.customFields) {
+     servicePayload.customFields = [];
+    }
+   } else if (formData.brandName?.trim()) {
+    servicePayload.brandName = formData.brandName.trim();
    }
 
    // If admin mode, include provider ID
@@ -1038,7 +1081,8 @@ export function MultiStepServiceForm({
          categories={effectiveCategories}
          selectedCategoryId={formData.category}
          onCategoryChange={(categoryId) => {
-          setFormData({ ...formData, category: categoryId, subcategory: "" });
+          setFormData({ ...formData, category: categoryId, subcategory: "", itemType: "" });
+          setToolsFields(EMPTY_TOOLS_FIELDS);
           setErrors({ ...errors, category: undefined });
          }}
          error={errors.category}
@@ -1049,7 +1093,7 @@ export function MultiStepServiceForm({
           subcategories={availableSubcategories}
           selectedSubcategory={formData.subcategory}
           onSubcategoryChange={(subcategory) => {
-           setFormData({ ...formData, subcategory });
+           setFormData({ ...formData, subcategory, itemType: "" });
           }}
           categoryName={selectedCategory.name}
          />
@@ -1067,6 +1111,26 @@ export function MultiStepServiceForm({
           <p className="caption">
            You can enter a subcategory manually. Select a category first for predefined options.
           </p>
+         </div>
+        )}
+        {isTools && formData.subcategory && availableItemTypes.length > 0 && (
+         <div className="space-y-2">
+          <Label htmlFor="itemType">Item Type</Label>
+          <Select
+           value={formData.itemType || ""}
+           onValueChange={(value) => setFormData({ ...formData, itemType: value })}
+          >
+           <SelectTrigger id="itemType">
+            <SelectValue placeholder="Select item type" />
+           </SelectTrigger>
+           <SelectContent>
+            {availableItemTypes.map((itemType, index) => (
+             <SelectItem key={`item-type-${index}`} value={itemType}>
+              {itemType}
+             </SelectItem>
+            ))}
+           </SelectContent>
+          </Select>
          </div>
         )}
         {showManpowerServicesYouOffer && (
@@ -1153,6 +1217,9 @@ export function MultiStepServiceForm({
        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 pt-0">
+      {isTools && (
+       <ToolsServiceFields value={toolsFields} onChange={setToolsFields} />
+      )}
       <CommonFields
        title={formData.title}
        brandName={formData.brandName}
