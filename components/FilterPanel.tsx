@@ -16,12 +16,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { X, Star, CheckCircle2, Sparkles, Users } from "lucide-react";
 import api from "@/lib/api-client";
+import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { useTranslation } from "react-i18next";
 
 interface FilterPanelProps {
   onFilterChange?: (filters: FilterState) => void;
   className?: string;
-  categories?: Array<{ _id: string; name: string; slug: string; subcategories?: string[] }>;
+  categories?: Array<{ _id: string; name: string; slug: string; subcategories?: unknown }>;
   value?: FilterState;
   /** When false, hides "Verified providers only" (browse shows all providers). Default true. */
   showVerifiedOnlyFilter?: boolean;
@@ -326,13 +327,9 @@ export function FilterPanel({
                   const allSubcategories = new Set<string>();
                   
                   selectedCategories.forEach((cat) => {
-                    if (cat.subcategories && Array.isArray(cat.subcategories)) {
-                      cat.subcategories.forEach((subcat) => {
-                        if (subcat && subcat.trim()) {
-                          allSubcategories.add(subcat.trim());
-                        }
-                      });
-                    }
+                    getSubcategoryNames(cat.subcategories).forEach((subcat) => {
+                      allSubcategories.add(subcat);
+                    });
                   });
 
                   const subcategoriesArray = Array.from(allSubcategories).sort();
