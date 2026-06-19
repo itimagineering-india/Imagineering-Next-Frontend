@@ -11,7 +11,7 @@ interface Category {
   _id: string;
   name: string;
   slug: string;
-  subcategories?: string[];
+  subcategories?: unknown;
 }
 
 interface CategorySelectorProps {
@@ -58,10 +58,10 @@ export function CategorySelector({
         </SelectContent>
       </Select>
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="caption text-destructive">{error}</p>
       )}
       {!error && selectedCategoryId && (
-        <p className="text-xs text-muted-foreground">
+        <p className="caption">
           Select a category to proceed to the next step
         </p>
       )}
