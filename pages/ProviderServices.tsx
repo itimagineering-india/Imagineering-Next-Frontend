@@ -24,6 +24,7 @@ import {
 } from "@/components/services";
 import { MultiStepServiceForm } from "@/components/services/form";
 import { pickConstructionMetadataFields } from "@/lib/constructionMaterials";
+import { parseToolsFieldsFromService } from "@/lib/toolsService";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -439,6 +440,12 @@ export default function ProviderServices() {
       initialData={{
        category: (typeof serviceToEdit.category === "string" ? serviceToEdit.category : serviceToEdit.category?._id) ?? "",
        subcategory: serviceToEdit.subcategory || "",
+       itemType: (serviceToEdit as { itemType?: string }).itemType || "",
+       toolsFields: parseToolsFieldsFromService(serviceToEdit as {
+        brandName?: string;
+        metadata?: unknown;
+        customFields?: unknown;
+       }),
        title: serviceToEdit.title || "",
        brandName: (serviceToEdit as any).brandName || "",
        shortDescription: serviceToEdit.description?.split('\n\n')[0] || "",
