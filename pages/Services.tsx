@@ -27,6 +27,12 @@ import { ProvidersBrowseList } from "@/components/services/ProvidersList";
 import type { CitySeoContent } from "@/constants/citySeoContent";
 import { CitySeoSections } from "@/components/seo/CitySeoSections";
 import {
+  getSubcategoryLabel,
+  getSubcategorySlug,
+  slimCategoriesForCache,
+  toSubcategorySlug,
+} from "@/lib/categorySubcategories";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -38,30 +44,7 @@ import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
-const toSlug = (value: string): string =>
-  value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-const getSubcategoryLabel = (subcategory: unknown): string => {
-  if (typeof subcategory === "string") return subcategory.trim();
-  if (subcategory && typeof subcategory === "object") {
-    const item = subcategory as { name?: unknown; slug?: unknown };
-    return String(item.name ?? item.slug ?? "").trim();
-  }
-  return "";
-};
-
-const getSubcategorySlug = (subcategory: unknown): string => {
-  if (subcategory && typeof subcategory === "object") {
-    const item = subcategory as { slug?: unknown };
-    const slug = String(item.slug ?? "").trim();
-    if (slug) return slug;
-  }
-  return toSlug(getSubcategoryLabel(subcategory));
-};
+const toSlug = toSubcategorySlug;
 
 export interface ServicesCityIntro {
   title: string;
@@ -268,8 +251,27 @@ export default function Services(props: ServicesProps = {}) {
   // Fetch categories from API (with caching and retry) - load immediately
   useEffect(() => {
     let isCancelled = false;
-    const cacheKey = 'categories_cache_with_subcategories';
+    const cacheKey = 'categories_cache_v2';
     const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+
+    const writeCategoriesCache = (categoriesData: unknown[]) => {
+      try {
+        localStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            data: slimCategoriesForCache(categoriesData as Parameters<typeof slimCategoriesForCache>[0]),
+            timestamp: Date.now(),
+          })
+        );
+      } catch {
+        try {
+          localStorage.removeItem(cacheKey);
+          localStorage.removeItem('categories_cache_with_subcategories');
+        } catch {
+          // ignore quota / private mode
+        }
+      }
+    };
     
     // Check cache first and set immediately
     const cached = localStorage.getItem(cacheKey);
@@ -298,11 +300,7 @@ export default function Services(props: ServicesProps = {}) {
         if (response.success && response.data) {
           const categoriesData = (response.data as any).categories || [];
           setCategories(categoriesData);
-          // Cache the result
-          localStorage.setItem(cacheKey, JSON.stringify({
-            data: categoriesData,
-            timestamp: Date.now(),
-          }));
+          writeCategoriesCache(categoriesData);
         } else if (response.error?.message?.includes('Too many requests')) {
           // Use cached data if available, don't show error if we have cache
           if (!cached && attempt === 0) {
