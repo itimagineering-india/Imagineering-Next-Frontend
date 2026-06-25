@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,18 @@ export default function CartPage() {
   const [inputQuantities, setInputQuantities] = useState<Record<string, number | string>>({});
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
+
+  // Keep quantity inputs in sync when cart updates (skip row being edited).
+  useEffect(() => {
+    const next: Record<string, number | string> = {};
+    items.forEach((it) => {
+      const id = String(it.service?._id ?? it.service);
+      if (id !== editingServiceId) {
+        next[id] = Math.max(1, Math.round(Number(it.quantity) || 1));
+      }
+    });
+    setInputQuantities((prev) => ({ ...prev, ...next }));
+  }, [items, editingServiceId]);
 
   const flushQtyDebounce = useCallback(
     (serviceId: string) => {
@@ -432,7 +444,7 @@ export default function CartPage() {
           couponUsageId={couponUsageId}
           onSuccess={() => {
             setOpenCheckout(false);
-            router.push("/buyer/orders");
+            router.push("/dashboard/buyer/orders");
           }}
         />
       )}
