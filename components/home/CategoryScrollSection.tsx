@@ -62,18 +62,19 @@ function CategoryScrollSectionComponent({
   return (
     <section ref={sectionRef} className="py-3 md:py-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
-        <Link href={categoryHeaderHref} className="flex items-center gap-2 group min-w-0 flex-1">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold truncate text-slate-900 group-hover:text-red-500 transition">
+      <div className="flex items-center justify-between mb-3 md:mb-6 gap-1.5 md:gap-2">
+        <Link href={categoryHeaderHref} className="flex items-center gap-1.5 group min-w-0 flex-1">
+          <h2 className="text-base sm:text-lg md:text-2xl font-bold line-clamp-1 text-slate-900 group-hover:text-red-500 transition">
             {title}
           </h2>
-          <ChevronRight className="h-4 w-4 md:h-5 md:w-5 transition-transform group-hover:translate-x-1" />
+          <ChevronRight className="h-4 w-4 shrink-0 md:h-5 md:w-5 transition-transform group-hover:translate-x-1" />
         </Link>
 
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-1.5 shrink-0">
           <Button 
             size="icon" 
             variant="outline" 
+            className="h-8 w-8 rounded-full md:h-9 md:w-9"
             onClick={handleScrollLeft}
             aria-label={`Scroll ${title} left`}
             title={`Scroll ${title} left`}
@@ -83,6 +84,7 @@ function CategoryScrollSectionComponent({
           <Button 
             size="icon" 
             variant="outline" 
+            className="h-8 w-8 rounded-full md:h-9 md:w-9"
             onClick={handleScrollRight}
             aria-label={`Scroll ${title} right`}
             title={`Scroll ${title} right`}
@@ -96,7 +98,7 @@ function CategoryScrollSectionComponent({
       {services.length === 0 ? (
         <div className="py-8 text-muted-foreground">No services available</div>
       ) : (
-        <div className="px-3 md:px-4">
+        <div>
           <ServicesList
             ref={listHandleRef}
             services={services}
