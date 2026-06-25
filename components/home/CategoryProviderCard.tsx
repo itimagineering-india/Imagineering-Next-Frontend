@@ -27,7 +27,9 @@ interface CategoryProviderCardProps {
   onToggleFavorite: (serviceId: string) => void;
 }
 
-// Card display width ~180px; request 240 for 1.3x density
+// Shared dimensions for horizontal category scroll (keep in sync with ServicesList ITEM_HEIGHT).
+export const CATEGORY_PROVIDER_CARD_WIDTH = 180;
+export const CATEGORY_PROVIDER_CARD_HEIGHT = 296;
 const CARD_IMAGE_WIDTH = 240;
 
 // Get API origin for our own uploads (e.g. /uploads/ or full API URL)
@@ -149,34 +151,34 @@ function CategoryProviderCardComponent({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
         <h3
-          className="h-[2.05rem] overflow-hidden text-ellipsis break-words text-xs font-semibold leading-snug text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:h-[2.4rem] md:text-sm"
+          className="h-[2.05rem] shrink-0 overflow-hidden text-ellipsis break-words text-xs font-semibold leading-snug text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:h-[2.4rem] md:text-sm"
           title={name}
         >
           {name}
         </h3>
-        <p className="mt-0.5 line-clamp-1 text-[10px] text-muted-foreground md:text-xs">
+        <p className="mt-0.5 h-3.5 shrink-0 truncate text-[10px] text-muted-foreground md:text-xs">
           {location}
         </p>
 
-        <div className="mt-2 flex min-w-0 items-start justify-between gap-2 md:mt-2">
-          <div className="min-w-0 flex-1 text-xs leading-tight text-foreground md:text-sm">
+        <div className="mt-2 flex h-9 shrink-0 min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0 flex-1 truncate text-xs font-bold leading-tight text-foreground md:text-sm">
             {!isRangePrice && mrp != null && mrp > 0 && (
-              <span className="mr-1 text-[10px] text-muted-foreground line-through md:text-xs">
+              <span className="mr-1 text-[10px] font-normal text-muted-foreground line-through md:text-xs">
                 ₹{mrp.toLocaleString("en-IN")}
               </span>
             )}
-            <span className="line-clamp-2 break-words font-bold">
-              {formattedPrice}
-            </span>
+            <span>{formattedPrice}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
+          <div className="flex shrink-0 items-center gap-0.5">
             <Star className="h-3 w-3 fill-foreground text-foreground md:h-3.5 md:w-3.5" />
             <span className="text-[10px] font-medium md:text-xs">{rating}</span>
           </div>
         </div>
 
+        <div className="min-h-0 flex-1" aria-hidden />
+
         <div
-          className="mt-auto w-full min-w-0 shrink-0 pt-2"
+          className="w-full min-w-0 shrink-0"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
