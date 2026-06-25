@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { CSSProperties, HTMLAttributes } from "react";
 import * as ReactWindow from "react-window";
-import { CategoryProviderCard, CATEGORY_PROVIDER_CARD_HEIGHT } from "./CategoryProviderCard";
+import { CategoryProviderCard, CATEGORY_PROVIDER_CARD_HEIGHT, getCategoryProviderScrollMetrics, CATEGORY_PROVIDER_CARD_MAX_WIDTH, CATEGORY_PROVIDER_CARD_GAP } from "./CategoryProviderCard";
 import { CardSkeleton } from "./CardSkeleton";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +40,7 @@ type ServicesRowData = {
   isLoading: boolean;
   skeletonCount: number;
   favoritesVersion: number;
+  cardWidth: number;
 };
 
 const ServicesRow = memo(function ServicesRow({
@@ -53,8 +54,8 @@ const ServicesRow = memo(function ServicesRow({
 }) {
   if (data.isLoading) {
     return (
-      <div style={style} className="box-border flex pr-2">
-        <CardSkeleton className="h-full w-full max-w-[180px]" />
+      <div style={style} className="box-border flex items-start overflow-hidden pr-2">
+      <CardSkeleton className="min-w-0" style={{ width: data.cardWidth, maxWidth: data.cardWidth }} />
       </div>
     );
   }
@@ -63,10 +64,11 @@ const ServicesRow = memo(function ServicesRow({
   if (!service) return null;
 
   return (
-    <div style={style} className="box-border flex h-full min-h-0 items-stretch overflow-hidden pr-2">
+    <div style={style} className="box-border flex items-start overflow-hidden pr-2">
       <CategoryProviderCard
         {...service}
-        className="h-full w-full max-w-[180px] min-w-0"
+        className="min-w-0"
+        style={{ width: data.cardWidth, maxWidth: data.cardWidth }}
         priority={data.prioritizeImages && index < 4}
         isFavorite={!!data.favoritesById[service.id]}
         onToggleFavorite={data.onToggleFavorite}
@@ -90,8 +92,8 @@ type ServicesListProps = {
   skeletonCount?: number;
 };
 
-const ITEM_WIDTH = 188;
-const ITEM_HEIGHT = CATEGORY_PROVIDER_CARD_HEIGHT;
+const FALLBACK_ITEM_WIDTH = CATEGORY_PROVIDER_CARD_MAX_WIDTH + CATEGORY_PROVIDER_CARD_GAP;
+const FALLBACK_ITEM_HEIGHT = CATEGORY_PROVIDER_CARD_HEIGHT;
 
 function ScrollOuterElement({
   className,
@@ -128,13 +130,23 @@ export const ServicesList = memo(
     const variableList = (ReactWindow as any).VariableSizeList;
     const VirtualList = fixedList || variableList;
 
-    const itemSizeFn = useCallback(() => ITEM_WIDTH, []);
+    const itemSizeFn = useCallback(() => itemWidthRef.current, []);
 
     const outerRef = useRef<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
+    const itemWidthRef = useRef(FALLBACK_ITEM_WIDTH);
     const [width, setWidth] = useState(0);
     const widthRef = useRef(0);
     const resizeTimeoutRef = useRef<number | null>(null);
+
+    const scrollMetrics = useMemo(
+      () => (width > 0 ? getCategoryProviderScrollMetrics(width) : null),
+      [width]
+    );
+    const itemWidth = scrollMetrics?.itemWidth ?? FALLBACK_ITEM_WIDTH;
+    const cardWidth = scrollMetrics?.cardWidth ?? CATEGORY_PROVIDER_CARD_MAX_WIDTH;
+    const itemHeight = scrollMetrics?.cardHeight ?? FALLBACK_ITEM_HEIGHT;
+    itemWidthRef.current = itemWidth;
 
     useEffect(() => {
       const el = containerRef.current;
@@ -164,7 +176,7 @@ export const ServicesList = memo(
     const scrollByItems = useCallback((direction: "left" | "right", step: number = 3) => {
       const el = outerRef.current;
       if (!el) return;
-      const delta = (direction === "left" ? -1 : 1) * step * ITEM_WIDTH;
+      const delta = (direction === "left" ? -1 : 1) * step * itemWidthRef.current;
       el.scrollBy({ left: delta, behavior: "smooth" });
     }, []);
 
@@ -181,6 +193,7 @@ export const ServicesList = memo(
         isLoading,
         skeletonCount,
         favoritesVersion,
+        cardWidth,
       }),
       [
         services,
@@ -190,6 +203,7 @@ export const ServicesList = memo(
         isLoading,
         skeletonCount,
         favoritesVersion,
+        cardWidth,
       ]
     );
 
@@ -211,17 +225,21 @@ export const ServicesList = memo(
       <div
         ref={containerRef}
         className="w-full overflow-hidden"
-        style={{ contentVisibility: "auto", containIntrinsicSize: "180px 296px" }}
+        style={{
+          contentVisibility: "auto",
+          containIntrinsicSize: `${CATEGORY_PROVIDER_CARD_MAX_WIDTH}px ${FALLBACK_ITEM_HEIGHT}px`,
+        }}
       >
         <VirtualList
+          key={`${itemWidth}-${itemHeight}`}
           outerRef={outerRef}
           outerElementType={ScrollOuterElement as any}
           direction="horizontal"
           layout="horizontal"
-          height={ITEM_HEIGHT}
+          height={itemHeight}
           width={width}
           itemCount={itemCount}
-          itemSize={isVariable ? itemSizeFn : ITEM_WIDTH}
+          itemSize={isVariable ? itemSizeFn : itemWidth}
           itemData={itemData}
           overscanCount={3}
         >
