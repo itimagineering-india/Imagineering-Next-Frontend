@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,13 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
-import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGeocoderByPolicy } from "@/hooks/useGeocoderByPolicy";
+import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
+import { loadSavedAddresses, type SavedAddress } from "@/lib/savedAddresses";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -83,11 +85,11 @@ function BookingSectionCard({
   return (
     <div
       className={cn(
-        "rounded-[12px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-5",
+        "rounded-[14px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-6",
         className,
       )}
     >
-      <div className="mb-3 flex items-center gap-2.5">
+      <div className="mb-3 flex items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
           <Icon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
         </span>
@@ -119,6 +121,11 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const [zip, setZip] = useState("");
   const [notes, setNotes] = useState("");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [addressExtrasOpen, setAddressExtrasOpen] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [addressPickerOpen, setAddressPickerOpen] = useState(false);
+  const selectedAddressIdRef = useRef<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentOption>("razorpay");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [neftReceiptFile, setNeftReceiptFile] = useState<File | null>(null);
@@ -127,7 +134,6 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const [sbiCollectDetails, setSbiCollectDetails] = useState<{ paymentLink?: string; instructions?: string } | null>(null);
   const [loadingSbiCollect, setLoadingSbiCollect] = useState(false);
   const [sbiCollectReceiptFile, setSbiCollectReceiptFile] = useState<File | null>(null);
-  const [addressExtrasOpen, setAddressExtrasOpen] = useState(false);
   const [detailsStep, setDetailsStep] = useState<DetailsStep>(1);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -155,9 +161,41 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     }
   }, [open]);
 
+  const applyFromSaved = useCallback((a: SavedAddress) => {
+    selectedAddressIdRef.current = a.id;
+    setSelectedAddressId(a.id);
+    setAddress(a.address);
+    setCity(a.city);
+    setStateVal(a.state);
+    setZip(a.zipCode);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const rows = loadSavedAddresses();
+    setSavedAddresses(rows);
+    if (rows.length === 0) {
+      setSelectedAddressId(null);
+      selectedAddressIdRef.current = null;
+      setAddress("");
+      setCity("");
+      setStateVal("");
+      setZip("");
+      return;
+    }
+    const id = selectedAddressIdRef.current;
+    const pick = (id && rows.find((r) => r.id === id)) || rows.find((x) => x.isDefault) || rows[0];
+    if (pick) applyFromSaved(pick);
+  }, [open, applyFromSaved]);
+
+  const selectedSaved = useMemo(
+    () => savedAddresses.find((s) => s.id === selectedAddressId) ?? null,
+    [savedAddresses, selectedAddressId],
+  );
+
   // When amount exceeds limit, switch to sbicollect if currently on limited methods
   useEffect(() => {
-    if (amount > PAYMENT_AMOUNT_LIMIT && ["razorpay", "cashfree", "cod"].includes(paymentMethod)) {
+    if (amount > PAYMENT_AMOUNT_LIMIT && ["razorpay", "cashfree"].includes(paymentMethod)) {
       setPaymentMethod("sbicollect");
       setNeftReceiptFile(null);
       setSbiCollectReceiptFile(null);
@@ -235,14 +273,15 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
 
   const {
     inputRef: addressInputRef,
-    isLoaded: isLocationLoaded,
+    isLoaded: rawLocationLoaded,
     getCurrentLocation,
     suggestions,
     showSuggestions,
     setShowSuggestions,
     selectSuggestion,
     handleInputChange,
-  } = useGoogleGeocoder({
+    hasAnyGeocoder,
+  } = useGeocoderByPolicy("public", {
     onPlaceSelect: (place) => {
       const formatted = place.formatted_address || "";
       const { addr, parsedCity, parsedState, parsedZip } = parseAddress(formatted);
@@ -254,12 +293,16 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
       setCity(resolvedCity);
       setStateVal(resolvedState);
       setZip(resolvedZip);
+      setSelectedAddressId(null);
+      selectedAddressIdRef.current = null;
       setIsGettingLocation(false);
     },
     onError: () => {
       setIsGettingLocation(false);
     },
   });
+
+  const isLocationLoaded = rawLocationLoaded || !hasAnyGeocoder;
 
   const handleGetCurrentLocation = () => {
     setIsGettingLocation(true);
@@ -422,7 +465,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     if (!canProceedToPayment) {
       toast({
         title: "Complete required fields",
-        description: "Please fill Date, Time, and Address before proceeding to payment.",
+        description: "Please fill date, time, and service address before proceeding to payment.",
         variant: "destructive",
       });
       return;
@@ -466,12 +509,13 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   }, [open]);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="flex max-h-[90vh] flex-col gap-0 overflow-y-auto overflow-x-hidden border-0 p-0 shadow-xl sm:max-w-lg sm:rounded-2xl"
         onInteractOutside={(e) => {
           const target = e.target as HTMLElement;
-          if (target.closest(".pac-container")) {
+          if (target?.closest?.(".pac-container")) {
             e.preventDefault();
           }
         }}
@@ -487,7 +531,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   Fill in details to confirm your booking
                 </DialogDescription>
                 <div className="mt-4 space-y-2">
-                  <div className="flex gap-1.5" aria-hidden>
+                  <div className="flex gap-2" aria-hidden>
                     {[1, 2, 3].map((s) => (
                       <div
                         key={s}
@@ -600,11 +644,13 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                           value={address}
                           onChange={(e) => {
                             setAddress(e.target.value);
+                            setSelectedAddressId(null);
+                            selectedAddressIdRef.current = null;
                             handleInputChange(e);
                           }}
                           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                           placeholder="Search address"
-                          className={cn("h-11 pl-10", inputFocusClass)}
+                          className={cn("h-11 pl-12", inputFocusClass)}
                           disabled={!isLocationLoaded}
                           autoComplete="street-address"
                         />
@@ -614,7 +660,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                               <button
                                 key={s.id || i}
                                 type="button"
-                                className="w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
+                                className="w-full px-3 py-3 text-left text-sm transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   void selectSuggestion(s);
@@ -626,7 +672,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                           </div>
                         )}
                       </div>
-                      {!isLocationLoaded ? (
+                      {!rawLocationLoaded && hasAnyGeocoder ? (
                         <p className="text-xs text-muted-foreground">Loading address search…</p>
                       ) : null}
                       <Button
@@ -635,7 +681,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                         size="sm"
                         className="h-10 w-full rounded-xl border-slate-200 transition-all duration-200 hover:bg-slate-100 dark:border-slate-600 sm:w-auto"
                         onClick={handleGetCurrentLocation}
-                        disabled={!isLocationLoaded || isGettingLocation}
+                        disabled={!hasAnyGeocoder || !rawLocationLoaded || isGettingLocation}
                       >
                         {isGettingLocation ? (
                           <>
@@ -649,6 +695,20 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                           </>
                         )}
                       </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 px-0 text-sm font-semibold text-blue-600 hover:bg-transparent hover:underline dark:text-blue-400"
+                        onClick={() => setAddressPickerOpen(true)}
+                      >
+                        Use saved address
+                      </Button>
+                      {selectedSaved ? (
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Saved: {selectedSaved.label} — {[city, stateVal, zip].filter(Boolean).join(", ")}
+                        </p>
+                      ) : null}
 
                       <Collapsible open={addressExtrasOpen} onOpenChange={setAddressExtrasOpen}>
                         <CollapsibleTrigger asChild>
@@ -793,7 +853,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
               <div className="space-y-4">
-                <div className="rounded-xl border border-blue-200/80 bg-gradient-to-r from-blue-50/90 to-sky-50/60 px-4 py-3.5 dark:border-blue-900/45 dark:from-blue-950/45 dark:to-sky-950/35">
+                <div className="rounded-xl border border-blue-200/80 bg-gradient-to-r from-blue-50/90 to-sky-50/60 px-4 py-4 dark:border-blue-900/45 dark:from-blue-950/45 dark:to-sky-950/35">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-800/90 dark:text-blue-300/95">
                     Total payable
                   </p>
@@ -864,9 +924,9 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                 </BookingSectionCard>
 
                 <div className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-[#f9fafb] shadow-sm dark:border-slate-800 dark:bg-muted/40">
-                  <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-sky-50/60 px-4 py-3.5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20 sm:px-5">
+                  <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-sky-50/60 px-4 py-4 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20 sm:px-6">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-3">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
                           <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         </span>
@@ -875,13 +935,13 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                           <p className="text-xs text-slate-600 dark:text-slate-400">Select your preferred gateway to continue</p>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         Imagineering India Secure Pay
                       </span>
                     </div>
                   </div>
-                  <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+                  <div className="space-y-3 px-4 py-4 sm:px-6 sm:py-6">
                     <PaymentOptionsSelector
                       value={paymentMethod}
                       onChange={(v) => {
@@ -898,8 +958,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                 </div>
 
                 {paymentMethod === "sbicollect" && (
-                  <div className="space-y-3 rounded-[12px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-5">
-                    <div className="flex items-center gap-2.5">
+                  <div className="space-y-3 rounded-[14px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-6">
+                    <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
                         <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       </span>
@@ -936,7 +996,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <label
                           htmlFor="sbicollect-receipt-upload"
-                          className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2.5 text-sm transition-colors hover:border-blue-400/60 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60 dark:hover:border-blue-500/40 dark:hover:bg-slate-800/80"
+                          className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm transition-colors hover:border-blue-400/60 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60 dark:hover:border-blue-500/40 dark:hover:bg-slate-800/80"
                         >
                           <Upload className="h-4 w-4 shrink-0 text-slate-500" />
                           <span className="truncate break-all text-slate-700 dark:text-slate-200">
@@ -968,8 +1028,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                 )}
 
                 {paymentMethod === "neft" && (
-                  <div className="space-y-3 rounded-[12px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-5">
-                    <div className="flex items-center gap-2.5">
+                  <div className="space-y-3 rounded-[14px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-6">
+                    <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
                         <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       </span>
@@ -1011,7 +1071,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <label
                           htmlFor="neft-receipt-upload"
-                          className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2.5 text-sm transition-colors hover:border-blue-400/60 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60 dark:hover:border-blue-500/40 dark:hover:bg-slate-800/80"
+                          className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm transition-colors hover:border-blue-400/60 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60 dark:hover:border-blue-500/40 dark:hover:bg-slate-800/80"
                         >
                           <Upload className="h-4 w-4 shrink-0 text-slate-500" />
                           <span className="truncate break-all text-slate-700 dark:text-slate-200">
@@ -1160,5 +1220,14 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
       </DialogContent>
     </Dialog>
 
+    <CheckoutAddressPickerModal
+      open={addressPickerOpen}
+      onOpenChange={setAddressPickerOpen}
+      addresses={savedAddresses}
+      selectedId={selectedAddressId}
+      onAddressesChange={setSavedAddresses}
+      onSelect={applyFromSaved}
+    />
+    </>
   );
 };
