@@ -90,6 +90,11 @@ export function Header() {
  const [headerCategories, setHeaderCategories] = useState<Array<{ _id?: string; id?: string; name: string; slug: string; subcategories?: string[] }>>([]);
  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
  const [typedHeadline, setTypedHeadline] = useState("");
+ const [isClient, setIsClient] = useState(false);
+
+ useEffect(() => {
+  setIsClient(true);
+ }, []);
 
  useEffect(() => {
   setTypedHeadline("");
@@ -836,6 +841,7 @@ export function Header() {
     {/* Desktop Navigation */}
     <nav className="hidden lg:flex items-center gap-6 shrink-0">
      {/** z-30: mega-menu must paint above the desktop search bar (next sibling), which otherwise covers the right-hand cards. */}
+     {isClient ? (
      <NavigationMenu className="z-30">
       <NavigationMenuList>
        <NavigationMenuItem key="browse-services">
@@ -861,8 +867,8 @@ export function Header() {
                 key={category.id || category._id || category.slug || `cat-${idx}`}
                 type="button"
                 onMouseEnter={() => {
-                 setActiveCategorySlug(category.slug);
-                 setActiveSubcategory(null);
+                 setActiveCategorySlug((prev) => (prev === category.slug ? prev : category.slug));
+                 setActiveSubcategory((prev) => (prev === null ? prev : null));
                 }}
                 className={cn(
                  "flex w-full items-center gap-3 px-4 py-3 body text-slate-800 cursor-pointer transition-colors",
@@ -901,14 +907,15 @@ export function Header() {
                <div className="mt-1 flex-1 overflow-y-auto pr-2">
                 {subs.length > 0 ? (
                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-3">
-                  {subs.map((sub) => {
+                  {subs.map((sub, subIdx) => {
                    const isChipActive = effectiveActiveSub === sub;
                    return (
                     <button
-                     key={`${active.slug}-${sub}`}
+                     key={`${active.slug}-${sub}-${subIdx}`}
                      type="button"
-                     onMouseEnter={() => setActiveSubcategory(sub)}
-                     onFocus={() => setActiveSubcategory(sub)}
+                     onMouseEnter={() => {
+                      setActiveSubcategory((prev) => (prev === sub ? prev : sub));
+                     }}
                      onClick={() => {
                       const params = new URLSearchParams();
                       params.set("category", active.slug);
@@ -979,8 +986,8 @@ export function Header() {
                             key={category.slug}
                             type="button"
                             onMouseEnter={() => {
-                              setActiveB2bCategorySlug(category.slug);
-                              setActiveB2bSubcategory(null);
+                              setActiveB2bCategorySlug((prev) => (prev === category.slug ? prev : category.slug));
+                              setActiveB2bSubcategory((prev) => (prev === null ? prev : null));
                             }}
                             className={cn(
                               "flex w-full items-center gap-3 px-4 py-3 body text-slate-800 cursor-pointer transition-colors",
@@ -1016,14 +1023,15 @@ export function Header() {
                           <div className="mt-1 flex-1 overflow-y-auto pr-2">
                             {subs.length > 0 ? (
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-3">
-                                {subs.map((sub) => {
+                                {subs.map((sub, subIdx) => {
                                   const isChipActive = effectiveActiveSub === sub;
                                   return (
                                     <button
-                                      key={`${active.slug}-${sub}`}
+                                      key={`${active.slug}-${sub}-${subIdx}`}
                                       type="button"
-                                      onMouseEnter={() => setActiveB2bSubcategory(sub)}
-                                      onFocus={() => setActiveB2bSubcategory(sub)}
+                                      onMouseEnter={() => {
+                                        setActiveB2bSubcategory((prev) => (prev === sub ? prev : sub));
+                                      }}
                                       onClick={() => {
                                         const params = new URLSearchParams();
                                         params.set("category", active.slug);
@@ -1073,6 +1081,9 @@ export function Header() {
           </NavigationMenuItem>
       </NavigationMenuList>
      </NavigationMenu>
+     ) : (
+      <div className="hidden h-10 w-[11rem] shrink-0 lg:block" aria-hidden />
+     )}
 
      {/* Search Bar - In Navigation (Desktop) */}
      <div className="w-[30rem] shrink-0">
