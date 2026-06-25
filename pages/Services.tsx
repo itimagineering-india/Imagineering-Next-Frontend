@@ -74,13 +74,9 @@ export default function Services(props: ServicesProps = {}) {
   const [browseMode, setBrowseMode] = useState<"providers" | "services">(() => {
     const view = searchParams?.get("view");
     if (view === "services" || view === "providers") return view;
-    try {
-      const saved = localStorage.getItem("servicesBrowseMode");
-      return saved === "services" ? "services" : "providers";
-    } catch {
-      return "providers";
-    }
+    return "providers";
   });
+  const [hydrated, setHydrated] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     category: [],
@@ -140,22 +136,7 @@ export default function Services(props: ServicesProps = {}) {
   const lngParam = searchParams?.get("lng");
 
   /** Block services fetch until URL/city coords known or browser geolocation finishes — stops duplicate cache keys (no-lat vs lat). */
-  const [locationGateReady, setLocationGateReady] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const hasUrl =
-      latParam &&
-      lngParam &&
-      Number.isFinite(parseFloat(latParam)) &&
-      Number.isFinite(parseFloat(lngParam));
-    const hasFixed =
-      fixedLat != null &&
-      fixedLng != null &&
-      Number.isFinite(fixedLat) &&
-      Number.isFinite(fixedLng);
-    if (hasUrl || hasFixed) return true;
-    if (typeof navigator === "undefined" || !navigator.geolocation) return true;
-    return false;
-  });
+  const [locationGateReady, setLocationGateReady] = useState(false);
 
   const maxPriceParam = searchParams?.get("maxPrice");
   const sortParam = searchParams?.get("sort") || "";
@@ -173,7 +154,11 @@ export default function Services(props: ServicesProps = {}) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : mapRadiusKm;
   })();
 
-  // Keep browseMode in sync with URL + localStorage
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  // Keep browseMode in sync with URL; restore saved preference after mount (avoids SSR text mismatch).
   useEffect(() => {
     const view = searchParams?.get("view");
     if (view === "services" || view === "providers") {
@@ -183,6 +168,15 @@ export default function Services(props: ServicesProps = {}) {
       } catch {
         // ignore
       }
+      return;
+    }
+    try {
+      const saved = localStorage.getItem("servicesBrowseMode");
+      if (saved === "services" || saved === "providers") {
+        setBrowseMode(saved);
+      }
+    } catch {
+      // ignore
     }
   }, [searchParams]);
 
@@ -744,8 +738,7 @@ export default function Services(props: ServicesProps = {}) {
     }
 
     if (mapMarkersLoadingToastRef.current !== null) {
-      dismissToast(String(mapMarkersLoadingToastRef.current));
-      mapMarkersLoadingToastRef.current = null;
+      return;
     }
     const headline =
       browseMode === "services"
@@ -769,7 +762,7 @@ export default function Services(props: ServicesProps = {}) {
         "sm:bottom-6 sm:right-auto [&>button]:hidden",
     });
     mapMarkersLoadingToastRef.current = loadingToast.id;
-  }, [viewMode, browseMode, servicesLoading, providersLoading, toast, dismissToast, t]);
+  }, [viewMode, browseMode, servicesLoading, providersLoading, dismissToast, t]);
 
   // Show loading toast when filters change (but not on initial mount)
   useEffect(() => {
@@ -1659,16 +1652,23 @@ export default function Services(props: ServicesProps = {}) {
                             <Badge
                               variant="secondary"
                               className="border bg-background/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-sm tabular-nums sm:text-xs"
+                              suppressHydrationWarning
                             >
-                              {mapPlottedMarkerCount}{" "}
-                              {browseMode === "services"
-                                ? mapPlottedMarkerCount === 1
-                                  ? t("service", "service")
-                                  : t("servicesLower", "services")
-                                : mapPlottedMarkerCount === 1
-                                  ? t("provider", "provider")
-                                  : t("providersLower", "providers")}{" "}
-                              {t("onMap", "on map")}
+                              {hydrated ? (
+                                <>
+                                  {mapPlottedMarkerCount}{" "}
+                                  {browseMode === "services"
+                                    ? mapPlottedMarkerCount === 1
+                                      ? t("service", "service")
+                                      : t("servicesLower", "services")
+                                    : mapPlottedMarkerCount === 1
+                                      ? t("provider", "provider")
+                                      : t("providersLower", "providers")}{" "}
+                                  {t("onMap", "on map")}
+                                </>
+                              ) : (
+                                t("onMap", "on map")
+                              )}
                             </Badge>
                           </div>
                         )}
