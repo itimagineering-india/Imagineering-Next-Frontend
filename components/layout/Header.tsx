@@ -750,7 +750,7 @@ export function Header() {
      </div>
     </div>
    ) : null}
-   <div className="flex h-auto min-h-14 w-full min-w-0 max-w-full items-center justify-between gap-2 px-2 py-2 sm:min-h-16 sm:px-3 md:px-4 lg:px-5 sm:py-3 sm:gap-3 2xl:px-6">
+   <div className="home-shell flex h-auto min-h-14 w-full min-w-0 max-w-full items-center justify-between gap-2 py-2 sm:min-h-16 sm:py-3 sm:gap-3">
     {/* Logo — full flex width on mobile; cap width md–lg for tablet */}
     <Link
      href="/"
