@@ -17,6 +17,53 @@ export function isConstructionMaterialsCategorySlug(slug: string | undefined): b
   return normalizeCategorySlugLikeApp(slug || "") === "construction-materials";
 }
 
+const TRADERS_CATEGORY_SLUGS = new Set(["traders", "b2b-traders", "vendors", "b2b-trader"]);
+
+export function isTradersCategorySlug(slug: string | undefined): boolean {
+  return TRADERS_CATEGORY_SLUGS.has(normalizeCategorySlugLikeApp(slug || ""));
+}
+
+export function isMaterialSupplierSubcategory(subcategory: string): boolean {
+  const n = String(subcategory || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!n) return false;
+  return (
+    n.includes("material supplier") ||
+    n.includes("construction material") ||
+    n === "cement & concrete"
+  );
+}
+
+export function shouldShowConstructionMaterialFields(
+  categorySlug: string | undefined,
+  subcategory: string,
+  itemType: string,
+): boolean {
+  if (isConstructionMaterialsCategorySlug(categorySlug)) {
+    return Boolean(subcategory?.trim());
+  }
+  if (isTradersCategorySlug(categorySlug) && isMaterialSupplierSubcategory(subcategory)) {
+    return Boolean(itemType?.trim());
+  }
+  return false;
+}
+
+export function resolveMaterialTypeKeyForServiceForm(
+  categorySlug: string | undefined,
+  subcategory: string,
+  itemType: string,
+): string {
+  if (isConstructionMaterialsCategorySlug(categorySlug)) {
+    return resolveConstructionMaterialTypeKeyFromSubcategory(subcategory);
+  }
+  if (isTradersCategorySlug(categorySlug) && isMaterialSupplierSubcategory(subcategory)) {
+    return resolveConstructionMaterialTypeKeySlugOnly(itemType);
+  }
+  return "";
+}
+
 /** Keys stored in provider form `dynamicData` and sent inside `metadata` on submit */
 export const CONSTRUCTION_MATERIAL_FORM_KEYS: readonly string[] = [
   "brand",
@@ -90,7 +137,7 @@ export const CONSTRUCTION_SELECT_TO_CUSTOM: Record<string, string> = {
   brickBlockSize: "brickBlockCustomSize",
 };
 
-function resolveConstructionMaterialTypeKeySlugOnly(raw: string): string {
+export function resolveConstructionMaterialTypeKeySlugOnly(raw: string): string {
   const n = String(raw || "")
     .toLowerCase()
     .trim()
