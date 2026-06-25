@@ -7,14 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -995,7 +987,7 @@ export default function BuyerBookings() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 smallTablet:grid-cols-3 laptop:grid-cols-6 gap-3 tablet:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-2">
@@ -1095,7 +1087,7 @@ export default function BuyerBookings() {
           </CardContent>
         </Card>
 
-        {/* Bookings Table */}
+        {/* Bookings List */}
         <Card>
           <CardHeader>
             <CardTitle>All Bookings</CardTitle>
@@ -1259,47 +1251,21 @@ export default function BuyerBookings() {
                     </div>
                   ))}
                 </div>
-                <div className="hidden md:block overflow-x-auto">
-                  <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Service</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Payment</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredBookings.map((booking) => (
-                      <TableRow key={booking._id}>
-                        <TableCell>
-                          <div className="font-medium">
+                <div className="hidden md:grid gap-4 md:grid-cols-3">
+                  {filteredBookings.map((booking) => (
+                    <div key={booking._id} className="rounded-xl border bg-card p-4 shadow-sm space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">
                             {booking.services?.[0]?.title || booking.service?.title || "N/A"}
                             {!!booking.services?.length && booking.services.length > 1 && (
                               <span className="text-xs text-muted-foreground ml-2">
                                 +{booking.services.length - 1} more
                               </span>
                             )}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatBookingId(booking._id)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-semibold">
-                            ₹{getTotal(booking).toLocaleString()}
-                          </div>
-                          {booking.paymentStatus !== "paid" && getOutstanding(booking) > 0 && (
-                            <div className="text-xs text-orange-600">
-                              Outstanding: ₹{getOutstanding(booking).toLocaleString()}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(booking.status, booking.rawStatus)}</TableCell>
-                        <TableCell>{getPaymentBadge(booking.paymentStatus)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">{formatBookingId(booking._id)}</p>
+                        </div>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1314,69 +1280,58 @@ export default function BuyerBookings() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                            {/* Invoice download is now available inside booking details dialog */}
-                            {canCancelBooking(booking) && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => openCancelBookingDialog(booking)}
-                                disabled={cancellingBookingId === booking._id}
-                                title="Cancel Booking"
-                              >
-                                {cancellingBookingId === booking._id ? (
-                                  <Clock className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  "Cancel Booking"
-                                )}
-                              </Button>
+                      </div>
+
+                      <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                        <p className="text-xs text-muted-foreground">Total Amount</p>
+                        <p className="font-semibold">₹{getTotal(booking).toLocaleString()}</p>
+                        {getOutstanding(booking) > 0 && (
+                          <p className="text-xs text-orange-600 mt-1">
+                            Outstanding: ₹{getOutstanding(booking).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-sm flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-20">Booking:</span>
+                          {getStatusBadge(booking.status, booking.rawStatus)}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-20">Payment:</span>
+                          {getPaymentBadge(booking.paymentStatus)}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canCancelBooking(booking) && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => openCancelBookingDialog(booking)}
+                            disabled={cancellingBookingId === booking._id}
+                            title="Cancel Booking"
+                          >
+                            {cancellingBookingId === booking._id ? (
+                              <Clock className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Cancel Booking"
                             )}
-                            {getOutstanding(booking) > 0 && (
-                              <div className="flex flex-col sm:flex-row gap-2">
-                                <RazorpayCheckout
-                                  bookingId={booking._id}
-                                  bookingPaymentStage="balance"
-                                  bookingDescription={`Balance payment for ${booking.service?.title || "Booking"}`}
-                                  amount={getOutstanding(booking) || getTotal(booking)}
-                                  variant="outline"
-                                  onSuccess={() => {
-                                    fetchBookings();
-                                    fetchInvoices();
-                                    fetchPaymentHistory(booking._id);
-                                  }}
-                                >
-                                  Pay Balance (₹{getOutstanding(booking).toLocaleString()}) – Razorpay
-                                </RazorpayCheckout>
-                                <CashfreeCheckout
-                                  bookingId={booking._id}
-                                  bookingPaymentStage="balance"
-                                  bookingDescription={`Balance payment for ${booking.service?.title || "Booking"}`}
-                                  amount={getOutstanding(booking) || getTotal(booking)}
-                                  variant="outline"
-                                  onSuccess={() => {
-                                    fetchBookings();
-                                    fetchInvoices();
-                                    fetchPaymentHistory(booking._id);
-                                  }}
-                                >
-                                  Pay Balance (₹{getOutstanding(booking).toLocaleString()}) – Cashfree
-                                </CashfreeCheckout>
-                              </div>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openSupportPage(booking)}
-                              title="Raise Ticket"
-                            >
-                              <HelpCircle className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openSupportPage(booking)}
+                          title="Raise Ticket"
+                        >
+                          <HelpCircle className="h-4 w-4 mr-1" />
+                          Raise Ticket
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
             </>
             )}
           </CardContent>
