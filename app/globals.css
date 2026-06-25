@@ -66,6 +66,13 @@
   }
 }
 
+@layer components {
+  .home-shell,
+  .layout-shell {
+    @apply mx-auto w-full max-w-[min(100%,100rem)] px-3 sm:px-4 md:px-5 lg:px-6;
+  }
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
