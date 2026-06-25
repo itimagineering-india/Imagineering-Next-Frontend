@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import {
   resolveConstructionMaterialTypeKeyFromSubcategory,
+  resolveConstructionMaterialTypeKeySlugOnly,
 } from "@/lib/constructionMaterials";
 
 function optLabel(v: string, label: string) {
@@ -82,6 +83,7 @@ function SelectWithCustom({
 
 interface ConstructionMaterialsDynamicFieldsProps {
   subcategory: string;
+  itemType?: string;
   dynamicData: Record<string, unknown>;
   onFieldChange: (fieldName: string, value: unknown) => void;
   errors?: Record<string, string>;
@@ -90,11 +92,15 @@ interface ConstructionMaterialsDynamicFieldsProps {
 /** Option values align with imagi-mitra `categoryFormConfigs` + admin `constructionMaterialsAdmin`. */
 export function ConstructionMaterialsDynamicFields({
   subcategory,
+  itemType,
   dynamicData,
   onFieldChange,
   errors,
 }: ConstructionMaterialsDynamicFieldsProps) {
-  const materialTypeKey = resolveConstructionMaterialTypeKeyFromSubcategory(subcategory);
+  const materialTypeKey =
+    itemType?.trim()
+      ? resolveConstructionMaterialTypeKeySlugOnly(itemType)
+      : resolveConstructionMaterialTypeKeyFromSubcategory(subcategory);
   const val = (k: string) => String(dynamicData[k] ?? "");
   const set = (patch: Record<string, string>) => {
     for (const [k, v] of Object.entries(patch)) {
