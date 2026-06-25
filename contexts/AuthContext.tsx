@@ -31,9 +31,13 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  const [token, setToken] = useState<string | null>(() => getAuthToken());
+  const [token, setToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
+    setToken(getAuthToken());
+    setAuthReady(true);
+
     const syncToken = () => setToken(getAuthToken());
     const handleStorage = (e: StorageEvent) => {
       if (e.key === "authToken" || e.key === "authCookieSession") syncToken();
@@ -69,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return {
         user,
-        isAuthenticated: !!token && !!user,
-        isLoading: !!token && meQuery.isLoading,
+        isAuthenticated: authReady && !!token && !!user,
+        isLoading: !authReady || (!!token && meQuery.isLoading),
         error: (meQuery.error as Error)?.message || null,
         refresh: () => queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
         logout: () => {
@@ -80,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       };
     },
-    [token, meQuery.data, meQuery.isLoading, meQuery.error, queryClient]
+    [authReady, token, meQuery.data, meQuery.isLoading, meQuery.error, queryClient]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
