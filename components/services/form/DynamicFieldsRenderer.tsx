@@ -10,12 +10,18 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldConfig, getDynamicFields } from "@/config/serviceFields";
-import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import {
+  isConstructionMaterialsCategorySlug,
+  isMaterialSupplierSubcategory,
+  isTradersCategorySlug,
+  shouldShowConstructionMaterialFields,
+} from "@/lib/constructionMaterials";
 import { ConstructionMaterialsDynamicFields } from "./ConstructionMaterialsDynamicFields";
 
 interface DynamicFieldsRendererProps {
   categorySlug: string;
   subcategory: string;
+  itemType?: string;
   dynamicData: Record<string, unknown>;
   onFieldChange: (fieldName: string, value: unknown) => void;
   errors?: Record<string, string>;
@@ -24,6 +30,7 @@ interface DynamicFieldsRendererProps {
 export function DynamicFieldsRenderer({
   categorySlug,
   subcategory,
+  itemType,
   dynamicData,
   onFieldChange,
   errors,
@@ -38,7 +45,19 @@ export function DynamicFieldsRenderer({
     );
   }
 
-  if (isConstructionMaterialsCategorySlug(categorySlug)) {
+  if (
+    isTradersCategorySlug(categorySlug) &&
+    isMaterialSupplierSubcategory(subcategory) &&
+    !itemType?.trim()
+  ) {
+    return (
+      <div className="p-4 rounded-lg border bg-muted/30">
+        <p className="caption">Select an item type to see material-specific fields</p>
+      </div>
+    );
+  }
+
+  if (shouldShowConstructionMaterialFields(categorySlug, subcategory, itemType || "")) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-4">
@@ -50,6 +69,7 @@ export function DynamicFieldsRenderer({
         </div>
         <ConstructionMaterialsDynamicFields
           subcategory={subcategory}
+          itemType={itemType}
           dynamicData={dynamicData}
           onFieldChange={onFieldChange}
           errors={errors}
