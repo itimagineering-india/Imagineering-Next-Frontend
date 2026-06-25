@@ -34,12 +34,12 @@ export function ServicesSection() {
   const rest = ordered.slice(5);
 
   return (
-    <section className="relative overflow-hidden px-4 sm:px-6 md:px-8 py-10 smallTablet:py-12 laptop:py-16">
+    <section className="relative overflow-hidden py-10 smallTablet:py-12 laptop:py-16">
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(40_25%_98%)] via-background to-background" />
       <div className="absolute top-1/4 left-0 w-64 h-64 bg-[hsl(var(--red-accent))]/[0.06] rounded-full blur-3xl -translate-x-1/2 pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-primary/[0.04] rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
 
-      <div className="relative mx-auto w-full max-w-7xl">
+      <div className="relative home-shell">
         <div
           ref={ref}
           className={`text-center mb-10 smallTablet:mb-12 laptop:mb-16 transition-all duration-700 ${
