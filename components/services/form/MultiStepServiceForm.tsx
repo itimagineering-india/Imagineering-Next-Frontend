@@ -31,8 +31,10 @@ import {
  CONSTRUCTION_MATERIAL_FORM_KEYS,
  buildConstructionMetadataPayload,
  extractConstructionStrings,
- isConstructionMaterialsCategorySlug,
- resolveConstructionMaterialTypeKeyFromSubcategory,
+ isMaterialSupplierSubcategory,
+ isTradersCategorySlug,
+ resolveMaterialTypeKeyForServiceForm,
+ shouldShowConstructionMaterialFields,
  validateConstructionMaterials,
 } from "@/lib/constructionMaterials";
 import { getManpowerServiceOfferPresetsForSubcategory } from "@/config/manpowerServiceOfferPresets";
@@ -445,6 +447,23 @@ export function MultiStepServiceForm({
 
  const isTools = useMemo(() => isToolsCategory(selectedCategory), [selectedCategory]);
 
+ const showItemTypeSelector = useMemo(() => {
+  if (!formData.subcategory || availableItemTypes.length === 0) return false;
+  if (isTools) return true;
+  return (
+   isTradersCategorySlug(selectedCategory?.slug) &&
+   isMaterialSupplierSubcategory(formData.subcategory)
+  );
+ }, [formData.subcategory, availableItemTypes.length, isTools, selectedCategory?.slug]);
+
+ const requiresItemType = useMemo(
+  () =>
+   isTradersCategorySlug(selectedCategory?.slug) &&
+   isMaterialSupplierSubcategory(formData.subcategory) &&
+   availableItemTypes.length > 0,
+  [selectedCategory?.slug, formData.subcategory, availableItemTypes.length],
+ );
+
  const manpowerServiceOfferPresets = useMemo(() => {
   if (selectedCategory?.slug !== "manpower") return [];
   const sub = String(formData.subcategory ?? "").trim();
@@ -491,10 +510,10 @@ export function MultiStepServiceForm({
  const hasStep4DynamicFields = useMemo(() => {
   const slug = selectedCategory?.slug ?? "";
   const sub = String(formData.subcategory ?? "").trim();
-  if (isConstructionMaterialsCategorySlug(slug) && sub) return true;
+  if (shouldShowConstructionMaterialFields(slug, sub, formData.itemType || "")) return true;
   const fields = getDynamicFields(slug, formData.subcategory ?? "");
   return fields.length > 0;
- }, [selectedCategory?.slug, formData.subcategory]);
+ }, [selectedCategory?.slug, formData.subcategory, formData.itemType]);
 
  // Step 5 (Contact & Visibility) removed for all – defaults used. Category extras (step id 4) right after category when present.
  const visibleStepIds = useMemo(
@@ -668,6 +687,14 @@ export function MultiStepServiceForm({
     } else if (!formData.category) {
      newErrors.category = "Please select a category";
     }
+    if (
+      isTradersCategorySlug(selectedCategory?.slug) &&
+      isMaterialSupplierSubcategory(formData.subcategory) &&
+      availableItemTypes.length > 0 &&
+      !formData.itemType?.trim()
+    ) {
+      newErrors.itemType = "Please select item type";
+    }
     break;
 
    case 2:
@@ -711,8 +738,12 @@ export function MultiStepServiceForm({
       newErrors.dynamicData = { ...(newErrors.dynamicData || {}), resumeOrDocument: "Resume or document is required" };
      }
     }
-    if (isConstructionMaterialsCategorySlug(selectedCategory?.slug)) {
-     const mt = resolveConstructionMaterialTypeKeyFromSubcategory(formData.subcategory || "");
+    if (shouldShowConstructionMaterialFields(selectedCategory?.slug, formData.subcategory || "", formData.itemType || "")) {
+     const mt = resolveMaterialTypeKeyForServiceForm(
+      selectedCategory?.slug,
+      formData.subcategory || "",
+      formData.itemType || "",
+     );
      const meta = extractConstructionStrings(formData.dynamicData);
      const cErr = validateConstructionMaterials(mt, meta);
      if (cErr) {
@@ -884,6 +915,7 @@ export function MultiStepServiceForm({
     description: fullDescription,
     category: formData.category,
     subcategory: formData.subcategory || "",
+    ...(formData.itemType?.trim() ? { itemType: formData.itemType.trim() } : {}),
     priceMode: formData.priceMode,
     price: isRangePrice ? resolvedMinPrice : resolvedExactPrice,
     ...(isRangePrice && { priceMin: resolvedMinPrice, priceMax: resolvedMaxPrice, mrp: undefined }),
@@ -916,8 +948,12 @@ export function MultiStepServiceForm({
     }
    }
 
-   if (isConstructionMaterialsCategorySlug(selectedCategory?.slug)) {
-    const mt = resolveConstructionMaterialTypeKeyFromSubcategory(formData.subcategory || "");
+   if (shouldShowConstructionMaterialFields(selectedCategory?.slug, formData.subcategory || "", formData.itemType || "")) {
+    const mt = resolveMaterialTypeKeyForServiceForm(
+     selectedCategory?.slug,
+     formData.subcategory || "",
+     formData.itemType || "",
+    );
     const meta = extractConstructionStrings(formData.dynamicData);
     servicePayload.metadata = buildConstructionMetadataPayload(mt, meta);
    }
@@ -925,9 +961,6 @@ export function MultiStepServiceForm({
    if (isTools) {
     const toolsPayload = buildToolsServicePayload(toolsFields);
     Object.assign(servicePayload, toolsPayload);
-    if (formData.itemType?.trim()) {
-     servicePayload.itemType = formData.itemType.trim();
-    }
     if (editMode && !toolsPayload.customFields) {
      servicePayload.customFields = [];
     }
@@ -1113,12 +1146,22 @@ export function MultiStepServiceForm({
           </p>
          </div>
         )}
-        {isTools && formData.subcategory && availableItemTypes.length > 0 && (
+        {showItemTypeSelector && (
          <div className="space-y-2">
-          <Label htmlFor="itemType">Item Type</Label>
+          <Label htmlFor="itemType">
+           Item Type{requiresItemType ? " *" : ""}
+          </Label>
           <Select
            value={formData.itemType || ""}
-           onValueChange={(value) => setFormData({ ...formData, itemType: value })}
+           onValueChange={(value) => {
+            setFormData((prev) => {
+             const nextDynamicData = { ...prev.dynamicData };
+             for (const k of CONSTRUCTION_MATERIAL_FORM_KEYS) {
+              delete nextDynamicData[k];
+             }
+             return { ...prev, itemType: value, dynamicData: nextDynamicData };
+            });
+           }}
           >
            <SelectTrigger id="itemType">
             <SelectValue placeholder="Select item type" />
@@ -1131,6 +1174,9 @@ export function MultiStepServiceForm({
             ))}
            </SelectContent>
           </Select>
+          {errors.itemType && (
+           <p className="caption text-destructive">{errors.itemType}</p>
+          )}
          </div>
         )}
         {showManpowerServicesYouOffer && (
@@ -1457,6 +1503,7 @@ export function MultiStepServiceForm({
        <DynamicFieldsRenderer
         categorySlug={selectedCategory?.slug || ""}
         subcategory={formData.subcategory}
+        itemType={formData.itemType}
         dynamicData={formData.dynamicData}
         onFieldChange={(fieldName, value) => {
          setFormData({
