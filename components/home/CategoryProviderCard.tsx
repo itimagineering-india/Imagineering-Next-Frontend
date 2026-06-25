@@ -1,10 +1,9 @@
 "use client";
 import Link from "next/link";
-import { memo, useState, useRef } from "react";
+import { memo, useState, useRef, type CSSProperties } from "react";
 import { Heart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AddToCartButton } from "@/components/services/AddToCartButton";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 
 interface CategoryProviderCardProps {
@@ -22,14 +21,60 @@ interface CategoryProviderCardProps {
   rating: number;
   reviewCount: number;
   className?: string;
+  style?: CSSProperties;
   priority?: boolean;
   isFavorite: boolean;
   onToggleFavorite: (serviceId: string) => void;
 }
 
-// Shared dimensions for horizontal category scroll (keep in sync with ServicesList ITEM_HEIGHT).
-export const CATEGORY_PROVIDER_CARD_WIDTH = 180;
-export const CATEGORY_PROVIDER_CARD_HEIGHT = 296;
+// Shared dimensions for horizontal category scroll (keep in sync with ServicesList).
+export const CATEGORY_PROVIDER_CARD_GAP = 8;
+export const CATEGORY_PROVIDER_CARD_MAX_WIDTH = 180;
+export const CATEGORY_PROVIDER_CARD_MIN_WIDTH = 140;
+/** @deprecated Use scroll metrics from container width; kept for fallbacks. */
+export const CATEGORY_PROVIDER_CARD_WIDTH = CATEGORY_PROVIDER_CARD_MAX_WIDTH;
+/** @deprecated Use scroll metrics from container width; kept for fallbacks. */
+export const CATEGORY_PROVIDER_CARD_HEIGHT = 248;
+/** Fixed text block under the 4:3 image (title, location, price). */
+function getCategoryProviderBodyHeight(cardWidth: number): number {
+  const padding = cardWidth >= 168 ? 24 : 16;
+  const titleBlock = cardWidth >= 168 ? 42 : 40;
+  const locationBlock = 18;
+  const priceBlock = 38;
+  const spacing = 10;
+  return padding + titleBlock + locationBlock + priceBlock + spacing;
+}
+
+export function getCategoryProviderCardHeight(cardWidth: number): number {
+  return Math.ceil(cardWidth * 0.75) + getCategoryProviderBodyHeight(cardWidth) + 4;
+}
+
+export function getCategoryProviderVisibleCount(containerWidth: number): number {
+  if (containerWidth < 480) return 2.2;
+  if (containerWidth < 640) return 2.5;
+  if (containerWidth < 768) return 3;
+  if (containerWidth < 1024) return 4;
+  if (containerWidth < 1280) return 6;
+  return 9;
+}
+
+export function getCategoryProviderScrollMetrics(containerWidth: number) {
+  const gap = CATEGORY_PROVIDER_CARD_GAP;
+  const visibleCount = getCategoryProviderVisibleCount(containerWidth);
+  const minItemWidth = CATEGORY_PROVIDER_CARD_MIN_WIDTH + gap;
+  const maxItemWidth = CATEGORY_PROVIDER_CARD_MAX_WIDTH + gap;
+  const itemWidth = Math.min(
+    maxItemWidth,
+    Math.max(minItemWidth, Math.floor(containerWidth / visibleCount))
+  );
+  const cardWidth = itemWidth - gap;
+  return {
+    cardWidth,
+    itemWidth,
+    cardHeight: getCategoryProviderCardHeight(cardWidth),
+    visibleCount,
+  };
+}
 const CARD_IMAGE_WIDTH = 240;
 
 // Get API origin for our own uploads (e.g. /uploads/ or full API URL)
@@ -85,6 +130,7 @@ function CategoryProviderCardComponent({
   rating,
   reviewCount,
   className,
+  style,
   priority = false,
   isFavorite,
   onToggleFavorite,
@@ -102,10 +148,10 @@ function CategoryProviderCardComponent({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "group flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/40 transition-all duration-300 hover:shadow-md hover:ring-primary/20 md:rounded-xl",
+        "group flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/40 transition-all duration-300 hover:shadow-md hover:ring-primary/20 md:rounded-xl",
         className
       )}
-      style={{ contentVisibility: "auto" }}
+      style={{ contentVisibility: "auto", ...style }}
     >
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
         <img
@@ -149,18 +195,18 @@ function CategoryProviderCardComponent({
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
+      <div className="flex shrink-0 flex-col p-2 md:p-3">
         <h3
-          className="h-[2.05rem] shrink-0 overflow-hidden text-ellipsis break-words text-xs font-semibold leading-snug text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:h-[2.4rem] md:text-sm"
+          className="min-h-[2.5rem] text-xs font-semibold leading-[1.35] text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:min-h-[2.75rem] md:text-sm md:leading-snug"
           title={name}
         >
           {name}
         </h3>
-        <p className="mt-0.5 h-3.5 shrink-0 truncate text-[10px] text-muted-foreground md:text-xs">
+        <p className="mt-1 min-h-4 truncate text-[11px] leading-4 text-muted-foreground md:text-xs">
           {location}
         </p>
 
-        <div className="mt-2 flex h-9 shrink-0 min-w-0 items-center justify-between gap-2">
+        <div className="mt-2 flex min-h-9 shrink-0 min-w-0 items-center justify-between gap-2">
           <div className="min-w-0 flex-1 truncate text-xs font-bold leading-tight text-foreground md:text-sm">
             {!isRangePrice && mrp != null && mrp > 0 && (
               <span className="mr-1 text-[10px] font-normal text-muted-foreground line-through md:text-xs">
@@ -173,34 +219,6 @@ function CategoryProviderCardComponent({
             <Star className="h-3 w-3 fill-foreground text-foreground md:h-3.5 md:w-3.5" />
             <span className="text-[10px] font-medium md:text-xs">{rating}</span>
           </div>
-        </div>
-
-        <div className="min-h-0 flex-1" aria-hidden />
-
-        <div
-          className="w-full min-w-0 shrink-0"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          {isRangePrice ? (
-            <Button variant="outline" className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:px-3">
-              Enquire now
-            </Button>
-          ) : (
-            <AddToCartButton
-              serviceId={id}
-              providerName={name}
-              showQuantity={false}
-              label="Add to cart"
-              className="h-8 w-full min-w-0 max-w-full px-2 text-xs sm:px-3"
-            />
-          )}
         </div>
       </div>
     </Link>
