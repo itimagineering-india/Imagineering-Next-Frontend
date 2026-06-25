@@ -32,6 +32,7 @@ import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X
 import { cn } from "@/lib/utils";
 import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
 import { parseHeaderSearchQuery } from "@/lib/searchNavigation";
+import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -206,11 +207,15 @@ export function Header() {
         // Only show categories that admins marked for purchase flow.
         return matchesName && (!interactionType || interactionType === "PURCHASE_ONLY");
        });
-       setB2bCategories(filteredB2b);
+       const withSubcategoryNames = (category: any) => ({
+        ...category,
+        subcategories: getSubcategoryNames(category?.subcategories),
+       });
+       setB2bCategories(filteredB2b.map(withSubcategoryNames));
        setActiveB2bCategorySlug(filteredB2b[0]?.slug ?? null);
        setActiveB2bSubcategory(null);
 
-       setHeaderCategories(activeCategoriesForExplore);
+       setHeaderCategories(activeCategoriesForExplore.map(withSubcategoryNames));
     const firstWithSubs =
      activeCategoriesForExplore.find((c: any) => Array.isArray(c?.subcategories) && c.subcategories.length > 0) ||
      activeCategoriesForExplore[0];
@@ -884,10 +889,7 @@ export function Header() {
               fallbackCategory;
              if (!active) return null;
 
-             const subs =
-              active?.subcategories && Array.isArray(active.subcategories)
-               ? active.subcategories
-               : [];
+             const subs = getSubcategoryNames(active?.subcategories);
              const effectiveActiveSub =
               activeSubcategory && subs.includes(activeSubcategory)
                ? activeSubcategory
@@ -1002,7 +1004,7 @@ export function Header() {
                     if (b2bCategories.length === 0) return null;
                     const active =
                       b2bCategories.find((c) => c.slug === activeB2bCategorySlug) || b2bCategories[0];
-                      const subs = Array.isArray(active?.subcategories) ? active.subcategories : [];
+                      const subs = getSubcategoryNames(active?.subcategories);
                       const effectiveActiveSub =
                         activeB2bSubcategory && subs.includes(activeB2bSubcategory)
                           ? activeB2bSubcategory
