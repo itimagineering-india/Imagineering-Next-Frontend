@@ -39,9 +39,11 @@ import {
   Eye,
   FileText,
   ExternalLink,
+  Star,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
@@ -105,6 +107,7 @@ interface Booking {
 export default function BuyerBookings() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -131,6 +134,11 @@ export default function BuyerBookings() {
   ];
 
   const [loadingPaymentHistoryId, setLoadingPaymentHistoryId] = useState<string | null>(null);
+  const [reviewedServiceIds, setReviewedServiceIds] = useState<Set<string>>(new Set());
+  const [reviewingServiceId, setReviewingServiceId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     fetchBookings();
@@ -391,6 +399,97 @@ export default function BuyerBookings() {
       ];
     }
     return [];
+  };
+
+  useEffect(() => {
+    if (!selectedBooking || !user) {
+      setReviewingServiceId(null);
+      setReviewRating(0);
+      setReviewComment("");
+      return;
+    }
+    setReviewingServiceId(null);
+    setReviewRating(0);
+    setReviewComment("");
+    const items = getServiceItems(selectedBooking);
+    const userId = (user as { _id?: string; id?: string })._id || (user as { _id?: string; id?: string }).id;
+    if (!userId) return;
+
+    const checkReviewed = async () => {
+      const reviewed = new Set<string>();
+      const uniqueServiceIds = Array.from(new Set(items.map((item) => item._id).filter(Boolean)));
+      if (uniqueServiceIds.length === 0) {
+        setReviewedServiceIds(reviewed);
+        return;
+      }
+
+      const results = await Promise.allSettled(
+        uniqueServiceIds.map((serviceId) => api.reviews.getByService(serviceId))
+      );
+
+      results.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        const list = (result.value.data as { reviews?: Array<{ buyer?: { _id?: string; id?: string } | string }> })?.reviews || [];
+        const hasReviewed = list.some((r) => {
+          const buyer = r.buyer;
+          const bid =
+            typeof buyer === "object" && buyer !== null
+              ? buyer._id || buyer.id
+              : buyer;
+          return bid && String(bid) === String(userId);
+        });
+        if (hasReviewed) {
+          reviewed.add(uniqueServiceIds[index]);
+        }
+      });
+
+      setReviewedServiceIds(reviewed);
+    };
+
+    void checkReviewed();
+  }, [selectedBooking?._id, user]);
+
+  const handleSubmitReview = async (serviceId: string) => {
+    if (reviewRating === 0 || !reviewComment.trim()) {
+      toast({
+        title: "Required",
+        description: "Please select a rating and write your review.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await api.reviews.create({
+        service: serviceId,
+        rating: reviewRating,
+        content: reviewComment.trim(),
+      });
+      if (res.success) {
+        toast({
+          title: "Thank you!",
+          description: "Your review has been submitted and also counted in the provider's overall rating.",
+        });
+        setReviewedServiceIds((prev) => new Set(prev).add(serviceId));
+        setReviewingServiceId(null);
+        setReviewRating(0);
+        setReviewComment("");
+      } else {
+        toast({
+          title: "Error",
+          description: (res as { error?: { message?: string } }).error?.message || "Failed to submit review.",
+          variant: "destructive",
+        });
+      }
+    } catch (e: unknown) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "Failed to submit review.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   const getSubtotal = (booking: Booking) => {
@@ -1681,6 +1780,98 @@ export default function BuyerBookings() {
                     <p className="text-sm">{selectedBooking.requirementNote}</p>
                   </div>
                 )}
+
+                {["delivered", "completed"].includes(selectedBooking.status) &&
+                  selectedBooking.paymentStatus === "paid" &&
+                  user && (
+                    <div>
+                      <h3 className="font-semibold mb-3">Leave a Review</h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Share your experience with the services you purchased. Each service review also updates the provider rating.
+                      </p>
+                      <div className="space-y-4">
+                        {getServiceItems(selectedBooking).map((item) => {
+                          const sid = item._id;
+                          const hasReviewed = reviewedServiceIds.has(sid);
+                          const isEditing = reviewingServiceId === sid;
+                          return (
+                            <div key={sid} className="border rounded-lg p-4 space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">{item.title || "Service"}</span>
+                                {hasReviewed ? (
+                                  <span className="text-sm text-green-600 flex items-center gap-1 shrink-0">
+                                    <CheckCircle2 className="h-4 w-4" /> Reviewed
+                                  </span>
+                                ) : !isEditing ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setReviewingServiceId(sid)}
+                                  >
+                                    Write Review
+                                  </Button>
+                                ) : null}
+                              </div>
+                              {isEditing && (
+                                <div className="space-y-3 pt-2 border-t">
+                                  <div>
+                                    <label className="text-sm font-medium mb-1 block">Rating</label>
+                                    <div className="flex gap-1">
+                                      {[1, 2, 3, 4, 5].map((s) => (
+                                        <button
+                                          key={s}
+                                          type="button"
+                                          onClick={() => setReviewRating(s)}
+                                          className="focus:outline-none"
+                                        >
+                                          <Star
+                                            className={`h-6 w-6 ${
+                                              s <= reviewRating ? "fill-warning text-warning" : "text-muted-foreground"
+                                            }`}
+                                          />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-medium mb-1 block">Your Review</label>
+                                    <Textarea
+                                      placeholder="Share your experience..."
+                                      value={reviewComment}
+                                      onChange={(e) => setReviewComment(e.target.value)}
+                                      className="min-h-[80px]"
+                                      rows={3}
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => void handleSubmitReview(sid)}
+                                      disabled={submittingReview || reviewRating === 0 || !reviewComment.trim()}
+                                    >
+                                      {submittingReview ? "Submitting..." : "Submit Review"}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setReviewingServiceId(null);
+                                        setReviewRating(0);
+                                        setReviewComment("");
+                                      }}
+                                      disabled={submittingReview}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
               </div>
             )}
           </DialogContent>
