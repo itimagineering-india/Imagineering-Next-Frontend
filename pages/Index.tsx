@@ -3,7 +3,7 @@ import { HomeRequirementPopup } from "@/components/home/HomeRequirementPopup";
 import { HeroSection } from "@/components/home/HeroSection";
 import { SearchBarSection } from "@/components/home/SearchBarSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
-import { JobsSection } from "@/components/home/JobsSection";
+import { HomePromoBannersSection } from "@/components/home/HomePromoBannersSection";
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
 import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
@@ -21,7 +21,7 @@ const Index = () => {
         <HeroSection />
         <SearchBarSection />
         <ServicesSection />
-        <JobsSection />
+        <HomePromoBannersSection />
         <TopProvidersSection />
         <CategorySections />
         <PlatformAudienceSection />
