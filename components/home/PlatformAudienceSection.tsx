@@ -17,7 +17,7 @@ export function PlatformAudienceSection() {
 
   return (
     <section className="border-y border-border/80 bg-muted/20">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 md:px-8 md:py-16">
+      <div className="home-shell py-12 md:py-16">
         <div className="mb-8 sm:mb-12">
           <h2 className="text-2xl sm:text-3xl font-bold">
             {t("audience.heading")}
