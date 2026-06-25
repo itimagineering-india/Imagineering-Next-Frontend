@@ -5,7 +5,7 @@ import { CategoryScrollSection } from "./CategoryScrollSection";
 import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { useFavorites } from "@/hooks/useFavorites";
-import { CardSkeleton } from "./CardSkeleton";
+import { CategorySectionsSkeleton } from "./CategoryScrollSkeleton";
 
 interface CategorySection {
   title: string;
@@ -214,20 +214,7 @@ export function CategorySections() {
     return (
       <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-busy="true" aria-label="Loading categories">
         <div className="home-shell space-y-6">
-          <div className="py-3 md:py-4">
-            <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
-              <div className="h-7 w-48 animate-pulse rounded bg-slate-200" />
-              <div className="flex gap-2">
-                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
-                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
-              </div>
-            </div>
-            <div className="flex gap-4 overflow-hidden">
-              {Array.from({ length: 10 }).map((_, idx) => (
-                <CardSkeleton key={idx} />
-              ))}
-            </div>
-          </div>
+          <CategorySectionsSkeleton rows={2} />
         </div>
       </section>
     );
