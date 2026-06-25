@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,7 +113,26 @@ export function FilterPanel({
       }
       return prev.filter((item) => item !== "subcategory");
     });
-  }, [filters.category]);
+  }, [filters.category.length > 0 ? filters.category[0] : ""]);
+
+  const activeCategorySlug = filters.category.length > 0 ? filters.category[0] : "";
+  const prevCategorySlugRef = useRef(activeCategorySlug);
+  const onFilterChangeRef = useRef(onFilterChange);
+  onFilterChangeRef.current = onFilterChange;
+
+  useEffect(() => {
+    if (prevCategorySlugRef.current === activeCategorySlug) return;
+    prevCategorySlugRef.current = activeCategorySlug;
+
+    setFilters((prev) => {
+      if (!prev.provider) return prev;
+      const nextFilters = { ...prev, provider: undefined };
+      onFilterChangeRef.current?.(nextFilters);
+      return nextFilters;
+    });
+    setProviders((prev) => (prev.length === 0 ? prev : []));
+    setHasFetchedProviders((prev) => (prev ? false : prev));
+  }, [activeCategorySlug]);
 
   // Lazy fetch providers - only when accordion is opened (no limit – fetch all for dropdown)
   const fetchProviders = async (categorySlug?: string) => {
@@ -225,23 +244,10 @@ export function FilterPanel({
     (filters.priceRange[0] > 0 || filters.priceRange[1] < 5000 ? 1 : 0);
 
   useEffect(() => {
-    // Clear provider selection when category changes
-    setFilters((prev) => {
-      if (!prev.provider) return prev;
-      const nextFilters = { ...prev, provider: undefined };
-      onFilterChange?.(nextFilters);
-      return nextFilters;
-    });
-    // Reset providers list for new category
-    setProviders([]);
-    setHasFetchedProviders(false);
-  }, [filters.category.length > 0 ? filters.category[0] : ""]);
-
-  useEffect(() => {
     if (openAccordions.includes("provider") && !isLoadingProviders) {
       fetchProviders(filters.category[0]);
     }
-  }, [openAccordions, filters.category, isLoadingProviders]);
+  }, [openAccordions, activeCategorySlug, isLoadingProviders]);
 
   return (
     <div className={className}>
