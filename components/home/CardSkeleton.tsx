@@ -12,11 +12,14 @@ export function CardSkeleton({ className, style }: { className?: string; style?:
       )}
       style={{ contentVisibility: "auto", ...style }}
     >
-      <div className="aspect-[4/3] bg-muted animate-pulse" />
-      <div className="p-2 md:p-3 space-y-2">
-        <div className="h-4 bg-muted animate-pulse rounded w-11/12" />
-        <div className="h-3 bg-muted animate-pulse rounded w-7/12" />
-        <div className="h-4 bg-muted animate-pulse rounded w-9/12" />
+      <div className="aspect-[4/3] w-full shrink-0 bg-muted animate-pulse" />
+      <div className="shrink-0 space-y-2 p-2 md:p-3">
+        <div className="h-4 w-11/12 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-7/12 rounded bg-muted animate-pulse" />
+        <div className="flex justify-between gap-2 pt-1">
+          <div className="h-4 w-9/12 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-8 rounded bg-muted animate-pulse" />
+        </div>
       </div>
     </div>
   );
