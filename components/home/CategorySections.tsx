@@ -139,7 +139,7 @@ export function CategorySections() {
         lat?: number;
         lng?: number;
         radiusKm?: number;
-      } = { limit: 6 };
+      } = { limit: 9 };
       const hasCoords =
         userLat != null &&
         userLng != null &&
@@ -197,7 +197,7 @@ export function CategorySections() {
   if (!hasEnteredView) {
     return (
       <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-label="Categories">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
+        <div className="home-shell">
           <div className="min-h-[240px] flex items-center justify-center text-slate-500 text-sm" aria-hidden="true">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-2xl mx-auto">
               {[1, 2, 3, 4].map((i) => (
@@ -213,7 +213,7 @@ export function CategorySections() {
   if (initialLoad && sections.length === 0 && !loadError) {
     return (
       <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-busy="true" aria-label="Loading categories">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-6">
+        <div className="home-shell space-y-6">
           <div className="py-3 md:py-4">
             <div className="flex items-center justify-between mb-4 md:mb-6 gap-2">
               <div className="h-7 w-48 animate-pulse rounded bg-slate-200" />
@@ -236,7 +236,7 @@ export function CategorySections() {
   if (loadError) {
     return (
       <section ref={sectionRef} className="py-8 md:py-12 bg-white">
-        <div className="mx-auto max-w-7xl px-4 text-center">
+        <div className="home-shell text-center">
           <p className="text-slate-600 mb-4">{loadError}</p>
           <button
             type="button"
@@ -256,7 +256,7 @@ export function CategorySections() {
   if (!initialLoad && sections.length === 0) {
     return (
       <section ref={sectionRef} className="py-8 md:py-12 bg-white">
-        <div className="mx-auto max-w-7xl px-4 text-center text-slate-600">
+        <div className="home-shell text-center text-slate-600">
           No categories available
         </div>
       </section>
@@ -265,7 +265,7 @@ export function CategorySections() {
 
   return (
     <section ref={sectionRef} className="py-8 md:py-12 bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 space-y-6">
+      <div className="home-shell space-y-6">
         {sections.map((section, sectionIndex) => (
           <CategoryScrollSection
             key={section.categorySlug}
