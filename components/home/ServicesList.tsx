@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { CSSProperties, HTMLAttributes } from "react";
 import * as ReactWindow from "react-window";
-import { CategoryProviderCard } from "./CategoryProviderCard";
+import { CategoryProviderCard, CATEGORY_PROVIDER_CARD_HEIGHT } from "./CategoryProviderCard";
 import { CardSkeleton } from "./CardSkeleton";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +63,7 @@ const ServicesRow = memo(function ServicesRow({
   if (!service) return null;
 
   return (
-    <div style={style} className="box-border flex h-full min-h-0 pr-2">
+    <div style={style} className="box-border flex h-full min-h-0 items-stretch overflow-hidden pr-2">
       <CategoryProviderCard
         {...service}
         className="h-full w-full max-w-[180px] min-w-0"
@@ -91,16 +91,22 @@ type ServicesListProps = {
 };
 
 const ITEM_WIDTH = 188;
-const ITEM_HEIGHT = 320;
+const ITEM_HEIGHT = CATEGORY_PROVIDER_CARD_HEIGHT;
 
 function ScrollOuterElement({
   className,
+  style,
   ...rest
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       {...rest}
-      className={cn("scrollbar-hide overflow-x-auto overflow-y-hidden", className)}
+      style={{
+        ...style,
+        overflowX: "auto",
+        overflowY: "hidden",
+      }}
+      className={cn("scrollbar-hide touch-pan-x", className)}
     />
   );
 }
@@ -204,8 +210,8 @@ export const ServicesList = memo(
     return (
       <div
         ref={containerRef}
-        className="w-full"
-        style={{ contentVisibility: "auto", containIntrinsicSize: "180px 135px" }}
+        className="w-full overflow-hidden"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "180px 296px" }}
       >
         <VirtualList
           outerRef={outerRef}
