@@ -46,10 +46,10 @@ export function HeroSection() {
   }, [cmsBanners.length]);
 
   return (
-    <section className="relative px-4 sm:px-6 md:px-6 lg:px-8 pt-6 sm:pt-8 md:pt-12 lg:pt-12 pb-6 sm:pb-8 md:pb-12 lg:pb-12">
+    <section className="relative pt-6 sm:pt-8 md:pt-12 lg:pt-12 pb-6 sm:pb-8 md:pb-12 lg:pb-12">
       {/* If no CMS banners, don't render hero (no fallback) — matches Vite/React app */}
       {cmsBanners.length > 0 && (
-        <div className="relative w-full aspect-[4/1] rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden mx-auto max-w-7xl">
+        <div className="home-shell relative w-full aspect-[4/1] rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden">
           {cmsBanners.map((banner, index) => (
             <div
               key={banner._id}
