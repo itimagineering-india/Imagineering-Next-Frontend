@@ -104,18 +104,22 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
         if (res.success && res.data) {
           const totalsData = (res.data as any).totals || { subtotal: 0, total: 0 };
           setTotals(totalsData);
-          setLoading(false);
           if (!options?.silent) toast({ title: "Added to cart" });
           refreshCart(true);
-        } else if (res.error) {
+          return;
+        }
+        if (res.error) {
           throw new Error(res.error.message);
         }
       } catch (error: any) {
-        toast({
-          title: "Cannot add to cart",
-          description: error.message || "Your cart contains another provider. Clear it first.",
-          variant: "destructive",
-        });
+        if (!options?.silent) {
+          toast({
+            title: "Cannot add to cart",
+            description: error.message || "Your cart contains another provider. Clear it first.",
+            variant: "destructive",
+          });
+        }
+        throw error;
       } finally {
         setLoading(false);
       }
