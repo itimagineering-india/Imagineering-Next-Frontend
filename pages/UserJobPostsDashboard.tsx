@@ -131,7 +131,7 @@ export default function UserJobPostsDashboard() {
 
   return (
     <DashboardLayout type="buyer">
-      <div className="w-full max-w-5xl mx-auto px-4 py-6 md:py-8">
+      <div className="page-shell">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold">My Job Posts</h1>
