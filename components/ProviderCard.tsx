@@ -3,8 +3,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin, Clock, CheckCircle2, Award } from "lucide-react";
+import { Star, MapPin, Clock, Award } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ImagineVerifiedBadge,
+  type ImagineScoreData,
+} from "@/components/trust/ImagineScorePanel";
 
 interface ProviderCardProps {
   id: string;
@@ -20,6 +24,7 @@ interface ProviderCardProps {
   topRated?: boolean;
   responseTime: string;
   skills: string[];
+  imagineScore?: ImagineScoreData | null;
   className?: string;
 }
 
@@ -37,6 +42,7 @@ export function ProviderCard({
   topRated,
   responseTime,
   skills,
+  imagineScore,
   className,
 }: ProviderCardProps) {
   const providerUrl = `/provider/${slug || id}`;
@@ -64,9 +70,10 @@ export function ProviderCard({
               >
                 {name}
               </Link>
-              {verified && (
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-              )}
+              <ImagineVerifiedBadge
+                score={imagineScore ?? { isImagineeringVerified: !!verified }}
+                className="text-[11px]"
+              />
               {topRated && (
                 <Badge className="bg-warning text-warning-foreground">
                   <Award className="h-3 w-3 mr-1" />
@@ -127,7 +134,7 @@ export function ProviderCard({
           <Button className="flex-1" asChild>
             <Link href={providerUrl}>View Profile</Link>
           </Button>
-          <Button variant="outline" className="flex-1">
+          <Button variant="secondary" className="flex-1">
             Contact
           </Button>
         </div>
