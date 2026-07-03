@@ -241,7 +241,7 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
 
   return (
     <>
-      <Card className="order-3 lg:col-span-2">
+      <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-amber-500" />
