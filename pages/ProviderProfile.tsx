@@ -8,23 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Star,
   MapPin,
   Clock,
   CheckCircle2,
   Award,
-  Calendar,
   Briefcase,
   MessageSquare,
   Grid3X3,
@@ -38,6 +29,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBuyerPremium } from "@/hooks/useBuyerPremium";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTranslation } from "react-i18next";
+import {
+  ImagineVerifiedBadge,
+  type ImagineScoreData,
+} from "@/components/trust/ImagineScorePanel";
+import { type ProviderAchievement } from "@/components/trust/AchievementBadges";
+import { ProviderTrustSummary } from "@/components/trust/ProviderTrustSummary";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -59,6 +57,7 @@ interface ProviderData {
   bio?: string;
   businessName?: string;
   businessLogo?: string;
+  coverImage?: string;
   businessAddress?: {
     address?: string;
     city?: string;
@@ -68,6 +67,7 @@ interface ProviderData {
   businessPhone?: string;
   businessEmail?: string;
   website?: string;
+  googleMapLink?: string;
   skills?: string[];
   portfolio?: Array<{ id: string; title: string; image: string }>;
   verified?: boolean;
@@ -75,10 +75,14 @@ interface ProviderData {
   rating?: number;
   reviewCount?: number;
   completedJobs?: number;
+  yearsOfExperience?: number;
+  experienceYears?: number;
+  experience?: number | string;
   memberSince?: string;
   responseTime?: string;
   hourlyRate?: number;
   tagline?: string;
+  imagineScore?: ImagineScoreData | null;
 }
 
 interface ServiceData {
@@ -88,6 +92,9 @@ interface ServiceData {
   title: string;
   description: string;
   price: number;
+  priceMode?: "exact" | "range";
+  priceMin?: number;
+  priceMax?: number;
   priceType: string;
   image?: string;
   images?: string[];
@@ -118,8 +125,11 @@ interface ServiceData {
 }
 
 export default function ProviderProfile() {
+  const { t } = useTranslation("providerProfile");
   const params = useParams();
-  const id = typeof params?.id === "string" ? params.id : params?.id?.[0];
+  const id =
+    (typeof params?.id === "string" ? params.id : params?.id?.[0]) ||
+    (typeof params?.slug === "string" ? params.slug : params?.slug?.[0]);
   const router = useRouter();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
@@ -134,8 +144,8 @@ export default function ProviderProfile() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [bioExpanded, setBioExpanded] = useState(false);
+  const [achievements, setAchievements] = useState<ProviderAchievement[]>([]);
 
   const SERVICES_PAGE_SIZE = 20;
 
@@ -219,9 +229,49 @@ export default function ProviderProfile() {
           }
         }
         setServicesLoading(false);
-        setReviews([]);
+        const providerDataForReviews = providerResponse?.success && (providerResponse?.data as any)?.provider
+          ? (providerResponse.data as any).provider
+          : null;
+        const providerUserIdForReviews =
+          providerDataForReviews?.user?._id ||
+          (typeof providerDataForReviews?.user === "string" ? providerDataForReviews.user : null);
+        if (providerUserIdForReviews) {
+          void apiRequest<{ success: boolean; data?: { reviews?: any[] } }>(
+            `/api/reviews/provider/${providerUserIdForReviews}?page=1&limit=20`,
+            { timeoutMs: 15000 }
+          ).then((reviewsRes) => {
+            if (reviewsRes?.success) {
+              const list = (reviewsRes.data as any)?.reviews || [];
+              const normalized = list.map((r: any) => ({
+                id: r._id,
+                author: r.buyer?.name || "Buyer",
+                avatar: r.buyer?.avatar || "",
+                rating: Number(r.rating || 0),
+                date: r.createdAt || new Date().toISOString(),
+                content: r.content || "",
+              }));
+              setReviews(normalized);
+            } else {
+              setReviews([]);
+            }
+          }).catch(() => setReviews([]));
+        } else {
+          setReviews([]);
+        }
       });
-  }, [id, toast]);
+  }, [id, toast, router]);
+
+  useEffect(() => {
+    const providerKey = provider?.slug || provider?._id || id;
+    if (!providerKey) return;
+    void apiRequest<{ achievements?: ProviderAchievement[] }>(
+      `/api/trust/providers/${encodeURIComponent(String(providerKey))}/achievements`
+    ).then((res) => {
+      if (res?.success && res.data?.achievements) {
+        setAchievements(res.data.achievements);
+      }
+    });
+  }, [provider?._id, provider?.slug, id]);
 
   const loadMoreServices = useCallback(async () => {
     if (!id || !provider) return;
@@ -272,45 +322,19 @@ export default function ProviderProfile() {
       );
     }
 
-    // Category filter
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter((service) => {
-        if (typeof service.category === 'object' && service.category !== null) {
-          return service.category._id === selectedCategory || service.category.slug === selectedCategory;
-        }
-        return false;
-      });
-    }
-
     return filtered;
-  }, [services, searchQuery, selectedCategory]);
+  }, [services, searchQuery]);
 
   // Final list to render: when no filters applied, always show all services
   const servicesToRender = useMemo(() => {
-    const hasFilters =
-      !!searchQuery.trim() ||
-      selectedCategory !== "all";
+    const hasFilters = !!searchQuery.trim();
 
     if (!hasFilters) {
       return services;
     }
 
     return filteredServices;
-  }, [services, filteredServices, searchQuery, selectedCategory]);
-
-  // Get unique categories from services
-  const availableCategories = useMemo(() => {
-    const categoryMap = new Map<string, { _id: string; name: string; slug: string }>();
-    services.forEach((service) => {
-      if (typeof service.category === 'object' && service.category !== null) {
-        const cat = service.category;
-        if (cat._id && cat.name) {
-          categoryMap.set(cat._id, { _id: cat._id, name: cat.name, slug: cat.slug || '' });
-        }
-      }
-    });
-    return Array.from(categoryMap.values());
-  }, [services]);
+  }, [services, filteredServices, searchQuery]);
 
   // Transform provider data for display - prioritize business profile data
   const providerDisplay = useMemo(() => {
@@ -339,11 +363,25 @@ export default function ProviderProfile() {
       }
     }
     
+    const rawExperience =
+      provider.yearsOfExperience ??
+      provider.experienceYears ??
+      provider.experience ??
+      0;
+    const numericExperience =
+      typeof rawExperience === "string" ? Number(rawExperience) : rawExperience;
+    const experienceYears =
+      Number.isFinite(numericExperience) && Number(numericExperience) > 0
+        ? Math.floor(Number(numericExperience))
+        : 0;
+
     return {
       // Business name takes priority over user name
       name: provider.businessName || provider.user?.name || "Provider",
+      ownerName: provider.user?.name || provider.businessName || "Provider",
       // Business logo takes priority over user avatar
       avatar: provider.businessLogo || provider.user?.avatar || "",
+      coverImage: provider.coverImage || "",
       tagline: provider.tagline || provider.bio || "",
       bio: provider.bio || "",
       skills: provider.skills || [],
@@ -353,6 +391,7 @@ export default function ProviderProfile() {
       rating: provider.rating || 0,
       reviewCount: provider.reviewCount || 0,
       completedJobs: provider.completedJobs || 0,
+      experienceText: experienceYears > 0 ? `${experienceYears}+ Years` : "",
       memberSince: provider.memberSince || "",
       responseTime: provider.responseTime || "N/A",
       hourlyRate: provider.hourlyRate || 0,
@@ -362,6 +401,7 @@ export default function ProviderProfile() {
       email: provider.businessEmail || provider.user?.email || "",
       phone: provider.businessPhone || provider.user?.phone || "",
       website: provider.website || "",
+      googleMapLink: provider.googleMapLink || "",
       // Current offer (from provider profile)
       offerTitle: (provider as any).offerTitle || "",
       offerDescription: (provider as any).offerDescription || "",
@@ -430,12 +470,12 @@ export default function ProviderProfile() {
           <Card className="max-w-md">
             <CardContent className="pt-6 text-center">
               <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-bold mb-2">Provider Not Found</h2>
+              <h2 className="text-xl font-bold mb-2">{t("providerNotFound")}</h2>
               <p className="text-muted-foreground mb-4">
                 {error || "The provider you're looking for doesn't exist."}
               </p>
               <Button asChild>
-                <Link href="/services">Browse Services</Link>
+                <Link href="/services">{t("browseServices")}</Link>
               </Button>
             </CardContent>
           </Card>
@@ -449,8 +489,18 @@ export default function ProviderProfile() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-primary/5 via-background to-primary/5 py-12">
-          <div className="container">
+        <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/5 py-12">
+          {providerDisplay.coverImage && (
+            <img
+              src={providerDisplay.coverImage}
+              alt={`${providerDisplay.name || "Provider"} cover`}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+          {providerDisplay.coverImage && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-[1px]" />
+          )}
+          <div className="container relative z-10">
             <div className="flex flex-col md:flex-row gap-8">
               {/* Business Profile Info */}
               <div className="flex-1">
@@ -492,10 +542,24 @@ export default function ProviderProfile() {
                       {providerDisplay.topRated && (
                         <Badge className="bg-warning text-warning-foreground">
                           <Award className="h-3 w-3 mr-1" />
-                          Top Rated
+                          {t("topRated", "Top Rated")}
                         </Badge>
                       )}
+                      <ImagineVerifiedBadge score={provider?.imagineScore} />
                     </div>
+                    {provider?.imagineScore?.isImagineeringVerified && provider?.slug && (
+                      <Link
+                        href={`/verified/${provider.slug}`}
+                        className="mb-3 inline-flex text-sm font-medium text-emerald-700 hover:underline"
+                      >
+                        View Imagineering Verified profile
+                      </Link>
+                    )}
+                    {providerDisplay.ownerName && (
+                      <p className="mb-3 text-sm font-medium text-muted-foreground md:text-base">
+                        Owner: <span className="text-foreground">{providerDisplay.ownerName}</span>
+                      </p>
+                    )}
                     
                     {/* Business Description */}
                     <div className="mb-4">
@@ -516,7 +580,7 @@ export default function ProviderProfile() {
                                     onClick={() => setBioExpanded((prev) => !prev)}
                                     className="text-primary hover:underline font-medium text-sm inline"
                                   >
-                                    {bioExpanded ? 'Read less' : 'Read more'}
+                                    {bioExpanded ? t("readLess", "Read less") : t("readMore", "Read more")}
                                   </button>
                                 </>
                               )}
@@ -542,21 +606,38 @@ export default function ProviderProfile() {
                       {/* Business Address */}
                       <div className="flex items-center gap-1 text-muted-foreground">
                         <MapPin className="h-4 w-4 flex-shrink-0" />
-                        <span className="line-clamp-1">
-                          {providerDisplay.location || 
-                           provider?.user?.location?.address || 
-                           (provider?.user?.location?.city && provider?.user?.location?.state 
-                             ? `${provider.user.location.city}, ${provider.user.location.state}`
-                             : provider?.user?.location?.city || 
-                               provider?.user?.location?.state || 
-                               'Address not available')}
-                        </span>
+                        {providerDisplay.googleMapLink ? (
+                          <a
+                            href={providerDisplay.googleMapLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="line-clamp-1 hover:text-primary hover:underline"
+                          >
+                            {providerDisplay.location ||
+                             provider?.user?.location?.address ||
+                             (provider?.user?.location?.city && provider?.user?.location?.state
+                               ? `${provider.user.location.city}, ${provider.user.location.state}`
+                               : provider?.user?.location?.city ||
+                                 provider?.user?.location?.state ||
+                                 'Open directions')}
+                          </a>
+                        ) : (
+                          <span className="line-clamp-1">
+                            {providerDisplay.location ||
+                             provider?.user?.location?.address ||
+                             (provider?.user?.location?.city && provider?.user?.location?.state
+                               ? `${provider.user.location.city}, ${provider.user.location.state}`
+                               : provider?.user?.location?.city ||
+                                 provider?.user?.location?.state ||
+                                 'Address not available')}
+                          </span>
+                        )}
                       </div>
                       
                       {providerDisplay.responseTime && providerDisplay.responseTime !== "N/A" && (
                         <div className="flex items-center gap-1 text-muted-foreground">
                           <Clock className="h-4 w-4" />
-                          <span>Responds in {providerDisplay.responseTime}</span>
+                        <span>{t("respondsIn", "Responds in")} {providerDisplay.responseTime}</span>
                         </div>
                       )}
                     </div>
@@ -576,16 +657,16 @@ export default function ProviderProfile() {
                         </span>
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Starting rate
+                        {t("startingRate", "Starting rate")}
                       </p>
                     </div>
                   ) : (
                     <div className="text-center">
                       <p className="text-lg font-semibold text-foreground">
-                        {totalServices || services.length} Services Available
+                        {totalServices || services.length} {t("servicesAvailable", "Services Available")}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Browse our catalog
+                        {t("browseCatalog", "Browse our catalog")}
                       </p>
                     </div>
                   )}
@@ -602,12 +683,12 @@ export default function ProviderProfile() {
                     {isAuthenticated && buyerSubLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Checking subscription…
+                        {t("checkingSubscription", "Checking subscription...")}
                       </>
                     ) : (
                       <>
                         <Phone className="mr-2 h-4 w-4" />
-                        Call Now
+                        {t("callNow", "Call Now")}
                       </>
                     )}
                   </Button>
@@ -616,32 +697,26 @@ export default function ProviderProfile() {
                     variant="outline"
                     className="w-full"
                     size="lg"
-                    disabled={isAuthenticated && buyerSubLoading}
                     onClick={() => {
                       if (!provider?.user?._id) return;
-                      if (buyerSubLoading) return;
-                      if (!isBuyerPremium) {
-                        router.push("/subscriptions/buyer");
-                        return;
-                      }
                       router.push(`/chat?providerId=${provider.user._id}&name=${encodeURIComponent(providerDisplay.name)}`);
                     }}
                   >
-                    {isAuthenticated && buyerSubLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Checking subscription…
-                      </>
-                    ) : (
-                      <>
-                        <MessageSquare className="mr-2 h-4 w-4" />
-                        Chat with Provider
-                      </>
-                    )}
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    {t("chatWithProvider", "Chat with Provider")}
                   </Button>
                 </CardContent>
               </Card>
             </div>
+
+            {(provider?.imagineScore || achievements.length > 0) && (
+              <div className="mt-6">
+                <ProviderTrustSummary
+                  score={provider?.imagineScore}
+                  achievements={achievements}
+                />
+              </div>
+            )}
           </div>
         </section>
 
@@ -682,14 +757,25 @@ export default function ProviderProfile() {
                 <p className="text-2xl font-bold text-foreground">
                   {totalServices || services.length}
                 </p>
-                <p className="text-sm text-muted-foreground">Services</p>
+                <p className="text-sm text-muted-foreground">{t("services")}</p>
               </div>
               <Separator orientation="vertical" className="h-12 hidden md:block" />
+              {providerDisplay.experienceText && (
+                <>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">
+                      {providerDisplay.experienceText}
+                    </p>
+                    <p className="text-sm text-muted-foreground">{t("experience")}</p>
+                  </div>
+                  <Separator orientation="vertical" className="h-12 hidden md:block" />
+                </>
+              )}
               <div className="text-center">
                 <p className="text-2xl font-bold text-foreground">
                   {providerDisplay.completedJobs}
                 </p>
-                <p className="text-sm text-muted-foreground">Jobs Completed</p>
+                <p className="text-sm text-muted-foreground">{t("jobsCompleted")}</p>
               </div>
               {providerDisplay.memberSince && (
                 <>
@@ -698,7 +784,7 @@ export default function ProviderProfile() {
                     <p className="text-2xl font-bold text-foreground">
                       {providerDisplay.memberSince}
                     </p>
-                    <p className="text-sm text-muted-foreground">Member Since</p>
+                    <p className="text-sm text-muted-foreground">{t("memberSince")}</p>
                   </div>
                 </>
               )}
@@ -709,18 +795,9 @@ export default function ProviderProfile() {
         {/* Main Content */}
         <section className="py-12" id="services">
           <div className="container">
-            <Tabs defaultValue="services" className="space-y-8">
-              <TabsList className="w-full md:w-auto">
-                <TabsTrigger value="services">Services ({totalServices || services.length})</TabsTrigger>
-                <TabsTrigger value="about">About</TabsTrigger>
-                {providerDisplay.portfolio.length > 0 && (
-                  <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
-                )}
-                <TabsTrigger value="reviews">Reviews ({providerDisplay.reviewCount})</TabsTrigger>
-              </TabsList>
-
-              {/* Services Tab - Storefront Style */}
-              <TabsContent value="services" className="space-y-6">
+            <div className="space-y-8">
+              {/* Services - Storefront Style */}
+              <div className="space-y-6">
                 {/* Storefront Header */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
@@ -728,8 +805,8 @@ export default function ProviderProfile() {
                       {providerDisplay.name}'s Store
                     </h2>
                     <p className="text-muted-foreground">
-                      {servicesToRender.length} {servicesToRender.length === 1 ? 'service' : 'services'} available
-                      {searchQuery && ` matching "${searchQuery}"`}
+                      {servicesToRender.length} {servicesToRender.length === 1 ? t("service", "service") : t("services")} {t("available", "available")}
+                      {searchQuery && ` ${t("matching", "matching")} "${searchQuery}"`}
                     </p>
                   </div>
                   
@@ -757,40 +834,25 @@ export default function ProviderProfile() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search services..."
+                      placeholder={t("searchServices")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
+                      className="pl-12"
                     />
                   </div>
-                  {availableCategories.length > 0 && (
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger className="w-full sm:w-[200px]">
-                        <SelectValue placeholder="All Categories" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {availableCategories.map((category) => (
-                          <SelectItem key={category._id} value={category._id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
 
                 {/* Services Grid/List */}
                 {servicesLoading ? (
                   <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin" />
-                    <span>Loading services...</span>
+                    <span>{t("loadingServices")}</span>
                   </div>
                 ) : servicesToRender.length > 0 ? (
                   <div
                     className={
                       viewMode === "grid"
-                        ? "grid sm:grid-cols-2 lg:grid-cols-3 gap-6"
+                        ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch"
                         : "space-y-4"
                     }
                   >
@@ -802,6 +864,9 @@ export default function ProviderProfile() {
                         title={service.title}
                         description={service.description}
                         price={service.price}
+                        priceMode={service.priceMode}
+                        priceMin={service.priceMin}
+                        priceMax={service.priceMax}
                         priceType={service.priceType}
                         image={service.images?.[0] || service.image || "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"}
                         provider={{
@@ -818,11 +883,12 @@ export default function ProviderProfile() {
                         viewMode={viewMode}
                         location={service.location}
                         category={service.category}
+                        hideProviderDetails
                       />
                     ))}
                   </div>
                 ) : null}
-                {!servicesLoading && servicesToRender.length > 0 && totalServices > services.length && !searchQuery && selectedCategory === "all" && (
+                {!servicesLoading && servicesToRender.length > 0 && totalServices > services.length && !searchQuery && (
                   <div className="flex justify-center mt-6">
                     <Button
                       variant="outline"
@@ -831,7 +897,7 @@ export default function ProviderProfile() {
                       className="gap-2"
                     >
                       {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      {loadingMore ? "Loading..." : `Load more (${services.length} of ${totalServices})`}
+                      {loadingMore ? t("loading", "Loading...") : `${t("loadMore", "Load more")} (${services.length} ${t("of", "of")} ${totalServices})`}
                     </Button>
                   </div>
                 )}
@@ -840,61 +906,55 @@ export default function ProviderProfile() {
                     <CardContent className="py-12 text-center">
                       <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <p className="text-muted-foreground mb-2">
-                        {searchQuery || selectedCategory !== "all"
-                          ? "No services match your filters."
-                          : "No services listed yet."}
+                        {searchQuery ? t("noServicesMatch", "No services match your search.") : t("noServicesListed", "No services listed yet.")}
                       </p>
-                      {(searchQuery || selectedCategory !== "all") && (
+                      {searchQuery && (
                         <Button
                           variant="outline"
                           onClick={() => {
                             setSearchQuery("");
-                            setSelectedCategory("all");
                           }}
                           className="mt-4"
                         >
-                          Clear Filters
+                          {t("clearFilters", "Clear Filters")}
                         </Button>
                       )}
                     </CardContent>
                   </Card>
                 )}
-              </TabsContent>
+              </div>
 
-              {/* About Tab */}
-              <TabsContent value="about" className="space-y-8">
+              {/* Reviews */}
+              <div>
                 <Card>
-                  <CardHeader>
-                    <CardTitle>About Me</CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle>{t("clientReviews")}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {providerDisplay.reviewCount} {t("reviews", "reviews")} • {providerDisplay.rating.toFixed(1)} {t("average", "average")}
+                      </p>
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {providerDisplay.bio || "No bio available."}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {providerDisplay.skills.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Skills & Expertise</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {providerDisplay.skills.map((skill, index) => (
-                          <Badge key={index} variant="secondary" className="text-sm">
-                            {skill}
-                          </Badge>
+                    {reviews.length > 0 ? (
+                      <div className="space-y-6">
+                        {reviews.map((review) => (
+                          <ReviewCard key={review.id || review._id} {...review} />
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
+                    ) : (
+                      <div className="py-8 text-center">
+                        <Star className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">{t("noReviews")}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
-              {/* Portfolio Tab */}
-              <TabsContent value="portfolio">
-                {providerDisplay.portfolio.length > 0 ? (
+              {providerDisplay.portfolio.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold text-foreground">{t("portfolio")}</h2>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {providerDisplay.portfolio.map((item) => (
                       <Card key={item.id} className="overflow-hidden group cursor-pointer">
@@ -911,46 +971,9 @@ export default function ProviderProfile() {
                       </Card>
                     ))}
                   </div>
-                ) : (
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">
-                        No portfolio items yet.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-
-              {/* Reviews Tab */}
-              <TabsContent value="reviews">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle>Client Reviews</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {providerDisplay.reviewCount} reviews • {providerDisplay.rating.toFixed(1)} average
-                      </p>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {reviews.length > 0 ? (
-                      <div className="space-y-6">
-                        {reviews.map((review) => (
-                          <ReviewCard key={review.id || review._id} {...review} />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-8 text-center">
-                        <Star className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                        <p className="text-muted-foreground">No reviews yet.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </main>
