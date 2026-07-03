@@ -6,102 +6,32 @@ import api from "@/lib/api-client";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CategorySectionsSkeleton } from "./CategoryScrollSkeleton";
+import {
+  normalizeHomeCategorySections,
+  normalizeHomeService,
+  type HomeCategorySection,
+  type HomeService,
+} from "@/lib/home-data";
 
-interface CategorySection {
-  title: string;
-  categorySlug: string;
-  services: NormalizedService[];
-}
+type CategorySection = HomeCategorySection;
+type NormalizedService = HomeService;
 
-type ApiService = {
-  id?: string;
-  _id?: string;
-  name?: string;
-  title?: string;
-  images?: string[];
-  image?: string;
-  location?: string | {
-    city?: string;
-    address?: string;
-  } | null;
-  price?: number | string | null;
-  priceMode?: "exact" | "range";
-  priceMin?: number | string | null;
-  priceMax?: number | string | null;
-  priceType?: string;
-  mrp?: number | string | null;
-  priceLabel?: string;
-  rating?: number | string | null;
-  reviewCount?: number | string | null;
+type CategorySectionsProps = {
+  /** Pre-fetched on the server for View Source / SEO. */
+  initialSections?: HomeCategorySection[];
 };
 
-type ApiCategoryGroup = {
-  category?: {
-    name?: string;
-    slug?: string;
-  };
-  services?: ApiService[];
-};
-
-type NormalizedService = {
-  id: string;
-  name: string;
-  image: string;
-  location: string;
-  price: number;
-  priceMode?: "exact" | "range";
-  priceMin?: number;
-  priceMax?: number;
-  priceType?: string;
-  mrp?: number;
-  priceLabel: string;
-  rating: number;
-  reviewCount: number;
-};
-
-// SPEED TEST: 1x1 gray pixel (data URL) - zero network, instant load for comparison
-const DUMMY_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='180' viewBox='0 0 240 180'%3E%3Crect fill='%23e2e8f0' width='240' height='180'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-size='14' font-family='sans-serif'%3EService%3C/text%3E%3C/svg%3E";
-
-// Normalize service from API (id/_id, name/title, location string/object)
-function normalizeService(s: ApiService): NormalizedService {
-  const id = s?.id ?? s?._id ?? "";
-  const name = s?.name ?? s?.title ?? "Service";
-  const image =
-    (Array.isArray(s?.images) && s.images.length > 0 ? s.images[0] : null) ||
-    s?.image ||
-    DUMMY_IMAGE;
-  let location = s?.location;
-  if (typeof location === "object" && location !== null) {
-    location = location?.city ?? location?.address ?? "Location not available";
-  }
-  location = typeof location === "string" ? location : "Location not available";
-  return {
-    id: String(id),
-    name: String(name),
-    image: String(image),
-    location,
-    price: Number(s?.price) || 0,
-    priceMode: s?.priceMode,
-    priceMin: s?.priceMin != null ? Number(s.priceMin) : undefined,
-    priceMax: s?.priceMax != null ? Number(s.priceMax) : undefined,
-    priceType: s?.priceType,
-    mrp: s?.mrp != null ? Number(s.mrp) : undefined,
-    priceLabel: s?.priceLabel ?? "/ project",
-    rating: Number(s?.rating) ?? 0,
-    reviewCount: Number(s?.reviewCount) ?? 0,
-  };
-}
-
-export function CategorySections() {
+export function CategorySections({ initialSections }: CategorySectionsProps) {
+  const hasServerData = initialSections !== undefined;
   const { userLocation } = useUserLocation();
   const userLat = userLocation?.lat;
   const userLng = userLocation?.lng;
-  const [sections, setSections] = useState<CategorySection[]>([]);
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [sections, setSections] = useState<CategorySection[]>(initialSections ?? []);
+  const [initialLoad, setInitialLoad] = useState(!hasServerData);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [hasEnteredView, setHasEnteredView] = useState(false);
+  const [hasEnteredView, setHasEnteredView] = useState(hasServerData);
   const sectionRef = useRef<HTMLElement>(null);
-  const viewTriggeredRef = useRef(false);
+  const viewTriggeredRef = useRef(hasServerData);
 
   const allServiceIds = useMemo(() => {
     const ids = new Set<string>();
@@ -158,26 +88,23 @@ export function CategorySections() {
         return;
       }
 
-      const rawCategories = ((res.data as { categories?: ApiCategoryGroup[] } | undefined)?.categories) ?? [];
-      const categories: CategorySection[] = rawCategories.map((cat) => ({
-        title: cat.category?.name ?? "Unknown",
-        categorySlug: cat.category?.slug ?? "",
-        services: (cat.services ?? []).map(normalizeService),
-      }));
-
-      setSections(categories);
+      const rawCategories =
+        ((res.data as { categories?: Parameters<typeof normalizeHomeCategorySections>[0] } | undefined)
+          ?.categories) ?? [];
+      setSections(normalizeHomeCategorySections(rawCategories));
       setLoadError(null);
       setInitialLoad(false);
     } catch (error: unknown) {
       setLoadError(
         (error instanceof Error ? error.message : "") ||
-          "Cannot load categories. Check if the backend server is running."
+          "Cannot load categories. Check if the backend server is running.",
       );
       setInitialLoad(false);
     }
   }, [userLat, userLng]);
 
   useEffect(() => {
+    if (hasServerData) return;
     const el = sectionRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -188,11 +115,11 @@ export function CategorySections() {
           void loadData();
         }
       },
-      { rootMargin: "100px", threshold: 0 }
+      { rootMargin: "100px", threshold: 0 },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loadData]);
+  }, [hasServerData, loadData]);
 
   if (!hasEnteredView) {
     return (
@@ -229,7 +156,7 @@ export function CategorySections() {
             type="button"
             onClick={() => {
               setInitialLoad(true);
-              loadData();
+              void loadData();
             }}
             className="text-red-500 font-medium hover:underline"
           >
@@ -258,7 +185,7 @@ export function CategorySections() {
             key={section.categorySlug}
             title={section.title}
             categorySlug={section.categorySlug}
-            services={section.services}
+            services={section.services as NormalizedService[]}
             prioritizeImages={sectionIndex === 0}
             favoritesById={favoritesById}
             favoritesVersion={favorites.size}
