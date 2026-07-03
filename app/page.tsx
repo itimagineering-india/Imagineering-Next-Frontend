@@ -8,8 +8,13 @@ import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
 import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
 import { BASE_URL } from "@/lib/constants";
+import {
+  getHomeBanners,
+  getHomeCategorySections,
+  getHomeTopProviders,
+} from "@/lib/api";
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   alternates: { canonical: BASE_URL },
@@ -21,18 +26,24 @@ export const metadata: Metadata = {
   },
 };
 
-/** Home layout matches Vite/React app: Hero → Search → Services → Jobs → Top providers → Categories */
-export default function Home() {
+/** Home layout: Hero → Search → Services → Jobs → Top providers → Categories */
+export default async function Home() {
+  const [banners, categorySections, topProviders] = await Promise.all([
+    getHomeBanners("home"),
+    getHomeCategorySections({ limit: 9 }),
+    getHomeTopProviders(10),
+  ]);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <HomeRequirementPopup />
       <main className="flex-1">
-        <HeroSection />
+        <HeroSection initialBanners={banners} />
         <SearchBarSection />
         <ServicesSection />
         <HomePromoBannersSection />
-        <TopProvidersSection />
-        <CategorySections />
+        <TopProvidersSection initialProviders={topProviders} />
+        <CategorySections initialSections={categorySections} />
         <PlatformAudienceSection />
       </main>
     </div>
