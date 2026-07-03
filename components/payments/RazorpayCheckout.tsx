@@ -17,6 +17,7 @@ interface RazorpayCheckoutProps {
           cartId?: string;
           bookingDescription?: string;
           couponUsageId?: string;
+          creditsToApply?: number;
           bookingPayload?: Record<string, any>;
   bookingPaymentStage?: "initial" | "balance";
   requirementId?: string;
@@ -47,6 +48,7 @@ export function RazorpayCheckout({
           cartId,
           bookingDescription,
           couponUsageId,
+          creditsToApply,
         bookingPayload,
         bookingPaymentStage = "initial",
           requirementId,
@@ -237,6 +239,7 @@ export function RazorpayCheckout({
             bookingId,
             cartId,
             couponUsageId: couponUsageId,
+            creditsToApply: creditsToApply && creditsToApply > 0 ? creditsToApply : undefined,
             ...(bookingPayload || {}),
           });
         }
