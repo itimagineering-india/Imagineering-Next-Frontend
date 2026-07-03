@@ -591,7 +591,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 mx-auto max-w-6xl lg:max-w-[1600px] px-3 py-4 sm:px-4 sm:py-6 md:p-6 lg:p-8 space-y-5 sm:space-y-6 md:space-y-8 lg:space-y-10 min-w-0 overflow-x-hidden">
+      <main className="flex-1 page-shell space-y-5 sm:space-y-6 md:space-y-8 lg:space-y-10 overflow-x-hidden">
         {/* Hero */}
         <section className="pt-0 pb-2 sm:pb-4 bg-gradient-to-br from-primary/5 via-background to-primary/5 border rounded-lg sm:rounded-xl border-border/50">
           <div className="p-4 sm:p-6">
