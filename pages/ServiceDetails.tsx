@@ -824,7 +824,7 @@ export default function ServiceDetails() {
   return (
     <div className="min-h-screen max-w-full overflow-x-clip flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
         <main className="min-w-0 flex-1 overflow-x-clip">
-          <div className="container max-w-full overflow-x-clip px-3 pb-28 pt-4 sm:px-4 sm:py-6 md:px-6 md:py-8 lg:pb-8">
+          <div className="layout-shell pb-28 pt-4 sm:pt-6 md:pt-8 lg:pb-8 overflow-x-clip">
             <nav className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 text-xs text-muted-foreground sm:mb-6 sm:text-sm">
               <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
                 <Home className="h-3.5 w-3.5" />
