@@ -203,7 +203,7 @@ export default function ProviderDashboard() {
       : "No pending requests";
 
   return (
-    <div className="mx-auto max-w-6xl lg:max-w-[1600px] px-3 py-4 sm:px-4 sm:py-6 md:p-6 lg:p-8 space-y-5 sm:space-y-6 md:space-y-8 lg:space-y-10 min-w-0 overflow-x-hidden">
+    <div className="page-shell space-y-5 sm:space-y-6 min-w-0 overflow-x-hidden">
         {/* Hero: Banner – mobile: full viewport width (no side cut); sm+: edge-to-edge in content */}
         {banners.length > 0 && (
           <div className="relative mt-0 overflow-hidden bg-muted
