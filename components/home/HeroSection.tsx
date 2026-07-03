@@ -1,40 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import api from "@/lib/api-client";
+import type { CmsBanner } from "@/lib/home-data";
 
-type CmsBanner = {
-  _id: string;
-  title: string;
-  imageUrl: string;
-  link?: string;
-  order: number;
+type HeroSectionProps = {
+  /** Pre-fetched on the server for View Source / SEO. */
+  initialBanners?: CmsBanner[];
 };
 
-export function HeroSection() {
+export function HeroSection({ initialBanners = [] }: HeroSectionProps) {
   const [active, setActive] = useState(0);
-  const [cmsBanners, setCmsBanners] = useState<CmsBanner[]>([]);
+  const cmsBanners = initialBanners;
 
-  // Load admin-uploaded banners for home hero (placement=home)
-  useEffect(() => {
-    let cancelled = false;
-    const loadBanners = async () => {
-      try {
-        const res = await api.cms.getBanners("home");
-        if (!cancelled && res.success && Array.isArray(res.data)) {
-          setCmsBanners(res.data as CmsBanner[]);
-        }
-      } catch {
-        // non-blocking – fall back to static hero banners
-      }
-    };
-    loadBanners();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Auto-rotate based on CMS banners
   useEffect(() => {
     const totalSlides = cmsBanners.length;
     if (totalSlides <= 1) return;
@@ -47,7 +24,6 @@ export function HeroSection() {
 
   return (
     <section className="relative pt-6 sm:pt-8 md:pt-12 lg:pt-12 pb-6 sm:pb-8 md:pb-12 lg:pb-12">
-      {/* If no CMS banners, don't render hero (no fallback) — matches Vite/React app */}
       {cmsBanners.length > 0 && (
         <div className="home-shell relative w-full aspect-[4/1] rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden">
           {cmsBanners.map((banner, index) => (
@@ -80,7 +56,6 @@ export function HeroSection() {
             </div>
           ))}
 
-          {/* Dots */}
           <div className="absolute bottom-3 md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 md:gap-2">
             {cmsBanners.map((_, index) => (
               <button
