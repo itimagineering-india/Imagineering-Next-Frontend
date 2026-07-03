@@ -392,8 +392,6 @@ function ServiceCardComponent({
         <AddToCartButton
          serviceId={id}
          providerName={provider?.name}
-         showQuantity={true}
-         className="h-8 w-full min-w-0"
         />
        )}
       </div>
@@ -486,13 +484,17 @@ function ServiceCardComponent({
 
    <CardContent
     className={cn(
-     "px-3 sm:px-4 pt-[2px] pb-[2px]",
-     hideProviderDetails ? "flex-none" : "flex-1 flex flex-col"
+     "px-3 sm:px-4 pt-[2px] pb-[2px] flex-1 flex flex-col min-h-0"
     )}
    >
     {/* Title */}
     <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
-     <h3 className="subtitle caption min-w-0 overflow-hidden text-ellipsis break-words text-foreground line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] hover:text-primary transition-colors">
+     <h3
+      className={cn(
+       "subtitle caption min-w-0 overflow-hidden text-ellipsis break-words text-foreground line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] hover:text-primary transition-colors",
+       hideProviderDetails && "min-h-10"
+      )}
+     >
       {title}
      </h3>
     </Link>
@@ -518,13 +520,10 @@ function ServiceCardComponent({
    </CardContent>
 
    <CardFooter
-    className={cn(
-     "p-3 sm:p-4 pt-2 pb-3 sm:pb-4 flex flex-col items-stretch gap-2",
-     hideProviderDetails ? "mt-0" : "mt-auto"
-    )}
+    className="p-3 sm:p-4 pt-2 pb-3 sm:pb-4 mt-auto flex flex-col items-stretch gap-2"
    >
     {showPricing ? (
-     <div className="w-full sm:w-auto">
+     <div className="w-full sm:w-auto min-h-[1.5rem]">
       {!hideProviderDetails && <span className="caption">Price</span>}
       <p className="body text-foreground">
        {formattedPrice}
@@ -565,8 +564,6 @@ function ServiceCardComponent({
       <AddToCartButton
        serviceId={id}
        providerName={provider?.name}
-       showQuantity={true}
-       className="h-8 flex-1 min-w-0"
       />
      )}
     </div>
