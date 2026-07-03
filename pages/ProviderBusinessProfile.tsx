@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/select";
 import { MapPin, Loader2, Upload, X } from "lucide-react";
 import api from "@/lib/api-client";
+import { getSubcategoryNames } from "@/lib/categorySubcategories";
+import { getReachableImageUrl } from "@/lib/mediaUrl";
 import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -204,15 +206,17 @@ export default function ProviderBusinessProfile() {
             businessName: provider.businessName || "",
             providerType: provider.providerType || "Individual",
             primaryCategory: provider.primaryCategory?._id || provider.primaryCategory || "",
-            primarySubcategory: Array.isArray(provider.primarySubcategory)
-              ? provider.primarySubcategory
-              : provider.primarySubcategory
-                ? [provider.primarySubcategory]
-                : [],
+            primarySubcategory: getSubcategoryNames(
+              Array.isArray(provider.primarySubcategory)
+                ? provider.primarySubcategory
+                : provider.primarySubcategory
+                  ? [provider.primarySubcategory]
+                  : []
+            ),
             yearsOfExperience: provider.yearsOfExperience?.toString() || "",
             businessDescription: (provider.bio || "").slice(0, 500),
-            businessLogo: provider.businessLogo || "",
-            coverImage: provider.coverImage || "",
+            businessLogo: getReachableImageUrl(provider.businessLogo) || "",
+            coverImage: getReachableImageUrl(provider.coverImage) || "",
             businessAddress: {
               address: provider.businessAddress?.address || "",
               city: provider.businessAddress?.city || "",
@@ -421,10 +425,12 @@ export default function ProviderBusinessProfile() {
                     <Label htmlFor="primary-subcategory">Primary Sub-Categories</Label>
                     <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
                       {businessProfile.primaryCategory ? (
-                        categories.find((c) => c._id === businessProfile.primaryCategory)?.subcategories?.length > 0 ? (
-                          categories
-                            .find((c) => c._id === businessProfile.primaryCategory)
-                            ?.subcategories?.map((subcat: string) => (
+                        getSubcategoryNames(
+                          categories.find((c) => c._id === businessProfile.primaryCategory)?.subcategories
+                        ).length > 0 ? (
+                          getSubcategoryNames(
+                            categories.find((c) => c._id === businessProfile.primaryCategory)?.subcategories
+                          ).map((subcat) => (
                               <div key={subcat} className="flex items-center space-x-2">
                                 <Checkbox
                                   id={`subcat-${subcat}`}
@@ -492,7 +498,7 @@ export default function ProviderBusinessProfile() {
                       {businessProfile.businessLogo ? (
                         <div className="relative">
                           <img
-                            src={businessProfile.businessLogo}
+                            src={getReachableImageUrl(businessProfile.businessLogo)}
                             alt="Logo preview"
                             className="h-20 w-20 object-contain border rounded"
                           />
@@ -523,7 +529,10 @@ export default function ProviderBusinessProfile() {
                             try {
                               const res = await api.providers.uploadProfileImage(file, "logo");
                               if (res.success && res.data?.url) {
-                                setBusinessProfile((p) => ({ ...p, businessLogo: res.data!.url }));
+                                setBusinessProfile((p) => ({
+                                  ...p,
+                                  businessLogo: getReachableImageUrl(res.data!.url),
+                                }));
                                 toast({ title: "Uploaded", description: "Logo uploaded" });
                               } else {
                                 toast({
@@ -556,7 +565,7 @@ export default function ProviderBusinessProfile() {
                       {businessProfile.coverImage ? (
                         <div className="relative aspect-[4/1] w-32 min-w-[80px]">
                           <img
-                            src={businessProfile.coverImage}
+                            src={getReachableImageUrl(businessProfile.coverImage)}
                             alt="Cover preview"
                             className="h-full w-full object-cover border rounded"
                           />
@@ -589,7 +598,10 @@ export default function ProviderBusinessProfile() {
                               const croppedFile = new File([blob], file.name, { type: blob.type });
                               const res = await api.providers.uploadProfileImage(croppedFile, "cover");
                               if (res.success && res.data?.url) {
-                                setBusinessProfile((p) => ({ ...p, coverImage: res.data!.url }));
+                                setBusinessProfile((p) => ({
+                                  ...p,
+                                  coverImage: getReachableImageUrl(res.data!.url),
+                                }));
                                 toast({ title: "Uploaded", description: "Cover uploaded (4:1 ratio)" });
                               } else {
                                 toast({
