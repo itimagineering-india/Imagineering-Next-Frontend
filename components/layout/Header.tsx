@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap, Mic, MicOff } from "lucide-react";
+import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap, Mic, MicOff, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
 import { parseHeaderSearchQuery } from "@/lib/searchNavigation";
@@ -36,6 +36,7 @@ import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
+import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/contexts/UserLocationContext";
 import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
@@ -81,6 +82,7 @@ export function Header() {
  const { toast } = useToast();
  const { user, isAuthenticated, isLoading: isAuthLoading, logout } = useAuth();
  const { userLocation, isLoading: isLocationLoading } = useUserLocation();
+ const { cartCount } = useCart();
 
  const [activeCategorySlug, setActiveCategorySlug] = useState<string | null>(null);
  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
@@ -1224,7 +1226,7 @@ export function Header() {
      )}
     </div>
 
-    {/* Mobile: Search icon + Menu (3 lines) - grouped together */}
+    {/* Mobile: Search icon + Cart + Menu */}
     <div className="flex shrink-0 items-center gap-0 lg:hidden">
      <Button
       type="button"
@@ -1235,6 +1237,9 @@ export function Header() {
      >
       <Search className="h-5 w-5 text-muted-foreground" />
      </Button>
+     <div className="flex h-10 w-10 items-center justify-center">
+      <CartIcon />
+     </div>
      <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
        <Button 
@@ -1246,14 +1251,19 @@ export function Header() {
         <Menu className="h-5 w-5" />
        </Button>
       </SheetTrigger>
-     <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+     <SheetContent side="right" className="flex w-[300px] flex-col overflow-hidden p-0 sm:w-[400px]">
       <SheetTitle className="sr-only">
        Imagineering India — {t("header:exploreServices")} and account menu
       </SheetTitle>
-      <nav className="flex flex-col gap-4 mt-8">
+      <div className="flex-1 overflow-y-auto overscroll-y-contain px-6 pb-6 pt-14 [-webkit-overflow-scrolling:touch]">
+      <nav className="flex flex-col gap-4">
        <LanguageSwitcher compact />
        <Link href="/services" className="subtitle" onClick={() => setIsOpen(false)}>
         {t("header:exploreServices")}
+       </Link>
+       <Link href="/cart" className="subtitle flex items-center gap-2" onClick={() => setIsOpen(false)}>
+        <ShoppingCart className="h-4 w-4 shrink-0" />
+        Cart{cartCount > 0 ? ` (${cartCount > 99 ? "99+" : cartCount})` : ""}
        </Link>
        <div className="space-y-2">
         {userLocation && (
@@ -1408,6 +1418,7 @@ export function Header() {
         </>
        )}
       </nav>
+      </div>
      </SheetContent>
     </Sheet>
     </div>
