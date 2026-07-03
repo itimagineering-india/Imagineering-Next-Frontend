@@ -71,6 +71,10 @@
   .layout-shell {
     @apply mx-auto w-full max-w-[min(100%,100rem)] px-3 sm:px-4 md:px-5 lg:px-6;
   }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-[min(100%,100rem)] px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-6 md:py-8 min-w-0;
+  }
 }
 
 @theme inline {
