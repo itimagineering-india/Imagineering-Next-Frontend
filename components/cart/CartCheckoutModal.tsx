@@ -24,7 +24,6 @@ import {
   StickyNote,
   Receipt,
   ClipboardList,
-  Wallet,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 import { useGeocoderByPolicy } from "@/hooks/useGeocoderByPolicy";
 import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
 import { loadSavedAddresses, type SavedAddress } from "@/lib/savedAddresses";
@@ -127,6 +127,13 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const selectedAddressIdRef = useRef<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentOption>("razorpay");
+  const [creditsToApply, setCreditsToApply] = useState(0);
+  const [creditsDiscount, setCreditsDiscount] = useState(0);
+
+  const handleCreditsChange = useCallback((credits: number, discount: number) => {
+    setCreditsToApply(credits);
+    setCreditsDiscount(discount);
+  }, []);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [neftReceiptFile, setNeftReceiptFile] = useState<File | null>(null);
   const [neftBankDetails, setNeftBankDetails] = useState<{ accountName: string; accountNo: string; ifsc: string; upi: string } | null>(null);
@@ -135,6 +142,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const [loadingSbiCollect, setLoadingSbiCollect] = useState(false);
   const [sbiCollectReceiptFile, setSbiCollectReceiptFile] = useState<File | null>(null);
   const [detailsStep, setDetailsStep] = useState<DetailsStep>(1);
+  const [bookingSummaryOpen, setBookingSummaryOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -158,6 +166,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
       setStep("details");
       setDetailsStep(1);
       setAddressExtrasOpen(false);
+      setBookingSummaryOpen(false);
     }
   }, [open]);
 
@@ -457,7 +466,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     }
   };
 
-  const paymentAmount = amount;
+  const paymentAmount = Math.max(0, amount - creditsDiscount);
 
   const canProceedToPayment = date.trim() !== "" && time.trim() !== "" && address.trim() !== "";
 
@@ -862,86 +871,107 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   </p>
                 </div>
 
-                <BookingSectionCard icon={ClipboardList} title="Booking summary">
-                  <div className="space-y-3 text-sm">
-                    <div className="flex gap-3">
-                      <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Date</p>
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{formatBookingDateDisplay(date)}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <Clock className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Time</p>
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{time || "—"}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Service address</p>
-                        <p className="break-words font-medium leading-snug text-slate-900 dark:text-slate-100">
-                          {address}
-                          {city ? `, ${city}` : ""}
-                          {stateVal ? `, ${stateVal}` : ""}
-                          {zip ? ` ${zip}` : ""}
+                <Collapsible open={bookingSummaryOpen} onOpenChange={setBookingSummaryOpen}>
+                  <div className="rounded-[14px] border border-slate-200/90 bg-[#f9fafb] shadow-sm dark:border-slate-800 dark:bg-muted/40">
+                    <CollapsibleTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-900/40 sm:px-6 sm:py-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
+                            <ClipboardList className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          </span>
+                          <h3 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                            Booking summary
+                          </h3>
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-slate-500 transition-transform duration-200",
+                            bookingSummaryOpen && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="data-[state=closed]:animate-none">
+                      <div className="space-y-3 border-t border-slate-200/90 px-4 pb-4 pt-3 text-sm dark:border-slate-800 sm:px-6 sm:pb-6">
+                        <div className="flex gap-3">
+                          <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Date</p>
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{formatBookingDateDisplay(date)}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Time</p>
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{time || "—"}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Service address</p>
+                            <p className="break-words font-medium leading-snug text-slate-900 dark:text-slate-100">
+                              {address}
+                              {city ? `, ${city}` : ""}
+                              {stateVal ? `, ${stateVal}` : ""}
+                              {zip ? ` ${zip}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-9 w-full rounded-lg border-slate-200 text-xs font-medium transition-colors sm:w-auto"
+                          onClick={() => {
+                            setStep("details");
+                            setDetailsStep(3);
+                          }}
+                        >
+                          <ArrowLeft className="mr-2 h-3.5 w-3.5" />
+                          Edit booking details
+                        </Button>
+                        <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                          {buyerGST || buyerPAN ? (
+                            <>Tax invoice will use GST/PAN from your profile.</>
+                          ) : (
+                            <>
+                              Need GST/PAN on invoices? Add them under{" "}
+                              <Link
+                                href="/profile"
+                                className="font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+                                onClick={() => onOpenChange(false)}
+                              >
+                                Profile
+                              </Link>
+                              .
+                            </>
+                          )}
                         </p>
                       </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 w-full rounded-lg border-slate-200 text-xs font-medium transition-colors sm:w-auto"
-                      onClick={() => {
-                        setStep("details");
-                        setDetailsStep(3);
-                      }}
-                    >
-                      <ArrowLeft className="mr-2 h-3.5 w-3.5" />
-                      Edit booking details
-                    </Button>
-                    <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                      {buyerGST || buyerPAN ? (
-                        <>Tax invoice will use GST/PAN from your profile.</>
-                      ) : (
-                        <>
-                          Need GST/PAN on invoices? Add them under{" "}
-                          <Link
-                            href="/profile"
-                            className="font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
-                            onClick={() => onOpenChange(false)}
-                          >
-                            Profile
-                          </Link>
-                          .
-                        </>
-                      )}
-                    </p>
+                    </CollapsibleContent>
                   </div>
-                </BookingSectionCard>
+                </Collapsible>
 
-                <div className="overflow-hidden rounded-[14px] border border-slate-200/90 bg-[#f9fafb] shadow-sm dark:border-slate-800 dark:bg-muted/40">
-                  <div className="border-b border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-sky-50/60 px-4 py-4 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20 sm:px-6">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
-                          <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">Payment method</p>
-                          <p className="text-xs text-slate-600 dark:text-slate-400">Select your preferred gateway to continue</p>
-                        </div>
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                  <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Pay using</p>
+                        <p className="mt-0.5 text-xs text-slate-500">Choose a payment option to complete your order</p>
                       </div>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Imagineering India Secure Pay
-                      </span>
+                      <div className="hidden items-center gap-1.5 text-[11px] text-slate-400 sm:flex">
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-600" strokeWidth={2} />
+                        <span>Secure checkout</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-3 px-4 py-4 sm:px-6 sm:py-6">
+                  <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                    <CreditsRedeemSection orderTotal={amount} onCreditsChange={handleCreditsChange} />
                     <PaymentOptionsSelector
                       value={paymentMethod}
                       onChange={(v) => {
@@ -951,9 +981,6 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       }}
                       amount={amount}
                     />
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      You can switch payment method anytime before placing this order.
-                    </p>
                   </div>
                 </div>
 
@@ -1175,6 +1202,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       cartId={cartId}
                       amount={paymentAmount}
                       couponUsageId={couponUsageId || undefined}
+                      creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                       bookingDescription="Cart Checkout"
                       bookingPayload={{
                         date,
@@ -1196,6 +1224,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       cartId={cartId}
                       amount={paymentAmount}
                       couponUsageId={couponUsageId || undefined}
+                      creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                       bookingDescription="Cart Checkout"
                       bookingPayload={{
                         date,
