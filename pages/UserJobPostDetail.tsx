@@ -170,7 +170,7 @@ export default function UserJobPostDetail() {
 
   return (
     <DashboardLayout type="buyer">
-      <div className="w-full max-w-5xl mx-auto px-4 py-6 md:py-8">
+      <div className="page-shell">
         <Button variant="ghost" size="sm" className="mb-4 -ml-2" asChild>
           <Link href="/dashboard/buyer/job-posts">
             <ArrowLeft className="h-4 w-4 mr-2" />
