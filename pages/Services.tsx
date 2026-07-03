@@ -1889,14 +1889,14 @@ export default function Services(props: ServicesProps = {}) {
                           <div
                             className={
                               viewMode === "grid"
-                                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
+                                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch"
                                 : "space-y-3 md:space-y-4"
                             }
                           >
                             {filteredServices.map((service, index) => (
                               <div
                                 key={service.id || service._id}
-                                className="animate-fade-in"
+                                className="animate-fade-in h-full"
                                 style={{ animationDelay: `${index * 50}ms` }}
                               >
                                 <ServiceCard 
