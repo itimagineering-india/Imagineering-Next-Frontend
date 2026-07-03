@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import {
@@ -32,6 +32,7 @@ import { getGoogleMapsApiKey } from "@/lib/mapConfig";
 import { reverseGeocodeLatLng } from "../../lib/googleMapsClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 
 // Google Maps types are declared elsewhere
 
@@ -101,6 +102,13 @@ export function DynamicBookingModal({
   const [actualPaymentAmount, setActualPaymentAmount] = useState<number | null>(null);
   const [gstNumber, setGstNumber] = useState("");
   const [panNumber, setPanNumber] = useState("");
+  const [creditsToApply, setCreditsToApply] = useState(0);
+  const [creditsDiscount, setCreditsDiscount] = useState(0);
+
+  const handleCreditsChange = useCallback((credits: number, discount: number) => {
+    setCreditsToApply(credits);
+    setCreditsDiscount(discount);
+  }, []);
 
   // Calculate payment amounts (centralized to ensure consistency)
   const paymentCalculation = useMemo(() => {
@@ -821,7 +829,7 @@ export function DynamicBookingModal({
                 <Input
                   type="time"
                   {...register("time", { required: "Time is required" })}
-                  className={cn("pl-9", errors.time && "border-destructive")}
+                  className={cn("pl-12", errors.time && "border-destructive")}
                 />
               </div>
               {errors.time && (
@@ -846,7 +854,7 @@ export function DynamicBookingModal({
                   size="sm"
                   onClick={handleAutoFetchLocation}
                   disabled={isFetchingLocation}
-                  className="h-7 text-xs gap-1.5"
+                  className="h-7 text-xs gap-2"
                 >
                   {isFetchingLocation ? (
                     <>
@@ -1192,21 +1200,37 @@ export function DynamicBookingModal({
                     </p>
                   </div>
 
+                  {/* Credits */}
+                  <CreditsRedeemSection
+                    orderTotal={paymentCalculation.totalPayable}
+                    onCreditsChange={handleCreditsChange}
+                  />
+
                   {/* Total Amount */}
                   <div className="p-4 bg-primary/5 rounded-lg border-2 border-primary/20">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-lg">Total to Pay:</span>
                       <span className="font-bold text-xl text-primary">
-                        ₹{(actualPaymentAmount || paymentCalculation.totalPayable).toLocaleString()}
+                        ₹
+                        {(
+                          actualPaymentAmount ??
+                          Math.max(0, paymentCalculation.totalPayable - creditsDiscount)
+                        ).toLocaleString()}
                       </span>
                     </div>
+                    {creditsDiscount > 0 && (
+                      <p className="mt-1 text-xs text-emerald-600">
+                        Includes ₹{creditsDiscount.toLocaleString()} credits discount
+                      </p>
+                    )}
                   </div>
 
                   <RazorpayCheckout
                     bookingId={currentBookingId}
                     bookingDescription={service.title}
-                    amount={paymentCalculation.totalPayable}
+                    amount={Math.max(0, paymentCalculation.totalPayable - creditsDiscount)}
                     couponUsageId={couponUsageId ?? undefined}
+                    creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                     onAmountReceived={(amount) => {
                       // Update display amount when backend confirms the actual amount
                       setActualPaymentAmount(amount);
@@ -1220,7 +1244,12 @@ export function DynamicBookingModal({
                     }}
                     className="w-full"
                   >
-                    Pay ₹{(actualPaymentAmount || paymentCalculation.totalPayable).toLocaleString()} Now
+                    Pay ₹
+                    {(
+                      actualPaymentAmount ??
+                      Math.max(0, paymentCalculation.totalPayable - creditsDiscount)
+                    ).toLocaleString()}{" "}
+                    Now
                   </RazorpayCheckout>
                 </>
               )
