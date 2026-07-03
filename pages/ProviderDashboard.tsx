@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
@@ -34,21 +33,22 @@ const DASHBOARD_ICONS = {
   payouts: "https://img.icons8.com/color/96/request-money.png",
   subscription: "https://img.icons8.com/color/96/crown.png",
   settings: "https://img.icons8.com/color/96/settings.png",
+  trust: "https://img.icons8.com/color/96/medal2.png",
+  wallet: "https://img.icons8.com/color/96/wallet.png",
 };
 import { useState, useEffect } from "react";
 import api from "@/lib/api-client";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { KycLock } from "@/components/provider/KycLock";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { ProviderTrustHubTeaser } from "@/components/trust/ProviderTrustHubTeaser";
 
 export async function getServerSideProps() { return { props: {} }; }
 
 export default function ProviderDashboard() {
   const { user } = useAuth();
   const { status: kycStatus, progress } = useProviderKycStatus();
-  const { toast } = useToast();
   const [stats, setStats] = useState({
     totalLeads: 0,
     totalBookings: 0,
@@ -70,12 +70,6 @@ export default function ProviderDashboard() {
   const [banners, setBanners] = useState<{ _id: string; title: string; imageUrl: string; link?: string; order: number }[]>([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const isLocked = kycStatus !== "KYC_APPROVED";
-
-  const creditsBalance = (user as any)?.creditsBalance ?? 0;
-  const referralCode = (user as any)?.referralCode ?? "";
-  const referralStats = (user as any)?.referralStats as
-    | { totalReferred?: number; successfulReferrals?: number; totalCreditsEarned?: number }
-    | undefined;
 
   // Auto-rotate banner carousel every 5s
   useEffect(() => {
@@ -339,93 +333,14 @@ export default function ProviderDashboard() {
           </CardContent>
         </Card>
 
-        {/* Invite & Earn Credits */}
-        {referralCode && (
-          <Card className="border-dashed bg-card/60">
-            <CardContent className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
-              <div className="flex items-start sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm sm:text-base font-semibold text-foreground">
-                    Invite & Earn Credits
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                    Share your referral link with buyers and providers. You both earn credits on their first booking.
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs sm:text-sm text-muted-foreground">Credits balance</p>
-                  <p className="text-base sm:text-lg font-semibold text-foreground">
-                    {creditsBalance}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id="provider-referral-code"
-                        value={referralCode}
-                        readOnly
-                        className="pr-12 text-sm"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="whitespace-nowrap text-xs sm:text-sm"
-                      onClick={async () => {
-                        try {
-                          const origin =
-                            typeof window !== "undefined" ? window.location.origin : "";
-                          const link = origin
-                            ? `${origin}/signup?ref=${encodeURIComponent(referralCode)}`
-                            : referralCode;
-                          await navigator.clipboard.writeText(link);
-                          toast({
-                            title: "Referral link copied",
-                            description: "Share it to earn credits on new bookings.",
-                          });
-                        } catch {
-                          toast({
-                            title: "Could not copy",
-                            description: "Please copy the referral code manually.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                    >
-                      Copy link
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              {referralStats && (
-                <div className="flex flex-wrap gap-3 text-[11px] sm:text-xs text-muted-foreground">
-                  <span>
-                    Invited: <span className="font-medium">{referralStats.totalReferred ?? 0}</span>
-                  </span>
-                  <span>
-                    Successful:{" "}
-                    <span className="font-medium">{referralStats.successfulReferrals ?? 0}</span>
-                  </span>
-                  <span>
-                    Credits earned:{" "}
-                    <span className="font-medium">
-                      {referralStats.totalCreditsEarned ?? creditsBalance}
-                    </span>
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        <ProviderTrustHubTeaser />
 
         {/* Quick Actions – mobile: 4 cols smaller; sm+ more cols */}
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 sm:gap-4">
           {[
              { label: "Business Profile", href: "/dashboard/provider/business-profile", icon: DASHBOARD_ICONS.businessProfile },
+            { label: "Trust & Growth", href: "/dashboard/provider/trust", icon: DASHBOARD_ICONS.trust },
+            { label: "Rewards", href: "/dashboard/wallet", icon: DASHBOARD_ICONS.wallet },
             { label: "My Services", href: "/dashboard/provider/services", icon: DASHBOARD_ICONS.services },
             { label: "Workforce", href: "/dashboard/provider/workforce", icon: DASHBOARD_ICONS.workforce },
             { label: "Hire labour", href: "/dashboard/provider/manpower-crew", icon: DASHBOARD_ICONS.hireLabour },
