@@ -175,8 +175,9 @@ export default function CartPage() {
         </div>
 
         {isRefreshing ? (
-          <div className="flex flex-col lg:grid lg:grid-cols-[2fr_1fr] gap-4 md:gap-6">
-            <Card className="order-2 lg:order-1">
+          <div className="flex flex-col lg:grid lg:grid-cols-[2fr_1fr] gap-4 md:gap-6 lg:items-start">
+            <div className="flex flex-col gap-4 md:gap-6 order-2 lg:order-1 min-w-0">
+              <Card>
               <CardHeader className="pb-3 sm:pb-4">
                 <Skeleton className="h-6 w-40" />
               </CardHeader>
@@ -200,9 +201,10 @@ export default function CartPage() {
                   </div>
                 ))}
               </CardContent>
-            </Card>
+              </Card>
+            </div>
 
-            <Card className="order-1 lg:order-2">
+            <Card className="order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start">
               <CardHeader className="pb-3 sm:pb-4">
                 <Skeleton className="h-6 w-32" />
               </CardHeader>
@@ -226,9 +228,10 @@ export default function CartPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="flex flex-col lg:grid lg:grid-cols-[2fr_1fr] gap-4 md:gap-6">
+          <div className="flex flex-col lg:grid lg:grid-cols-[2fr_1fr] gap-4 md:gap-6 lg:items-start">
+            <div className="flex flex-col gap-4 md:gap-6 order-2 lg:order-1 min-w-0">
             {/* Services List */}
-            <Card className="order-2 lg:order-1">
+            <Card>
               <CardHeader className="pb-3 sm:pb-4">
                 <CardTitle className="text-lg sm:text-xl">Services ({items.length})</CardTitle>
               </CardHeader>
@@ -333,8 +336,9 @@ export default function CartPage() {
             </Card>
 
             <CartSuggestions cartProviderId={cartProviderId} cartServiceIds={cartServiceIds} />
+            </div>
 
-            {/* Order Summary - Sticky on mobile */}
+            {/* Order Summary */}
             <Card className="order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start">
               <CardHeader className="pb-3 sm:pb-4">
                 <CardTitle className="text-lg sm:text-xl">Order Summary</CardTitle>
