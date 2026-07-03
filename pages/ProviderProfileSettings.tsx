@@ -149,6 +149,12 @@ export default function ProviderProfileSettings() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
+  const [dataSharing, setDataSharing] = useState({
+    lending_signals: false,
+    market_analytics: false,
+  });
+  const [consentSaving, setConsentSaving] = useState<string | null>(null);
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -201,6 +207,12 @@ export default function ProviderProfileSettings() {
             businessLogo: p.businessLogo,
           });
         }
+      }
+
+      const consentRes = await api.finance.getConsent();
+      if (consentRes.success && consentRes.data) {
+        const c = (consentRes.data as { consent?: typeof dataSharing }).consent;
+        if (c) setDataSharing(c);
       }
     } catch (error) {
       console.error("Failed to fetch settings data:", error);
@@ -388,6 +400,35 @@ export default function ProviderProfileSettings() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleConsentToggle = async (
+    scope: "lending_signals" | "market_analytics",
+    granted: boolean
+  ) => {
+    setConsentSaving(scope);
+    try {
+      const res = await api.finance.updateConsent({ scope, granted });
+      if (res.success && res.data) {
+        const c = (res.data as { consent?: typeof dataSharing }).consent;
+        if (c) setDataSharing(c);
+        toast({
+          title: granted ? "Consent granted" : "Consent revoked",
+          description:
+            scope === "lending_signals"
+              ? granted
+                ? "Your performance data may be shared with verified lending partners."
+                : "Lending partners can no longer access your performance signals."
+              : granted
+                ? "Anonymous market analytics may include your aggregated data."
+                : "Market analytics sharing has been turned off.",
+        });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to update consent", variant: "destructive" });
+    } finally {
+      setConsentSaving(null);
     }
   };
 
@@ -885,6 +926,46 @@ export default function ProviderProfileSettings() {
                     />
                   </div>
                 </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-semibold">Data sharing (Imagineering India)</h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Control how your business performance data is used for finance and market products.
+                      Changes are logged for compliance.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label>Lending partner signals</Label>
+                      <p className="text-xs text-muted-foreground max-w-md">
+                        Share anonymized GMV, trust score, and tenure with verified NBFC partners for credit
+                        eligibility. No personal contact info is shared.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={dataSharing.lending_signals}
+                      disabled={consentSaving === "lending_signals"}
+                      onCheckedChange={(checked) => void handleConsentToggle("lending_signals", checked)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label>Market analytics</Label>
+                      <p className="text-xs text-muted-foreground max-w-md">
+                        Include your aggregated performance in city-level market pulse and benchmarks.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={dataSharing.market_analytics}
+                      disabled={consentSaving === "market_analytics"}
+                      onCheckedChange={(checked) => void handleConsentToggle("market_analytics", checked)}
+                    />
+                  </div>
+                </div>
+
                 <Button onClick={handleSavePrivacy} disabled={isSaving}>
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Save Privacy Settings
