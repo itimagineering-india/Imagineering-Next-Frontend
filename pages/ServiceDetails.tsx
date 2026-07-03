@@ -46,8 +46,13 @@ import {
   type ServiceWithInteraction,
 } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
+import { BestSupplierCard } from "@/components/routing/BestSupplierCard";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import { useTranslation } from "react-i18next";
+import {
+  ImagineVerifiedBadge,
+  type ImagineScoreData,
+} from "@/components/trust/ImagineScorePanel";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -165,6 +170,7 @@ interface ServiceData {
     experienceYears?: number;
     completedJobs?: number;
     trustBadges?: string[];
+    imagineScore?: ImagineScoreData | null;
   };
   location?: {
     address: string;
@@ -340,6 +346,7 @@ export default function ServiceDetails() {
               experienceYears: Number(providerExperience) || 0,
               completedJobs: serviceData.provider?.completedJobs,
               trustBadges: serviceData.provider?.trustBadges,
+              imagineScore: serviceData.provider?.imagineScore,
             },
             location: serviceData.location,
             rating: serviceData.rating || 0,
@@ -466,6 +473,9 @@ export default function ServiceDetails() {
   const trustBadges = useMemo(() => {
     if (!service) return [];
     const badges = [
+      service.provider.imagineScore?.isImagineeringVerified
+        ? { label: "Imagineering Verified", icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+        : null,
       service.provider.verified ? { label: "Business Verified", icon: BadgeCheck, className: "bg-blue-50 text-blue-700 border-blue-200" } : null,
       fieldValue(["gst", "gst invoice"]) ? { label: "GST Verified", icon: ReceiptText, className: "bg-emerald-50 text-emerald-700 border-emerald-200" } : null,
       deliveryOption.toLowerCase().includes("available") ? { label: "Delivery Available", icon: Truck, className: "bg-orange-50 text-orange-700 border-orange-200" } : null,
@@ -958,7 +968,10 @@ export default function ServiceDetails() {
                               <Link href={`/provider/${service.provider.slug || service.provider._id}`} className="text-base font-bold leading-snug tracking-[-0.01em] text-foreground hover:text-primary lg:text-lg">
                                 {service.provider.businessName || service.provider.name}
                               </Link>
-                              {service.provider.verified && <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50">{t("verified", "Verified")}</Badge>}
+                              <ImagineVerifiedBadge score={service.provider.imagineScore} />
+                              {!service.provider.imagineScore?.isImagineeringVerified && service.provider.verified && (
+                                <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50">{t("verified", "Verified")}</Badge>
+                              )}
                             </div>
                             <div className="mt-2 grid grid-cols-1 gap-2 text-xs font-medium text-muted-foreground sm:grid-cols-2 lg:text-sm">
                               <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> Fast response</span>
@@ -980,6 +993,16 @@ export default function ServiceDetails() {
                         </div>
                       </CardContent>
                     </Card>
+
+                    {service?.id && (
+                      <BestSupplierCard
+                        serviceId={service.id}
+                        city={service.location?.city}
+                        lat={service.location?.coordinates?.lat}
+                        lng={service.location?.coordinates?.lng}
+                        urgency="flexible"
+                      />
+                    )}
 
                     <div className="hidden space-y-2 lg:block">
                       {canAddToCart ? (
@@ -1073,6 +1096,7 @@ export default function ServiceDetails() {
                       completedJobs: service.provider.completedJobs ?? 0,
                       rating: service.provider.rating ?? service.rating,
                       trustBadges: service.provider.trustBadges,
+                      imagineScore: service.provider.imagineScore,
                     }}
                     onSave={handleToggleFavorite}
                     isSaved={isSaved}
@@ -1162,6 +1186,7 @@ export default function ServiceDetails() {
                       completedJobs: service.provider.completedJobs ?? 0,
                       rating: service.provider.rating ?? service.rating,
                       trustBadges: service.provider.trustBadges,
+                      imagineScore: service.provider.imagineScore,
                     }}
                     onSave={handleToggleFavorite}
                     isSaved={isSaved}
