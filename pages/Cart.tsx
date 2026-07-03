@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { CartCheckoutModal } from "@/components/cart/CartCheckoutModal";
 import { CartOffersModal } from "@/components/cart/CartOffersModal";
+import { CartSuggestions } from "@/components/cart/CartSuggestions";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +35,16 @@ export default function CartPage() {
   const router = useRouter();
 
   const items = useMemo(() => cart?.items ?? [], [cart?.items]);
+  const cartServiceIds = useMemo(
+    () => items.map((it) => String(it.service?._id ?? it.service)),
+    [items]
+  );
+  const cartProviderId = useMemo(() => {
+    const p = cart?.provider;
+    if (!p) return "";
+    if (typeof p === "object" && p !== null && "_id" in p) return String((p as { _id: string })._id);
+    return String(p);
+  }, [cart?.provider]);
   const [inputQuantities, setInputQuantities] = useState<Record<string, number | string>>({});
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({});
@@ -320,6 +331,8 @@ export default function CartPage() {
                 })}
               </CardContent>
             </Card>
+
+            <CartSuggestions cartProviderId={cartProviderId} cartServiceIds={cartServiceIds} />
 
             {/* Order Summary - Sticky on mobile */}
             <Card className="order-1 lg:order-2 lg:sticky lg:top-4 lg:self-start">
