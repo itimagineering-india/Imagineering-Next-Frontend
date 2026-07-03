@@ -987,6 +987,149 @@ export const api = {
       }),
   },
 
+  // Imagineering Verified Network — trust & scores
+  trust: {
+    getProviderScore: (providerId: string) =>
+      apiRequest(`/api/trust/providers/${encodeURIComponent(providerId)}/score`),
+    getProviderAchievements: (providerId: string) =>
+      apiRequest(`/api/trust/providers/${encodeURIComponent(providerId)}/achievements`),
+    getProviderShare: (providerId: string) =>
+      apiRequest(`/api/trust/providers/${encodeURIComponent(providerId)}/share`),
+    getMyScore: () => apiRequest('/api/trust/me/score'),
+    getMyAchievements: () => apiRequest('/api/trust/me/achievements'),
+    getMyDailyGoals: () => apiRequest('/api/trust/me/daily-goals'),
+    getMyShare: () => apiRequest('/api/trust/me/share'),
+    getAchievementShare: (achievementId: string) =>
+      apiRequest(`/api/trust/achievements/${encodeURIComponent(achievementId)}/share`),
+  },
+
+  wallet: {
+    getMe: () =>
+      apiRequest<{
+        wallet: {
+          balance: number;
+          creditInrValue: number;
+          maxRedeemOrderPercent: number;
+          minRedeemCredits: number;
+        };
+      }>('/api/wallet/me'),
+    getTransactions: (params?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.page) query.set('page', String(params.page));
+      if (params?.limit) query.set('limit', String(params.limit));
+      const qs = query.toString();
+      return apiRequest<{
+        transactions: Array<{
+          id: string;
+          entryType: 'credit' | 'debit';
+          amount: number;
+          balanceAfter: number;
+          sourceType: string;
+          sourceId?: string;
+          description?: string;
+          occurredAt: string;
+        }>;
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/wallet/me/transactions${qs ? `?${qs}` : ''}`);
+    },
+    redeemPreview: (payload: { orderTotal: number; creditsToApply?: number }) =>
+      apiRequest<{
+        balance: number;
+        orderTotal: number;
+        maxApplicableCredits: number;
+        creditsApplied: number;
+        discountInr: number;
+        payableAfterCredits: number;
+      }>('/api/wallet/redeem-preview', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getRewardsProgram: () =>
+      apiRequest<{
+        program: {
+          isActive: boolean;
+          redemption: {
+            enabled: boolean;
+            creditInrValue: number;
+            maxRedeemOrderPercent: number;
+            minRedeemCredits: number;
+          };
+          referral: {
+            isActive: boolean;
+            buyer: { enabled: boolean; referrerCredits: number; refereeCredits: number };
+            provider: { enabled: boolean; referrerCredits: number; refereeCredits: number };
+          };
+          dailyGoals: Array<{ id: string; label: string; description: string; credits: number }>;
+          achievements: Array<{ slug: string; title: string; credits: number }>;
+        };
+      }>('/api/wallet/rewards-program'),
+  },
+
+  finance: {
+    getMarketPulse: () =>
+      apiRequest<{
+        marketPulse: {
+          city: string;
+          cityDisplay: string;
+          healthScore: number;
+          metrics: {
+            completedTransactions7d: number;
+            cancellationRatePct: number;
+            avgTrustScore: number;
+            activeSuppliers: number;
+            verifiedSuppliers: number;
+            gmv7dInr: number;
+          };
+          periodComparison: { gmvChangePct: number | null; completedChangePct: number | null };
+          yourPosition?: {
+            trustScore: number;
+            imagineScore: number;
+            rank: string;
+            cityPercentile: number;
+            isImagineeringVerified: boolean;
+          };
+          alerts: Array<{ type: string; message: string }>;
+        };
+      }>('/api/finance/me/market-pulse'),
+    getConsumptionInsights: () =>
+      apiRequest<{
+        insights: {
+          periodDays: number;
+          totalSpendInr: number;
+          completedOrders: number;
+          avgOrderValueInr: number;
+          spendByMonth: Array<{ month: string; spendInr: number; orders: number }>;
+          topCategories: Array<{ category: string; spendInr: number; orders: number }>;
+          topCities: Array<{ city: string; spendInr: number; orders: number }>;
+          recentTrend: 'up' | 'down' | 'stable';
+        };
+      }>('/api/finance/me/consumption-insights'),
+    getConsent: () =>
+      apiRequest<{ consent: { lending_signals: boolean; market_analytics: boolean } }>(
+        '/api/finance/consent'
+      ),
+    updateConsent: (payload: { scope: 'lending_signals' | 'market_analytics'; granted: boolean }) =>
+      apiRequest('/api/finance/consent', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  },
+
+  routing: {
+    match: (payload: {
+      serviceId?: string;
+      categorySlug?: string;
+      query?: string;
+      quantity?: number;
+      location: { city?: string; lat?: number; lng?: number; area?: string };
+      urgency?: 'today' | 'tomorrow' | 'flexible';
+    }) =>
+      apiRequest('/api/routing/match', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  },
+
   // Reviews
   reviews: {
     getAll: () => apiRequest('/api/reviews'),
@@ -1182,9 +1325,11 @@ export const api = {
         body: JSON.stringify({ status }),
       }),
     // Provider actions for new status workflow
-    acceptBooking: (bookingId: string) => apiRequest(`/api/bookings/${bookingId}/provider/accept`, {
-      method: 'POST',
-    }),
+    acceptBooking: (bookingId: string, promisedDeliveryAt?: string) =>
+      apiRequest(`/api/bookings/${bookingId}/provider/accept`, {
+        method: 'POST',
+        body: JSON.stringify(promisedDeliveryAt ? { promisedDeliveryAt } : {}),
+      }),
     rejectBooking: (bookingId: string, reason: string) => apiRequest(`/api/bookings/${bookingId}/provider/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
@@ -1553,6 +1698,7 @@ export const api = {
       bookingId?: string;
       cartId?: string;
       couponUsageId?: string;
+      creditsToApply?: number;
       date?: string;
       time?: string;
       location?: any;
@@ -2758,6 +2904,17 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ quantity }),
         timeoutMs: 20000,
+      }),
+    getSuggestions: (data?: {
+      selectedActivityIds?: string[];
+      city?: string;
+      lat?: number;
+      lng?: number;
+    }) =>
+      apiRequest('/api/construction-workflow/cart/suggestions', {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+        timeoutMs: 25000,
       }),
   },
 
