@@ -207,15 +207,54 @@ export const ServicesList = memo(
       ]
     );
 
-    if (!VirtualList) return null;
-
     if (!width || width < 1) {
       return (
         <div
           ref={containerRef}
-          className="w-full h-0"
-          style={{ contentVisibility: "auto", containIntrinsicSize: "180px 135px" }}
-        />
+          className="flex w-full gap-2 overflow-x-auto scrollbar-hide touch-pan-x"
+          style={{ contentVisibility: "auto", containIntrinsicSize: "180px 248px" }}
+        >
+          {isLoading
+            ? Array.from({ length: skeletonCount }).map((_, index) => (
+                <CardSkeleton
+                  key={`ssr-skeleton-${index}`}
+                  className="min-w-0 shrink-0"
+                  style={{ width: CATEGORY_PROVIDER_CARD_MAX_WIDTH, maxWidth: CATEGORY_PROVIDER_CARD_MAX_WIDTH }}
+                />
+              ))
+            : services.map((service, index) => (
+                <CategoryProviderCard
+                  key={service.id}
+                  {...service}
+                  className="min-w-0 shrink-0"
+                  style={{ width: CATEGORY_PROVIDER_CARD_MAX_WIDTH, maxWidth: CATEGORY_PROVIDER_CARD_MAX_WIDTH }}
+                  priority={prioritizeImages && index < 4}
+                  isFavorite={!!favoritesById[service.id]}
+                  onToggleFavorite={onToggleFavorite}
+                />
+              ))}
+        </div>
+      );
+    }
+
+    if (!VirtualList) {
+      return (
+        <div
+          ref={containerRef}
+          className="flex w-full gap-2 overflow-x-auto scrollbar-hide touch-pan-x"
+        >
+          {services.map((service, index) => (
+            <CategoryProviderCard
+              key={service.id}
+              {...service}
+              className="min-w-0 shrink-0"
+              style={{ width: CATEGORY_PROVIDER_CARD_MAX_WIDTH, maxWidth: CATEGORY_PROVIDER_CARD_MAX_WIDTH }}
+              priority={prioritizeImages && index < 4}
+              isFavorite={!!favoritesById[service.id]}
+              onToggleFavorite={onToggleFavorite}
+            />
+          ))}
+        </div>
       );
     }
 
