@@ -13,6 +13,11 @@ import {
   Camera,
 } from "lucide-react";
 
+import {
+  ImagineVerifiedBadge,
+  type ImagineScoreData,
+} from "@/components/trust/ImagineScorePanel";
+
 interface ProviderCardProps {
   provider: {
     id: string;
@@ -23,6 +28,7 @@ interface ProviderCardProps {
     completedJobs: number;
     rating: number;
     trustBadges?: string[];
+    imagineScore?: Partial<ImagineScoreData> | null;
   };
   onSave?: () => void;
   isSaved?: boolean;
@@ -59,11 +65,11 @@ export function ProviderCard({
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+            <div className="flex items-center gap-2 sm:gap-2 mb-1 flex-wrap">
               <h3 className="font-semibold text-base sm:text-lg truncate">{provider.name}</h3>
-              {provider.isVerified && (
-                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-              )}
+              <ImagineVerifiedBadge
+                score={provider.imagineScore ?? { isImagineeringVerified: provider.isVerified }}
+              />
             </div>
             <div className="flex items-center gap-1 text-xs sm:text-sm">
               <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-warning text-warning" />
@@ -72,7 +78,7 @@ export function ProviderCard({
             </div>
           </div>
           <Button
-            variant="ghost"
+            variant="icon"
             size="icon"
             onClick={onSave}
             className={cn(
@@ -93,14 +99,14 @@ export function ProviderCard({
 
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4 pt-3 sm:pt-4 border-t">
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2">
             <Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             <div>
               <p className="text-xs sm:text-sm font-medium">{provider.experience} Years</p>
               <p className="text-[10px] sm:text-xs text-muted-foreground">Experience</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2">
             <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
             <div>
               <p className="text-xs sm:text-sm font-medium">{provider.completedJobs}+</p>
@@ -112,14 +118,14 @@ export function ProviderCard({
         {/* Trust Badges */}
         <div className="pt-3 sm:pt-4 border-t space-y-1.5 sm:space-y-2">
           <p className="text-xs sm:text-sm font-medium">Trust Badges</p>
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          <div className="flex flex-wrap gap-2 sm:gap-2">
             {badges.map((badge, index) => {
               const Icon = badgeIcons[badge] || CheckCircle2;
               return (
                 <Badge
                   key={index}
                   variant="secondary"
-                  className="flex items-center gap-1 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1"
+                  className="flex items-center gap-1 text-[10px] sm:text-xs px-2 sm:px-2 py-0.5 sm:py-1"
                 >
                   <Icon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   {badge}
