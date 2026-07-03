@@ -671,6 +671,12 @@ const Profile = () => {
                       <p className="text-base sm:text-lg font-semibold text-foreground">
                         {creditsBalance}
                       </p>
+                      <Link
+                        href="/dashboard/wallet"
+                        className="text-xs text-primary underline-offset-2 hover:underline"
+                      >
+                        View wallet
+                      </Link>
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
