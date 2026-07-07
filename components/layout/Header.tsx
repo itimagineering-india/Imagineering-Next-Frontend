@@ -536,15 +536,8 @@ export function Header() {
    className="flex items-center flex-1 min-w-0 max-w-full"
   >
    <div className="relative w-full" ref={searchRef}>
-    <div className="flex h-11 w-full min-w-0 items-center gap-1.5 rounded-2xl border border-primary/20 bg-background px-2 py-1.5 shadow-[0_10px_30px_rgba(37,99,235,0.18)] ring-1 ring-primary/10 transition focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/25 lg:h-12 lg:px-3">
-     <button
-      type="submit"
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
-      aria-label="Search"
-      title="Search"
-     >
-      <Search className="h-4 w-4 shrink-0" />
-     </button>
+    <div className="search-bar-gradient-border">
+    <div className="search-bar-gradient-inner">
      <Input
       ref={searchInputRef}
       type="text"
@@ -594,12 +587,15 @@ export function Header() {
      >
       {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
      </button>
-     <Button
+     <button
       type="submit"
-      className="h-8 shrink-0 rounded-xl bg-blue-600 px-5 text-xs font-semibold text-white shadow-[0_6px_16px_rgba(37,99,235,0.35)] transition hover:bg-blue-700 lg:h-9 lg:px-7"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition hover:bg-blue-700 lg:h-9 lg:w-9"
+      aria-label="Search"
+      title="Search"
      >
-      Search
-     </Button>
+      <Search className="h-4 w-4" />
+     </button>
+    </div>
     </div>
 
     {/* Search Suggestions Dropdown */}
@@ -800,7 +796,7 @@ export function Header() {
       <Button
        variant="secondary"
        size="sm"
-       className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground shrink-0 max-w-[140px] md:max-w-[180px]"
+       className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground shrink-0 max-w-[140px] md:max-w-[180px] shadow-none hover:translate-y-0 hover:shadow-none active:shadow-none"
        title={userLocation?.city || userLocation?.address || "Set or change your location"}
       >
        <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -1106,7 +1102,7 @@ export function Header() {
     {/* Desktop Actions */}
     <div className="hidden lg:flex items-center gap-3">
      <LanguageSwitcher />
-     <CartIcon />
+     {cartCount > 0 && <CartIcon />}
      {!isAuthLoading && (
       <>
        {isAuthenticated && user ? (
@@ -1214,10 +1210,10 @@ export function Header() {
         </DropdownMenu>
        ) : (
         <>
-         <Button variant="secondary" asChild>
+         <Button variant="secondary" asChild className="shadow-none hover:translate-y-0 hover:shadow-none active:shadow-none">
           <Link href="/login">{t("header:login")}</Link>
          </Button>
-         <Button asChild>
+         <Button asChild className="shadow-none hover:translate-y-0 hover:shadow-none active:shadow-none">
           <Link href="/signup">{t("header:signUp")}</Link>
          </Button>
         </>
@@ -1237,9 +1233,11 @@ export function Header() {
      >
       <Search className="h-5 w-5 text-muted-foreground" />
      </Button>
-     <div className="flex h-10 w-10 items-center justify-center">
-      <CartIcon />
-     </div>
+     {cartCount > 0 ? (
+      <div className="flex h-10 w-10 items-center justify-center">
+       <CartIcon />
+      </div>
+     ) : null}
      <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
        <Button 
@@ -1261,10 +1259,12 @@ export function Header() {
        <Link href="/services" className="subtitle" onClick={() => setIsOpen(false)}>
         {t("header:exploreServices")}
        </Link>
+       {cartCount > 0 ? (
        <Link href="/cart" className="subtitle flex items-center gap-2" onClick={() => setIsOpen(false)}>
         <ShoppingCart className="h-4 w-4 shrink-0" />
-        Cart{cartCount > 0 ? ` (${cartCount > 99 ? "99+" : cartCount})` : ""}
+        Cart ({cartCount > 99 ? "99+" : cartCount})
        </Link>
+       ) : null}
        <div className="space-y-2">
         {userLocation && (
          <Link
