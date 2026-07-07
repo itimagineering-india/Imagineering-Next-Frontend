@@ -19,7 +19,7 @@ export function LanguageSwitcher({ className, compact = false }: LanguageSwitche
   return (
     <label
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground shadow-sm",
+        "inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground",
         compact && "w-full justify-between rounded-xl px-3 py-2",
         className
       )}
