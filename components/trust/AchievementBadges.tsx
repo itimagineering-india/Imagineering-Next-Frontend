@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Share2 } from "lucide-react";
+import { Share2, Tag } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -30,16 +30,21 @@ export function AchievementBadges({
   variant = "compact",
   className,
   showShare = false,
+  onViewOffers,
+  offersLabel = "Offers",
 }: {
   achievements?: ProviderAchievement[];
   variant?: "compact" | "grid";
   className?: string;
   showShare?: boolean;
+  onViewOffers?: () => void;
+  offersLabel?: string;
 }) {
   const { toast } = useToast();
   const [sharingId, setSharingId] = useState<string | null>(null);
 
-  if (!achievements?.length) return null;
+  const hasAchievements = (achievements?.length ?? 0) > 0;
+  if (!hasAchievements && !onViewOffers) return null;
 
   const onShare = async (id: string) => {
     setSharingId(id);
@@ -66,7 +71,7 @@ export function AchievementBadges({
   if (variant === "compact") {
     return (
       <div className={cn("flex flex-wrap gap-2", className)}>
-        {achievements.slice(0, 6).map((a) => (
+        {(achievements ?? []).slice(0, 6).map((a) => (
           <TooltipProvider key={a.id}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -79,9 +84,21 @@ export function AchievementBadges({
             </Tooltip>
           </TooltipProvider>
         ))}
-        {achievements.length > 6 && (
-          <Badge variant="outline">+{achievements.length - 6} more</Badge>
+        {hasAchievements && (achievements?.length ?? 0) > 6 && (
+          <Badge variant="outline">+{(achievements?.length ?? 0) - 6} more</Badge>
         )}
+        {onViewOffers ? (
+          <Badge
+            asChild
+            variant="secondary"
+            className="gap-1 text-sm py-1 cursor-pointer border-amber-200/80 bg-amber-50 text-amber-900 hover:bg-amber-100"
+          >
+            <button type="button" onClick={onViewOffers}>
+              <Tag className="h-3.5 w-3.5" />
+              {offersLabel}
+            </button>
+          </Badge>
+        ) : null}
       </div>
     );
   }
@@ -93,7 +110,7 @@ export function AchievementBadges({
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-2">
-          {achievements.map((a) => (
+          {(achievements ?? []).map((a) => (
             <div
               key={a.id}
               className="flex items-start gap-3 rounded-lg border p-3 bg-muted/20"
