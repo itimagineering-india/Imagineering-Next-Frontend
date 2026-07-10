@@ -16,10 +16,11 @@ const footerLinkKeys = {
     { key: "howItWorks" as const, href: "/about" },
     { key: "pricingPlans" as const, href: "/pricing" },
     { key: "standardPrices" as const, href: "/standard-prices" },
+    { key: "constructionCalculator" as const, href: "/construction-calculator" },
     { key: "caseStudies" as const, href: "/about" },
   ],
   forProviders: [
-    { key: "registerAsProvider" as const, href: "/signup?type=provider" },
+    { key: "registerAsProvider" as const, href: "/join-provider" },
     { key: "providerGuidelines" as const, href: "/help" },
     { key: "providerNetwork" as const, href: "/community" },
     { key: "growthBestPractices" as const, href: "/help" },
@@ -297,7 +298,7 @@ export function Footer() {
                 Imagineering India
               </span>
               <span className="caption text-muted-foreground">
-                One Point Solution For All The Construction M3
+                Integrated Construction Solutions Platform
               </span>
             </div>
           </div>
