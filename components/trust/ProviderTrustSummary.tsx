@@ -14,22 +14,32 @@ export function ProviderTrustSummary({
   score,
   achievements,
   className,
+  onViewOffers,
+  offersLabel,
 }: {
   score?: ImagineScoreData | null;
   achievements?: ProviderAchievement[];
   className?: string;
+  onViewOffers?: () => void;
+  offersLabel?: string;
 }) {
   const hasScore = !!score;
   const hasAchievements = (achievements?.length ?? 0) > 0;
-  if (!hasScore && !hasAchievements) return null;
+  const hasBadgeRow = hasAchievements || !!onViewOffers;
+  if (!hasScore && !hasBadgeRow) return null;
 
   return (
     <Card className={cn("border border-primary/10 shadow-sm", className)}>
       <CardContent className="p-3 sm:p-4 space-y-3">
         {hasScore && <ImagineScorePanel score={score} variant="compact" />}
-        {hasScore && hasAchievements && <Separator />}
-        {hasAchievements && (
-          <AchievementBadges achievements={achievements} variant="compact" />
+        {hasScore && hasBadgeRow && <Separator />}
+        {hasBadgeRow && (
+          <AchievementBadges
+            achievements={achievements}
+            variant="compact"
+            onViewOffers={onViewOffers}
+            offersLabel={offersLabel}
+          />
         )}
       </CardContent>
     </Card>
