@@ -47,6 +47,7 @@ import {
 } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
 import { BestSupplierCard } from "@/components/routing/BestSupplierCard";
+import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import { useTranslation } from "react-i18next";
 import {
@@ -208,6 +209,7 @@ export default function ServiceDetails() {
   const searchParamsFromUrl = useSearchParams();
   const { toast } = useToast();
   const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [offersModalOpen, setOffersModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [service, setService] = useState<ServiceData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -924,19 +926,27 @@ export default function ServiceDetails() {
                           )}
                         </div>
                         <div className="rounded-2xl border border-white/70 bg-white/85 p-3 shadow-sm">
-                          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                               <p className="text-sm font-bold tracking-[-0.01em] text-foreground">Offers & EMI Plans</p>
-                              <p className="text-xs font-medium text-muted-foreground">Check available benefits before purchase</p>
+                              <p className="text-xs font-medium text-muted-foreground">
+                                Provider promotions, platform deals & coupon codes
+                              </p>
                             </div>
-                            <Badge className="w-fit rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-50">Available</Badge>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full sm:w-auto shrink-0 rounded-full border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                              onClick={() => setOffersModalOpen(true)}
+                            >
+                              View offers
+                            </Button>
                           </div>
-                          <div className="grid gap-2 text-sm sm:grid-cols-2">
+                          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                             {[
                               { label: "Bulk order offer", value: "Best price on quantity orders", icon: BadgePercent },
                               { label: "EMI plans", value: "Available on eligible orders", icon: CreditCard },
-                              { label: "GST invoice", value: "Ask supplier for invoice support", icon: ReceiptText },
-                              { label: "Secure checkout", value: "Add to cart and confirm order", icon: ShieldCheck },
                             ].map((offer) => {
                               const Icon = offer.icon;
                               return (
@@ -1282,6 +1292,14 @@ export default function ServiceDetails() {
             }}
           />
         )}
+
+        <ProviderOffersModal
+          open={offersModalOpen}
+          onOpenChange={setOffersModalOpen}
+          providerId={service?.provider?.slug || service?.provider?._id || null}
+          serviceId={service?.id || null}
+          providerName={service?.provider?.businessName || service?.provider?.name}
+        />
       </div>
   );
 }
