@@ -36,6 +36,7 @@ import {
 } from "@/components/trust/ImagineScorePanel";
 import { type ProviderAchievement } from "@/components/trust/AchievementBadges";
 import { ProviderTrustSummary } from "@/components/trust/ProviderTrustSummary";
+import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -146,6 +147,7 @@ export default function ProviderProfile() {
   const [searchQuery, setSearchQuery] = useState("");
   const [bioExpanded, setBioExpanded] = useState(false);
   const [achievements, setAchievements] = useState<ProviderAchievement[]>([]);
+  const [offersModalOpen, setOffersModalOpen] = useState(false);
 
   const SERVICES_PAGE_SIZE = 20;
 
@@ -410,6 +412,8 @@ export default function ProviderProfile() {
       offerValidTo: (provider as any).offerValidTo || "",
     };
   }, [provider]);
+
+  const providerPublicId = provider?.slug || provider?._id || id || null;
 
   const handleCallNow = useCallback(() => {
     const buyerPlansPath = "/subscriptions/buyer";
@@ -709,85 +713,13 @@ export default function ProviderProfile() {
               </Card>
             </div>
 
-            {(provider?.imagineScore || achievements.length > 0) && (
-              <div className="mt-6">
-                <ProviderTrustSummary
-                  score={provider?.imagineScore}
-                  achievements={achievements}
-                />
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Provider Offer Banner (from provider's current offer) */}
-        {providerDisplay.offerBannerUrl && (
-          <section className="bg-background py-4">
-            <div className="container">
-              <div className="relative w-full max-w-5xl mx-auto rounded-xl overflow-hidden border bg-muted aspect-[4/1] min-h-[140px]">
-                <img
-                  src={providerDisplay.offerBannerUrl}
-                  alt={providerDisplay.offerTitle || "Current offer"}
-                  className="w-full h-full object-cover object-center"
-                />
-                {(providerDisplay.offerTitle || providerDisplay.offerDescription) && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
-                    {providerDisplay.offerTitle && (
-                      <p className="text-sm sm:text-base font-semibold text-white line-clamp-1">
-                        {providerDisplay.offerTitle}
-                      </p>
-                    )}
-                    {providerDisplay.offerDescription && (
-                      <p className="text-[11px] sm:text-xs text-white/90 line-clamp-2">
-                        {providerDisplay.offerDescription}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Stats Bar */}
-        <section className="border-y bg-card py-4">
-          <div className="container">
-            <div className="flex flex-wrap justify-center md:justify-start gap-8">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">
-                  {totalServices || services.length}
-                </p>
-                <p className="text-sm text-muted-foreground">{t("services")}</p>
-              </div>
-              <Separator orientation="vertical" className="h-12 hidden md:block" />
-              {providerDisplay.experienceText && (
-                <>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">
-                      {providerDisplay.experienceText}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{t("experience")}</p>
-                  </div>
-                  <Separator orientation="vertical" className="h-12 hidden md:block" />
-                </>
-              )}
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground">
-                  {providerDisplay.completedJobs}
-                </p>
-                <p className="text-sm text-muted-foreground">{t("jobsCompleted")}</p>
-              </div>
-              {providerDisplay.memberSince && (
-                <>
-                  <Separator orientation="vertical" className="h-12 hidden md:block" />
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">
-                      {providerDisplay.memberSince}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{t("memberSince")}</p>
-                  </div>
-                </>
-              )}
+            <div className="mt-6">
+              <ProviderTrustSummary
+                score={provider?.imagineScore}
+                achievements={achievements}
+                onViewOffers={() => setOffersModalOpen(true)}
+                offersLabel={t("offers", "Offers")}
+              />
             </div>
           </div>
         </section>
@@ -978,6 +910,12 @@ export default function ProviderProfile() {
         </section>
       </main>
 
+      <ProviderOffersModal
+        open={offersModalOpen}
+        onOpenChange={setOffersModalOpen}
+        providerId={providerPublicId}
+        providerName={providerDisplay?.name}
+      />
     </div>
   );
 }
