@@ -4,6 +4,7 @@ import { HeroSection } from "@/components/home/HeroSection";
 import { SearchBarSection } from "@/components/home/SearchBarSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
 import { HomePromoBannersSection } from "@/components/home/HomePromoBannersSection";
+import { ConstructionCalculatorBannerSection } from "@/components/home/ConstructionCalculatorBannerSection";
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
 import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
@@ -21,6 +22,7 @@ const Index = () => {
         <HeroSection />
         <SearchBarSection />
         <ServicesSection />
+        <ConstructionCalculatorBannerSection />
         <HomePromoBannersSection />
         <TopProvidersSection />
         <CategorySections />
