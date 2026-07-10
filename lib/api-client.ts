@@ -3106,6 +3106,93 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  /** Construction estimation engine (public calculators) */
+  estimation: {
+    getOptions: () =>
+      apiRequest<{
+        cities: Array<{ _id: string; name: string; slug: string; state?: string }>;
+        constructionTypes: Array<{ _id: string; name: string; slug: string; description?: string }>;
+        constructionStandards: Array<{
+          _id: string;
+          name: string;
+          slug: string;
+          description?: string;
+        }>;
+        brands: Array<{ _id: string; name: string; slug: string }>;
+        boqTemplates: Array<{
+          _id: string;
+          name: string;
+          slug: string;
+          description?: string;
+          defaultFloors: number;
+          defaultBuiltUpArea?: number;
+          defaultStandardSlug?: string;
+          foundationType?: string;
+          buildingConfiguration?: {
+            bedrooms?: number;
+            bathrooms?: number;
+            kitchens?: number;
+            balconies?: number;
+            livingRooms?: number;
+          };
+          constructionTypeId?: { name: string; slug: string };
+        }>;
+        structureTypes: string[];
+        soilTypes: string[];
+        foundationTypes: string[];
+      }>('/api/estimation/public/options'),
+    calculate: (data: {
+      city: string;
+      constructionType: string;
+      standard: string;
+      builtUpArea: number;
+      floors?: number;
+      structureType?: string | null;
+      soilType?: string | null;
+      foundationType?: string | null;
+      buildingConfiguration?: {
+        bedrooms?: number;
+        bathrooms?: number;
+        kitchens?: number;
+        balconies?: number;
+        livingRooms?: number;
+      };
+      boqTemplate?: string;
+      brandId?: string | null;
+    }) =>
+      apiRequest('/api/estimation/calculate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    downloadBoqPdf: (data: {
+      city: string;
+      constructionType: string;
+      standard: string;
+      builtUpArea: number;
+      floors?: number;
+      structureType?: string | null;
+      soilType?: string | null;
+      foundationType?: string | null;
+      buildingConfiguration?: {
+        bedrooms?: number;
+        bathrooms?: number;
+        kitchens?: number;
+        balconies?: number;
+        livingRooms?: number;
+      };
+      boqTemplate?: string;
+      brandId?: string | null;
+    }) =>
+      apiRequest<{
+        pdfUrl: string;
+        filename: string;
+        estimate: unknown;
+      }>('/api/estimation/boq/pdf', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
 };
 
 export const apiClient = api;
