@@ -88,16 +88,14 @@ export function AchievementBadges({
           <Badge variant="outline">+{(achievements?.length ?? 0) - 6} more</Badge>
         )}
         {onViewOffers ? (
-          <Badge
-            asChild
-            variant="secondary"
-            className="gap-1 text-sm py-1 cursor-pointer border-amber-200/80 bg-amber-50 text-amber-900 hover:bg-amber-100"
+          <button
+            type="button"
+            onClick={onViewOffers}
+            className="inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100 gap-1"
           >
-            <button type="button" onClick={onViewOffers}>
-              <Tag className="h-3.5 w-3.5" />
-              {offersLabel}
-            </button>
-          </Badge>
+            <Tag className="h-3.5 w-3.5" />
+            {offersLabel}
+          </button>
         ) : null}
       </div>
     );
