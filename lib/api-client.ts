@@ -932,6 +932,23 @@ export const api = {
     getServices: (id: string, page = 1, limit = 20) =>
       apiRequest(`/api/providers/${id}/services?page=${page}&limit=${limit}`),
     getByUserId: (userId: string) => apiRequest(`/api/providers/user/${userId}`),
+    getOffers: (id: string, serviceId?: string) => {
+      const qs = serviceId ? `?serviceId=${encodeURIComponent(serviceId)}` : "";
+      return apiRequest<{
+        offers: Array<{
+          id: string;
+          source: "provider" | "admin" | "coupon";
+          title: string;
+          description?: string;
+          bannerImageUrl?: string;
+          validFrom?: string;
+          validTo?: string;
+          couponCode?: string;
+          discountLabel?: string;
+          minOrderValue?: number;
+        }>;
+      }>(`/api/providers/${encodeURIComponent(id)}/offers${qs}`);
+    },
     getDashboardStats: () => apiRequest('/api/providers/dashboard/stats'),
     getRecentLeads: (limit?: number) => {
       const query = limit ? `?limit=${limit}` : '';
