@@ -26,26 +26,33 @@ const ACTIVITY_STORAGE_KEY = "imagineering-cart-activity-ids";
 const GROUP_PRIORITY = [
   "missing_essentials",
   "materials_required",
+  "manpower_required",
   "tools_required",
   "machines_required",
   "related_services",
   "safety_equipment",
   "logistics",
+  "lowest_price_suppliers",
+  "nearby_suppliers",
 ];
 
 const GROUP_LABELS: Record<string, string> = {
   missing_essentials: "Don't forget",
   materials_required: "Materials you may need",
+  manpower_required: "Manpower you may need",
   tools_required: "Tools you may need",
   machines_required: "Machines & equipment",
   related_services: "Related services",
   safety_equipment: "Safety equipment",
   logistics: "Logistics",
+  lowest_price_suppliers: "Best prices",
+  nearby_suppliers: "Nearby suppliers",
 };
 
 type MarketplaceMatch = {
   serviceId: string;
   title: string;
+  slug?: string;
   price: number;
   priceType: string;
   providerId: string;
@@ -152,20 +159,28 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
   const { addToCart, clearCart } = useCart();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false);
   const [data, setData] = useState<SuggestionsResponse | null>(null);
   const [selectedActivityIds, setSelectedActivityIds] = useState<string[]>([]);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
   const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
   const [showMismatch, setShowMismatch] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const cartIdSet = useMemo(() => new Set(cartServiceIds.map(String)), [cartServiceIds]);
 
   const fetchSuggestions = useCallback(
     async (activityIds?: string[]) => {
-      if (!getAuthToken() || cartServiceIds.length === 0) return;
+      if (!getAuthToken() || cartServiceIds.length === 0) {
+        setHasFetched(true);
+        return;
+      }
       setLoading(true);
+      setFetchError(null);
       try {
         const res = await api.cart.getSuggestions({
+          serviceIds: cartServiceIds,
           selectedActivityIds: activityIds?.length ? activityIds : undefined,
         });
         if (res.success && res.data) {
@@ -174,11 +189,14 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
           if (payload.needsUserSelection && !activityIds?.length) {
             setActivityDialogOpen(true);
           }
+        } else {
+          setFetchError(res.error?.message || "Could not load suggestions.");
         }
       } catch {
-        /* silent — suggestions are optional */
+        setFetchError("Could not load suggestions. Please try again.");
       } finally {
         setLoading(false);
+        setHasFetched(true);
       }
     },
     [cartServiceIds]
@@ -187,10 +205,21 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
   const cartItemsKey = cartServiceIds.join(",");
 
   useEffect(() => {
+    setIsLoggedIn(Boolean(getAuthToken()));
+    const onAuthChanged = () => setIsLoggedIn(Boolean(getAuthToken()));
+    window.addEventListener("auth-token-changed", onAuthChanged);
+    return () => window.removeEventListener("auth-token-changed", onAuthChanged);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || cartServiceIds.length === 0) {
+      setHasFetched(true);
+      return;
+    }
     const stored = loadStoredActivityIds();
     setSelectedActivityIds(stored);
     void fetchSuggestions(stored.length ? stored : undefined);
-  }, [fetchSuggestions, cartItemsKey]);
+  }, [fetchSuggestions, cartItemsKey, isLoggedIn]);
 
   const suggestions = useMemo(
     () => flattenSuggestionGroups(data?.groups, cartIdSet),
@@ -235,10 +264,6 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
 
   if (!cartServiceIds.length) return null;
 
-  const showSection = loading || suggestions.length > 0 || data?.needsUserSelection;
-
-  if (!showSection) return null;
-
   return (
     <>
       <Card>
@@ -252,6 +277,19 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
           </p>
         </CardHeader>
         <CardContent>
+          {!isLoggedIn ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Sign in to see related materials and services for your cart items.
+            </p>
+          ) : fetchError ? (
+            <div className="py-4 text-center space-y-3">
+              <p className="text-sm text-destructive">{fetchError}</p>
+              <Button type="button" size="sm" variant="outline" onClick={() => void fetchSuggestions(selectedActivityIds)}>
+                Try again
+              </Button>
+            </div>
+          ) : (
+            <>
           {data?.needsUserSelection && primaryPrompt && (
             <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 sm:p-4">
               <p className="text-sm font-medium mb-2">{primaryPrompt.promptTitle}</p>
@@ -279,9 +317,11 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
             </div>
           ) : suggestions.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
-              {data?.needsUserSelection
-                ? "Select the type of work above to see related items."
-                : "No related items found nearby right now."}
+              {!hasFetched
+                ? "Loading suggestions…"
+                : data?.needsUserSelection
+                  ? "Select the type of work above to see related items."
+                  : "No related items found right now. Try adding a mason, plumber, or material service."}
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -348,7 +388,7 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
                           </Button>
                         )}
                         <Button type="button" size="sm" variant="ghost" className="h-8 text-xs px-2" asChild>
-                          <Link href={`/services/${s.serviceId}`}>
+                          <Link href={`/service/${s.slug || s.serviceId}`}>
                             <ExternalLink className="h-3.5 w-3.5 mr-1" />
                             View
                           </Link>
@@ -359,6 +399,8 @@ export function CartSuggestions({ cartProviderId, cartServiceIds }: CartSuggesti
                 );
               })}
             </div>
+          )}
+            </>
           )}
         </CardContent>
       </Card>
