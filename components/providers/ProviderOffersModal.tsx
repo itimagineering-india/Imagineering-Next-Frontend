@@ -86,7 +86,7 @@ export function ProviderOffersModal({
       .then((res) => {
         if (cancelled) return;
         if (res.success && res.data?.offers) {
-          setOffers(res.data.offers as ProviderOfferItem[]);
+          setOffers(res.data.offers);
         } else {
           setOffers([]);
           setError(res.error?.message || "Could not load offers.");
