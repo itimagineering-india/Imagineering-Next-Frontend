@@ -58,6 +58,7 @@ const providerNavItems = [
   { label: "Overview", href: "/dashboard/provider", icon: LayoutDashboard },
   { label: "My Services", href: "/dashboard/provider/services", icon: Briefcase },
   { label: "Business Profile", href: "/dashboard/provider/business-profile", icon: Building2 },
+  { label: "Provider Agreement", href: "/dashboard/provider/agreement", icon: FileText },
   { label: "KYC & Verification", href: "/dashboard/provider/kyc", icon: Shield },
   { label: "Trust & Growth", href: "/dashboard/provider/trust", icon: Award },
   { label: "Requests", href: "/dashboard/provider/leads", icon: FileText },
