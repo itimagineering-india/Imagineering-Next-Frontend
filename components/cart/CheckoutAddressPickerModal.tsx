@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { SavedAddress } from "@/lib/savedAddresses";
 import { upsertSavedAddress } from "@/lib/savedAddresses";
 import { useGeocoderByPolicy, type PlaceDetails } from "@/hooks/useGeocoderByPolicy";
+import { buildAddressGeocodeQuery, geocodeAddressToCoordinates } from "@/lib/geocodeAddress";
 import { useToast } from "@/hooks/use-toast";
 import { Check, Loader2, MapPin, Plus } from "lucide-react";
 
@@ -76,6 +77,7 @@ export function CheckoutAddressPickerModal({
   const [newState, setNewState] = useState("");
   const [newZip, setNewZip] = useState("");
   const [newIsDefault, setNewIsDefault] = useState(false);
+  const [newCoordinates, setNewCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const { toast } = useToast();
@@ -89,6 +91,13 @@ export function CheckoutAddressPickerModal({
         setNewState,
         setNewZip,
       });
+      const lat = place.geometry?.location?.lat?.();
+      const lng = place.geometry?.location?.lng?.();
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setNewCoordinates({ lat: Number(lat), lng: Number(lng) });
+      } else {
+        setNewCoordinates(null);
+      }
       toast({
         title: "Address filled",
         description: "Review the fields below, then save if it looks correct.",
@@ -121,6 +130,7 @@ export function CheckoutAddressPickerModal({
       setSaving(false);
       setLocating(false);
       setShowSuggestions(false);
+      setNewCoordinates(null);
     }
   }, [open, setShowSuggestions]);
 
@@ -129,11 +139,31 @@ export function CheckoutAddressPickerModal({
     onOpenChange(false);
   };
 
-  const handleSaveNew = () => {
+  const handleSaveNew = async () => {
     const line = newAddress.trim();
     if (!line) return;
     setSaving(true);
     try {
+      let coordinates = newCoordinates;
+      if (!coordinates) {
+        coordinates = await geocodeAddressToCoordinates(
+          buildAddressGeocodeQuery({
+            address: line,
+            city: newCity,
+            state: newState,
+            zipCode: newZip,
+          })
+        );
+      }
+      if (!coordinates) {
+        toast({
+          title: "Location needed",
+          description: "Please pick an address from search suggestions so we can save map coordinates for distance.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const row: SavedAddress = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         label: newLabel.trim() || "Address",
@@ -142,6 +172,7 @@ export function CheckoutAddressPickerModal({
         state: newState.trim(),
         zipCode: newZip.trim(),
         isDefault: newIsDefault,
+        coordinates,
       };
       const next = upsertSavedAddress(row);
       onAddressesChange(next);
@@ -153,6 +184,7 @@ export function CheckoutAddressPickerModal({
       setNewZip("");
       setNewLabel("Home");
       setNewIsDefault(false);
+      setNewCoordinates(null);
       setShowAdd(false);
       onOpenChange(false);
     } finally {
@@ -266,6 +298,7 @@ export function CheckoutAddressPickerModal({
                         value={newAddress}
                         onChange={(e) => {
                           setNewAddress(e.target.value);
+                          setNewCoordinates(null);
                           handleInputChange(e);
                         }}
                         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
