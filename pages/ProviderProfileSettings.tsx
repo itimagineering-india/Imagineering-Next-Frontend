@@ -52,7 +52,6 @@ interface NotificationPreferences {
   emailNotifications: boolean;
   pushNotifications: boolean;
   smsNotifications: boolean;
-  newLeads: boolean;
   bookingUpdates: boolean;
   paymentUpdates: boolean;
   marketingEmails: boolean;
@@ -129,7 +128,6 @@ export default function ProviderProfileSettings() {
     emailNotifications: true,
     pushNotifications: true,
     smsNotifications: false,
-    newLeads: true,
     bookingUpdates: true,
     paymentUpdates: true,
     marketingEmails: false,
@@ -734,13 +732,6 @@ export default function ProviderProfileSettings() {
                 <div className="space-y-4 pt-4">
                   <h4 className="text-sm font-medium">Notification Types</h4>
                   <div className="grid gap-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="flex-1">New Leads</Label>
-                      <Switch
-                        checked={notifications.newLeads}
-                        onCheckedChange={(checked) => setNotifications({ ...notifications, newLeads: checked })}
-                      />
-                    </div>
                     <div className="flex items-center justify-between">
                       <Label className="flex-1">Booking Updates</Label>
                       <Switch
