@@ -873,6 +873,29 @@ export const api = {
       }),
   },
 
+  productCatalog: {
+    list: (params?: {
+      categorySlug?: string;
+      subcategory?: string;
+      materialTypeKey?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== "") {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      const qs = queryParams.toString();
+      return apiRequest(`/api/product-catalog${qs ? `?${qs}` : ""}`);
+    },
+    getById: (id: string) => apiRequest(`/api/product-catalog/${id}`),
+  },
+
   // Search
   search: {
     search: (params: {
@@ -950,10 +973,25 @@ export const api = {
       }>(`/api/providers/${encodeURIComponent(id)}/offers${qs}`);
     },
     getDashboardStats: () => apiRequest('/api/providers/dashboard/stats'),
-    getRecentLeads: (limit?: number) => {
-      const query = limit ? `?limit=${limit}` : '';
-      return apiRequest(`/api/providers/dashboard/recent-leads${query}`);
-    },
+    getAgreementStatus: () =>
+      apiRequest<{
+        isAccepted: boolean;
+        needsReacceptance: boolean;
+        currentVersion: string;
+        acceptedVersion: string | null;
+        acceptedAt: string | null;
+      }>('/api/providers/agreement/status'),
+    acceptAgreement: (body: {
+      agreementVersion: string;
+      sectionsAccepted: string[];
+      language?: string;
+      appVersion?: string;
+      device?: string;
+    }) =>
+      apiRequest('/api/providers/agreement/accept', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     uploadOfferImage: (file: File): Promise<ApiResponse<{ url: string }>> => {
       const formData = new FormData();
       formData.append('image', file);
@@ -2164,67 +2202,6 @@ export const api = {
       method: 'DELETE',
     }),
   },
-  leads: {
-    createServiceEnquiry: (data: { serviceId: string; message?: string }) =>
-      apiRequest<{ id: string }>('/api/leads', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-
-    getAll: (params?: { type?: string; status?: string; search?: string; page?: number; limit?: number }) => {
-      const queryParams = new URLSearchParams();
-      if (params) {
-        Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            queryParams.append(key, String(value));
-          }
-        });
-      }
-      const queryString = queryParams.toString();
-      return apiRequest<Array<{
-        id: string;
-        type: 'direct' | 'platform';
-        title: string;
-        description: string;
-        budget?: number;
-        location: string;
-        status: string;
-        date: string;
-        buyerName: string;
-        buyerEmail: string;
-        buyerPhone: string;
-        buyerAvatar?: string;
-        serviceTitle: string;
-        priority: 'low' | 'medium' | 'high';
-      }>>(`/api/leads${queryString ? `?${queryString}` : ''}`);
-    },
-
-    getById: (id: string) => apiRequest<{
-      id: string;
-      type: 'direct' | 'platform';
-      title: string;
-      description: string;
-      budget?: number;
-      location: any;
-      status: string;
-      date: string;
-      buyerName: string;
-      buyerEmail: string;
-      buyerPhone: string;
-      buyerAvatar?: string;
-      serviceTitle: string;
-      priority: 'low' | 'medium' | 'high';
-      service?: any;
-    }>(`/api/leads/${id}`),
-
-    updateStatus: (id: string, status: string) => apiRequest<{
-      id: string;
-      status: string;
-    }>(`/api/leads/${id}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    }),
-  },
 
   /** Bulk labour crew requests (contractors invite multiple workers). */
   manpowerCrew: {
@@ -2513,6 +2490,86 @@ export const api = {
       ),
     distribution: () =>
       apiRequest<{ success: boolean; data: any }>('/api/workforce/assignments/distribution'),
+  },
+
+  // Multi-provider Best Quotes RFQ
+  quoteRequests: {
+    create: (data: {
+      serviceId: string;
+      quantity: number;
+      preferredDate: string;
+      preferredTime: string;
+      address: string;
+      city: string;
+      state: string;
+      zipCode?: string;
+      coordinates?: { lat: number; lng: number };
+      notes?: string;
+    }) =>
+      apiRequest<{ data: any }>('/api/quote-requests', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    getMine: () => apiRequest<{ data: any[] }>('/api/quote-requests/mine'),
+    getById: (id: string) => apiRequest<{ data: any }>(`/api/quote-requests/${id}`),
+    cancel: (id: string) =>
+      apiRequest<{ data: any }>(`/api/quote-requests/${id}/cancel`, { method: 'POST' }),
+    providerInbox: () => apiRequest<{ data: any[] }>('/api/quote-requests/provider/inbox'),
+    providerGetById: (id: string) =>
+      apiRequest<{ data: any }>(`/api/quote-requests/provider/${id}`),
+    uploadSampleImage: (file: File): Promise<ApiResponse<{ url: string }>> => {
+      const formData = new FormData();
+      formData.append('image', file);
+      const token = getAuthToken();
+      return fetch(`${API_BASE_URL}/api/quote-requests/upload-sample-image`, {
+        method: 'POST',
+        headers: bearerAuthHeaders(token),
+        credentials: 'include',
+        body: formData,
+      })
+        .then((res) => res.json())
+        .then((data) =>
+          data.success
+            ? { success: true, data: data.data }
+            : { success: false, error: data.error }
+        );
+    },
+    submitOffer: (id: string, data: {
+      amount: number;
+      notes?: string;
+      estimatedDelivery?: string;
+      deliveryOption?: 'free' | 'paid' | 'not_available';
+      deliveryCharge?: number;
+      sampleImages?: string[];
+    }) =>
+      apiRequest<{ data: any }>(`/api/quote-requests/${id}/offers`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    payOffer: (
+      id: string,
+      offerId: string,
+      data?: {
+        gstNumber?: string;
+        transport?: 'supplier' | 'self_pickup';
+        paymentOption?: string;
+      }
+    ) =>
+      apiRequest<{
+        data: {
+          bookingId: string;
+          amount: number;
+          serviceAmount?: number;
+          transport?: string;
+          deliveryCharge?: number;
+          paymentOption?: string;
+          requiresOnlinePayment?: boolean;
+          alreadyOrdered?: boolean;
+        };
+      }>(`/api/quote-requests/${id}/offers/${offerId}/pay`, {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      }),
   },
 
   // User requirements (submit → admin quotes → approve)
@@ -2923,6 +2980,7 @@ export const api = {
         timeoutMs: 20000,
       }),
     getSuggestions: (data?: {
+      serviceIds?: string[];
       selectedActivityIds?: string[];
       city?: string;
       lat?: number;
