@@ -759,10 +759,10 @@ export function Header() {
     </div>
    ) : null}
    <div className="home-shell flex h-auto min-h-14 w-full min-w-0 max-w-full items-center justify-between gap-2 py-2 sm:min-h-16 sm:py-3 sm:gap-3">
-    {/* Logo — full flex width on mobile; cap width md–lg for tablet */}
+    {/* Logo — full flex width on mobile; capped on tablet/desktop so actions stay visible */}
     <Link
      href="/"
-     className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[15rem] md:max-w-[18rem] lg:w-[18rem] lg:max-w-none lg:flex-none lg:shrink-0"
+     className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[15rem] md:max-w-[16rem] xl:max-w-[18rem] xl:flex-none xl:shrink-0"
     >
      <img 
       src="https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png" 
@@ -796,7 +796,7 @@ export function Header() {
       <Button
        variant="secondary"
        size="sm"
-       className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground shrink-0 max-w-[140px] md:max-w-[180px] shadow-none hover:translate-y-0 hover:shadow-none active:shadow-none"
+       className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground shrink-0 max-w-[120px] md:max-w-[140px] xl:max-w-[160px] 2xl:max-w-[180px] shadow-none hover:translate-y-0 hover:shadow-none active:shadow-none"
        title={userLocation?.city || userLocation?.address || "Set or change your location"}
       >
        <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -836,11 +836,11 @@ export function Header() {
      </DropdownMenuContent>
     </DropdownMenu>
 
-    {/* Desktop Navigation */}
-    <nav className="hidden lg:flex items-center gap-6 shrink-0">
+    {/* Desktop Navigation — xl+ so mid widths don't clip Login/Signup */}
+    <nav className="hidden min-w-0 flex-1 items-center gap-3 xl:flex 2xl:gap-5">
      {/** z-30: mega-menu must paint above the desktop search bar (next sibling), which otherwise covers the right-hand cards. */}
      {isClient ? (
-     <NavigationMenu className="z-30">
+     <NavigationMenu className="z-30 shrink-0">
       <NavigationMenuList>
        <NavigationMenuItem key="browse-services">
         <NavigationMenuTrigger className="bg-transparent">{t("header:exploreServices")}</NavigationMenuTrigger>
@@ -1080,18 +1080,18 @@ export function Header() {
       </NavigationMenuList>
      </NavigationMenu>
      ) : (
-      <div className="hidden h-10 w-[11rem] shrink-0 lg:block" aria-hidden />
+      <div className="hidden h-10 w-[11rem] shrink-0 xl:block" aria-hidden />
      )}
 
-     {/* Search Bar - In Navigation (Desktop) */}
-     <div className="w-[30rem] shrink-0">
+     {/* Search Bar - In Navigation (Desktop): flex so it shrinks before actions clip */}
+     <div className="min-w-0 flex-1 max-w-[30rem]">
       {searchForm()}
      </div>
 
      <Link
       href="/about"
       className={cn(
-       "body transition-colors hover:text-primary",
+       "body shrink-0 transition-colors hover:text-primary",
        isActive("/about") ? "text-primary" : "text-muted-foreground",
       )}
      >
@@ -1100,7 +1100,7 @@ export function Header() {
     </nav>
 
     {/* Desktop Actions */}
-    <div className="hidden lg:flex items-center gap-3">
+    <div className="hidden shrink-0 items-center gap-2 xl:flex 2xl:gap-3">
      <LanguageSwitcher />
      {cartCount > 0 && <CartIcon />}
      {!isAuthLoading && (
@@ -1113,7 +1113,7 @@ export function Header() {
             <AvatarImage src={typeof user.avatar === "string" ? user.avatar : undefined} alt={typeof user.name === "string" ? user.name : "User"} />
             <AvatarFallback>{getUserInitials()}</AvatarFallback>
            </Avatar>
-           <span className="hidden md:inline-block body">
+           <span className="hidden 2xl:inline-block body">
             {user.name || "User"}
            </span>
            <ChevronDown className="h-4 w-4" />
@@ -1222,8 +1222,8 @@ export function Header() {
      )}
     </div>
 
-    {/* Mobile: Search icon + Cart + Menu */}
-    <div className="flex shrink-0 items-center gap-0 lg:hidden">
+    {/* Mobile / tablet: Search icon + Cart + Menu (until xl) */}
+    <div className="flex shrink-0 items-center gap-0 xl:hidden">
      <Button
       type="button"
       variant="search"
