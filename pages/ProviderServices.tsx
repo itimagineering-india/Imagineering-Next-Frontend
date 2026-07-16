@@ -23,7 +23,10 @@ import {
  ServiceGrid,
 } from "@/components/services";
 import { MultiStepServiceForm } from "@/components/services/form";
-import { pickConstructionMetadataFields } from "@/lib/constructionMaterials";
+import {
+ isConstructionMaterialsCategorySlug,
+ pickConstructionMetadataFields,
+} from "@/lib/constructionMaterials";
 import { parseToolsFieldsFromService } from "@/lib/toolsService";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -186,6 +189,12 @@ export default function ProviderServices() {
     return;
    }
    setProviderPrimaryCategoryIdForForm(primary);
+   const primaryCat = categories.find((c) => String(c._id) === String(primary));
+   const catSlug = primaryCat?.slug ?? "";
+   if (isConstructionMaterialsCategorySlug(catSlug)) {
+    router.push(`/dashboard/provider/services/${service._id}/edit`);
+    return;
+   }
    setServiceToEdit(service);
    setEditServiceDialogOpen(true);
   } catch {
@@ -224,6 +233,12 @@ export default function ProviderServices() {
     return;
    }
    setProviderPrimaryCategoryIdForForm(primary);
+   const primaryCat = categories.find((c) => String(c._id) === String(primary));
+   const catSlug = primaryCat?.slug ?? "";
+   if (isConstructionMaterialsCategorySlug(catSlug)) {
+    router.push("/dashboard/provider/services/add");
+    return;
+   }
    setAddServiceDialogOpen(true);
   } catch {
    toast({
@@ -497,6 +512,22 @@ export default function ProviderServices() {
        })(),
        contactMode: "platform",
        visibility: serviceToEdit.featured ? "featured" : "normal",
+       catalogProductId:
+        (serviceToEdit as { catalogProductId?: string }).catalogProductId || null,
+       catalogCustomFields: Array.isArray(
+        (serviceToEdit as { customFields?: unknown }).customFields,
+       )
+        ? (
+            (serviceToEdit as { customFields?: Array<{ label?: string; value?: string }> })
+              .customFields || []
+          )
+            .filter((f) => f?.label?.trim() && f?.value?.trim())
+            .map((f) => ({
+              label: String(f.label).trim(),
+              value: String(f.value).trim(),
+              type: "text" as const,
+            }))
+        : [],
       }}
      />
     )}
