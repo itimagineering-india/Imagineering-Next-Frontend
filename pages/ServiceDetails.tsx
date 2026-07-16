@@ -4,7 +4,6 @@ import { useParams, usePathname, useSearchParams, useRouter } from "next/navigat
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +11,6 @@ import {
   BadgeCheck,
   BadgePercent,
   Boxes,
-  Building2,
   ChevronRight,
   Clock3,
   CreditCard,
@@ -38,7 +36,9 @@ import {
   SimilarServices,
   CustomFields,
   ServiceDetailSkeleton,
+  ConstructionMaterialProductLayout,
 } from "@/components/service-details";
+import { GetBestQuotesModal } from "@/components/service-details/GetBestQuotesModal";
 import {
   shouldShowPricing,
   canBookDirectly,
@@ -50,10 +50,8 @@ import { BestSupplierCard } from "@/components/routing/BestSupplierCard";
 import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import { useTranslation } from "react-i18next";
-import {
-  ImagineVerifiedBadge,
-  type ImagineScoreData,
-} from "@/components/trust/ImagineScorePanel";
+import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import type { ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -209,6 +207,7 @@ export default function ServiceDetails() {
   const searchParamsFromUrl = useSearchParams();
   const { toast } = useToast();
   const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [quotesModalOpen, setQuotesModalOpen] = useState(false);
   const [offersModalOpen, setOffersModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [service, setService] = useState<ServiceData | null>(null);
@@ -218,7 +217,6 @@ export default function ServiceDetails() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const latestActualIdRef = useRef(actualId);
-  const enquiryLeadCreatedRef = useRef<string | null>(null);
   latestActualIdRef.current = actualId;
 
   // Open modal after login redirect (auth handled globally via AuthProvider)
@@ -432,6 +430,25 @@ export default function ServiceDetails() {
   );
   const canAddToCart = showPricing && !isRangePrice;
 
+  const categorySlug = useMemo(() => {
+    if (!service) return "";
+    return typeof service.category === "object" ? service.category.slug : "";
+  }, [service]);
+
+  const isConstructionMaterialPage = useMemo(
+    () => isConstructionMaterialsCategorySlug(categorySlug),
+    [categorySlug],
+  );
+
+  const specFields = useMemo(() => {
+    if (!service) return [];
+    const fromCustom = service.customFields || [];
+    if (fromCustom.length > 0) return fromCustom;
+    return metadataToCustomFields(service.metadata);
+  }, [service]);
+
+  const cityLabel = service?.location?.city || "your city";
+
   const fieldValue = useCallback((labels: string[]) => {
     const fields = service?.customFields || [];
     const normalizedLabels = labels.map((label) => label.toLowerCase());
@@ -566,17 +583,6 @@ export default function ServiceDetails() {
     const providerName = service?.provider?.name || service?.provider?.businessName;
     if (!providerUserId) return;
     const enquiryMessage = prefillEnquiry ? buildServiceEnquiryMessage() : "";
-    if (prefillEnquiry && service?.id && enquiryLeadCreatedRef.current !== service.id) {
-      try {
-        await api.leads.createServiceEnquiry({
-          serviceId: service.id,
-          message: enquiryMessage,
-        });
-        enquiryLeadCreatedRef.current = service.id;
-      } catch {
-        // Chat should still open even if lead persistence fails.
-      }
-    }
     const params = new URLSearchParams({
       providerId: String(providerUserId),
       ...(service?.id && { serviceId: String(service.id) }),
@@ -599,6 +605,19 @@ export default function ServiceDetails() {
     }
     router.push(`/chat?${params.toString()}`);
   }, [buildServiceEnquiryMessage, isAuthenticated, router, toast, service?.provider, service?.id, redirectToLogin]);
+
+  const handleGetBestQuotes = useCallback(() => {
+    if (!isAuthenticated) {
+      redirectToLogin();
+      toast({
+        title: "Login Required",
+        description: "Please login to get quotes from nearby providers",
+        variant: "destructive",
+      });
+      return;
+    }
+    setQuotesModalOpen(true);
+  }, [isAuthenticated, redirectToLogin, toast]);
 
   const handleSubmitRequest = useCallback(async (data: {
     date: Date;
@@ -826,7 +845,26 @@ export default function ServiceDetails() {
   return (
     <div className="min-h-screen max-w-full overflow-x-clip flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
         <main className="min-w-0 flex-1 overflow-x-clip">
-          <div className="layout-shell pb-28 pt-4 sm:pt-6 md:pt-8 lg:pb-8 overflow-x-clip">
+          <div className={`layout-shell overflow-x-clip pt-4 sm:pt-6 md:pt-8 ${isConstructionMaterialPage ? "pb-28 lg:pb-28" : "pb-28 lg:pb-8"}`}>
+            {isConstructionMaterialPage && (
+              <ConstructionMaterialProductLayout
+                service={service}
+                categoryName={categoryName}
+                categorySlug={categorySlug}
+                formattedPrice={formattedServicePrice}
+                isRangePrice={isRangePrice}
+                showPricing={showPricing}
+                specFields={specFields}
+                similarServices={similarServices}
+                cityLabel={cityLabel}
+                onGetQuotes={handleGetBestQuotes}
+                onShare={handleShare}
+                onFavorite={handleToggleFavorite}
+                isSaved={isSaved}
+              />
+            )}
+
+            <div className={isConstructionMaterialPage ? "lg:hidden" : undefined}>
             <nav className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 text-xs text-muted-foreground sm:mb-6 sm:text-sm">
               <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
                 <Home className="h-3.5 w-3.5" />
@@ -966,44 +1004,6 @@ export default function ServiceDetails() {
                       </CardContent>
                     </Card>
 
-                    <Card className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/80 via-white to-emerald-50/60 shadow-sm">
-                      <CardContent className="space-y-4 p-3 sm:p-4">
-                        <div className="flex items-start gap-3">
-                          <Avatar className="h-11 w-11 border bg-background sm:h-12 sm:w-12">
-                            <AvatarImage src={service.provider.avatar} />
-                            <AvatarFallback>{service.provider.name.charAt(0).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Link href={`/provider/${service.provider.slug || service.provider._id}`} className="text-base font-bold leading-snug tracking-[-0.01em] text-foreground hover:text-primary lg:text-lg">
-                                {service.provider.businessName || service.provider.name}
-                              </Link>
-                              <ImagineVerifiedBadge score={service.provider.imagineScore} />
-                              {!service.provider.imagineScore?.isImagineeringVerified && service.provider.verified && (
-                                <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50">{t("verified", "Verified")}</Badge>
-                              )}
-                            </div>
-                            <div className="mt-2 grid grid-cols-1 gap-2 text-xs font-medium text-muted-foreground sm:grid-cols-2 lg:text-sm">
-                              <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> Fast response</span>
-                              <span className="inline-flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> Trusted supplier</span>
-                              <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5" /> {(service.provider.rating ?? service.rating).toFixed(1)} Rating</span>
-                              <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {service.location?.city || "India"}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          <Button variant="outline" asChild>
-                            <Link href={`/provider/${service.provider.slug || service.provider._id}`}>
-                              {t("viewSupplierProfile", "View Supplier Profile")}
-                            </Link>
-                          </Button>
-                          <Button onClick={() => handleOpenChat()}>
-                            {t("contactSupplier", "Contact Supplier")}
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
                     {service?.id && (
                       <BestSupplierCard
                         serviceId={service.id}
@@ -1018,8 +1018,8 @@ export default function ServiceDetails() {
                       {canAddToCart ? (
                         <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-12 w-full text-base font-semibold" />
                       ) : showPricing && isRangePrice ? (
-                        <Button onClick={() => handleOpenChat(true)} className="h-12 w-full text-base font-semibold">
-                          {t("enquireNow", "Enquire Now")}
+                        <Button onClick={handleGetBestQuotes} className="h-12 w-full text-base font-semibold">
+                          Get Best Quotes
                         </Button>
                       ) : showPricing ? (
                         <Button onClick={() => handleOpenChat(true)} className="h-12 w-full text-base font-semibold">
@@ -1214,6 +1214,7 @@ export default function ServiceDetails() {
                 <SimilarServices services={similarServices} title="Similar Products" />
               </div>
             )}
+            </div>
           </div>
         </main>
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
@@ -1221,8 +1222,8 @@ export default function ServiceDetails() {
             {canAddToCart ? (
               <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-11 w-full text-sm font-semibold" />
             ) : showPricing && isRangePrice ? (
-              <Button onClick={() => handleOpenChat(true)} className="h-11 w-full text-sm font-semibold">
-                {t("enquireNow", "Enquire Now")}
+              <Button onClick={handleGetBestQuotes} className="h-11 w-full text-sm font-semibold">
+                Get Best Quotes
               </Button>
             ) : (
               <Button onClick={() => handleOpenChat(true)} className="h-11 w-full text-sm font-semibold">
@@ -1231,6 +1232,15 @@ export default function ServiceDetails() {
             )}
           </div>
         </div>
+
+        {service && (
+          <GetBestQuotesModal
+            open={quotesModalOpen}
+            onOpenChange={setQuotesModalOpen}
+            serviceId={service.id}
+            serviceTitle={service.title}
+          />
+        )}
 
         {/* Request Modal */}
         {service && (
