@@ -10,4 +10,5 @@ export { Reviews } from "./Reviews";
 export { SimilarServices } from "./SimilarServices";
 export { CustomFields } from "./CustomFields";
 export { ServiceDetailSkeleton } from "./ServiceDetailSkeleton";
+export { ConstructionMaterialProductLayout } from "./ConstructionMaterialProductLayout";
 
