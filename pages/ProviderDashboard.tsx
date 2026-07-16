@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import {
   DollarSign,
@@ -50,7 +49,6 @@ export default function ProviderDashboard() {
   const { user } = useAuth();
   const { status: kycStatus, progress } = useProviderKycStatus();
   const [stats, setStats] = useState({
-    totalLeads: 0,
     totalBookings: 0,
     earningsThisMonth: 0,
     pendingRequests: 0,
@@ -58,7 +56,6 @@ export default function ProviderDashboard() {
     subscriptionStatus: "free",
     completedBookings: 0,
   });
-  const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [performanceStats, setPerformanceStats] = useState({
     completionRate: 0,
@@ -99,11 +96,7 @@ export default function ProviderDashboard() {
   const fetchDashboardData = async () => {
     setIsLoading(true);
     try {
-      // Fetch dashboard stats and recent leads in parallel
-      const [statsResponse, leadsResponse] = await Promise.all([
-        api.providers.getDashboardStats(),
-        api.providers.getRecentLeads(5),
-      ]);
+      const statsResponse = await api.providers.getDashboardStats();
 
       if (statsResponse.success && statsResponse.data) {
         const responseData = statsResponse.data as any;
@@ -111,7 +104,6 @@ export default function ProviderDashboard() {
         
         if (statsData) {
           setStats({
-            totalLeads: statsData.totalLeads || 0,
             totalBookings: statsData.totalBookings || 0,
             earningsThisMonth: statsData.earningsThisMonth || 0,
             pendingRequests: statsData.pendingRequests || 0,
@@ -120,28 +112,17 @@ export default function ProviderDashboard() {
             completedBookings: statsData.completedBookings || 0,
           });
 
-          // Calculate performance stats
           const totalBookings = statsData.totalBookings || 0;
           const completed = statsData.completedBookings || 0;
           const completionRate = totalBookings > 0 ? Math.round((completed / totalBookings) * 100) : 0;
-          
-          // Calculate response rate (leads responded / total leads)
-          const responseRate = statsData.totalLeads > 0 
-            ? Math.round(((statsData.totalLeads - statsData.pendingRequests) / statsData.totalLeads) * 100)
-            : 0;
 
           setPerformanceStats({
             completionRate: completionRate,
-            responseRate: responseRate,
+            responseRate: 0,
             onTimeDelivery: 92, // This would come from backend in future
             avgResponseTime: "1.5 hours", // This would come from backend in future
           });
         }
-      }
-
-      if (leadsResponse.success && leadsResponse.data) {
-        const leadsData = leadsResponse.data as any;
-        setRecentLeads(leadsData.leads || []);
       }
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -380,85 +361,12 @@ export default function ProviderDashboard() {
 
         {renderKycBanner()}
 
-        {/* My Business – Recent requests & Performance */}
+        {/* My Business – Performance */}
         <div className="min-w-0">
           <h3 className="text-base sm:text-lg font-semibold text-foreground mb-3 sm:mb-4">My Business</h3>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
-          <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-              <div>
-                <CardTitle className="text-base md:text-lg">Recent Requests</CardTitle>
-                <CardDescription className="text-xs md:text-sm">New client inquiries</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" className="text-xs md:text-sm self-start sm:self-auto" asChild>
-                <Link href="/dashboard/provider/leads">View all</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="text-center py-6 md:py-8 text-sm md:text-base text-muted-foreground">
-                  Loading recent requests...
-                </div>
-              ) : recentLeads.length > 0 ? (
-                <div className="space-y-3 md:space-y-4">
-                  {recentLeads.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 p-3 md:p-4 rounded-lg border"
-                    >
-                      <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
-                        <Avatar className="h-10 w-10 md:h-12 md:w-12 shrink-0">
-                          <AvatarImage
-                            src={request.client.avatar}
-                            alt={request.client.name}
-                          />
-                          <AvatarFallback className="text-xs md:text-sm">{request.client.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 md:gap-2">
-                            <p className="font-medium text-sm md:text-base truncate">{request.title}</p>
-                            {request.status === "new" && (
-                              <Badge className="bg-success text-success-foreground text-[10px] md:text-xs shrink-0">
-                                New
-                              </Badge>
-                            )}
-                            {request.status === "viewed" && (
-                              <Badge variant="outline" className="text-[10px] md:text-xs shrink-0">
-                                Viewed
-                              </Badge>
-                            )}
-                            {request.status === "responded" && (
-                              <Badge className="bg-primary text-primary-foreground text-[10px] md:text-xs shrink-0">
-                                Responded
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                            {request.client.name} • {request.date}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4">
-                        <p className="font-semibold text-sm md:text-base">{request.budget}</p>
-                        <Button size="sm" className="text-xs md:text-sm shrink-0" asChild>
-                          <Link href={`/dashboard/provider/leads`}>
-                            {request.status === "new" ? "Respond" : "View"}
-                          </Link>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 md:py-8 text-sm md:text-base text-muted-foreground">
-                  No recent requests. Your leads will appear here.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Performance */}
-          <Card>
+          <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="text-base md:text-lg">Performance</CardTitle>
               <CardDescription className="text-xs md:text-sm">Your monthly stats</CardDescription>
