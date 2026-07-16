@@ -13,13 +13,27 @@ export type SavedAddress = {
   state: string;
   zipCode: string;
   isDefault?: boolean;
+  /** Required for distance / nearby matching when used in quote requests */
+  coordinates?: { lat: number; lng: number };
 };
 
 type SavedAddressPayload = {
   addresses: SavedAddress[];
 };
 
+function normalizeCoordinates(
+  input: SavedAddress["coordinates"] | unknown
+): SavedAddress["coordinates"] | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const lat = Number((input as { lat?: unknown }).lat);
+  const lng = Number((input as { lng?: unknown }).lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return undefined;
+  return { lat, lng };
+}
+
 function normalizeAddress(input: SavedAddress): SavedAddress {
+  const coordinates = normalizeCoordinates(input.coordinates);
   return {
     id: String(input.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     label: String(input.label || "Address").trim() || "Address",
@@ -28,6 +42,7 @@ function normalizeAddress(input: SavedAddress): SavedAddress {
     state: String(input.state || "").trim(),
     zipCode: String(input.zipCode || "").trim(),
     isDefault: Boolean(input.isDefault),
+    ...(coordinates ? { coordinates } : {}),
   };
 }
 
