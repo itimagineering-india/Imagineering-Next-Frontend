@@ -21,6 +21,7 @@ import { SubCategorySelector } from "./SubCategorySelector";
 import { ToolsServiceFields } from "./ToolsServiceFields";
 import { CommonFields } from "./CommonFields";
 import { DynamicFieldsRenderer } from "./DynamicFieldsRenderer";
+import { ProductCatalogPicker } from "./ProductCatalogPicker";
 import { PricingSection } from "./PricingSection";
 import { SubmitReview } from "./SubmitReview";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -31,6 +32,7 @@ import {
  CONSTRUCTION_MATERIAL_FORM_KEYS,
  buildConstructionMetadataPayload,
  extractConstructionStrings,
+ isConstructionMaterialsCategorySlug,
  isMaterialSupplierSubcategory,
  isTradersCategorySlug,
  resolveMaterialTypeKeyForServiceForm,
@@ -54,6 +56,11 @@ import {
  fitListingShortDescription,
 } from "@/lib/serviceListingAiContext";
 import type { ProviderBusinessAddressSnapshot } from "../ServiceLocationInput";
+import {
+ clearConstructionDynamicData,
+ mapCatalogProductToListingForm,
+ type CatalogProductItem,
+} from "@/lib/productCatalog";
 
 interface Category {
  _id: string;
@@ -122,6 +129,8 @@ interface MultiStepServiceFormProps {
  serviceId?: string; // Service ID for edit mode
  initialData?: Partial<ServiceFormData> & {
   toolsFields?: ToolsServiceFieldsValue;
+  catalogProductId?: string | null;
+  catalogCustomFields?: Array<{ label: string; value: string; type: "text" }>;
  };
  adminMode?: boolean; // Admin mode - allows selecting provider
  selectedProviderId?: string; // Provider ID for admin mode
@@ -234,6 +243,10 @@ export function MultiStepServiceForm({
 
  const [errors, setErrors] = useState<Record<string, any>>({});
  const [toolsFields, setToolsFields] = useState<ToolsServiceFieldsValue>(EMPTY_TOOLS_FIELDS);
+ const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string | null>(null);
+ const [catalogCustomFields, setCatalogCustomFields] = useState<
+  Array<{ label: string; value: string; type: "text" }>
+ >([]);
 
  // Reset form when dialog closes or initialData changes
  useEffect(() => {
@@ -245,6 +258,8 @@ export function MultiStepServiceForm({
    setIsAiShortDescriptionLoading(false);
    setProviderBusinessAddress(undefined);
    setToolsFields(EMPTY_TOOLS_FIELDS);
+   setSelectedCatalogProductId(null);
+   setCatalogCustomFields([]);
    setFormData({
     category: "",
     subcategory: "",
@@ -314,6 +329,8 @@ export function MultiStepServiceForm({
    setAgreedToTerms(false);
    setManpowerCustomDraft("");
    setToolsFields(initialData.toolsFields ?? EMPTY_TOOLS_FIELDS);
+   setSelectedCatalogProductId(initialData.catalogProductId ?? null);
+   setCatalogCustomFields(initialData.catalogCustomFields ?? []);
   }
  }, [open, initialData]);
 
@@ -395,6 +412,67 @@ export function MultiStepServiceForm({
   if (!formData.category || effectiveCategories.length === 0) return null;
   return effectiveCategories.find((cat) => String(cat._id) === String(formData.category)) || null;
  }, [formData.category, effectiveCategories]);
+
+ const showCatalogProductPicker = useMemo(
+  () => isConstructionMaterialsCategorySlug(selectedCategory?.slug) && adminMode,
+  [selectedCategory?.slug, adminMode],
+ );
+
+ const handleCatalogProductSelect = useCallback(
+  (product: CatalogProductItem | null) => {
+   if (!product) {
+    setSelectedCatalogProductId(null);
+    setCatalogCustomFields([]);
+    setFormData((prev) => ({
+     ...prev,
+     title: "",
+     brandName: "",
+     shortDescription: "",
+     detailedDescription: "",
+     images: [],
+     uploadedImages: [],
+     dynamicData: clearConstructionDynamicData(prev.dynamicData),
+     priceMode: "exact",
+     startingPrice: "",
+     priceMin: "",
+     priceMax: "",
+    }));
+    return;
+   }
+
+   const patch = mapCatalogProductToListingForm(
+    product,
+    selectedCategory?.slug || "construction-materials",
+    formData.subcategory,
+    formData.itemType,
+   );
+   setSelectedCatalogProductId(product._id);
+   setCatalogCustomFields(patch.catalogCustomFields);
+   setFormData((prev) => ({
+    ...prev,
+    title: patch.title,
+    brandName: patch.brandName,
+    shortDescription: patch.shortDescription,
+    detailedDescription: patch.detailedDescription,
+    images: patch.images,
+    uploadedImages: patch.uploadedImages,
+    dynamicData: {
+     ...clearConstructionDynamicData(prev.dynamicData),
+     ...patch.dynamicData,
+    },
+    priceMode: patch.priceMode,
+    pricingType: patch.pricingType as ServiceFormData["pricingType"],
+    startingPrice: patch.startingPrice,
+    priceMin: patch.priceMin,
+    priceMax: patch.priceMax,
+   }));
+   toast({
+    title: "Product selected",
+    description: `"${product.name}" details applied. Review price and location before submitting.`,
+   });
+  },
+  [selectedCategory?.slug, formData.subcategory, formData.itemType, toast],
+ );
 
  const webListingContextInput = useMemo(
   () => ({
@@ -968,6 +1046,13 @@ export function MultiStepServiceForm({
     servicePayload.brandName = formData.brandName.trim();
    }
 
+   if (selectedCatalogProductId) {
+    servicePayload.catalogProductId = selectedCatalogProductId;
+   }
+   if (catalogCustomFields.length > 0) {
+    servicePayload.customFields = catalogCustomFields;
+   }
+
    // If admin mode, include provider ID
    if (adminMode && selectedProviderId) {
     servicePayload.provider = selectedProviderId;
@@ -1126,7 +1211,20 @@ export function MultiStepServiceForm({
           subcategories={availableSubcategories}
           selectedSubcategory={formData.subcategory}
           onSubcategoryChange={(subcategory) => {
-           setFormData({ ...formData, subcategory, itemType: "" });
+           setSelectedCatalogProductId(null);
+           setCatalogCustomFields([]);
+           setFormData((prev) => ({
+            ...prev,
+            subcategory,
+            itemType: "",
+            title: "",
+            brandName: "",
+            shortDescription: "",
+            detailedDescription: "",
+            images: [],
+            uploadedImages: [],
+            dynamicData: clearConstructionDynamicData(prev.dynamicData),
+           }));
           }}
           categoryName={selectedCategory.name}
          />
@@ -1145,6 +1243,15 @@ export function MultiStepServiceForm({
            You can enter a subcategory manually. Select a category first for predefined options.
           </p>
          </div>
+        )}
+        {showCatalogProductPicker && selectedCategory && (
+         <ProductCatalogPicker
+          categorySlug={selectedCategory.slug}
+          subcategory={formData.subcategory}
+          itemType={formData.itemType}
+          selectedProductId={selectedCatalogProductId}
+          onSelect={handleCatalogProductSelect}
+         />
         )}
         {showItemTypeSelector && (
          <div className="space-y-2">
