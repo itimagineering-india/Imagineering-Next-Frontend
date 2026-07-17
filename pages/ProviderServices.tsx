@@ -27,6 +27,7 @@ import {
  isConstructionMaterialsCategorySlug,
  pickConstructionMetadataFields,
 } from "@/lib/constructionMaterials";
+import { usesCatalogSelectFlow } from "@/lib/manpowerCatalog";
 import { parseToolsFieldsFromService } from "@/lib/toolsService";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -235,7 +236,7 @@ export default function ProviderServices() {
    setProviderPrimaryCategoryIdForForm(primary);
    const primaryCat = categories.find((c) => String(c._id) === String(primary));
    const catSlug = primaryCat?.slug ?? "";
-   if (isConstructionMaterialsCategorySlug(catSlug)) {
+   if (usesCatalogSelectFlow(catSlug)) {
     router.push("/dashboard/provider/services/add");
     return;
    }
