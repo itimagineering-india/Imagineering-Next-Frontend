@@ -113,7 +113,7 @@ export function CartOffersModal({ open, onOpenChange, onSelectCode }: CartOffers
             Available offers
           </DialogTitle>
           <DialogDescription>
-            Copy a code or tap Use — it fills the coupon field on your cart. Terms still apply at checkout.
+            Copy a code or tap Use — it fills the coupon field. Tap Apply to use it on your order.
           </DialogDescription>
         </DialogHeader>
 
