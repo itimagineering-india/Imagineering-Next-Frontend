@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, ArrowLeft, CreditCard, Package } from "lucide-react";
+import { Loader2, ArrowLeft, CreditCard, Package, Tag } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,7 @@ import { clearActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { PaymentOptionsSelector, type PaymentOption } from "@/components/payments/PaymentOptionsSelector";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
+import { CartOffersModal } from "@/components/cart/CartOffersModal";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -39,6 +40,13 @@ export default function QuoteRequestConfirmPage() {
   const [submitting, setSubmitting] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState(0);
+
+  const [offersOpen, setOffersOpen] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponUsageId, setCouponUsageId] = useState<string | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -90,11 +98,75 @@ export default function QuoteRequestConfirmPage() {
     return "your request";
   }, [data?.service]);
 
+  const serviceId = useMemo(() => {
+    const s = data?.service;
+    if (!s) return undefined;
+    if (typeof s === "string") return s;
+    return s.id || s._id || undefined;
+  }, [data?.service]);
+
+  const categoryId = useMemo(() => {
+    const s = data?.service;
+    if (!s || typeof s !== "object") return undefined;
+    const cat = s.category;
+    if (!cat) return undefined;
+    if (typeof cat === "string") return cat;
+    return cat._id || cat.id || undefined;
+  }, [data?.service]);
+
   const productAmount = Number(offer?.amount || 0);
   const quotedDelivery =
     offer?.deliveryOption === "paid" ? Math.max(0, Number(offer?.deliveryCharge || 0)) : 0;
   const effectiveDelivery = transport === "self_pickup" ? 0 : quotedDelivery;
-  const displayTotal = productAmount + effectiveDelivery;
+  const subtotalBeforeOffer = productAmount + effectiveDelivery;
+  const displayTotal = Math.max(0, subtotalBeforeOffer - (couponDiscount || 0));
+
+  // Transport changes the payable base — clear applied offer so user re-applies on the new total
+  useEffect(() => {
+    if (!couponUsageId && couponDiscount <= 0) return;
+    setCouponUsageId(null);
+    setCouponDiscount(0);
+    setCouponError(null);
+    // keep couponCode filled for quick re-apply
+  }, [transport]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || bookingId) return;
+    setCouponApplying(true);
+    setCouponError(null);
+    try {
+      const response = await api.coupons.validate({
+        code: couponCode.trim(),
+        amount: subtotalBeforeOffer,
+        type: "booking",
+        serviceId: serviceId ? String(serviceId) : undefined,
+        categoryId: categoryId ? String(categoryId) : undefined,
+      });
+      if (response.success && response.data) {
+        setCouponUsageId(response.data.usageId || null);
+        setCouponDiscount(response.data.discountAmount || 0);
+        toast({
+          title: "Offer applied",
+          description: `You saved ${formatINR(response.data.discountAmount || 0)}`,
+        });
+      } else {
+        throw new Error((response as any).error?.message || "Invalid offer");
+      }
+    } catch (err: any) {
+      setCouponUsageId(null);
+      setCouponDiscount(0);
+      setCouponError(err?.message || "Failed to apply offer");
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponUsageId(null);
+    setCouponDiscount(0);
+    setCouponCode("");
+    setCouponError(null);
+  };
 
   const onContinue = async () => {
     if (!offer || !id || !offerId) return;
@@ -113,6 +185,7 @@ export default function QuoteRequestConfirmPage() {
         gstNumber: gstNumber.trim() || undefined,
         transport,
         paymentOption,
+        couponUsageId: couponUsageId || undefined,
       });
       if (!res.success || !(res as any).data?.bookingId) {
         throw new Error((res as any)?.error?.message || "Failed to place order");
@@ -120,6 +193,9 @@ export default function QuoteRequestConfirmPage() {
       const payload = (res as any).data;
       const nextBookingId = String(payload.bookingId);
       const amount = Number(payload.amount || displayTotal);
+      if (typeof payload.couponUsageId === "string" && payload.couponUsageId) {
+        setCouponUsageId(payload.couponUsageId);
+      }
 
       if (payload.requiresOnlinePayment === false || paymentOption === "cod" || paymentOption === "neft" || paymentOption === "sbicollect") {
         clearActiveQuoteRequest(id);
@@ -215,6 +291,12 @@ export default function QuoteRequestConfirmPage() {
                     ? " · Free delivery"
                     : ""}
             </p>
+            {couponDiscount > 0 ? (
+              <p className="mt-1 text-xs font-medium text-primary">
+                Offer: −{formatINR(couponDiscount)}
+                {couponCode ? ` (${couponCode})` : ""}
+              </p>
+            ) : null}
           </div>
           <p className="text-xl font-bold tabular-nums">{formatINR(displayTotal)}</p>
         </div>
@@ -233,6 +315,56 @@ export default function QuoteRequestConfirmPage() {
             maxLength={15}
             disabled={Boolean(bookingId)}
           />
+        </div>
+
+        <div className="space-y-3 border-t pt-6">
+          <div className="flex items-center justify-between gap-2">
+            <Label className="flex items-center gap-1.5">
+              <Tag className="h-3.5 w-3.5" />
+              Offer / Coupon
+            </Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setOffersOpen(true)}
+              disabled={Boolean(bookingId)}
+            >
+              View offers
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              value={couponCode}
+              onChange={(e) => {
+                setCouponCode(e.target.value.toUpperCase());
+                setCouponError(null);
+              }}
+              placeholder="Enter offer code"
+              className="h-9"
+              disabled={couponApplying || Boolean(bookingId) || couponDiscount > 0}
+            />
+            {couponDiscount > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRemoveCoupon}
+                disabled={Boolean(bookingId)}
+              >
+                Remove
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={handleApplyCoupon}
+                disabled={couponApplying || !couponCode.trim() || Boolean(bookingId)}
+              >
+                {couponApplying ? "Applying..." : "Apply"}
+              </Button>
+            )}
+          </div>
+          {couponError ? <p className="text-xs text-destructive">{couponError}</p> : null}
         </div>
 
         <div className="space-y-2 border-t pt-6">
@@ -297,6 +429,7 @@ export default function QuoteRequestConfirmPage() {
                   bookingId={bookingId}
                   bookingDescription={`Quote for ${serviceTitle}`}
                   amount={payAmount}
+                  couponUsageId={couponUsageId || undefined}
                   onSuccess={() => {
                     toast({ title: "Payment successful", description: "Your order is placed." });
                     router.push("/dashboard/buyer/orders");
@@ -310,6 +443,7 @@ export default function QuoteRequestConfirmPage() {
                   bookingId={bookingId}
                   bookingDescription={`Quote for ${serviceTitle}`}
                   amount={payAmount}
+                  couponUsageId={couponUsageId || undefined}
                   onSuccess={() => {
                     toast({ title: "Payment successful", description: "Your order is placed." });
                     router.push("/dashboard/buyer/orders");
@@ -322,6 +456,19 @@ export default function QuoteRequestConfirmPage() {
           </div>
         )}
       </div>
+
+      <CartOffersModal
+        open={offersOpen}
+        onOpenChange={setOffersOpen}
+        onSelectCode={(code) => {
+          setCouponCode(code);
+          setCouponError(null);
+          if (couponDiscount > 0) {
+            setCouponUsageId(null);
+            setCouponDiscount(0);
+          }
+        }}
+      />
     </main>
   );
 }
