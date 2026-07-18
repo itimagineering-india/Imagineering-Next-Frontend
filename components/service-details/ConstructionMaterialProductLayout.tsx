@@ -340,13 +340,13 @@ export function ConstructionMaterialProductLayout({
             <CardContent className="space-y-3 p-5">
               <p className="font-bold">Need Help?</p>
               <p className="text-sm text-muted-foreground">Talk to our procurement expert</p>
-              <a href="tel:+919876543210" className="flex items-center gap-2 text-lg font-bold text-primary">
+              <a href="tel:+919993578006" className="flex items-center gap-2 text-lg font-bold text-primary">
                 <Phone className="h-5 w-5" />
-                +91 98765 43210
+                +91 9993578006
               </a>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock3 className="h-3.5 w-3.5" />
-                Mon–Sat, 9 AM – 7 PM
+                Mon–Sat, 9 AM – 6 PM
               </p>
             </CardContent>
           </Card>
