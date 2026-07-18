@@ -2553,6 +2553,7 @@ export const api = {
         gstNumber?: string;
         transport?: 'supplier' | 'self_pickup';
         paymentOption?: string;
+        couponUsageId?: string;
       }
     ) =>
       apiRequest<{
@@ -2565,6 +2566,9 @@ export const api = {
           paymentOption?: string;
           requiresOnlinePayment?: boolean;
           alreadyOrdered?: boolean;
+          couponDiscount?: number;
+          couponCode?: string;
+          couponUsageId?: string;
         };
       }>(`/api/quote-requests/${id}/offers/${offerId}/pay`, {
         method: 'POST',
