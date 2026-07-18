@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,14 +45,14 @@ export async function getServerSideProps() { return { props: {} }; }
 
 interface Notification {
   id: string;
-  type: "lead" | "job" | "payment" | "subscription" | "review" | "info" | "announcement";
+  type: "request" | "job" | "payment" | "subscription" | "review" | "info" | "announcement";
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
   actionUrl?: string;
   metadata?: {
-    leadId?: string;
+    requestId?: string;
     jobId?: string;
     amount?: number;
     buyerName?: string;
@@ -60,6 +61,7 @@ interface Notification {
 }
 
 export default function Notifications() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,13 +93,17 @@ export default function Notifications() {
           let frontendType: Notification["type"] = "info";
           
           if (notif.metadata?.type) {
-            frontendType = notif.metadata.type;
+            const t = notif.metadata.type === "lead" ? "request" : notif.metadata.type;
+            frontendType = t === "QUOTE_OFFER" ? "request" : t;
           } else if (notif.link) {
-            if (notif.link.includes('/leads')) frontendType = "lead";
+            if (notif.link.includes('/quote-requests')) frontendType = "request";
+            else if (notif.link.includes('/leads')) frontendType = "request";
             else if (notif.link.includes('/bookings')) frontendType = "job";
             else if (notif.link.includes('/earnings')) frontendType = "payment";
             else if (notif.link.includes('/subscription')) frontendType = "subscription";
             else if (notif.link.includes('/reviews')) frontendType = "review";
+          } else if (notif.metadata?.type === "QUOTE_OFFER") {
+            frontendType = "request";
           } else if (notif.type === "success" && notif.message.toLowerCase().includes("payment")) {
             frontendType = "payment";
           } else if (notif.type === "announcement") {
@@ -214,7 +220,7 @@ export default function Notifications() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case "lead":
+      case "request":
         return <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />;
       case "job":
         return <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />;
@@ -233,7 +239,7 @@ export default function Notifications() {
 
   const getNotificationBadge = (type: string) => {
     const badges: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      lead: { label: "Lead", variant: "default" },
+      request: { label: "Request", variant: "default" },
       job: { label: "Job", variant: "default" },
       payment: { label: "Payment", variant: "default" },
       subscription: { label: "Subscription", variant: "default" },
@@ -268,14 +274,21 @@ export default function Notifications() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.actionUrl) return;
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    await router.push(notification.actionUrl);
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="py-8 sm:py-10 md:py-12 bg-gradient-to-br from-primary/5 via-background to-primary/5">
-          <div className="container px-4 sm:px-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <section className="py-8 sm:py-12 md:py-12 bg-gradient-to-br from-primary/5 via-background to-primary/5">
+          <div className="layout-shell">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
                 <div>
                   <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
                     Notifications
@@ -316,7 +329,7 @@ export default function Notifications() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="lead">Leads</SelectItem>
+                    <SelectItem value="request">Requests</SelectItem>
                     <SelectItem value="job">Jobs</SelectItem>
                     <SelectItem value="payment">Payments</SelectItem>
                     <SelectItem value="subscription">Subscriptions</SelectItem>
@@ -326,14 +339,12 @@ export default function Notifications() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
           </div>
         </section>
 
         {/* Notifications List */}
-        <section className="py-6 sm:py-8 md:py-10">
-          <div className="container px-4 sm:px-6">
-            <div className="max-w-4xl mx-auto">
+        <section className="py-6 sm:py-8 md:py-12">
+          <div className="layout-shell">
               <Card>
                 <CardHeader className="pb-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -358,14 +369,15 @@ export default function Notifications() {
                       {filteredNotifications.map((notification) => (
                         <div
                           key={notification.id}
-                          className={`p-2.5 sm:p-3 rounded-md border transition-colors duration-200 ${
+                          className={`p-3 sm:p-3 rounded-md border transition-colors duration-200 ${
                             notification.read
                               ? "bg-background border-border"
                               : "bg-primary/5 border-primary/20 shadow-sm"
-                          }`}
+                          } ${notification.actionUrl ? "cursor-pointer hover:border-primary/40" : ""}`}
+                          onClick={() => handleNotificationClick(notification)}
                         >
-                          <div className="flex items-start gap-2.5 sm:gap-3">
-                            <div className={`flex-shrink-0 p-1.5 rounded-md ${
+                          <div className="flex items-start gap-3 sm:gap-3">
+                            <div className={`flex-shrink-0 p-2 rounded-md ${
                               notification.read ? "bg-muted" : "bg-primary/10"
                             }`}>
                               {getNotificationIcon(notification.type)}
@@ -380,14 +392,14 @@ export default function Notifications() {
                                       {notification.title}
                                     </h3>
                                     {!notification.read && (
-                                      <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0 mt-1.5" />
+                                      <div className="h-1.5 w-1.5 rounded-full bg-primary flex-shrink-0 mt-2" />
                                     )}
                                   </div>
-                                  <p className="text-xs text-muted-foreground mb-1.5 line-clamp-1">
+                                  <p className="text-xs text-muted-foreground mb-2 line-clamp-1">
                                     {notification.message}
                                   </p>
                                   {notification.metadata && (
-                                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
                                       {notification.metadata.buyerName && (
                                         <Badge variant="outline" className="text-xs">
                                           {notification.metadata.buyerName}
@@ -417,7 +429,10 @@ export default function Notifications() {
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => markAsRead(notification.id)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        markAsRead(notification.id);
+                                      }}
                                       className="h-8 w-8"
                                       title="Mark as read"
                                       aria-label="Mark as read"
@@ -442,7 +457,8 @@ export default function Notifications() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setNotificationToDelete(notification.id);
                                       setDeleteDialogOpen(true);
                                     }}
@@ -462,7 +478,6 @@ export default function Notifications() {
                   )}
                 </CardContent>
               </Card>
-            </div>
           </div>
         </section>
       </main>
