@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,14 +44,14 @@ export async function getServerSideProps() { return { props: {} }; }
 
 interface Notification {
   id: string;
-  type: "lead" | "job" | "payment" | "subscription" | "review";
+  type: "request" | "job" | "payment" | "subscription" | "review";
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
   actionUrl?: string;
   metadata?: {
-    leadId?: string;
+    requestId?: string;
     jobId?: string;
     amount?: number;
     buyerName?: string;
@@ -59,6 +60,7 @@ interface Notification {
 }
 
 export default function ProviderNotifications() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,12 +90,13 @@ export default function ProviderNotifications() {
         // Map backend notifications to frontend format
         const mappedNotifications: Notification[] = backendNotifications.map((notif: any) => {
           // Determine notification type from metadata, link, or type
-          let frontendType: "lead" | "job" | "payment" | "subscription" | "review" = "lead";
+          let frontendType: "request" | "job" | "payment" | "subscription" | "review" = "request";
           
           if (notif.metadata?.type) {
-            frontendType = notif.metadata.type;
+            const t = notif.metadata.type === "lead" ? "request" : notif.metadata.type;
+            frontendType = t;
           } else if (notif.link) {
-            if (notif.link.includes('/leads')) frontendType = "lead";
+            if (notif.link.includes('/leads') || notif.link.includes('/quote-requests')) frontendType = "request";
             else if (notif.link.includes('/bookings')) frontendType = "job";
             else if (notif.link.includes('/earnings')) frontendType = "payment";
             else if (notif.link.includes('/subscription')) frontendType = "subscription";
@@ -222,7 +225,7 @@ export default function ProviderNotifications() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case "lead":
+      case "request":
         return <Mail className="h-5 w-5 text-blue-500" />;
       case "job":
         return <Calendar className="h-5 w-5 text-green-500" />;
@@ -239,8 +242,8 @@ export default function ProviderNotifications() {
 
   const getNotificationBadge = (type: string) => {
     switch (type) {
-      case "lead":
-        return <Badge className="bg-blue-500 text-white">Lead</Badge>;
+      case "request":
+        return <Badge className="bg-blue-500 text-white">Request</Badge>;
       case "job":
         return <Badge className="bg-green-500 text-white">Job</Badge>;
       case "payment":
@@ -271,6 +274,14 @@ export default function ProviderNotifications() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.actionUrl) return;
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    await router.push(notification.actionUrl);
+  };
+
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
         {/* Header */}
@@ -280,7 +291,7 @@ export default function ProviderNotifications() {
               Notifications
             </h1>
             <p className="text-muted-foreground mt-1">
-              Stay updated with your leads, jobs, and payments
+              Stay updated with your requests, jobs, and payments
             </p>
           </div>
           <div className="flex gap-2">
@@ -307,9 +318,9 @@ export default function ProviderNotifications() {
             <CardContent className="p-3 sm:pt-6">
               <div className="text-center">
                 <div className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-blue-500">
-                  {notifications.filter((n) => n.type === "lead").length}
+                  {notifications.filter((n) => n.type === "request").length}
                 </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Leads</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Requests</p>
               </div>
             </CardContent>
           </Card>
@@ -356,7 +367,7 @@ export default function ProviderNotifications() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="lead">Leads</SelectItem>
+                  <SelectItem value="request">Requests</SelectItem>
                   <SelectItem value="job">Jobs</SelectItem>
                   <SelectItem value="payment">Payments</SelectItem>
                   <SelectItem value="subscription">Subscription</SelectItem>
@@ -404,7 +415,8 @@ export default function ProviderNotifications() {
                       notification.read
                         ? "bg-background"
                         : "bg-primary/5 border-primary/20"
-                    } hover:bg-muted/50`}
+                    } hover:bg-muted/50 ${notification.actionUrl ? "cursor-pointer hover:border-primary/40" : ""}`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start gap-4">
                       <div className="mt-1">
@@ -451,20 +463,29 @@ export default function ProviderNotifications() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => markAsRead(notification.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markAsRead(notification.id);
+                                }}
                               >
                                 <CheckCircle2 className="h-4 w-4" />
                               </Button>
                             )}
                             {notification.actionUrl && (
                               <Button variant="outline" size="sm" asChild>
-                                <a href={notification.actionUrl}>View</a>
+                                <a
+                                  href={notification.actionUrl}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  View
+                                </a>
                               </Button>
                             )}
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setNotificationToDelete(notification.id);
                                 setDeleteDialogOpen(true);
                               }}
