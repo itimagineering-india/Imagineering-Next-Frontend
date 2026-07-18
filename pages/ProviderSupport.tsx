@@ -641,12 +641,12 @@ export default function ProviderSupport() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button onClick={() => setChatOpen(true)} size="sm" className="text-xs md:text-sm w-full sm:w-auto">
-              <MessageSquare className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+              <MessageSquare className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
               <span className="hidden sm:inline">Live Chat</span>
               <span className="sm:hidden">Chat</span>
             </Button>
             <Button onClick={() => setCreateTicketOpen(true)} size="sm" className="text-xs md:text-sm w-full sm:w-auto">
-              <Plus className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+              <Plus className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
               New Ticket
             </Button>
           </div>
@@ -693,12 +693,12 @@ export default function ProviderSupport() {
                       placeholder="Search tickets..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 md:pl-10 text-xs md:text-sm"
+                      className="pl-8 md:pl-12 text-xs md:text-sm"
                     />
                   </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-full sm:w-auto md:w-48 text-xs md:text-sm">
-                      <Filter className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                      <Filter className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -732,7 +732,7 @@ export default function ProviderSupport() {
                         size="sm"
                         onClick={() => setCreateTicketOpen(true)}
                       >
-                        <Plus className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                        <Plus className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                         Create Your First Ticket
                       </Button>
                     </div>
@@ -991,7 +991,7 @@ export default function ProviderSupport() {
                       </div>
                     )}
                     <div
-                      className={`max-w-[75%] md:max-w-[70%] rounded-lg p-2.5 md:p-3 ${
+                      className={`max-w-[75%] md:max-w-[70%] rounded-lg p-3 md:p-3 ${
                         message.sender === "provider"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted"
