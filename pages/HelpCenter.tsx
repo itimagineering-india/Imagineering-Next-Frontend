@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,8 +19,10 @@ import {
   FileText,
   MessageSquare,
   ArrowRight,
+  UserX,
 } from "lucide-react";
 import { faqItems } from "@/data/mockData";
+import { useTranslation } from "react-i18next";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -28,7 +30,7 @@ const helpCategories = [
   {
     icon: Users,
     title: "Getting Started",
-    description: "Learn the basics of using ServiceHub",
+    description: "Learn the basics of using Imagineering India",
     articles: 12,
     href: "#getting-started",
   },
@@ -70,6 +72,11 @@ const helpCategories = [
 ];
 
 const popularArticles = [
+  {
+    title: "How to delete your account",
+    category: "Account & privacy",
+    href: "#account-deletion" as const,
+  },
   { title: "How to create your first service listing", category: "Providers" },
   { title: "Understanding our escrow payment system", category: "Payments" },
   { title: "How to leave a review for a provider", category: "Getting Started" },
@@ -79,30 +86,48 @@ const popularArticles = [
 ];
 
 export default function HelpCenter() {
+  const { t } = useTranslation("staticPages");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === "#account-deletion") {
+      requestAnimationFrame(() => {
+        document.getElementById("account-deletion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col">
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="py-10 sm:py-12 md:py-16 lg:py-24 bg-gradient-to-br from-primary/5 via-background to-primary/5">
+        <section className="py-12 sm:py-12 md:py-16 lg:py-16 bg-gradient-to-br from-primary/5 via-background to-primary/5">
           <div className="container px-4 sm:px-6">
             <div className="mx-auto max-w-3xl text-center">
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
-                How Can We Help?
+                {t("help.title")}
               </h1>
               <p className="mt-3 sm:mt-4 text-sm sm:text-base md:text-lg text-muted-foreground">
-                Search our knowledge base or browse categories below
+                {t("help.description")}
+              </p>
+              <p className="mt-4 text-sm text-muted-foreground">
+                <Link
+                  href="/help#account-deletion"
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  {t("help.deleteAccount")}
+                </Link>
               </p>
               <div className="mt-6 sm:mt-8 max-w-xl mx-auto relative">
                 <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search for help articles..."
+                  placeholder={t("help.searchPlaceholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-11 sm:h-12 md:h-14 pl-10 sm:pl-12 text-sm sm:text-base"
+                  className="h-11 sm:h-12 md:h-14 pl-12 sm:pl-12 text-sm sm:text-base"
                 />
               </div>
             </div>
@@ -110,19 +135,19 @@ export default function HelpCenter() {
         </section>
 
         {/* Categories */}
-        <section className="py-8 sm:py-10 md:py-12">
+        <section className="py-8 sm:py-12 md:py-12">
           <div className="container px-4 sm:px-6">
             <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6 sm:mb-8 text-center">
-              Browse by Category
+              {t("help.browseByCategory")}
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-6 max-w-5xl mx-auto">
               {helpCategories.map((category, index) => (
                 <Card
                   key={category.title}
                   className="group hover:shadow-lg transition-all duration-300 animate-fade-in cursor-pointer"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <CardContent className="pt-4 sm:pt-5 md:pt-6 p-4 sm:p-5 md:p-6">
+                  <CardContent className="pt-4 sm:pt-6 md:pt-6 p-4 sm:p-6 md:p-6">
                     <div className="flex items-start gap-3 sm:gap-4">
                       <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors flex-shrink-0">
                         <category.icon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -134,8 +159,8 @@ export default function HelpCenter() {
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                           {category.description}
                         </p>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 sm:mt-2">
-                          {category.articles} articles
+                        <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 sm:mt-2">
+                          {category.articles} {t("help.articles")}
                         </p>
                       </div>
                     </div>
@@ -147,19 +172,16 @@ export default function HelpCenter() {
         </section>
 
         {/* Popular Articles */}
-        <section className="py-8 sm:py-10 md:py-12 bg-secondary/30">
+        <section className="py-8 sm:py-12 md:py-12 bg-secondary/30">
           <div className="container px-4 sm:px-6">
             <div className="max-w-4xl mx-auto">
               <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6 sm:mb-8 text-center">
-                Popular Articles
+                {t("help.popularArticles")}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                {popularArticles.map((article) => (
-                  <Card
-                    key={article.title}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                  >
-                    <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-3">
+                {popularArticles.map((article) => {
+                  const inner = (
+                    <>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm sm:text-base text-foreground">
                           {article.title}
@@ -169,16 +191,104 @@ export default function HelpCenter() {
                         </p>
                       </div>
                       <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-                    </CardContent>
-                  </Card>
-                ))}
+                    </>
+                  );
+                  return "href" in article && article.href ? (
+                    <Link key={article.title} href={article.href} className="block">
+                      <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                        <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-3">
+                          {inner}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ) : (
+                    <Card
+                      key={article.title}
+                      className="cursor-pointer hover:shadow-md transition-shadow"
+                    >
+                      <CardContent className="p-3 sm:p-4 flex items-center justify-between gap-3">
+                        {inner}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           </div>
         </section>
 
+        <section
+          id="account-deletion"
+          className="py-12 sm:py-12 md:py-16 scroll-mt-16 border-t border-border/60 bg-muted/30"
+        >
+          <div className="container px-4 sm:px-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="flex items-start gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <div className="h-11 w-11 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <UserX className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+                    Delete your account
+                  </h2>
+                  <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+                    Imagineering India lets you remove your account and associated provider profile data.
+                    Below is how to do it on the website; you can link this page from app stores.
+                  </p>
+                </div>
+              </div>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base sm:text-lg">Self-service (website)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm sm:text-base text-muted-foreground">
+                  <div>
+                    <p className="font-medium text-foreground mb-2">If you are a service provider</p>
+                    <ol className="list-decimal list-inside space-y-2">
+                      <li>Sign in to your Imagineering India account.</li>
+                      <li>
+                        Open{" "}
+                        <Link
+                          href="/dashboard/provider/settings"
+                          className="text-primary font-medium underline-offset-4 hover:underline"
+                        >
+                          Provider dashboard → Profile settings
+                        </Link>
+                        .
+                      </li>
+                      <li>
+                        Scroll to <strong className="text-foreground">Delete account</strong>, confirm the
+                        prompt, and complete the flow. This removes your user record, provider profile, and
+                        sign-in identity so you can register again with the same email if you choose.
+                      </li>
+                    </ol>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-2">If you are a buyer or need help</p>
+                    <p>
+                      Self-service deletion from the buyer area may not be available in all versions of the
+                      product. To request deletion, use{" "}
+                      <Link href="/contact" className="text-primary font-medium underline-offset-4 hover:underline">
+                        Contact support
+                      </Link>{" "}
+                      and send your request from your <strong className="text-foreground">registered email</strong>.
+                      We will verify ownership and process the request within a reasonable time.
+                    </p>
+                  </div>
+                  <p className="text-xs sm:text-sm border-t border-border pt-4 text-muted-foreground">
+                    <span className="font-medium text-foreground">हिंदी:</span> अकाउंट हटाने के लिए प्रोवाइडर
+                    होने पर वेबसाइट पर लॉग इन करके प्रोवाइडर डैशबोर्ड → प्रोफ़ाइल सेटिंग्स में &quot;Delete
+                    account&quot; का उपयोग करें। खरीदार या अन्य उपयोगकर्ता सपोर्ट से अपने रजिस्टर्ड ईमेल से संपर्क
+                    कर सकते हैं।
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
         {/* FAQ Section */}
-        <section className="py-10 sm:py-12 md:py-16">
+        <section className="py-12 sm:py-12 md:py-16">
           <div className="container px-4 sm:px-6">
             <div className="max-w-3xl mx-auto">
               <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6 sm:mb-8 text-center">
@@ -218,7 +328,7 @@ export default function HelpCenter() {
         </section>
 
         {/* Contact CTA */}
-        <section className="py-10 sm:py-12 md:py-16 bg-primary">
+        <section className="py-12 sm:py-12 md:py-16 bg-primary">
           <div className="container px-4 sm:px-6">
             <div className="mx-auto max-w-3xl text-center">
               <h2 className="text-2xl sm:text-3xl font-bold text-primary-foreground">
