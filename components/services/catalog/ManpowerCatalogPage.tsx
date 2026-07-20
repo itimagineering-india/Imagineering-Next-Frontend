@@ -22,6 +22,7 @@ import {
   type ManpowerCatalogTaskOption,
   type ManpowerWorkerTypeOption,
 } from "@/lib/manpowerCatalog";
+import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import type { ProviderBusinessAddressSnapshot } from "@/components/services/ServiceLocationInput";
 
 interface Category {
@@ -131,9 +132,10 @@ export function ManpowerCatalogPage() {
 
         const categories =
           (catRes.data as { categories?: Category[] }).categories || [];
+        // Always use Manpower category for this page (not primaryCategory if it is CM).
         const match =
-          categories.find((c) => String(c._id) === String(snapshot.primaryCategoryId)) ||
-          categories.find((c) => isManpowerCategorySlug(c.slug));
+          categories.find((c) => isManpowerCategorySlug(c.slug)) ||
+          categories.find((c) => String(c._id) === String(snapshot.primaryCategoryId));
         if (match) setCategory(match);
       } finally {
         if (!cancelled) setLoading(false);
@@ -144,9 +146,18 @@ export function ManpowerCatalogPage() {
     };
   }, [user?.id]);
 
+  const manpowerCategorySubcategories = useMemo(
+    () => (category ? getSubcategoryNames(category.subcategories) : []),
+    [category],
+  );
+
   const workerTypes = useMemo(
-    () => resolveManpowerWorkerTypesForProfile(profileSubcategories),
-    [profileSubcategories],
+    () =>
+      resolveManpowerWorkerTypesForProfile(
+        profileSubcategories,
+        manpowerCategorySubcategories,
+      ),
+    [profileSubcategories, manpowerCategorySubcategories],
   );
 
   // Single profile subcategory → skip picker
@@ -162,9 +173,10 @@ export function ManpowerCatalogPage() {
   }, [loading, step, workerTypes]);
 
   const workerTypeKey = selectedWorker?.key || "";
+  const workerSubcategoryLabel = selectedWorker?.label || "";
 
   useEffect(() => {
-    if (step !== 2 || !workerTypeKey) {
+    if (step !== 2 || !selectedWorker) {
       setCatalogTasks([]);
       return;
     }
@@ -172,18 +184,35 @@ export function ManpowerCatalogPage() {
     setLoadingTasks(true);
     (async () => {
       try {
-        const res = await api.productCatalog.list({
-          categorySlug: "manpower",
-          materialTypeKey: workerTypeKey,
-          limit: 100,
-        });
+        // Prefer exact profile subcategory label; fallback to materialTypeKey.
+        let products: Array<Record<string, unknown>> = [];
+        if (workerSubcategoryLabel) {
+          const bySub = await api.productCatalog.list({
+            categorySlug: "manpower",
+            subcategory: workerSubcategoryLabel,
+            limit: 100,
+          });
+          if (bySub.success) {
+            products =
+              ((bySub.data as { products?: Array<Record<string, unknown>> })?.products || []);
+          }
+        }
+        if (products.length === 0 && workerTypeKey) {
+          const byKey = await api.productCatalog.list({
+            categorySlug: "manpower",
+            materialTypeKey: workerTypeKey,
+            limit: 100,
+          });
+          if (byKey.success) {
+            products =
+              ((byKey.data as { products?: Array<Record<string, unknown>> })?.products || []);
+          }
+        }
         if (cancelled) return;
-        const products =
-          (res.success &&
-            ((res.data as { products?: Array<Record<string, unknown>> })?.products || [])) ||
-          [];
         const mapped = mapCatalogProductsToManpowerTasks(products);
-        setCatalogTasks(mapped.length > 0 ? mapped : getManpowerPresetFallbackTasks(workerTypeKey));
+        setCatalogTasks(
+          mapped.length > 0 ? mapped : getManpowerPresetFallbackTasks(workerTypeKey),
+        );
       } catch {
         if (!cancelled) {
           setCatalogTasks(getManpowerPresetFallbackTasks(workerTypeKey));
@@ -195,7 +224,7 @@ export function ManpowerCatalogPage() {
     return () => {
       cancelled = true;
     };
-  }, [step, workerTypeKey]);
+  }, [step, workerTypeKey, workerSubcategoryLabel, selectedWorker]);
 
   const filteredTasks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -337,9 +366,9 @@ export function ManpowerCatalogPage() {
       {step === 1 ? (
         <div className="space-y-6">
           <div>
-            <h2 className="text-base font-medium">Choose worker type</h2>
+            <h2 className="text-base font-medium">Choose subcategory</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Only subcategories from your business profile are listed. Tap one to continue.
+              Only Manpower subcategories from your business profile are listed. Tap one to continue.
             </p>
           </div>
 
