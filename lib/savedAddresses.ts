@@ -1,7 +1,9 @@
 /**
- * Buyer saved addresses — persisted locally (same shape as the Imagineering India mobile app).
- * Web uses localStorage; mobile uses AsyncStorage with a parallel key name.
+ * Buyer saved addresses — local cache + account sync (web ↔ mobile via /api/auth/saved-addresses).
  */
+
+import { api } from "@/lib/api-client";
+import { getAuthToken } from "@/lib/auth-token";
 
 const STORAGE_KEY = "imagineering_saved_addresses_v1";
 
@@ -64,7 +66,11 @@ function ensureSingleDefault(addresses: SavedAddress[]): SavedAddress[] {
   });
 }
 
-export function loadSavedAddresses(): SavedAddress[] {
+function isLoggedIn(): boolean {
+  return Boolean(getAuthToken());
+}
+
+function loadLocal(): SavedAddress[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -80,7 +86,7 @@ export function loadSavedAddresses(): SavedAddress[] {
   }
 }
 
-export function saveSavedAddresses(addresses: SavedAddress[]): void {
+function saveLocal(addresses: SavedAddress[]): void {
   if (typeof window === "undefined") return;
   const normalized = ensureSingleDefault(
     addresses.map(normalizeAddress).filter((row) => row.address.length > 0),
@@ -89,8 +95,77 @@ export function saveSavedAddresses(addresses: SavedAddress[]): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
-export function upsertSavedAddress(address: SavedAddress): SavedAddress[] {
-  const existing = loadSavedAddresses();
+function mergeAddresses(local: SavedAddress[], remote: SavedAddress[]): SavedAddress[] {
+  const byId = new Map<string, SavedAddress>();
+  for (const row of local) byId.set(row.id, row);
+  for (const row of remote) byId.set(row.id, row); // remote wins on conflict
+  return ensureSingleDefault([...byId.values()]);
+}
+
+async function pushRemote(addresses: SavedAddress[]): Promise<SavedAddress[]> {
+  const res = await api.auth.updateSavedAddresses({ addresses });
+  const rows = (res as any)?.data?.addresses;
+  if (Array.isArray(rows)) {
+    const normalized = ensureSingleDefault(
+      rows.map((row: SavedAddress) => normalizeAddress(row)).filter((row: SavedAddress) => row.address.length > 0),
+    );
+    saveLocal(normalized);
+    return normalized;
+  }
+  saveLocal(addresses);
+  return addresses;
+}
+
+/**
+ * Load addresses: local cache first; when logged in, sync with account
+ * (merge local-only rows, then prefer account as source of truth).
+ */
+export async function loadSavedAddresses(): Promise<SavedAddress[]> {
+  const local = loadLocal();
+  if (!isLoggedIn()) return local;
+
+  try {
+    const res = await api.auth.getSavedAddresses();
+    const remoteRaw = (res as any)?.data?.addresses;
+    const remote = Array.isArray(remoteRaw)
+      ? ensureSingleDefault(
+          remoteRaw.map((row: SavedAddress) => normalizeAddress(row)).filter((r: SavedAddress) => r.address.length > 0),
+        )
+      : [];
+
+    if (remote.length === 0 && local.length > 0) {
+      return await pushRemote(local);
+    }
+
+    const merged = mergeAddresses(local, remote);
+    const remoteIds = new Set(remote.map((r) => r.id));
+    const hasLocalOnly = local.some((l) => !remoteIds.has(l.id));
+    if (hasLocalOnly) {
+      return await pushRemote(merged);
+    }
+
+    saveLocal(merged);
+    return merged;
+  } catch {
+    return local;
+  }
+}
+
+export async function saveSavedAddresses(addresses: SavedAddress[]): Promise<SavedAddress[]> {
+  const normalized = ensureSingleDefault(
+    addresses.map(normalizeAddress).filter((row) => row.address.length > 0),
+  );
+  saveLocal(normalized);
+  if (!isLoggedIn()) return normalized;
+  try {
+    return await pushRemote(normalized);
+  } catch {
+    return normalized;
+  }
+}
+
+export async function upsertSavedAddress(address: SavedAddress): Promise<SavedAddress[]> {
+  const existing = loadLocal();
   const nextAddress = normalizeAddress(address);
   const matchIndex = existing.findIndex((item) => item.id === nextAddress.id);
   const next = [...existing];
@@ -99,14 +174,11 @@ export function upsertSavedAddress(address: SavedAddress): SavedAddress[] {
   const adjusted = nextAddress.isDefault
     ? next.map((item) => ({ ...item, isDefault: item.id === nextAddress.id }))
     : ensureSingleDefault(next);
-  saveSavedAddresses(adjusted);
-  return adjusted;
+  return saveSavedAddresses(adjusted);
 }
 
-export function deleteSavedAddress(addressId: string): SavedAddress[] {
-  const existing = loadSavedAddresses();
+export async function deleteSavedAddress(addressId: string): Promise<SavedAddress[]> {
+  const existing = loadLocal();
   const next = existing.filter((item) => item.id !== addressId);
-  const adjusted = ensureSingleDefault(next);
-  saveSavedAddresses(adjusted);
-  return adjusted;
+  return saveSavedAddresses(ensureSingleDefault(next));
 }
