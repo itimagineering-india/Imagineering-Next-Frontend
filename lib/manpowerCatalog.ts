@@ -12,6 +12,18 @@ export type ManpowerWorkerTypeOption = {
   label: string;
 };
 
+/** Selectable manpower task — from Product Catalog API or local preset fallback. */
+export type ManpowerCatalogTaskOption = {
+  id: string;
+  label: string;
+  catalogProductId?: string;
+  description?: string;
+  suggestedPriceType?: string;
+  suggestedPriceMin?: number;
+  suggestedPriceMax?: number;
+  images?: string[];
+};
+
 /** Worker types that have selectable task presets. */
 export const MANPOWER_WORKER_TYPE_OPTIONS: ManpowerWorkerTypeOption[] = [
   { key: "electrician", label: "Electrician" },
@@ -62,6 +74,33 @@ export function getManpowerTasksForWorker(workerTypeKey: string): ManpowerServic
   return getManpowerServiceOfferPresetsForSubcategory(workerTypeKey);
 }
 
+export function mapCatalogProductsToManpowerTasks(
+  products: Array<Record<string, unknown>>,
+): ManpowerCatalogTaskOption[] {
+  return products.map((p) => {
+    const meta = (p.metadata || {}) as Record<string, unknown>;
+    const taskId = String(meta.taskId || p.slug || p._id || "").trim();
+    const images = Array.isArray(p.images) ? p.images.map(String).filter(Boolean) : [];
+    return {
+      id: taskId,
+      label: String(p.name || taskId).trim(),
+      catalogProductId: String(p._id || ""),
+      description: p.description ? String(p.description) : undefined,
+      suggestedPriceType: p.suggestedPriceType ? String(p.suggestedPriceType) : undefined,
+      suggestedPriceMin: typeof p.suggestedPriceMin === "number" ? p.suggestedPriceMin : undefined,
+      suggestedPriceMax: typeof p.suggestedPriceMax === "number" ? p.suggestedPriceMax : undefined,
+      images,
+    };
+  });
+}
+
+export function getManpowerPresetFallbackTasks(workerTypeKey: string): ManpowerCatalogTaskOption[] {
+  return getManpowerTasksForWorker(workerTypeKey).map((task) => ({
+    id: task.id,
+    label: task.label,
+  }));
+}
+
 export type ManpowerCatalogLocation = {
   address?: string;
   city?: string;
@@ -69,13 +108,12 @@ export type ManpowerCatalogLocation = {
   coordinates?: { lat: number; lng: number };
 };
 
-/** One service per selected task (CM product-select parity + ImagiMitra). */
-export function buildServicePayloadFromManpowerTask(
-  task: ManpowerServiceOfferPreset,
+/** One service per selected catalog task (CM product-select parity + ImagiMitra). */
+export function buildServicePayloadFromManpowerCatalogTask(
+  task: ManpowerCatalogTaskOption,
   opts: {
     categoryId: string;
     workerTypeKey: string;
-    /** Exact business-profile subcategory label when available */
     profileLabel?: string;
     location?: ManpowerCatalogLocation | null;
   },
@@ -83,16 +121,24 @@ export function buildServicePayloadFromManpowerTask(
   const workerKey = normalizeManpowerWorkerTypeKey(opts.workerTypeKey) || opts.workerTypeKey;
   const workerLabel = String(opts.profileLabel || "").trim() || labelForWorkerKey(workerKey);
   const title = String(task.label || task.id).trim() || task.id;
-  const description = `${workerLabel}: ${title}`.trim();
+  const description = String(task.description || `${workerLabel}: ${title}`).trim();
+
+  const min = task.suggestedPriceMin;
+  const max = task.suggestedPriceMax;
+  const hasRange = min != null && max != null && min > 0 && max > 0 && max > min;
+  const priceMin = min != null && min > 0 ? min : undefined;
+  const priceMax = max != null && max > 0 ? max : undefined;
+  const exactPrice = priceMin != null ? priceMin : 1;
 
   const payload: Record<string, unknown> = {
     title,
     description,
     category: opts.categoryId,
     subcategory: workerLabel,
-    price: 1,
-    priceMode: "exact",
-    priceType: "negotiable",
+    priceMode: hasRange ? "range" : "exact",
+    price: hasRange && priceMin != null ? priceMin : exactPrice,
+    ...(hasRange && priceMin != null && priceMax != null ? { priceMin, priceMax } : {}),
+    priceType: task.suggestedPriceType || "negotiable",
     deliveryTime: "1-2 days",
     metadata: {
       formVariant: "manpower",
@@ -104,6 +150,12 @@ export function buildServicePayloadFromManpowerTask(
     },
   };
 
+  if (task.catalogProductId) payload.catalogProductId = task.catalogProductId;
+  if (task.images && task.images.length > 0) {
+    payload.image = task.images[0];
+    payload.images = task.images;
+  }
+
   const loc = opts.location;
   if (loc && (loc.address || loc.city)) {
     payload.location = {
@@ -113,6 +165,22 @@ export function buildServicePayloadFromManpowerTask(
   }
 
   return payload;
+}
+
+/** @deprecated Prefer buildServicePayloadFromManpowerCatalogTask */
+export function buildServicePayloadFromManpowerTask(
+  task: ManpowerServiceOfferPreset,
+  opts: {
+    categoryId: string;
+    workerTypeKey: string;
+    profileLabel?: string;
+    location?: ManpowerCatalogLocation | null;
+  },
+) {
+  return buildServicePayloadFromManpowerCatalogTask(
+    { id: task.id, label: task.label },
+    opts,
+  );
 }
 
 export function normalizePrimarySubcategoryLabels(raw: unknown): string[] {
