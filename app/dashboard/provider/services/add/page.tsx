@@ -5,7 +5,7 @@ import { BASE_URL } from "@/lib/constants";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Add products | Imagineering India",
+  title: "Add service | Imagineering India",
   alternates: { canonical: `${BASE_URL}/dashboard/provider/services/add` },
 };
 
