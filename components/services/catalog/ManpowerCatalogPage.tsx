@@ -11,14 +11,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { ManpowerServiceOfferPreset } from "@/config/manpowerServiceOfferPresets";
 import {
-  buildServicePayloadFromManpowerTask,
-  getManpowerTasksForWorker,
+  buildServicePayloadFromManpowerCatalogTask,
+  getManpowerPresetFallbackTasks,
   isManpowerCategorySlug,
+  mapCatalogProductsToManpowerTasks,
   normalizePrimarySubcategoryLabels,
   resolveManpowerWorkerTypesForProfile,
   type ManpowerCatalogLocation,
+  type ManpowerCatalogTaskOption,
   type ManpowerWorkerTypeOption,
 } from "@/lib/manpowerCatalog";
 import type { ProviderBusinessAddressSnapshot } from "@/components/services/ServiceLocationInput";
@@ -95,7 +96,9 @@ export function ManpowerCatalogPage() {
   const [category, setCategory] = useState<Category | null>(null);
   const [profileSubcategories, setProfileSubcategories] = useState<string[]>([]);
   const [selectedWorker, setSelectedWorker] = useState<ManpowerWorkerTypeOption | null>(null);
-  const [selectedTasks, setSelectedTasks] = useState<ManpowerServiceOfferPreset[]>([]);
+  const [selectedTasks, setSelectedTasks] = useState<ManpowerCatalogTaskOption[]>([]);
+  const [catalogTasks, setCatalogTasks] = useState<ManpowerCatalogTaskOption[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [businessAddress, setBusinessAddress] = useState<ManpowerCatalogLocation | null>(null);
   const [loading, setLoading] = useState(true);
@@ -159,16 +162,49 @@ export function ManpowerCatalogPage() {
   }, [loading, step, workerTypes]);
 
   const workerTypeKey = selectedWorker?.key || "";
-  const tasks = useMemo(() => getManpowerTasksForWorker(workerTypeKey), [workerTypeKey]);
+
+  useEffect(() => {
+    if (step !== 2 || !workerTypeKey) {
+      setCatalogTasks([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTasks(true);
+    (async () => {
+      try {
+        const res = await api.productCatalog.list({
+          categorySlug: "manpower",
+          materialTypeKey: workerTypeKey,
+          limit: 100,
+        });
+        if (cancelled) return;
+        const products =
+          (res.success &&
+            ((res.data as { products?: Array<Record<string, unknown>> })?.products || [])) ||
+          [];
+        const mapped = mapCatalogProductsToManpowerTasks(products);
+        setCatalogTasks(mapped.length > 0 ? mapped : getManpowerPresetFallbackTasks(workerTypeKey));
+      } catch {
+        if (!cancelled) {
+          setCatalogTasks(getManpowerPresetFallbackTasks(workerTypeKey));
+        }
+      } finally {
+        if (!cancelled) setLoadingTasks(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, workerTypeKey]);
 
   const filteredTasks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return tasks;
-    return tasks.filter(
+    if (!q) return catalogTasks;
+    return catalogTasks.filter(
       (task) =>
         task.label.toLowerCase().includes(q) || task.id.toLowerCase().includes(q),
     );
-  }, [searchQuery, tasks]);
+  }, [searchQuery, catalogTasks]);
 
   const selectedIds = useMemo(() => new Set(selectedTasks.map((t) => t.id)), [selectedTasks]);
 
@@ -182,7 +218,7 @@ export function ManpowerCatalogPage() {
     setStep(2);
   }, []);
 
-  const toggleTask = useCallback((task: ManpowerServiceOfferPreset) => {
+  const toggleTask = useCallback((task: ManpowerCatalogTaskOption) => {
     setSelectedTasks((prev) => {
       const exists = prev.some((x) => x.id === task.id);
       if (exists) return prev.filter((x) => x.id !== task.id);
@@ -203,7 +239,7 @@ export function ManpowerCatalogPage() {
       const results = await Promise.all(
         selectedTasks.map((task) =>
           api.services.create(
-            buildServicePayloadFromManpowerTask(task, {
+            buildServicePayloadFromManpowerCatalogTask(task, {
               categoryId: category._id,
               workerTypeKey: selectedWorker.key,
               profileLabel: selectedWorker.label,
@@ -370,18 +406,22 @@ export function ManpowerCatalogPage() {
           </div>
 
           <div className="space-y-2">
-            {filteredTasks.length === 0 ? (
+            {loadingTasks ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredTasks.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">
                 {searchQuery.trim()
                   ? "No tasks match your search."
-                  : "No tasks for this worker type."}
+                  : "No tasks for this worker type. Ask admin to add Manpower catalog services."}
               </p>
             ) : (
               filteredTasks.map((task) => {
                 const selected = selectedIds.has(task.id);
                 return (
                   <button
-                    key={task.id}
+                    key={task.catalogProductId || task.id}
                     type="button"
                     onClick={() => toggleTask(task)}
                     className={cn(
