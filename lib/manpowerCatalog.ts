@@ -50,12 +50,18 @@ function labelForWorkerKey(key: string): string {
 }
 
 /**
- * Step 1 worker types = only business-profile primarySubcategory values.
- * No fallback to the full default list (CM material-type parity).
+ * Step 1 options = business-profile primarySubcategory values that belong to Manpower.
+ * Pass `allowedCategorySubcategories` (from Manpower category) to drop CM / other leftovers.
  */
 export function resolveManpowerWorkerTypesForProfile(
   profileSubcategories: string[],
+  allowedCategorySubcategories?: string[],
 ): ManpowerWorkerTypeOption[] {
+  const allowed = new Set(
+    (allowedCategorySubcategories || [])
+      .map((s) => String(s || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
   const seen = new Set<string>();
   const out: ManpowerWorkerTypeOption[] = [];
   for (const raw of profileSubcategories) {
@@ -63,8 +69,9 @@ export function resolveManpowerWorkerTypesForProfile(
     if (!label) continue;
     const dedupe = label.toLowerCase();
     if (seen.has(dedupe)) continue;
+    if (allowed.size > 0 && !allowed.has(dedupe)) continue;
     seen.add(dedupe);
-    const key = normalizeManpowerWorkerTypeKey(label) || label;
+    const key = normalizeManpowerWorkerTypeKey(label) || label.toLowerCase().replace(/\s+/g, "_");
     out.push({ key, label });
   }
   return out;
