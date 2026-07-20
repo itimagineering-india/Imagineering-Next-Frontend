@@ -440,6 +440,15 @@ export const api = {
         body: JSON.stringify(preferenceData),
       }),
 
+    getSavedAddresses: () =>
+      apiRequest<{ success: boolean; data?: { addresses?: any[] } }>('/api/auth/saved-addresses'),
+
+    updateSavedAddresses: (payload: { addresses: any[] }) =>
+      apiRequest<{ success: boolean; data?: { addresses?: any[] } }>('/api/auth/saved-addresses', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+
     // Password reset via OTP can take slightly longer due to email sending,
     // so we allow a higher timeout specifically for these endpoints.
     sendPasswordResetOTP: (email: string) =>
