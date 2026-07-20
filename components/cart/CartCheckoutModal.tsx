@@ -181,20 +181,26 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
 
   useEffect(() => {
     if (!open) return;
-    const rows = loadSavedAddresses();
-    setSavedAddresses(rows);
-    if (rows.length === 0) {
-      setSelectedAddressId(null);
-      selectedAddressIdRef.current = null;
-      setAddress("");
-      setCity("");
-      setStateVal("");
-      setZip("");
-      return;
-    }
-    const id = selectedAddressIdRef.current;
-    const pick = (id && rows.find((r) => r.id === id)) || rows.find((x) => x.isDefault) || rows[0];
-    if (pick) applyFromSaved(pick);
+    let cancelled = false;
+    loadSavedAddresses().then((rows) => {
+      if (cancelled) return;
+      setSavedAddresses(rows);
+      if (rows.length === 0) {
+        setSelectedAddressId(null);
+        selectedAddressIdRef.current = null;
+        setAddress("");
+        setCity("");
+        setStateVal("");
+        setZip("");
+        return;
+      }
+      const id = selectedAddressIdRef.current;
+      const pick = (id && rows.find((r) => r.id === id)) || rows.find((x) => x.isDefault) || rows[0];
+      if (pick) applyFromSaved(pick);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [open, applyFromSaved]);
 
   const selectedSaved = useMemo(
