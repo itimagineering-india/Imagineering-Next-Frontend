@@ -174,7 +174,7 @@ export function CheckoutAddressPickerModal({
         isDefault: newIsDefault,
         coordinates,
       };
-      const next = upsertSavedAddress(row);
+      const next = await upsertSavedAddress(row);
       onAddressesChange(next);
       const saved = next.find((a) => a.id === row.id) || row;
       onSelect(saved);
@@ -207,7 +207,8 @@ export function CheckoutAddressPickerModal({
             Saved addresses
           </DialogTitle>
           <DialogDescription className="text-sm">
-            Choose where the service should happen, or add a new address. Stored on this device only.
+            Choose where the service should happen, or add a new address. Synced to your Imagineering India account
+            across web and app when you are logged in.
           </DialogDescription>
         </DialogHeader>
 
