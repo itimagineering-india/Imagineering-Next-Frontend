@@ -63,18 +63,24 @@ export function GetBestQuotesModal({
 
   useEffect(() => {
     if (!open) return;
-    const saved = loadSavedAddresses();
-    setSavedAddresses(saved);
-    const def = saved.find((a) => a.isDefault) || saved[0];
-    if (def) {
-      setAddress(def.address);
-      setCity(def.city);
-      setStateVal(def.state);
-      setZipCode(def.zipCode || "");
-      setSelectedAddressId(def.id);
-      setCoordinates(def.coordinates || null);
-    }
+    let cancelled = false;
+    loadSavedAddresses().then((saved) => {
+      if (cancelled) return;
+      setSavedAddresses(saved);
+      const def = saved.find((a) => a.isDefault) || saved[0];
+      if (def) {
+        setAddress(def.address);
+        setCity(def.city);
+        setStateVal(def.state);
+        setZipCode(def.zipCode || "");
+        setSelectedAddressId(def.id);
+        setCoordinates(def.coordinates || null);
+      }
+    });
     setDate((prev) => prev || minDate);
+    return () => {
+      cancelled = true;
+    };
   }, [open, minDate]);
 
   const applySavedAddress = useCallback((row: SavedAddress) => {
