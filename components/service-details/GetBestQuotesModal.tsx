@@ -97,7 +97,7 @@ export function GetBestQuotesModal({
     if (!isAuthenticated) {
       toast({
         title: "Login required",
-        description: "Please login to request quotes from nearby providers.",
+        description: "Please login to request quotes from providers who list this product.",
         variant: "destructive",
       });
       return;
@@ -152,7 +152,7 @@ export function GetBestQuotesModal({
       onOpenChange(false);
       toast({
         title: "Request sent",
-        description: "Nearby providers will share prices within 30 minutes.",
+        description: "Providers who list this product will share prices within 30 minutes.",
       });
       router.push(`/quote-requests/${id}`);
     } catch (err: any) {
