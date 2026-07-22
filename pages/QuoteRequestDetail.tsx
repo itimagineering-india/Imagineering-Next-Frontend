@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Clock, CheckCircle2, MapPin, Package } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
+import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
+import { cn } from "@/lib/utils";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -21,9 +23,181 @@ function formatCountdown(seconds: number) {
   return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
+function formatCreatedAt(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function shortLocation(data: any) {
+  const city = data?.address?.city || "";
+  const state = data?.address?.state || "";
+  const pin = data?.address?.zipCode || "";
+  const line = [city, state, pin].filter(Boolean).join(", ");
+  return line || data?.addressLabel || data?.address?.address || "Delivery location set";
+}
+
+function ScoreMeter({ score }: { score: number }) {
+  const pct = Math.max(0, Math.min(100, score));
+  return (
+    <div className="mt-3">
+      <p className="text-[11px] font-medium text-stone-500">Offer score</p>
+      <div className="mt-1.5 flex items-center gap-2.5">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-200">
+          <div className="h-full rounded-full bg-stone-900" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="min-w-[1.75rem] text-right text-sm font-bold tabular-nums text-stone-900">
+          {pct}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function OfferCard({
+  offer,
+  expanded,
+  onToggle,
+  onSelect,
+  canSelect,
+  isOrdered,
+}: {
+  offer: any;
+  expanded: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  canSelect: boolean;
+  isOrdered: boolean;
+}) {
+  const total = Number(
+    offer.totalAmount ?? Number(offer.amount || 0) + Number(offer.deliveryCharge || 0)
+  );
+  const material = Number(offer.materialAmount ?? offer.amount || 0);
+  const delivery = Number(offer.deliveryCharge || 0);
+  const score = Number(offer.offerScore || 0);
+  const recommended = Boolean(offer.isRecommended);
+
+  return (
+    <article
+      className={cn(
+        "rounded-2xl border bg-white p-4 transition-shadow sm:p-5",
+        recommended
+          ? "border-amber-600/70 bg-[#FFFCF5] shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
+          : "border-stone-200"
+      )}
+    >
+      <button type="button" className="w-full text-left" onClick={onToggle}>
+        {recommended ? (
+          <span className="mb-2.5 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+            Recommended
+          </span>
+        ) : null}
+        <p className="text-[32px] font-extrabold leading-none tracking-tight text-stone-900 tabular-nums sm:text-4xl">
+          {formatINR(total)}
+        </p>
+        <p className="mt-1 text-xs text-stone-500">Total · material + delivery</p>
+        {score > 0 ? <ScoreMeter score={score} /> : null}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {offer.verified ? (
+            <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+              Verified
+            </span>
+          ) : null}
+          {offer.rating != null ? (
+            <span className="text-xs font-medium text-stone-500">
+              ★ {Number(offer.rating).toFixed(1)}
+            </span>
+          ) : null}
+          {offer.successfulDeliveries != null ? (
+            <span className="text-xs font-medium text-stone-500">
+              {offer.successfulDeliveries} deliveries
+            </span>
+          ) : null}
+          {offer.onTimePercent != null ? (
+            <span className="text-xs font-medium text-stone-500">
+              {offer.onTimePercent}% on-time
+            </span>
+          ) : null}
+        </div>
+      </button>
+
+      {expanded ? (
+        <div className="mt-4 space-y-2 border-t border-stone-200 pt-3 text-sm">
+          <div className="flex justify-between gap-3">
+            <span className="text-stone-500">Material</span>
+            <span className="font-semibold tabular-nums text-stone-900">{formatINR(material)}</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-stone-500">Delivery</span>
+            <span className="font-semibold text-stone-900">
+              {offer.deliveryOption === "not_available"
+                ? "Not available"
+                : delivery > 0
+                  ? formatINR(delivery)
+                  : "Free"}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-stone-500">GST</span>
+            <span className="font-semibold text-stone-900">{offer.gstLabel || "GST Included"}</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-stone-500">Transport</span>
+            <span className="font-semibold text-stone-900">
+              {offer.transportLabel || "Supplier transport"}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-stone-500">ETA</span>
+            <span className="max-w-[60%] text-right font-semibold text-stone-900">
+              {offer.estimatedDelivery || "Confirm on select"}
+            </span>
+          </div>
+          {offer.validitySecondsRemaining != null ? (
+            <div className="flex justify-between gap-3">
+              <span className="text-stone-500">Valid for</span>
+              <span className="font-semibold tabular-nums text-stone-900">
+                {formatCountdown(Number(offer.validitySecondsRemaining))}
+              </span>
+            </div>
+          ) : null}
+          {offer.notes ? <p className="pt-1 text-xs text-stone-500">{offer.notes}</p> : null}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs font-medium text-stone-500">Tap for breakdown</p>
+      )}
+
+      {offer.status === "selected" ? (
+        <p className="mt-2 text-xs font-bold text-teal-700">Selected</p>
+      ) : null}
+
+      {canSelect ? (
+        <Button
+          className="mt-4 h-11 w-full bg-[#B91C1C] text-base font-semibold hover:bg-[#991B1B]"
+          onClick={onSelect}
+        >
+          Select offer
+        </Button>
+      ) : null}
+      {isOrdered && offer.status === "selected" ? (
+        <Button className="mt-4 h-11 w-full" asChild>
+          <Link href="/dashboard/buyer/orders">View order</Link>
+        </Button>
+      ) : null}
+    </article>
+  );
+}
+
 export default function QuoteRequestPage() {
   const params = useParams();
-  const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : "";
+  const id =
+    typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : "";
   const router = useRouter();
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -31,13 +205,14 @@ export default function QuoteRequestPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [liveBanner, setLiveBanner] = useState<string | null>(null);
+  const prevOfferCount = useRef(0);
+  const prevRecommended = useRef<string | null>(null);
 
-  const fetchDetail = useCallback(async () => {
-    if (!id) return;
-    try {
-      const res = await api.quoteRequests.getById(id);
-      if (!res.success) throw new Error((res as any)?.error?.message || "Failed to load");
-      const row = (res as any).data;
+  const applyRow = useCallback(
+    (row: any) => {
+      if (!row) return;
       setData(row);
       setSecondsLeft(Number(row?.secondsRemaining || 0));
       if (row?.status === "cancelled" || row?.status === "ordered" || row?.booking) {
@@ -50,16 +225,32 @@ export default function QuoteRequestPage() {
             typeof row.service === "object" && row.service?.title ? row.service.title : undefined,
         });
       }
-    } catch (err: any) {
-      toast({
-        title: "Could not load request",
-        description: err?.message || "Try again",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [id, toast]);
+    },
+    [id]
+  );
+
+  const fetchDetail = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!id) return;
+      const silent = Boolean(opts?.silent);
+      try {
+        const res = await api.quoteRequests.getById(id);
+        if (!res.success) throw new Error((res as any)?.error?.message || "Failed to load");
+        applyRow((res as any).data);
+      } catch (err: any) {
+        if (!silent) {
+          toast({
+            title: "Could not load request",
+            description: err?.message || "Try again",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [id, toast, applyRow]
+  );
 
   useEffect(() => {
     if (authLoading) return;
@@ -67,51 +258,74 @@ export default function QuoteRequestPage() {
       router.push(`/login?redirect=${encodeURIComponent(`/quote-requests/${id}`)}`);
       return;
     }
-    fetchDetail();
+    void fetchDetail();
   }, [authLoading, isAuthenticated, fetchDetail, id, router]);
 
   useEffect(() => {
     if (!data?.windowOpen) return;
-    const t = setInterval(() => {
-      setSecondsLeft((prev) => Math.max(0, prev - 1));
-    }, 1000);
+    const t = setInterval(() => setSecondsLeft((prev) => Math.max(0, prev - 1)), 1000);
     return () => clearInterval(t);
   }, [data?.windowOpen, data?.expiresAt]);
 
   useEffect(() => {
     if (!id || !isAuthenticated) return;
-    const shouldPoll = data?.status === "open" || (data?.windowOpen && !data?.booking);
-    if (!shouldPoll && data?.status === "ordered") return;
-
-    const interval = setInterval(() => {
-      fetchDetail();
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [id, isAuthenticated, data?.status, data?.windowOpen, data?.booking, fetchDetail]);
+    return subscribeToQuoteRequest(id, (payload) => {
+      if (payload?.data) {
+        applyRow(payload.data);
+        return;
+      }
+      void fetchDetail({ silent: true });
+    });
+  }, [id, isAuthenticated, applyRow, fetchDetail]);
 
   const serviceTitle = useMemo(() => {
     const s = data?.service;
-    if (!s) return "your request";
-    if (typeof s === "object") return s.title || "your request";
-    return "your request";
+    if (!s) return "Your request";
+    if (typeof s === "object") return s.title || "Your request";
+    return "Your request";
   }, [data?.service]);
 
-  const offers = Array.isArray(data?.offers) ? data.offers : [];
+  const offers = useMemo(() => (Array.isArray(data?.offers) ? data.offers : []), [data?.offers]);
+
+  useEffect(() => {
+    const count = offers.length;
+    const recommendedId =
+      data?.recommendedOfferId || offers.find((o: any) => o.isRecommended)?.id || null;
+    if (prevOfferCount.current > 0 && count > prevOfferCount.current) {
+      const msg =
+        recommendedId && recommendedId !== prevRecommended.current
+          ? "New best offer received"
+          : "New offer received";
+      setLiveBanner(msg);
+      const t = setTimeout(() => setLiveBanner(null), 2800);
+      return () => clearTimeout(t);
+    }
+    if (count > 0 && !expandedId) {
+      const rec = offers.find((o: any) => o.isRecommended) || offers[0];
+      if (rec?.id) setExpandedId(String(rec.id));
+    }
+    prevOfferCount.current = count;
+    prevRecommended.current = recommendedId ? String(recommendedId) : null;
+  }, [offers, data?.recommendedOfferId, expandedId]);
+
+  const notified = Number(data?.notifiedProviderCount || 0);
+  const received = Number(data?.offersReceived ?? offers.length);
+  const progress = notified > 0 ? Math.min(100, Math.round((received / notified) * 100)) : 0;
   const windowClosed = Boolean(data && (!data.windowOpen || data.status === "expired"));
   const isOrdered = data?.status === "ordered" || Boolean(data?.booking);
 
   if (loading || authLoading) {
     return (
-      <main className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <main className="flex min-h-[50vh] items-center justify-center bg-[#F6F4F1]">
+        <Loader2 className="h-8 w-8 animate-spin text-stone-400" />
       </main>
     );
   }
 
   if (!data) {
     return (
-      <main className="mx-auto max-w-lg px-4 py-16 text-center">
-        <h1 className="text-xl font-semibold">Quote request not found</h1>
+      <main className="mx-auto max-w-lg bg-[#F6F4F1] px-4 py-16 text-center">
+        <h1 className="text-xl font-semibold text-stone-900">Quote request not found</h1>
         <Button asChild className="mt-4">
           <Link href="/services">Browse services</Link>
         </Button>
@@ -120,179 +334,121 @@ export default function QuoteRequestPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
-      <div className="rounded-2xl border bg-gradient-to-b from-sky-50/80 to-white p-6 shadow-sm dark:from-slate-900 dark:to-slate-950">
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
-          <div>
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-              Aapki requirement bhej di gayi hai
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Nearby providers have received your request for{" "}
-              <span className="font-medium text-foreground">{serviceTitle}</span>. They will share
-              prices within this window.
-            </p>
+    <main className="min-h-screen bg-[#F6F4F1] px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-xl">
+        {liveBanner ? (
+          <div className="mb-4 rounded-2xl bg-stone-900 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg">
+            {liveBanner}
           </div>
-        </div>
+        ) : null}
 
-        <div className="mt-6 flex flex-wrap items-center gap-4 rounded-xl border bg-background/80 px-4 py-3">
-          <Clock className="h-5 w-5 text-blue-600" />
+        <header className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Live quotes</p>
+          <h1 className="mt-1 text-xl font-bold tracking-tight text-stone-900 sm:text-2xl">
+            {serviceTitle}
+          </h1>
+          <p className="mt-2 text-sm font-medium text-stone-800">Qty {data.quantity}</p>
+          <p className="mt-1 text-sm text-stone-600">{shortLocation(data)}</p>
+          {data.createdAt ? (
+            <p className="mt-1 text-xs text-stone-500">Requested {formatCreatedAt(data.createdAt)}</p>
+          ) : null}
+        </header>
+
+        <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
           {windowClosed || isOrdered ? (
-            <div>
-              <p className="text-sm font-semibold">
-                {isOrdered ? "Order in progress" : "Quote window closed"}
+            <p className="text-base font-semibold text-stone-900">
+              {isOrdered ? "Order in progress" : "Quote window closed"}
+            </p>
+          ) : (
+            <>
+              <p className="font-mono text-3xl font-extrabold tabular-nums tracking-tight text-[#B91C1C]">
+                {formatCountdown(secondsLeft)}
               </p>
-              <p className="text-xs text-muted-foreground">
-                {isOrdered
-                  ? "You selected a quote. Complete payment if still pending."
-                  : "New quotes cannot be submitted. You can still select an existing quote below."}
+              <p className="mt-1 text-xs font-medium text-stone-500">Window open · auto-closes</p>
+            </>
+          )}
+          <p className="mt-4 text-sm font-semibold text-stone-900">
+            {received} / {notified || "—"} quotes received
+          </p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
+            <div className="h-full rounded-full bg-teal-700" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
+            Supplier details unlock after you confirm through Imagineering India.
+          </p>
+        </section>
+
+        <section className="mt-8 space-y-4">
+          <h2 className="text-base font-bold text-stone-900">Offers</h2>
+
+          {offers.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-10 text-center">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-700" />
+              <p className="mt-3 text-sm font-semibold text-stone-900">
+                Searching verified suppliers…
+              </p>
+              <p className="mt-1 text-sm text-stone-500">
+                {notified} suppliers notified.
+                <br />
+                Waiting for responses…
               </p>
             </div>
           ) : (
-            <div>
-              <p className="font-mono text-2xl font-bold tabular-nums tracking-tight">
-                {formatCountdown(secondsLeft)}
-              </p>
-              <p className="text-xs text-muted-foreground">Time left for providers to quote</p>
-            </div>
+            offers.map((offer: any) => {
+              const offerId = String(offer.id);
+              return (
+                <OfferCard
+                  key={offerId}
+                  offer={offer}
+                  expanded={expandedId === offerId || Boolean(offer.isRecommended)}
+                  onToggle={() => setExpandedId((cur) => (cur === offerId ? null : offerId))}
+                  canSelect={
+                    offer.status === "active" && data.status !== "cancelled" && !isOrdered
+                  }
+                  isOrdered={isOrdered}
+                  onSelect={() =>
+                    router.push(
+                      `/quote-requests/${id}/confirm?offerId=${encodeURIComponent(offerId)}`
+                    )
+                  }
+                />
+              );
+            })
           )}
-        </div>
+        </section>
 
-        <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-          <p className="flex items-center gap-2">
-            <Package className="h-4 w-4" /> Qty: {data.quantity}
+        <div className="mt-8 space-y-3 pb-8 text-center">
+          <p className="text-xs text-stone-500">
+            Live updates arrive automatically. Refresh if needed.
           </p>
-          <p className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            {data.preferredDate} · {data.preferredTime}
-          </p>
-          <p className="flex items-start gap-2 sm:col-span-2">
-            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              {data.address?.address}, {data.address?.city}, {data.address?.state}
-              {data.address?.zipCode ? ` ${data.address.zipCode}` : ""}
-            </span>
-          </p>
-          <p className="text-xs sm:col-span-2">
-            Sent to {data.notifiedProviderCount || 0} nearby provider
-            {(data.notifiedProviderCount || 0) === 1 ? "" : "s"}
-          </p>
-        </div>
-      </div>
-
-      <section className="mt-8 space-y-4">
-        <h2 className="text-lg font-semibold">Quotes received ({offers.length})</h2>
-
-        {offers.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            {windowClosed
-              ? "No quotes arrived in time. You can submit a new request from the product page."
-              : "Waiting for providers to respond… This page updates automatically."}
-          </div>
-        ) : (
-          offers.map((offer: any, index: number) => {
-            const offerId = String(offer.id);
-            const canSelect = offer.status === "active" && data.status !== "cancelled" && !isOrdered;
-
-            return (
-              <div key={offerId} className="rounded-xl border bg-card p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">Quote {index + 1}</p>
-                    {offer.notes ? (
-                      <p className="mt-1 text-sm text-muted-foreground">{offer.notes}</p>
-                    ) : null}
-                    {offer.estimatedDelivery ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Timeline: {offer.estimatedDelivery}
-                      </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Delivery:{" "}
-                      {offer.deliveryOption === "paid"
-                        ? `Paid · ${formatINR(offer.deliveryCharge || 0)}`
-                        : offer.deliveryOption === "not_available"
-                          ? "Not available"
-                          : "Free"}
-                    </p>
-                    {Array.isArray(offer.sampleImages) && offer.sampleImages.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {offer.sampleImages.map((url: string) => (
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block h-16 w-16 overflow-hidden rounded-md border"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt="Sample" className="h-full w-full object-cover" />
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
-                    {offer.status === "selected" ? (
-                      <p className="mt-1 text-xs font-medium text-emerald-700">Selected</p>
-                    ) : null}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold tabular-nums">{formatINR(offer.amount)}</p>
-                    {offer.deliveryOption === "paid" && Number(offer.deliveryCharge || 0) > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Total + delivery:{" "}
-                        {formatINR(Number(offer.amount) + Number(offer.deliveryCharge || 0))}
-                      </p>
-                    ) : null}
-                    {canSelect ? (
-                      <Button
-                        size="sm"
-                        className="mt-2"
-                        onClick={() =>
-                          router.push(`/quote-requests/${id}/confirm?offerId=${encodeURIComponent(offerId)}`)
-                        }
-                      >
-                        Select
-                      </Button>
-                    ) : null}
-                    {isOrdered && offer.status === "selected" ? (
-                      <Button size="sm" className="mt-2" asChild>
-                        <Link href="/dashboard/buyer/orders">View order</Link>
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </section>
-
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Button variant="outline" asChild>
-          <Link href="/services">Back to services</Link>
-        </Button>
-        {data.status === "open" || data.status === "expired" ? (
-          <Button
-            variant="ghost"
-            onClick={async () => {
-              try {
-                await api.quoteRequests.cancel(id);
-                clearActiveQuoteRequest(id);
-                toast({ title: "Request cancelled" });
-                router.push("/services");
-              } catch (err: any) {
-                toast({
-                  title: "Cancel failed",
-                  description: err?.message,
-                  variant: "destructive",
-                });
-              }
-            }}
-          >
-            Cancel request
+          <Button variant="outline" asChild>
+            <Link href="/services">Back to services</Link>
           </Button>
-        ) : null}
+          {data.status === "open" || data.status === "expired" ? (
+            <div>
+              <Button
+                variant="ghost"
+                className="text-[#B91C1C] hover:bg-red-50 hover:text-[#991B1B]"
+                onClick={async () => {
+                  try {
+                    await api.quoteRequests.cancel(id);
+                    clearActiveQuoteRequest(id);
+                    toast({ title: "Request cancelled" });
+                    router.push("/services");
+                  } catch (err: any) {
+                    toast({
+                      title: "Cancel failed",
+                      description: err?.message,
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                Cancel request
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </main>
   );
