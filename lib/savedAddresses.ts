@@ -49,21 +49,13 @@ function normalizeAddress(input: SavedAddress): SavedAddress {
 }
 
 function ensureSingleDefault(addresses: SavedAddress[]): SavedAddress[] {
-  let foundDefault = false;
-  return addresses.map((entry, index) => {
-    if (entry.isDefault && !foundDefault) {
-      foundDefault = true;
-      return entry;
-    }
-    if (entry.isDefault && foundDefault) {
-      return { ...entry, isDefault: false };
-    }
-    if (!foundDefault && index === 0) {
-      foundDefault = true;
-      return { ...entry, isDefault: true };
-    }
-    return entry;
-  });
+  if (addresses.length === 0) return [];
+  const preferred = addresses.findIndex((entry) => entry.isDefault);
+  const keepIndex = preferred >= 0 ? preferred : 0;
+  return addresses.map((entry, index) => ({
+    ...entry,
+    isDefault: index === keepIndex,
+  }));
 }
 
 function isLoggedIn(): boolean {
