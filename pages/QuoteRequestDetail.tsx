@@ -78,7 +78,7 @@ function OfferCard({
   const total = Number(
     offer.totalAmount ?? Number(offer.amount || 0) + Number(offer.deliveryCharge || 0)
   );
-  const material = Number(offer.materialAmount ?? offer.amount || 0);
+  const material = Number(offer.materialAmount ?? (offer.amount || 0));
   const delivery = Number(offer.deliveryCharge || 0);
   const score = Number(offer.offerScore || 0);
   const recommended = Boolean(offer.isRecommended);
