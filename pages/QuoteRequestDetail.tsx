@@ -127,6 +127,26 @@ function OfferCard({
         </div>
       </button>
 
+      {Array.isArray(offer.sampleImages) && offer.sampleImages.length > 0 ? (
+        <div className="mt-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+            Sample images
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {offer.sampleImages
+              .filter((url: unknown) => typeof url === "string" && url.trim())
+              .map((url: string) => (
+                <img
+                  key={url}
+                  src={url}
+                  alt="Offer sample"
+                  className="h-20 w-20 shrink-0 rounded-xl border border-stone-200 object-cover"
+                />
+              ))}
+          </div>
+        </div>
+      ) : null}
+
       {expanded ? (
         <div className="mt-4 space-y-2 border-t border-stone-200 pt-3 text-sm">
           <div className="flex justify-between gap-3">
