@@ -888,20 +888,32 @@ export default function ProviderProfile() {
                 <div className="space-y-4">
                   <h2 className="text-2xl font-bold text-foreground">{t("portfolio")}</h2>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {providerDisplay.portfolio.map((item) => (
+                    {providerDisplay.portfolio.map((item) => {
+                      const isVideo = (item as { mediaType?: string }).mediaType === 'video';
+                      return (
                       <Card key={item.id} className="overflow-hidden group cursor-pointer">
-                        <div className="aspect-[4/3] overflow-hidden">
-                          <img
-                            src={item.image}
-                            alt={item.title}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
+                        <div className="aspect-[4/3] overflow-hidden bg-muted">
+                          {isVideo ? (
+                            <video
+                              src={item.image}
+                              className="h-full w-full object-cover"
+                              controls
+                              preload="metadata"
+                            />
+                          ) : (
+                            <img
+                              src={item.image}
+                              alt={item.title}
+                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                          )}
                         </div>
                         <CardContent className="p-4">
                           <h3 className="font-medium">{item.title}</h3>
                         </CardContent>
                       </Card>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
