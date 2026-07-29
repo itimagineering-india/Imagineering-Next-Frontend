@@ -161,7 +161,7 @@ const faqCategories = [
       {
         question: "When do I receive payments?",
         answer:
-          "Payments are processed after job completion and buyer confirmation. For Platform Leads, commission is deducted before payout. Payouts are processed weekly on Fridays.",
+          "Payments are released after job completion and buyer confirmation. Commission is deducted before payout. Transfers are initiated by Imagineering India via IMPS after payout KYC approval.",
       },
       {
         question: "What commission does the platform charge?",
@@ -171,7 +171,7 @@ const faqCategories = [
       {
         question: "How do I withdraw my earnings?",
         answer:
-          "Go to Earnings > Payout History. Once your balance reaches the minimum threshold (₹5,000), you can request a payout. Payments are transferred to your registered bank account within 3-5 business days.",
+          "Complete Payout KYC under Payouts, then track transfers in Payout History. Payouts are initiated by Imagineering India after each completed job — there is no self-service withdrawal button.",
       },
       {
         question: "Why is my payment on hold?",
@@ -262,8 +262,8 @@ const platformPolicies = [
       <ul>
         <li>Payments are processed after job completion</li>
         <li>Commission is deducted from Platform Lead bookings</li>
-        <li>Payouts are processed weekly (Fridays)</li>
-        <li>Minimum payout threshold: ₹5,000</li>
+        <li>Payouts are initiated by Imagineering India after KYC approval</li>
+        <li>Transfers are sent via IMPS to your verified bank account</li>
       </ul>
     `,
   },
