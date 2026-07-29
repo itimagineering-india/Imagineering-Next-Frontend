@@ -19,12 +19,10 @@ interface SocialProfile {
   photoURL?: string;
 }
 
-type SocialProvider = "google" | "facebook";
+type SocialProvider = "google";
 
-function getProviderKeys(provider: SocialProvider) {
-  return provider === "facebook"
-    ? { tempToken: "facebookTempToken", profile: "facebookProfile", label: "Facebook" }
-    : { tempToken: "googleTempToken", profile: "googleProfile", label: "Google" };
+function getProviderKeys(_provider: SocialProvider) {
+  return { tempToken: "googleTempToken", profile: "googleProfile", label: "Google" };
 }
 
 export default function SignupComplete() {
@@ -39,27 +37,10 @@ export default function SignupComplete() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const providerParam = params.get("provider");
-    const resolvedProvider: SocialProvider =
-      providerParam === "facebook" ? "facebook" : "google";
-    const keys = getProviderKeys(resolvedProvider);
+    const keys = getProviderKeys("google");
 
     try {
-      let storedProfile = sessionStorage.getItem(keys.profile);
-      if (!storedProfile && resolvedProvider === "google") {
-        storedProfile = sessionStorage.getItem("facebookProfile");
-        if (storedProfile) {
-          setProvider("facebook");
-          const parsed: SocialProfile = JSON.parse(storedProfile);
-          if (!parsed.email) {
-            router.push("/login");
-            return;
-          }
-          setProfile(parsed);
-          return;
-        }
-      }
+      const storedProfile = sessionStorage.getItem(keys.profile);
       if (!storedProfile) {
         router.push("/login");
         return;
@@ -69,7 +50,7 @@ export default function SignupComplete() {
         router.push("/login");
         return;
       }
-      setProvider(resolvedProvider);
+      setProvider("google");
       setProfile(parsed);
     } catch {
       router.push("/login");
@@ -108,12 +89,7 @@ export default function SignupComplete() {
     setIsSubmitting(true);
 
     try {
-      const completeSignup =
-        provider === "facebook"
-          ? api.auth.facebookCompleteSignup
-          : api.auth.googleCompleteSignup;
-
-      const response = await completeSignup({
+      const response = await api.auth.googleCompleteSignup({
         tempToken,
         role,
         acceptTerms: true,
