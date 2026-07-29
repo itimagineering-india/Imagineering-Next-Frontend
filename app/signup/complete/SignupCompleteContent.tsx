@@ -7,12 +7,10 @@ import { apiClient, setAuthToken } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 
-type SocialProvider = "google" | "facebook";
+type SocialProvider = "google";
 
-function getProviderKeys(provider: SocialProvider) {
-  return provider === "facebook"
-    ? { tempToken: "facebookTempToken", profile: "facebookProfile", label: "Facebook" }
-    : { tempToken: "googleTempToken", profile: "googleProfile", label: "Google" };
+function getProviderKeys(_provider: SocialProvider) {
+  return { tempToken: "googleTempToken", profile: "googleProfile", label: "Google" };
 }
 
 export default function SignupCompleteContent() {
@@ -30,26 +28,10 @@ export default function SignupCompleteContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const providerParam = searchParams?.get("provider");
-    const resolvedProvider: SocialProvider =
-      providerParam === "facebook" ? "facebook" : "google";
-    const keys = getProviderKeys(resolvedProvider);
+    const keys = getProviderKeys("google");
 
     try {
       const stored = sessionStorage.getItem(keys.profile);
-      if (!stored && resolvedProvider === "google") {
-        const fbStored = sessionStorage.getItem("facebookProfile");
-        if (fbStored) {
-          setProvider("facebook");
-          const parsed = JSON.parse(fbStored);
-          if (!parsed?.email) {
-            router.replace("/login");
-            return;
-          }
-          setProfile(parsed);
-          return;
-        }
-      }
       if (!stored) {
         router.replace("/login");
         return;
@@ -59,7 +41,7 @@ export default function SignupCompleteContent() {
         router.replace("/login");
         return;
       }
-      setProvider(resolvedProvider);
+      setProvider("google");
       setProfile(parsed);
     } catch {
       router.replace("/login");
@@ -98,12 +80,7 @@ export default function SignupCompleteContent() {
 
     setIsSubmitting(true);
     try {
-      const completeSignup =
-        provider === "facebook"
-          ? apiClient.auth.facebookCompleteSignup
-          : apiClient.auth.googleCompleteSignup;
-
-      const res = await completeSignup({
+      const res = await apiClient.auth.googleCompleteSignup({
         tempToken,
         role,
         acceptTerms: true,
