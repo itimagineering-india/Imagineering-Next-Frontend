@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { signInWithEmail, signInWithGoogle, signInWithFacebook } from "@/lib/firebaseAuth";
+import { signInWithEmail, signInWithGoogle } from "@/lib/firebaseAuth";
 import { useAuth, AUTH_ME_QUERY_KEY } from "@/contexts/AuthContext";
 import api, { setAuthToken } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +38,7 @@ const STORAGE_KEY = "ii-onboarding-login-v1";
 const PRIMARY = "#ef4444";
 const BG = "#f9fafb";
 
-type LoginMethod = "phone" | "email" | "google" | "facebook";
+type LoginMethod = "phone" | "email" | "google";
 
 export function OnboardingLoginFlow() {
   const router = useRouter();
@@ -92,7 +92,7 @@ export function OnboardingLoginFlow() {
       if (raw) {
         const p = JSON.parse(raw) as Record<string, unknown>;
         if (p.mainStep === 1 || p.mainStep === 2) setMainStep(p.mainStep);
-        if (p.loginMethod === "phone" || p.loginMethod === "email" || p.loginMethod === "google" || p.loginMethod === "facebook") {
+        if (p.loginMethod === "phone" || p.loginMethod === "email" || p.loginMethod === "google") {
           setLoginMethod(p.loginMethod);
         }
         if (typeof p.email === "string") setEmail(p.email);
@@ -361,47 +361,6 @@ export function OnboardingLoginFlow() {
     }
   };
 
-  const handleFacebookSignIn = async () => {
-    setError("");
-    setIsLoading(true);
-    try {
-      const result = await signInWithFacebook();
-      if (result.success && result.needsSignupCompletion) {
-        try {
-          sessionStorage.removeItem(STORAGE_KEY);
-        } catch {
-          /* ignore */
-        }
-        router.push(`${signupCompleteHref}${signupCompleteHref.includes("?") ? "&" : "?"}provider=facebook`);
-        return;
-      }
-      if (result.success) {
-        await syncSessionAfterToken();
-        try {
-          sessionStorage.removeItem(STORAGE_KEY);
-        } catch {
-          /* ignore */
-        }
-        toast({ title: "Welcome back!" });
-        handleRedirect();
-        return;
-      }
-      if (result.error === "ADMIN_RESTRICTED") {
-        toast({ title: "Admin access required", variant: "destructive" });
-        window.location.href = "/admin/login";
-        return;
-      }
-      const msg = result.error || "Facebook sign-in failed";
-      setError(msg);
-      toast({ title: "Facebook sign-in failed", description: msg, variant: "destructive" });
-    } catch {
-      setError("Something went wrong.");
-      toast({ title: "Error", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const methodCard = (method: LoginMethod, title: string, subtitle: string, Icon: LucideIcon) => {
     const selected = loginMethod === method;
     return (
@@ -538,29 +497,6 @@ export function OnboardingLoginFlow() {
                     {loginMethod === "google" && <Check className="h-5 w-5 shrink-0 text-red-500" />}
                   </div>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setLoginMethod("facebook")}
-                  className={cn(
-                    "relative w-full rounded-2xl border-2 p-4 sm:p-6 text-left transition-all duration-300 hover:scale-[1.01] hover:shadow-md",
-                    loginMethod === "facebook"
-                      ? "border-red-500 bg-red-50/80 shadow-md ring-1 ring-red-500/20"
-                      : "border-gray-200 bg-white hover:border-red-100"
-                  )}
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm text-[#1877F2]">
-                      <svg className="h-6 w-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                        <path d="M22 12.07C22 6.48 17.52 2 11.93 2 6.34 2 1.86 6.48 1.86 12.07c0 4.86 3.44 8.9 7.94 9.8v-6.93H7.64v-2.87h2.16V9.83c0-2.14 1.27-3.33 3.22-3.33.93 0 1.9.17 1.9.17v2.1h-1.07c-1.05 0-1.38.65-1.38 1.32v1.59h2.35l-.38 2.87h-1.97v6.93c4.5-.9 7.94-4.94 7.94-9.8Z" />
-                      </svg>
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-gray-900">Facebook</p>
-                      <p className="text-sm text-gray-500">Continue with your Facebook account</p>
-                    </div>
-                    {loginMethod === "facebook" && <Check className="h-5 w-5 shrink-0 text-red-500" />}
-                  </div>
-                </button>
               </div>
               <Button
                 type="button"
@@ -569,13 +505,9 @@ export function OnboardingLoginFlow() {
                     void handleGoogleSignIn();
                     return;
                   }
-                  if (loginMethod === "facebook") {
-                    void handleFacebookSignIn();
-                    return;
-                  }
                   onContinueMethod();
                 }}
-                disabled={(loginMethod === "google" || loginMethod === "facebook") && isLoading}
+                disabled={loginMethod === "google" && isLoading}
                 className="h-12 w-full rounded-xl text-base font-semibold text-white shadow-lg shadow-red-500/25"
                 style={{ backgroundColor: PRIMARY }}
               >
@@ -583,11 +515,6 @@ export function OnboardingLoginFlow() {
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Opening Google…
-                  </>
-                ) : loginMethod === "facebook" && isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Opening Facebook…
                   </>
                 ) : (
                   <>
