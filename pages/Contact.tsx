@@ -35,7 +35,7 @@ export async function getServerSideProps() { return { props: {} }; }
 
 const contactMethods = [
   { icon: Mail, titleKey: "contact.emailUs", descriptionKey: "contact.emailDesc", contact: "it.imagineering@gmail.com", action: "mailto:it.imagineering@gmail.com", gradient: "from-blue-500 to-cyan-500" },
-  { icon: Phone, titleKey: "contact.callUs", descriptionKey: "contact.callDesc", contact: "+91 9876543212", action: "tel:+919876543212", gradient: "from-green-500 to-emerald-500" },
+  { icon: Phone, titleKey: "contact.callUs", descriptionKey: "contact.callDesc", contact: "+91 9993578006", action: "tel:+919993578006", gradient: "from-green-500 to-emerald-500" },
   { icon: MessageSquare, titleKey: "contact.liveChat", descriptionKey: "contact.chatDesc", contactKey: "contact.startConversation", action: "#chat", gradient: "from-purple-500 to-pink-500" },
 ];
 
