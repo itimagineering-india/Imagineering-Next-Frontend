@@ -98,10 +98,11 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   const { t } = useTranslation("home");
   const category = serviceCategories[index];
 
-  const servicesHref = useMemo(
-    () => `/services?${buildServicesBrowseQuery(category?.slug ?? "")}`,
-    [category?.slug]
-  );
+  const servicesHref = useMemo(() => {
+    if (category?.slug === "construction-materials") return "/construction-materials";
+    if (category?.slug === "manpower") return "/manpower";
+    return `/services?${buildServicesBrowseQuery(category?.slug ?? "")}`;
+  }, [category?.slug]);
 
   if (!category) {
     return (
