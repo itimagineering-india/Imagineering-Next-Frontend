@@ -650,6 +650,7 @@ export const api = {
     getAll: (params?: {
       category?: string;
       subcategory?: string;
+      catalogProductId?: string;
       featured?: boolean;
       minPrice?: number;
       maxPrice?: number;
@@ -657,6 +658,7 @@ export const api = {
       page?: number;
       limit?: number;
       sort?: string;
+      q?: string;
     }) => {
       const queryParams = new URLSearchParams();
       if (params) {
@@ -863,6 +865,7 @@ export const api = {
       categorySlug?: string;
       subcategory?: string;
       materialTypeKey?: string;
+      hireMode?: string;
       search?: string;
       page?: number;
       limit?: number;
@@ -922,6 +925,7 @@ export const api = {
       lng?: number;
       radiusKm?: number;
       q?: string;
+      sort?: string;
       mapMarkers?: number | boolean;
     }) => {
       const queryParams = new URLSearchParams();
@@ -1350,6 +1354,59 @@ export const api = {
       return apiRequest(`/api/bookings/buyer${queryString ? `?${queryString}` : ''}`, options);
     },
     getById: (id: string) => apiRequest(`/api/bookings/${id}`),
+    previewManpowerDispatch: (payload: {
+      catalogProductId: string;
+      hireMode: string;
+      hours?: number;
+    }) =>
+      apiRequest<{
+        subtotal: number;
+        platformFee: number;
+        platformFeeGst: number;
+        gst: number;
+        total: number;
+        quantity: number;
+        unitPrice: number;
+        priceType: string;
+        productName: string;
+      }>("/api/bookings/manpower-dispatch/preview", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    createManpowerDispatch: (payload: {
+      catalogProductId: string;
+      hireMode: string;
+      hours?: number;
+      paymentMethod: string;
+      couponUsageId?: string;
+      location: {
+        address: string;
+        city: string;
+        state: string;
+        zipCode?: string;
+        coordinates?: { lat: number; lng: number };
+      };
+      notes?: string;
+    }) =>
+      apiRequest<{
+        bookingId: string;
+        status: string;
+        requiresPayment: boolean;
+        total: number;
+        candidateCount: number;
+        providerResponseDeadline?: string;
+        couponDiscount?: number;
+        couponCode?: string;
+      }>("/api/bookings/manpower-dispatch", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    getManpowerDispatch: (bookingId: string) =>
+      apiRequest(`/api/bookings/manpower-dispatch/${bookingId}`),
+    retryManpowerDispatchSearch: (bookingId: string) =>
+      apiRequest(`/api/bookings/manpower-dispatch/${bookingId}/retry-search`, {
+        method: "POST",
+      }),
     cancelByBuyer: (id: string, reason?: string) =>
       apiRequest(`/api/bookings/${id}/cancel`, {
         method: 'POST',
