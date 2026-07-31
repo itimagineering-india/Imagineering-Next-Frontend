@@ -19,6 +19,7 @@ import { format, parse } from "date-fns";
 import { FileText, Send, Paperclip, Loader2, Crosshair, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/contexts/UserLocationContext";
+import { getSubcategoryNames } from "@/lib/categorySubcategories";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -27,7 +28,7 @@ type CategoryRow = {
   id?: string;
   name: string;
   slug: string;
-  subcategories?: string[];
+  subcategories?: unknown;
 };
 
 /** When API has no subcategories for manpower, still offer common labour types */
@@ -163,11 +164,11 @@ export default function SubmitRequirement() {
   );
 
   const subcategoryOptions = useMemo(() => {
-    if (!selectedCategory) return [];
-    const raw = selectedCategory.subcategories;
-    if (Array.isArray(raw) && raw.length > 0) return raw;
-    if (selectedCategory.slug === "manpower") return MANPOWER_FALLBACK_SUBS;
-    return [];
+    if (!selectedCategory) return [] as string[];
+    const names = getSubcategoryNames(selectedCategory.subcategories);
+    if (names.length > 0) return names;
+    if (selectedCategory.slug === "manpower") return [...MANPOWER_FALLBACK_SUBS];
+    return [] as string[];
   }, [selectedCategory]);
 
   const sortedCategories = useMemo(
