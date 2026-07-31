@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Slider } from "@/components/ui/slider";
 import {
   Accordion,
   AccordionContent,
@@ -14,8 +12,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { X, Star, CheckCircle2, Sparkles, Users } from "lucide-react";
-import api from "@/lib/api-client";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { useTranslation } from "react-i18next";
 
@@ -36,14 +32,10 @@ export interface FilterState {
   deliveryTime: string[];
   verified: boolean;
   featured: boolean;
-  provider?: string; // Provider ID filter
+  provider?: string; // Provider ID filter (URL / legacy)
   location?: string;
   sortBy?: string;
 }
-
-type ProviderListResponse = {
-  providers?: Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>;
-};
 
 const deliveryOptions = [
   { value: "1day", labelKey: "filters.upTo1Day" },
@@ -52,10 +44,6 @@ const deliveryOptions = [
   { value: "14days", labelKey: "filters.upTo14Days" },
   { value: "30days", labelKey: "filters.upTo30Days" },
 ];
-
-// Cache for providers list
-const providersCache: { data: Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>; timestamp: number } | null = null;
-const PROVIDERS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
 const DEFAULT_FILTERS: FilterState = {
   category: [],
@@ -90,16 +78,13 @@ export function FilterPanel({
   className,
   categories = [],
   value,
-  showVerifiedOnlyFilter = true,
+  showVerifiedOnlyFilter: _showVerifiedOnlyFilter = true,
 }: FilterPanelProps) {
   const { t } = useTranslation("services");
-  const [providers, setProviders] = useState<Array<{ _id: string; name?: string; businessName?: string; user?: { name: string; email?: string } }>>([]);
-  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
-  const [hasFetchedProviders, setHasFetchedProviders] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>(value ?? DEFAULT_FILTERS);
 
-  const [openAccordions, setOpenAccordions] = useState<string[]>(["category", "price", "rating"]);
+  const [openAccordions, setOpenAccordions] = useState<string[]>(["category", "rating"]);
 
   useEffect(() => {
     if (!value) return;
@@ -130,52 +115,7 @@ export function FilterPanel({
       onFilterChangeRef.current?.(nextFilters);
       return nextFilters;
     });
-    setProviders((prev) => (prev.length === 0 ? prev : []));
-    setHasFetchedProviders((prev) => (prev ? false : prev));
   }, [activeCategorySlug]);
-
-  // Lazy fetch providers - only when accordion is opened (no limit – fetch all for dropdown)
-  const fetchProviders = async (categorySlug?: string) => {
-    const cacheVersion = 2; // bump to invalidate old cache when changing limit behaviour
-    const cacheKey = `top_providers_cache_v${cacheVersion}_${categorySlug || 'all'}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < PROVIDERS_CACHE_TTL) {
-          setProviders(data);
-          setHasFetchedProviders(true);
-          return;
-        }
-      } catch (e) {
-        // Invalid cache, continue to fetch
-      }
-    }
-
-    if (hasFetchedProviders) return; // Already fetched or fetching
-    
-    setIsLoadingProviders(true);
-    try {
-      const response = await api.providers.getAll(
-        categorySlug ? { categorySlug } : {}
-      );
-      if (response.success && response.data) {
-        const providersData = (response.data as ProviderListResponse).providers || [];
-        setProviders(providersData);
-        setHasFetchedProviders(true);
-        
-        // Cache the result
-        localStorage.setItem(cacheKey, JSON.stringify({
-          data: providersData,
-          timestamp: Date.now(),
-        }));
-      }
-    } catch {
-      setProviders([]);
-    } finally {
-      setIsLoadingProviders(false);
-    }
-  };
 
   const updateFilter = <K extends keyof FilterState>(
     key: K,
@@ -237,17 +177,8 @@ export function FilterPanel({
     filters.subcategory.length +
     filters.deliveryTime.length +
     (filters.rating > 0 ? 1 : 0) +
-    (showVerifiedOnlyFilter && filters.verified ? 1 : 0) +
-    (filters.featured ? 1 : 0) +
     (filters.provider ? 1 : 0) +
-    (filters.location ? 1 : 0) +
-    (filters.priceRange[0] > 0 || filters.priceRange[1] < 5000 ? 1 : 0);
-
-  useEffect(() => {
-    if (openAccordions.includes("provider") && !isLoadingProviders) {
-      fetchProviders(filters.category[0]);
-    }
-  }, [openAccordions, activeCategorySlug, isLoadingProviders]);
+    (filters.location ? 1 : 0);
 
   return (
     <div className={className}>
@@ -273,10 +204,6 @@ export function FilterPanel({
         className="space-y-0"
         onValueChange={(value) => {
           setOpenAccordions(value);
-          // Lazy load providers when provider accordion is opened
-          if (value.includes("provider") && !hasFetchedProviders && !isLoadingProviders) {
-            fetchProviders(filters.category[0]);
-          }
         }}
       >
         {/* Categories */}
@@ -368,95 +295,6 @@ export function FilterPanel({
         </AccordionItem>
         )}
 
-        {/* Top Providers */}
-        <AccordionItem value="provider" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">
-            {t("filters.topProvider")}
-          </AccordionTrigger>
-          <AccordionContent className="!pb-2 !pt-0">
-            <div className="space-y-1.5 pt-1">
-              {isLoadingProviders ? (
-                <p className="text-sm text-muted-foreground py-2">{t("filters.loadingProviders")}</p>
-              ) : providers.length > 0 ? (
-                <RadioGroup
-                  value={filters.provider || ""}
-                  onValueChange={(value) => {
-                    updateFilter("provider", value || undefined);
-                  }}
-                >
-                  {providers.map((provider) => {
-                    // Prioritize businessName from business details, then fallback to name or user name
-                    const providerName = provider.businessName || provider.name || provider.user?.name || "Unknown Provider";
-                    const providerId = provider._id;
-                    return (
-                      <div key={providerId} className="flex items-center space-x-2 py-0.5">
-                        <RadioGroupItem
-                          value={providerId}
-                          id={`provider-${providerId}`}
-                          className="h-4 w-4"
-                        />
-                        <Label
-                          htmlFor={`provider-${providerId}`}
-                          className="text-sm font-normal cursor-pointer flex-1"
-                        >
-                          {providerName}
-                        </Label>
-                      </div>
-                    );
-                  })}
-                </RadioGroup>
-              ) : (
-                <p className="text-sm text-muted-foreground py-2">{t("filters.noProviders")}</p>
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Price Range */}
-        <AccordionItem value="price" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">{t("filters.priceRange")}</AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-3 pt-1 min-h-[120px]">
-              <Slider
-                value={filters.priceRange}
-                onValueChange={(value) =>
-                  updateFilter("priceRange", value as [number, number])
-                }
-                max={5000}
-                step={50}
-                className="mt-1"
-              />
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  value={filters.priceRange[0]}
-                  onChange={(e) =>
-                    updateFilter("priceRange", [
-                      Number(e.target.value),
-                      filters.priceRange[1],
-                    ])
-                  }
-                  className="w-24"
-                  placeholder={t("filters.min")}
-                />
-                <span className="text-muted-foreground">{t("filters.to")}</span>
-                <Input
-                  type="number"
-                  value={filters.priceRange[1]}
-                  onChange={(e) =>
-                    updateFilter("priceRange", [
-                      filters.priceRange[0],
-                      Number(e.target.value),
-                    ])
-                  }
-                  className="w-24"
-                  placeholder={t("filters.max")}
-                />
-              </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
         {/* Rating */}
         <AccordionItem value="rating" className="border-b">
           <AccordionTrigger className="py-3 text-sm">{t("filters.minimumRating")}</AccordionTrigger>
@@ -498,47 +336,6 @@ export function FilterPanel({
                   </Label>
                 </div>
               ))}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-
-        {/* Verified (optional) + Featured */}
-        <AccordionItem value="verified" className="border-b">
-          <AccordionTrigger className="py-3 text-sm">
-            {showVerifiedOnlyFilter ? t("filters.providerStatus") : t("filters.highlights")}
-          </AccordionTrigger>
-          <AccordionContent className="!pb-2 !pt-0">
-            <div className="space-y-2 pt-1">
-              {showVerifiedOnlyFilter && (
-                <div className="flex items-center space-x-2 py-0.5">
-                  <Checkbox
-                    id="verified"
-                    checked={filters.verified}
-                    onCheckedChange={(checked) =>
-                      updateFilter("verified", checked as boolean)
-                    }
-                    className="h-4 w-4"
-                  />
-                  <Label htmlFor="verified" className="text-sm font-normal cursor-pointer flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    {t("filters.verifiedOnly")}
-                  </Label>
-                </div>
-              )}
-              <div className="flex items-center space-x-2 py-0.5">
-                <Checkbox
-                  id="featured"
-                  checked={filters.featured}
-                  onCheckedChange={(checked) =>
-                    updateFilter("featured", checked as boolean)
-                  }
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="featured" className="text-sm font-normal cursor-pointer flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-warning" />
-                  {t("filters.featuredOnly")}
-                </Label>
-              </div>
             </div>
           </AccordionContent>
         </AccordionItem>
