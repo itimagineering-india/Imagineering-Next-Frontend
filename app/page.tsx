@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { HomeRequirementPopup } from "@/components/home/HomeRequirementPopup";
 import { HeroSection } from "@/components/home/HeroSection";
 import { SearchBarSection } from "@/components/home/SearchBarSection";
+import { FeaturedCategoryCardsSection } from "@/components/home/FeaturedCategoryCardsSection";
+import { TrustStatsSection } from "@/components/home/TrustStatsSection";
 import { ServicesSection } from "@/components/home/ServicesSection";
 import { HomePromoBannersSection } from "@/components/home/HomePromoBannersSection";
 import { ConstructionCalculatorBannerSection } from "@/components/home/ConstructionCalculatorBannerSection";
@@ -27,7 +29,7 @@ export const metadata: Metadata = {
   },
 };
 
-/** Home layout: Hero → Search → Services → Jobs → Top providers → Categories */
+/** Home layout: Hero → Search → Featured categories → Services → Top providers → Categories */
 export default async function Home() {
   const [banners, categorySections, topProviders] = await Promise.all([
     getHomeBanners("home"),
@@ -41,6 +43,8 @@ export default async function Home() {
       <main className="flex-1">
         <HeroSection initialBanners={banners} />
         <SearchBarSection />
+        <FeaturedCategoryCardsSection />
+        <TrustStatsSection />
         <ServicesSection />
         <ConstructionCalculatorBannerSection />
         <HomePromoBannersSection />
