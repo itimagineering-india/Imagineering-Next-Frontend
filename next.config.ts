@@ -22,6 +22,9 @@ const nextConfig: NextConfig = {
       { source: "/buyer/job-posts/:id", destination: "/dashboard/buyer/job-posts/:id", permanent: true },
       // Single canonical URL for service detail (avoid duplicate content with /service/:slug)
       { source: "/services/:service", destination: "/service/:service", permanent: true },
+      // Construction Materials hub
+      { source: "/category/construction-materials", destination: "/construction-materials", permanent: false },
+      { source: "/category/manpower", destination: "/manpower", permanent: false },
     ];
   },
 };
