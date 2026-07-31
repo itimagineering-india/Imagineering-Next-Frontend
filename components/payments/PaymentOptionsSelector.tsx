@@ -90,7 +90,7 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
 ];
 
 type PaymentOptionsSelectorProps = {
-  value: PaymentOption;
+  value: PaymentOption | null;
   onChange: (value: PaymentOption) => void;
   amount?: number;
   className?: string;
