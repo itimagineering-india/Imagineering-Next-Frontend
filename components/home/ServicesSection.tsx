@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import { useCallback, useRef } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import { ServicePlaceholderCard, serviceCategories } from "./ServicePlaceholderCard";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
 
-/** Matches homepage reference: top row = materials → resale, then contractors → logistics, then remaining. */
+/** Matches homepage reference order. */
 const DISPLAY_ORDER = [
   "construction-materials",
   "manpower",
@@ -26,15 +27,22 @@ const DISPLAY_ORDER = [
 export function ServicesSection() {
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.1 });
   const { t } = useTranslation("home");
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   const ordered = DISPLAY_ORDER.map((slug) => serviceCategories.find((c) => c.slug === slug)).filter(
     (c): c is NonNullable<typeof c> => c != null
   );
-  const firstFive = ordered.slice(0, 5);
-  const rest = ordered.slice(5);
+
+  const scrollByCards = useCallback((direction: "left" | "right") => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const card = el.querySelector<HTMLElement>("[data-category-card]");
+    const step = (card?.offsetWidth ?? 160) + 16;
+    el.scrollBy({ left: direction === "left" ? -step * 3 : step * 3, behavior: "smooth" });
+  }, []);
 
   return (
-    <section className="relative overflow-hidden py-10 smallTablet:py-12 laptop:py-16">
+    <section className="relative overflow-hidden py-10 md:py-12 lg:py-16">
       <div className="absolute inset-0 bg-gradient-to-b from-[hsl(40_25%_98%)] via-background to-background" />
       <div className="absolute top-1/4 left-0 w-64 h-64 bg-[hsl(var(--red-accent))]/[0.06] rounded-full blur-3xl -translate-x-1/2 pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-primary/[0.04] rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
@@ -42,96 +50,70 @@ export function ServicesSection() {
       <div className="relative home-shell">
         <div
           ref={ref}
-          className={`text-center mb-10 smallTablet:mb-12 laptop:mb-16 transition-all duration-700 ${
+          className={`flex items-end justify-between gap-4 mb-8 md:mb-10 lg:mb-12 transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
         >
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3rem] xl:text-[3.25rem] 2xl:text-[3.5rem] font-bold tracking-tight mb-3 smallTablet:mb-4">
-            <span className="text-foreground">{t("services.our")} </span>
-            <span className="text-[hsl(var(--red-accent))]">{t("services.title")}</span>
-          </h2>
-          <p className="text-muted-foreground text-sm smallTablet:text-base max-w-2xl mx-auto leading-relaxed">
-            {t("services.description")}
-          </p>
-        </div>
-
-        {/* Mobile / tablet: three cards per row */}
-        <div
-          className={`laptop:hidden lg:hidden grid grid-cols-3 gap-1.5 sm:gap-3 smallTablet:gap-4 transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
-          style={{ transitionDelay: "120ms" }}
-        >
-          {ordered.map((cat, i) => {
-            const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
-            return (
-              <div
-                key={cat.slug}
-                className={`min-w-0 transition-all duration-500 ${
-                  isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-6 scale-[0.98]"
-                }`}
-                style={{ transitionDelay: `${180 + i * 35}ms` }}
-              >
-                <ServicePlaceholderCard index={idx} size="default" />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Desktop (lg+): first row 5 cards, second row remaining 8 in one line */}
-        <div
-          className={`hidden laptop:flex lg:flex flex-col gap-3 desktopXL:gap-4 transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
-          style={{ transitionDelay: "120ms" }}
-        >
-          <div className="grid grid-cols-5 gap-3 desktopXL:gap-4">
-            {firstFive.map((cat, i) => {
-              const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
-              return (
-                <div
-                  key={cat.slug}
-                  className={`min-w-0 transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-6 scale-[0.98]"
-                  }`}
-                  style={{ transitionDelay: `${180 + i * 35}ms` }}
-                >
-                  <ServicePlaceholderCard index={idx} size="default" />
-                </div>
-              );
-            })}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[3rem] font-bold tracking-tight mb-2 md:mb-3">
+              <span className="text-foreground">{t("services.our")} </span>
+              <span className="text-[hsl(var(--red-accent))]">{t("services.title")}</span>
+            </h2>
+            <p className="text-muted-foreground text-sm md:text-base max-w-2xl leading-relaxed">
+              {t("services.description")}
+            </p>
           </div>
-          <div className="grid grid-cols-8 gap-2 desktopXL:gap-3">
-            {rest.map((cat, i) => {
-              const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
-              const gi = 5 + i;
-              return (
-                <div
-                  key={cat.slug}
-                  className={`min-w-0 transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-6 scale-[0.98]"
-                  }`}
-                  style={{ transitionDelay: `${180 + gi * 35}ms` }}
-                >
-                  <ServicePlaceholderCard index={idx} size="default" />
-                </div>
-              );
-            })}
+
+          <div className="flex gap-2 shrink-0 pb-1">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-9 w-9 rounded-full md:h-10 md:w-10"
+              onClick={() => scrollByCards("left")}
+              aria-label="Scroll categories left"
+            >
+              <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-9 w-9 rounded-full md:h-10 md:w-10"
+              onClick={() => scrollByCards("right")}
+              aria-label="Scroll categories right"
+            >
+              <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
+            </Button>
           </div>
         </div>
 
         <div
-          className={`mt-10 smallTablet:mt-12 flex justify-center transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+          className={`transition-all duration-700 ${
+            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
-          style={{ transitionDelay: "400ms" }}
+          style={{ transitionDelay: "120ms" }}
         >
-          <Link
-            href={`/services?${buildServicesBrowseQuery("")}`}
-            className="inline-flex items-center justify-center rounded-xl bg-[hsl(var(--red-accent))] px-10 smallTablet:px-12 py-4 text-sm smallTablet:text-base font-semibold text-[hsl(var(--red-accent-foreground))] shadow-lg shadow-md/20 transition hover:brightness-110 hover:shadow-xl hover:shadow-md/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--red-accent))] focus-visible:ring-offset-2"
+          <div
+            ref={scrollerRef}
+            className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide touch-pan-x pb-2 snap-x snap-mandatory"
           >
-            {t("services.viewAll")}
-          </Link>
+            {ordered.map((cat, i) => {
+              const idx = serviceCategories.findIndex((c) => c.slug === cat.slug);
+              return (
+                <div
+                  key={cat.slug}
+                  data-category-card
+                  className={`shrink-0 w-[132px] sm:w-[148px] md:w-[160px] lg:w-[172px] snap-start transition-all duration-500 ${
+                    isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+                  }`}
+                  style={{ transitionDelay: `${150 + i * 30}ms` }}
+                >
+                  <ServicePlaceholderCard index={idx} size="default" />
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
