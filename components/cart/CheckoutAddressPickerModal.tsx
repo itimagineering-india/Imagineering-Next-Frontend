@@ -14,11 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { SavedAddress } from "@/lib/savedAddresses";
-import { upsertSavedAddress } from "@/lib/savedAddresses";
+import { formatSavedAddressLine, upsertSavedAddress } from "@/lib/savedAddresses";
 import { useGeocoderByPolicy, type PlaceDetails } from "@/hooks/useGeocoderByPolicy";
 import { buildAddressGeocodeQuery, geocodeAddressToCoordinates } from "@/lib/geocodeAddress";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Loader2, MapPin, Plus } from "lucide-react";
+import { Check, ChevronRight, Loader2, MapPin, Plus } from "lucide-react";
 
 const inputClass =
   "rounded-xl border-slate-200 transition-all duration-200 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/25 dark:border-slate-700";
@@ -72,6 +72,8 @@ export function CheckoutAddressPickerModal({
 }: CheckoutAddressPickerModalProps) {
   const [showAdd, setShowAdd] = useState(false);
   const [newLabel, setNewLabel] = useState("Home");
+  const [newHouseNo, setNewHouseNo] = useState("");
+  const [newLandmark, setNewLandmark] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newCity, setNewCity] = useState("");
   const [newState, setNewState] = useState("");
@@ -168,6 +170,8 @@ export function CheckoutAddressPickerModal({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         label: newLabel.trim() || "Address",
         address: line,
+        ...(newHouseNo.trim() ? { houseNo: newHouseNo.trim() } : {}),
+        ...(newLandmark.trim() ? { landmark: newLandmark.trim() } : {}),
         city: newCity.trim(),
         state: newState.trim(),
         zipCode: newZip.trim(),
@@ -179,6 +183,8 @@ export function CheckoutAddressPickerModal({
       const saved = next.find((a) => a.id === row.id) || row;
       onSelect(saved);
       setNewAddress("");
+      setNewHouseNo("");
+      setNewLandmark("");
       setNewCity("");
       setNewState("");
       setNewZip("");
@@ -203,56 +209,66 @@ export function CheckoutAddressPickerModal({
       >
         <DialogHeader className="shrink-0 space-y-1 border-b border-slate-200/90 px-4 pb-4 pt-5 text-left dark:border-slate-800 sm:px-6">
           <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-            <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <MapPin className="h-5 w-5 text-primary" />
             Saved addresses
           </DialogTitle>
           <DialogDescription className="text-sm">
-            Choose where the service should happen, or add a new address. Synced to your Imagineering India account
-            across web and app when you are logged in.
+            Choose a delivery / site address. Synced with your Imagineering India account on web and app.
           </DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
           {addresses.length === 0 && !showAdd ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">No saved addresses yet. Add one below.</p>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-8 text-center">
+              <p className="text-sm font-extrabold text-slate-900">No saved addresses yet</p>
+              <p className="mt-1 text-[13px] text-slate-500">Add one to use for quotes and delivery.</p>
+            </div>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-2.5">
               {addresses.map((row) => {
                 const selected = row.id === selectedId;
+                const line = formatSavedAddressLine(row) || row.address || "";
+                const meta = [row.city, row.state, row.zipCode].filter(Boolean).join(", ");
                 return (
                   <li key={row.id}>
                     <button
                       type="button"
                       onClick={() => handlePick(row)}
                       className={cn(
-                        "flex w-full items-start gap-3 rounded-xl border p-3 text-left text-sm transition-colors sm:p-4",
+                        "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition sm:p-3.5",
                         selected
-                          ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-500/20 dark:border-blue-600 dark:bg-blue-950/35"
-                          : "border-slate-200/90 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:bg-slate-800/60",
+                          ? "border-primary bg-primary/5 ring-2 ring-primary/15"
+                          : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"
                       )}
                     >
-                      <span
-                        className={cn(
-                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-                          selected
-                            ? "border-blue-600 bg-blue-600 text-white"
-                            : "border-slate-300 dark:border-slate-600",
-                        )}
-                      >
-                        {selected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-base">
+                        📍
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">
-                          {row.label}
+                        <span className="block truncate text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                          {row.label || "Address"}
                           {row.isDefault ? (
-                            <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">Default</span>
+                            <span className="ml-2 text-[11px] font-semibold text-primary">Default</span>
                           ) : null}
                         </span>
-                        <span className="mt-1 block text-muted-foreground leading-snug">{row.address}</span>
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          {[row.city, row.state, row.zipCode].filter(Boolean).join(", ") || "—"}
-                        </span>
+                        {line ? (
+                          <span className="mt-1 block text-[13px] font-medium leading-snug text-slate-700 dark:text-slate-300">
+                            {line}
+                          </span>
+                        ) : null}
+                        {meta ? (
+                          <span className="mt-1 block truncate text-xs font-medium text-slate-500">
+                            {meta}
+                          </span>
+                        ) : null}
                       </span>
+                      {selected ? (
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                        </span>
+                      ) : (
+                        <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                      )}
                     </button>
                   </li>
                 );
@@ -265,15 +281,15 @@ export function CheckoutAddressPickerModal({
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 w-full rounded-xl border-dashed border-slate-300 text-sm font-medium dark:border-slate-600"
+                className="h-11 w-full rounded-xl border-dashed border-slate-300 text-sm font-semibold dark:border-slate-600"
                 onClick={() => setShowAdd(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add new address
               </Button>
             ) : (
-              <div className="space-y-3 rounded-xl border border-slate-200/90 bg-[#f9fafb] p-4 dark:border-slate-800 dark:bg-muted/30">
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">New address</p>
+              <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-[#f9fafb] p-4 dark:border-slate-800 dark:bg-muted/30">
+                <p className="text-sm font-extrabold text-slate-900 dark:text-slate-100">New address</p>
                 <div className="space-y-2">
                   <div>
                     <Label htmlFor="addr-label" className="text-xs">
@@ -325,11 +341,6 @@ export function CheckoutAddressPickerModal({
                         </div>
                       ) : null}
                     </div>
-                    {!hasAnyGeocoder ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Add a Mapbox token or Google Maps key to enable place search; you can still type manually.
-                      </p>
-                    ) : null}
                     <Button
                       type="button"
                       variant="outline"
@@ -353,6 +364,32 @@ export function CheckoutAddressPickerModal({
                         </>
                       )}
                     </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="addr-house" className="text-xs">
+                        House / Flat
+                      </Label>
+                      <Input
+                        id="addr-house"
+                        value={newHouseNo}
+                        onChange={(e) => setNewHouseNo(e.target.value)}
+                        placeholder="Flat / plot"
+                        className={cn("mt-1 h-10", inputClass)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="addr-landmark" className="text-xs">
+                        Landmark
+                      </Label>
+                      <Input
+                        id="addr-landmark"
+                        value={newLandmark}
+                        onChange={(e) => setNewLandmark(e.target.value)}
+                        placeholder="Near…"
+                        className={cn("mt-1 h-10", inputClass)}
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -400,7 +437,7 @@ export function CheckoutAddressPickerModal({
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Button
                     type="button"
-                    className="h-10 flex-1 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8]"
+                    className="h-10 flex-1 rounded-xl"
                     disabled={!newAddress.trim() || saving}
                     onClick={handleSaveNew}
                   >
