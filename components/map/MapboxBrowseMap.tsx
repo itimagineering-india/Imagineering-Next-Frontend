@@ -8,12 +8,14 @@ import { useEffect, useRef, useCallback, useState, useMemo, memo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { getMapboxAccessToken } from "@/lib/mapboxConfig";
+import { boundsLikeFromNeSw, filterMarkersByViewport, type LatLngBoundsLike } from "@/utils/mapViewportMarkers";
 import type { GoogleMapProps, ServiceMarker, ProviderMarker } from "./GoogleMap";
+import { formatServicePrice } from "@/lib/formatServicePrice";
 
 export type { ServiceMarker, ProviderMarker };
 
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
-const DEFAULT_ZOOM = 12;
+const DEFAULT_ZOOM = 14;
 
 function escapeHtml(s: string): string {
   return s
@@ -85,7 +87,10 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
   flyToRevision = 0,
   clusteringEnabled: _clusteringEnabled = true,
   lazyWhenVisible = false,
+  onMarkersRendered,
 }: GoogleMapProps) {
+  const onMarkersRenderedRef = useRef(onMarkersRendered);
+  onMarkersRenderedRef.current = onMarkersRendered;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerByIdRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -94,6 +99,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
   const [sdkReady, setSdkReady] = useState(0);
   const [mapActive, setMapActive] = useState(false);
   const [visible, setVisible] = useState(!lazyWhenVisible);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const token = getMapboxAccessToken();
 
@@ -108,6 +114,12 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
     () => buildStableMarkerKey(browseMode, serviceMarkers, providerMarkers),
     [browseMode, serviceMarkers, providerMarkers]
   );
+
+  const [viewportBounds, setViewportBounds] = useState<LatLngBoundsLike | null>(null);
+
+  const markersToRender = useMemo(() => {
+    return filterMarkersByViewport(normalizedMarkers, viewportBounds);
+  }, [normalizedMarkers, viewportBounds]);
 
   const userLocKey = userLocation
     ? `${userLocation.lat.toFixed(5)},${userLocation.lng.toFixed(5)}`
@@ -137,11 +149,12 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
       const popup = popupRef.current;
       if (browseMode === "services") {
         const s = item as ServiceMarker;
+        const priceText = formatServicePrice(s);
         popup.setHTML(`<div style="padding:12px;min-width:220px;font-family:system-ui,sans-serif">
             ${s.categoryName ? `<div style="font-size:11px;color:#6b7280;text-transform:uppercase;font-weight:600;margin-bottom:6px">${escapeHtml(s.categoryName)}</div>` : ""}
             <h3 style="font-weight:700;margin-bottom:6px;font-size:16px">${escapeHtml(s.title)}</h3>
             ${s.description ? `<p style="color:#4b5563;font-size:13px;margin-bottom:8px">${escapeHtml(s.description)}</p>` : ""}
-            ${s.price != null ? `<div style="font-weight:700;color:#059669;font-size:16px;margin-bottom:8px">₹${s.price.toLocaleString()}${s.priceType ? ` ${escapeHtml(String(s.priceType))}` : ""}</div>` : ""}
+            ${priceText ? `<div style="font-weight:700;color:#059669;font-size:16px;margin-bottom:8px">${escapeHtml(priceText)}</div>` : ""}
             <a href="/services/${escapeHtml(s.id)}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 16px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600">View Details →</a>
           </div>`);
       } else {
@@ -166,9 +179,11 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
     if (!visible) return;
     if (!token) {
       setMapActive(false);
+      setMapError("Mapbox token missing from this build.");
       return;
     }
     mapboxgl.accessToken = token;
+    setMapError(null);
 
     let cancelled = false;
     let destroy: (() => void) | undefined;
@@ -181,6 +196,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
       const el = containerRef.current;
       if (!(await waitForMapContainer(el))) {
         setMapActive(false);
+        setMapError("Map container failed to size. Try refreshing.");
         return;
       }
       if (cancelled) return;
@@ -196,6 +212,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
       } catch {
         setMapActive(false);
+        setMapError("Could not start Mapbox. Check the access token.");
         return;
       }
       if (cancelled) {
@@ -205,6 +222,24 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
 
       mapRef.current = map;
       setMapActive(true);
+
+      const onMapError = (e: mapboxgl.ErrorEvent) => {
+        if (cancelled) return;
+        const msg = String(e?.error?.message || e?.error || "").toLowerCase();
+        if (
+          msg.includes("401") ||
+          msg.includes("403") ||
+          msg.includes("unauthorized") ||
+          msg.includes("forbidden")
+        ) {
+          setMapError(
+            "Mapbox blocked this domain (401/403). Add your production URL to the token allowlist, or set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN and rebuild."
+          );
+        } else if (msg) {
+          setMapError("Map tiles failed to load. Check Mapbox token and network.");
+        }
+      };
+      map.on("error", onMapError);
 
       const resizeMap = () => {
         if (cancelled) return;
@@ -223,6 +258,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
 
       map.once("load", () => {
         if (cancelled) return;
+        setMapError(null);
         resizeMap();
         setSdkReady((n) => n + 1);
       });
@@ -236,6 +272,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
       destroy = () => {
         window.clearTimeout(fallbackId);
         resizeObserver?.disconnect();
+        map.off("error", onMapError);
         markerInteractionAbortByIdRef.current.forEach((ac) => ac.abort());
         markerInteractionAbortByIdRef.current.clear();
         markerByIdRef.current.forEach((m) => m.remove());
@@ -289,11 +326,31 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
   }, [flyToRevision, flyToTarget, mapActive]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapActive || !sdkReady) return;
+    let debounceId: ReturnType<typeof setTimeout> | undefined;
+    const updateBounds = () => {
+      const b = map.getBounds();
+      setViewportBounds(b ? boundsLikeFromNeSw(b.getNorthEast(), b.getSouthWest()) : null);
+    };
+    updateBounds();
+    const onMoveEnd = () => {
+      if (debounceId !== undefined) clearTimeout(debounceId);
+      debounceId = setTimeout(updateBounds, 90);
+    };
+    map.on("moveend", onMoveEnd);
+    return () => {
+      if (debounceId !== undefined) clearTimeout(debounceId);
+      map.off("moveend", onMoveEnd);
+    };
+  }, [mapActive, sdkReady]);
+
+  useEffect(() => {
     if (!sdkReady || !mapActive) return;
     const map = mapRef.current;
     if (!map) return;
 
-    const nextIds = new Set(normalizedMarkers.map((m) => String(m.id)));
+    const nextIds = new Set(markersToRender.map((m) => String(m.id)));
     const byId = markerByIdRef.current;
     const abortById = markerInteractionAbortByIdRef.current;
 
@@ -334,7 +391,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
       );
     };
 
-    for (const item of normalizedMarkers) {
+    for (const item of markersToRender) {
       const color = (item as ServiceMarker & ProviderMarker).color || "#3b82f6";
       const idKey = String(item.id);
       let m = byId.get(idKey);
@@ -375,17 +432,31 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
       userMarkerRef.current = null;
     }
 
+    requestAnimationFrame(() => {
+      onMarkersRenderedRef.current?.();
+    });
+
     return () => {
       markerInteractionAbortByIdRef.current.forEach((ac) => ac.abort());
       markerInteractionAbortByIdRef.current.clear();
     };
-  }, [sdkReady, mapActive, browseMode, markersDataKey, normalizedMarkers, userLocKey, userLocation]);
+  }, [sdkReady, mapActive, browseMode, markersDataKey, markersToRender, userLocKey, userLocation]);
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full h-full min-h-[400px] ${className}`}
-      data-mapbox-browse-map="true"
-    />
+    <div className={`relative w-full h-full min-h-[400px] ${className}`}>
+      <div
+        ref={containerRef}
+        className="absolute inset-0 h-full w-full"
+        data-mapbox-browse-map="true"
+      />
+      {mapError ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-muted/90 p-4">
+          <div className="max-w-sm rounded-xl border bg-background p-4 text-center shadow-sm">
+            <p className="text-sm font-semibold text-foreground">Map unavailable</p>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{mapError}</p>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 });
