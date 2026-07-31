@@ -80,7 +80,7 @@ export function SearchPageClient() {
   const quickLinks = [
     { href: "/services", label: "Browse all services" },
     { href: "/services?category=construction-materials", label: "Construction materials" },
-    { href: "/services?category=manpower", label: "Manpower" },
+    { href: "/manpower", label: "Manpower" },
     { href: "/services?category=machines", label: "Machines" },
   ] as const;
 
