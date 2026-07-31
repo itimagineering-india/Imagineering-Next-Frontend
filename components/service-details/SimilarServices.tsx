@@ -26,21 +26,27 @@ interface SimilarService {
   priceMin?: number;
   priceMax?: number;
   priceType: "hourly" | "daily" | "fixed" | "monthly" | "per_minute" | "per_article" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip";
-  location: string;
+  location?: string;
 }
 
 interface SimilarServicesProps {
   services: SimilarService[];
   title?: string;
+  hrefBase?: string;
+  viewAllHref?: string;
 }
 
 export function SimilarServices({
   services,
   title = "Similar Services",
+  hrefBase = "/service",
+  viewAllHref = "/services",
 }: SimilarServicesProps) {
   if (services.length === 0) {
     return null;
   }
+
+  const base = hrefBase.replace(/\/$/, "");
 
   return (
     <div className="min-w-0 overflow-x-clip space-y-4 sm:space-y-6">
@@ -49,7 +55,7 @@ export function SimilarServices({
           {title}
         </h2>
         <Button variant="secondary" asChild className="hover:bg-primary/5">
-          <Link href="/services" className="flex items-center gap-1">
+          <Link href={viewAllHref} className="flex items-center gap-1">
             View All
             <ChevronRight className="h-4 w-4" />
           </Link>
@@ -63,7 +69,7 @@ export function SimilarServices({
               key={service.id}
               className="basis-3/4 pl-2 sm:basis-1/2 md:pl-4 lg:basis-1/4 xl:basis-1/5"
             >
-              <Link href={`/service/${service.slug || service.id}`} target="_blank" rel="noopener noreferrer">
+              <Link href={`${base}/${service.slug || service.id}`}>
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-rose-50/60 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg">
                   <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-rose-50">
                     <img
@@ -100,10 +106,12 @@ export function SimilarServices({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground lg:text-sm">
-                      <MapPin className="h-3 w-3" />
-                      <span className="line-clamp-1">{service.location}</span>
-                    </div>
+                    {service.location ? (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground lg:text-sm">
+                        <MapPin className="h-3 w-3" />
+                        <span className="line-clamp-1">{service.location}</span>
+                      </div>
+                    ) : null}
 
                     <p className="line-clamp-1 text-xs text-muted-foreground lg:text-sm">
                       by {service.providerName}
