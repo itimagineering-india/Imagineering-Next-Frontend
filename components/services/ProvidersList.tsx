@@ -15,6 +15,31 @@ import api from "@/lib/api-client";
 
 const providerRatingCache = new Map<string, { averageRating: number | null; reviewCount: number | null }>();
 
+function resolveProviderImageUrl(raw?: string | null): string {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) {
+    return value;
+  }
+  if (value.startsWith("//")) return `https:${value}`;
+  const base =
+    (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_BASE_URL) ||
+    "http://localhost:5000";
+  if (value.startsWith("/")) return `${String(base).replace(/\/$/, "")}${value}`;
+  return value;
+}
+
+function getProviderDisplayImage(p: any): string {
+  const raw =
+    p?.businessLogo ||
+    p?.logo ||
+    p?.avatar ||
+    p?.user?.avatar ||
+    p?.coverImage ||
+    "";
+  return resolveProviderImageUrl(raw);
+}
+
 function distanceKmForProvider(
   p: any,
   userLat: number | undefined,
@@ -67,6 +92,7 @@ const ProviderMapCard = memo(function ProviderMapCard({
 }) {
   const coords = getProviderCoordinates(p);
   const name = p?.businessName || p?.user?.name || "Provider";
+  const displayImage = getProviderDisplayImage(p);
   const addr = p?.businessAddress || p?.user?.location || {};
   const fullLocation = [addr.address, addr.city, addr.state]
     .filter(Boolean)
@@ -75,15 +101,15 @@ const ProviderMapCard = memo(function ProviderMapCard({
     .join(", ");
 
   const profileHref = p?.isFallbackProfile
-    ? `/services?provider=${encodeURIComponent(p?.user?._id || p?._id)}&view=services`
+    ? `/services?provider=${encodeURIComponent(p?.user?._id || p?._id)}`
     : `/provider/${p?.slug || p._id}`;
 
   return (
     <Card className="border hover:shadow-md transition-shadow overflow-hidden h-full">
       <Link href={profileHref}>
         <div className="relative flex h-20 w-full items-center justify-center overflow-hidden bg-muted">
-          {p?.businessLogo ? (
-            <img src={p.businessLogo} alt={name} className="h-full w-full object-cover" loading="lazy" />
+          {displayImage ? (
+            <img src={displayImage} alt={name} className="h-full w-full object-cover" loading="lazy" />
           ) : (
             <span className="px-1 text-center text-xs text-muted-foreground">No Image</span>
           )}
@@ -127,7 +153,7 @@ const ProviderMapCard = memo(function ProviderMapCard({
             </Button>
             <Button asChild size="sm" className="flex-1 text-xs">
               <Link href={profileHref} onClick={(e: MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}>
-                View Services
+                View Profile
               </Link>
             </Button>
           </div>
@@ -206,11 +232,16 @@ const ProviderBrowseCard = memo(function ProviderBrowseCard({
   distanceKm: number | null;
 }) {
   const name = p?.businessName || p?.user?.name || "Provider";
+  const displayImage = getProviderDisplayImage(p);
   const addressLine = getProviderLocationKey(p);
   const providerId = String(p?._id ?? "");
-  const userIdForServices = String(p?.user?._id ?? p?.user ?? "").trim() || providerId;
   const profileHref = `/provider/${p?.slug || p._id}`;
-  const servicesHref = `/services?provider=${encodeURIComponent(userIdForServices)}&view=services`;
+  const mark = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0]?.toUpperCase() || "")
+    .join("");
   const initialMetrics = useMemo(() => {
     const fromProvider = getProviderRatingSnapshot(p);
     if (providerId && (fromProvider.averageRating == null || fromProvider.reviewCount == null)) {
@@ -266,135 +297,151 @@ const ProviderBrowseCard = memo(function ProviderBrowseCard({
     };
   }, [providerId, metrics.averageRating, metrics.reviewCount]);
 
-  const logoBlock = (
-    <>
-      {p?.businessLogo ? (
-        <img src={p.businessLogo} alt={name} className="w-full h-full object-cover" loading="lazy" />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center px-1 text-center text-xs leading-tight text-muted-foreground break-words">
-          No Image
+  const ratingLabel =
+    metrics.averageRating != null && metrics.averageRating > 0
+      ? Number(metrics.averageRating).toFixed(1)
+      : null;
+  const reviewLabel =
+    metrics.reviewCount != null && metrics.reviewCount > 0
+      ? Math.max(0, Math.trunc(metrics.reviewCount))
+      : null;
+  const distanceLabel =
+    distanceKm !== null && Number.isFinite(distanceKm)
+      ? distanceKm < 1
+        ? `${Math.round(distanceKm * 1000)} m`
+        : `${distanceKm.toFixed(1)} km`
+      : null;
+  const serviceCount =
+    typeof p?.serviceCount === "number" && p.serviceCount > 0 ? p.serviceCount : null;
+
+  if (viewMode === "list") {
+    return (
+      <Link
+        href={profileHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group block w-full shrink-0 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+      >
+        <div className="flex gap-3">
+          <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200/80">
+            {displayImage ? (
+              <img
+                src={displayImage}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm font-bold tracking-wide text-slate-500">
+                {mark || "P"}
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug text-slate-900 transition group-hover:text-[#FF385C]">
+                {name}
+              </h3>
+              {distanceLabel ? (
+                <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600">
+                  {distanceLabel}
+                </span>
+              ) : null}
+            </div>
+
+            <p
+              className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-slate-500"
+              title={addressLine || undefined}
+            >
+              {addressLine || "Address not added"}
+            </p>
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-600">
+              <span className="inline-flex items-center gap-0.5 font-medium text-slate-800">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                {ratingLabel ?? "New"}
+                {reviewLabel != null ? (
+                  <span className="font-normal text-slate-400">({reviewLabel})</span>
+                ) : null}
+              </span>
+              {p?.yearsOfExperience ? (
+                <span className="inline-flex items-center gap-0.5 text-slate-500">
+                  <Briefcase className="h-3 w-3" />
+                  {p.yearsOfExperience}+ yrs
+                </span>
+              ) : null}
+              {serviceCount != null ? (
+                <span className="text-slate-500">{serviceCount} services</span>
+              ) : null}
+            </div>
+          </div>
         </div>
-      )}
-    </>
-  );
-
-  const actions = (
-    <div
-      className={
-        viewMode === "list"
-          ? "grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-[124px] sm:flex-col sm:justify-start"
-          : "flex flex-wrap gap-2 mt-auto pt-1"
-      }
-    >
-      <Button
-        variant="default"
-        size="sm"
-        className={viewMode === "list" ? "h-8 text-xs w-full" : "h-8 text-xs flex-1 min-w-[112px]"}
-        asChild
-      >
-        <Link href={profileHref}>View Profile</Link>
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className={viewMode === "list" ? "h-8 text-xs w-full" : "h-8 text-xs flex-1 min-w-[112px]"}
-        asChild
-      >
-        <Link href={servicesHref}>View Services</Link>
-      </Button>
-    </div>
-  );
-
-  const body = (
-    <>
-      <div
-        className={
-          viewMode === "list" ? "min-w-0 space-y-1 sm:min-w-0 sm:flex-1" : "space-y-1 min-w-0 flex-1"
-        }
-      >
-        <Link href={profileHref} className="block group">
-          <div className="text-sm font-semibold line-clamp-2 group-hover:text-primary transition-colors">
-            {name}
-          </div>
-        </Link>
-        {addressLine ? (
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-snug" title={addressLine}>
-            {addressLine}
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground italic">Address not added</p>
-        )}
-        {distanceKm !== null && Number.isFinite(distanceKm) && (
-          <p className="text-xs font-medium text-foreground">
-            {distanceKm < 1
-              ? `${Math.round(distanceKm * 1000)} m away`
-              : `${distanceKm.toFixed(1)} km away`}
-          </p>
-        )}
-        {typeof p?.serviceCount === "number" && (
-          <p className="text-xs text-muted-foreground">{p.serviceCount} services</p>
-        )}
-
-        {p?.yearsOfExperience ? (
-          <div className="mt-1 flex items-center gap-0.5 text-xs text-muted-foreground">
-            <Briefcase className="h-3 w-3" />
-            <span>{p.yearsOfExperience}+ yrs</span>
-          </div>
-        ) : null}
-      </div>
-      {actions}
-    </>
-  );
+      </Link>
+    );
+  }
 
   return (
-    <Card
-      className={
-        viewMode === "list"
-          ? "w-full shrink-0 overflow-hidden shadow-sm transition-shadow hover:shadow-md"
-          : "flex h-full flex-col overflow-hidden shadow-sm transition-shadow hover:shadow-md"
-      }
-    >
-      {viewMode === "list" ? (
-        <div className="flex min-h-0 min-w-0 flex-row items-start gap-3 p-3 sm:gap-4 sm:p-4">
-          <Link
-            href={profileHref}
-            className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-20 sm:w-20"
-          >
-            <div className="absolute left-1 top-1 z-10 inline-flex items-center gap-0.5 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-xs leading-none text-white sm:left-1.5 sm:top-1.5 sm:gap-0.5">
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              <span>
-                {metrics.averageRating != null ? Number(metrics.averageRating).toFixed(1) : "—"}
-              </span>
-              {metrics.reviewCount != null && (
-                <span className="text-white/75">({Math.max(0, Math.trunc(metrics.reviewCount))})</span>
-              )}
+    <Card className="flex h-full flex-col overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <Link
+          href={profileHref}
+          className="relative block aspect-[4/3] w-full overflow-hidden bg-muted"
+        >
+          {ratingLabel ? (
+            <div className="absolute left-1.5 top-1.5 z-10 inline-flex items-center gap-0.5 rounded bg-black/70 px-1.5 py-0.5 text-xs leading-none text-white">
+              <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+              <span>{ratingLabel}</span>
+              {reviewLabel != null ? (
+                <span className="text-white/75">({reviewLabel})</span>
+              ) : null}
             </div>
-            {logoBlock}
-          </Link>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-            {body}
+          ) : null}
+          {displayImage ? (
+            <img
+              src={displayImage}
+              alt={name}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-2xl font-bold text-slate-400">
+              {mark || "P"}
+            </div>
+          )}
+        </Link>
+        <CardContent className="flex flex-1 flex-col gap-2 p-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            <Link href={profileHref} className="block group">
+              <div className="line-clamp-2 text-sm font-semibold transition-colors group-hover:text-primary">
+                {name}
+              </div>
+            </Link>
+            {addressLine ? (
+              <p className="line-clamp-2 text-xs leading-snug text-muted-foreground" title={addressLine}>
+                {addressLine}
+              </p>
+            ) : (
+              <p className="text-xs italic text-muted-foreground">Address not added</p>
+            )}
+            {distanceLabel ? (
+              <p className="text-xs font-medium text-foreground">{distanceLabel} away</p>
+            ) : null}
+            {serviceCount != null ? (
+              <p className="text-xs text-muted-foreground">{serviceCount} services</p>
+            ) : null}
+            {p?.yearsOfExperience ? (
+              <div className="mt-1 flex items-center gap-0.5 text-xs text-muted-foreground">
+                <Briefcase className="h-3 w-3" />
+                <span>{p.yearsOfExperience}+ yrs</span>
+              </div>
+            ) : null}
           </div>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <Link
-            href={profileHref}
-            className="relative block aspect-[4/3] w-full overflow-hidden bg-muted"
-          >
-            <div className="absolute left-1 top-1 z-10 inline-flex items-center gap-0.5 whitespace-nowrap rounded bg-black/70 px-1.5 py-0.5 text-xs leading-none text-white sm:left-1.5 sm:top-1.5">
-              <Star className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
-              <span>
-                {metrics.averageRating != null ? Number(metrics.averageRating).toFixed(1) : "—"}
-              </span>
-              {metrics.reviewCount != null && (
-                <span className="text-white/75">({Math.max(0, Math.trunc(metrics.reviewCount))})</span>
-              )}
-            </div>
-            {logoBlock}
-          </Link>
-          <CardContent className="flex flex-1 flex-col gap-2 p-3">{body}</CardContent>
-        </div>
-      )}
+          <Button variant="default" size="sm" className="mt-auto h-8 min-w-[112px] flex-1 text-xs" asChild>
+            <Link href={profileHref}>View Profile</Link>
+          </Button>
+        </CardContent>
+      </div>
     </Card>
   );
 });
@@ -407,6 +454,7 @@ export interface ProvidersBrowseListProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  className?: string;
 }
 
 export function ProvidersBrowseList({
@@ -417,6 +465,7 @@ export function ProvidersBrowseList({
   onLoadMore,
   hasMore = false,
   isLoadingMore = false,
+  className,
 }: ProvidersBrowseListProps) {
   const cols = useBrowseGridColumns();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -457,7 +506,10 @@ export function ProvidersBrowseList({
   return (
     <div
       ref={scrollRef}
-      className="max-h-[70vh] min-h-0 w-full overflow-y-auto overflow-x-hidden sm:max-h-[75vh] lg:max-h-[78vh] [&>*+*]:mt-2 sm:[&>*+*]:mt-3 md:[&>*+*]:mt-4"
+      className={
+        className ??
+        "max-h-[70vh] min-h-0 w-full overflow-y-auto overflow-x-hidden sm:max-h-[75vh] lg:max-h-[78vh] [&>*+*]:mt-2 sm:[&>*+*]:mt-3 md:[&>*+*]:mt-4"
+      }
     >
       {viewMode === "list" ? (
         providers.map((p, i) => (
