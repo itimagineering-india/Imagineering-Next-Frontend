@@ -12,6 +12,9 @@ import enServiceDetails from "@/locales/en/serviceDetails.json";
 import enProviderProfile from "@/locales/en/providerProfile.json";
 import enStaticPages from "@/locales/en/staticPages.json";
 import enAuth from "@/locales/en/auth.json";
+import enJoinProvider from "@/locales/en/joinProvider.json";
+import enMaterials from "@/locales/en/materials.json";
+import enManpower from "@/locales/en/manpower.json";
 import hiCommon from "@/locales/hi/common.json";
 import hiHeader from "@/locales/hi/header.json";
 import hiFooter from "@/locales/hi/footer.json";
@@ -21,6 +24,9 @@ import hiServiceDetails from "@/locales/hi/serviceDetails.json";
 import hiProviderProfile from "@/locales/hi/providerProfile.json";
 import hiStaticPages from "@/locales/hi/staticPages.json";
 import hiAuth from "@/locales/hi/auth.json";
+import hiJoinProvider from "@/locales/hi/joinProvider.json";
+import hiMaterials from "@/locales/hi/materials.json";
+import hiManpower from "@/locales/hi/manpower.json";
 
 const LANG_STORAGE_KEY = "app_lang";
 
@@ -67,6 +73,9 @@ i18n.use(initReactI18next).init({
     "providerProfile",
     "staticPages",
     "auth",
+    "joinProvider",
+    "materials",
+    "manpower",
   ],
   defaultNS: "common",
   interpolation: {
@@ -83,6 +92,9 @@ i18n.use(initReactI18next).init({
       providerProfile: enProviderProfile,
       staticPages: enStaticPages,
       auth: enAuth,
+      joinProvider: enJoinProvider,
+      materials: enMaterials,
+      manpower: enManpower,
     },
     hi: {
       common: hiCommon,
@@ -94,6 +106,9 @@ i18n.use(initReactI18next).init({
       providerProfile: hiProviderProfile,
       staticPages: hiStaticPages,
       auth: hiAuth,
+      joinProvider: hiJoinProvider,
+      materials: hiMaterials,
+      manpower: hiManpower,
     },
   },
   react: {
