@@ -64,6 +64,12 @@ export interface ConstructionMaterialProductLayoutProps {
   onShare: () => void;
   onFavorite: () => void;
   isSaved: boolean;
+  /** Show on all breakpoints (catalog product page). Default: desktop-only for ServiceDetails. */
+  responsive?: boolean;
+  /** Base path for similar product links. Default: /service */
+  similarHrefBase?: string;
+  /** Breadcrumb middle link override */
+  categoryHref?: string;
 }
 
 const WHY_BUY_POINTS = [
@@ -108,10 +114,14 @@ export function ConstructionMaterialProductLayout({
   onShare,
   onFavorite,
   isSaved,
+  responsive = false,
+  similarHrefBase = "/service",
+  categoryHref,
 }: ConstructionMaterialProductLayoutProps) {
   const [overviewExpanded, setOverviewExpanded] = useState(false);
-  const canAddToCart = showPricing && !isRangePrice;
+  const canAddToCart = showPricing && !isRangePrice && Boolean(service.id);
   const showGetBestQuotes = isRangePrice;
+  const categoryLink = categoryHref || `/services?category=${categorySlug}`;
 
   const shortDescription =
     service.description.length > 320 && !overviewExpanded
@@ -125,31 +135,34 @@ export function ConstructionMaterialProductLayout({
     { icon: ShieldCheck, label: "Easy Returns", sub: "As per policy" },
   ];
 
+  const similarPath = (slugOrId: string) =>
+    `${similarHrefBase.replace(/\/$/, "")}/${encodeURIComponent(slugOrId)}`;
+
   return (
-    <div className="hidden lg:block">
-      <nav className="mb-5 flex items-center gap-2 text-sm text-muted-foreground">
+    <div className={responsive ? "block" : "hidden lg:block"}>
+      <nav className="mb-5 flex items-center gap-2 overflow-x-auto whitespace-nowrap text-sm text-muted-foreground">
         <Link href="/" className="flex items-center gap-1 hover:text-foreground">
           <Home className="h-4 w-4" />
           Home
         </Link>
-        <ChevronRight className="h-4 w-4" />
-        <Link href={`/services?category=${categorySlug}`} className="hover:text-foreground">
+        <ChevronRight className="h-4 w-4 shrink-0" />
+        <Link href={categoryLink} className="hover:text-foreground">
           {categoryName}
         </Link>
         {service.subcategory && (
           <>
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4 shrink-0" />
             <span>{service.subcategory}</span>
           </>
         )}
-        <ChevronRight className="h-4 w-4" />
+        <ChevronRight className="h-4 w-4 shrink-0" />
         <span className="truncate font-medium text-foreground">{service.title}</span>
       </nav>
 
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:gap-8 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-6">
           {/* Hero: gallery + product summary */}
-          <div className="grid grid-cols-[minmax(0,420px)_1fr] gap-6 rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="grid grid-cols-1 gap-6 rounded-2xl border bg-white p-4 shadow-sm sm:p-5 lg:grid-cols-[minmax(0,420px)_1fr]">
             <div className="relative">
               <ServiceGallery images={service.images} />
               <div className="absolute right-2 top-2 z-10 flex gap-2">
@@ -230,7 +243,7 @@ export function ConstructionMaterialProductLayout({
               <CardTitle className="text-lg">Product Overview</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground">{shortDescription}</p>
+              <p className="whitespace-pre-line text-sm leading-7 text-muted-foreground">{shortDescription || "—"}</p>
               {service.description.length > 320 && (
                 <button
                   type="button"
@@ -250,7 +263,7 @@ export function ConstructionMaterialProductLayout({
                 <CardTitle className="text-lg">Product Specifications</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
                   {specFields.map((field, i) => (
                     <div key={`${field.label}-${i}`} className="border-b border-dashed pb-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -266,7 +279,16 @@ export function ConstructionMaterialProductLayout({
 
           {similarServices.length > 0 && (
             <div className="min-w-0">
-              <SimilarServices services={similarServices as never} title="Related Products" />
+              <SimilarServices
+                services={similarServices as never}
+                title="Related Products"
+                hrefBase={similarHrefBase}
+                viewAllHref={
+                  similarHrefBase.includes("construction-materials")
+                    ? "/construction-materials"
+                    : "/services"
+                }
+              />
             </div>
           )}
 
@@ -346,7 +368,7 @@ export function ConstructionMaterialProductLayout({
               </a>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock3 className="h-3.5 w-3.5" />
-                Mon–Sat, 9 AM – 6 PM
+                Mon–Sat, 9 AM – 7 PM
               </p>
             </CardContent>
           </Card>
@@ -380,7 +402,7 @@ export function ConstructionMaterialProductLayout({
                   return (
                   <Link
                     key={id}
-                    href={`/service/${slug}`}
+                    href={similarPath(slug)}
                     className="flex items-center justify-between gap-2 rounded-lg border p-2 hover:bg-muted/40"
                   >
                     <span className="truncate text-sm font-medium">{String(s.title ?? "")}</span>
@@ -408,9 +430,9 @@ export function ConstructionMaterialProductLayout({
         </aside>
       </div>
 
-      {/* Desktop sticky footer bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 hidden border-t bg-white/95 px-6 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur lg:block">
-        <div className="mx-auto flex max-w-6xl items-center gap-4">
+      {/* Sticky footer bar */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 sm:gap-4">
           {service.images[0] && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={service.images[0]} alt="" className="h-10 w-10 rounded-md border object-cover" />
@@ -430,12 +452,12 @@ export function ConstructionMaterialProductLayout({
               serviceId={service.id}
               providerName={service.provider?.name || service.provider?.businessName}
               label="Add to Cart"
-              className="h-10 w-auto min-w-[140px] max-w-[180px] shrink-0 px-5 text-sm font-semibold"
+              className="h-10 w-auto min-w-[120px] max-w-[180px] shrink-0 px-4 text-sm font-semibold sm:min-w-[140px] sm:px-5"
             />
           ) : showGetBestQuotes ? (
             <Button
               size="sm"
-              className="h-10 w-auto min-w-[140px] max-w-[200px] shrink-0 px-5 text-sm font-semibold"
+              className="h-10 w-auto min-w-[120px] max-w-[200px] shrink-0 px-4 text-sm font-semibold sm:min-w-[140px] sm:px-5"
               onClick={onGetQuotes}
             >
               Get Best Quotes
