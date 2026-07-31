@@ -1,20 +1,12 @@
 "use client";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
-import { ServiceCard } from "@/components/ServiceCard";
-import { FilterPanel, FilterState } from "@/components/FilterPanel";
+import { FilterState } from "@/components/FilterPanel";
+import { FilterToolbar } from "@/components/services/FilterToolbar";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { List, SlidersHorizontal, Map as MapIcon, MapPin, Navigation, Loader2 } from "lucide-react";
+import { Map as MapIcon, MapPin, Navigation, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -70,12 +62,10 @@ export default function Services(props: ServicesProps = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const { toast, dismiss: dismissToast } = useToast();
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "map">("map");
-  const [browseMode, setBrowseMode] = useState<"providers" | "services">(() => {
-    const view = searchParams?.get("view");
-    if (view === "services" || view === "providers") return view;
-    return "providers";
-  });
+  /** Always map + providers list (map/list toggle removed). */
+  const viewMode = "map" as const;
+  /** Browse page always lists providers (services toggle removed). */
+  const browseMode = "providers" as const;
   const [hydrated, setHydrated] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [filters, setFilters] = useState<FilterState>({
@@ -158,40 +148,17 @@ export default function Services(props: ServicesProps = {}) {
     setHydrated(true);
   }, []);
 
-  // Keep browseMode in sync with URL; restore saved preference after mount (avoids SSR text mismatch).
+  // Drop legacy ?view=services from URL so share links land on providers-only browse.
   useEffect(() => {
     const view = searchParams?.get("view");
-    if (view === "services" || view === "providers") {
-      setBrowseMode(view);
-      try {
-        localStorage.setItem("servicesBrowseMode", view);
-      } catch {
-        // ignore
-      }
-      return;
-    }
-    try {
-      const saved = localStorage.getItem("servicesBrowseMode");
-      if (saved === "services" || saved === "providers") {
-        setBrowseMode(saved);
-      }
-    } catch {
-      // ignore
-    }
-  }, [searchParams]);
-
-  const setBrowseModeAndPersist = (mode: "providers" | "services") => {
-    setBrowseMode(mode);
-    try {
-      localStorage.setItem("servicesBrowseMode", mode);
-    } catch {
-      // ignore
-    }
+    if (view !== "services") return;
     const next = new URLSearchParams(searchParams?.toString() ?? "");
-    next.set("view", mode);
-    router.replace(`${pathname}?${next.toString()}`);
-  };
-  
+    next.delete("view");
+    const qs = next.toString();
+    const base = pathname || "/services";
+    router.replace(qs ? `${base}?${qs}` : base);
+  }, [searchParams, pathname, router]);
+ 
   const resolveSubcategoryParam = useCallback(
     (categorySlug: string, rawSubcategory: string) => {
       const subcategory = rawSubcategory.trim();
@@ -726,8 +693,7 @@ export default function Services(props: ServicesProps = {}) {
       return;
     }
 
-    const loading =
-      browseMode === "services" ? servicesLoading : providersLoading;
+    const loading = providersLoading;
 
     if (!loading) {
       if (mapMarkersLoadingToastRef.current !== null) {
@@ -740,10 +706,7 @@ export default function Services(props: ServicesProps = {}) {
     if (mapMarkersLoadingToastRef.current !== null) {
       return;
     }
-    const headline =
-      browseMode === "services"
-        ? t("map.loadingServices", "Loading services")
-        : t("map.loadingProviders", "Loading providers");
+    const headline = t("map.loadingProviders", "Loading providers");
     const loadingToast = toast({
       title: (
         <span className="flex items-center gap-2 text-sm font-medium">
@@ -1431,620 +1394,171 @@ export default function Services(props: ServicesProps = {}) {
       )}
 
       <main className="flex-1">
-        {/* Main Content */}
         <div className="container px-4 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
-          <div className="flex flex-col lg:flex-row gap-4 md:gap-6 lg:gap-8">
-            {/* Desktop Filters Sidebar */}
-            <aside className="hidden lg:block w-64 shrink-0">
-              <FilterPanel 
-                showVerifiedOnlyFilter={false}
-                value={filters}
-                onFilterChange={(newFilters) => {
-                  // Clear subcategories if categories are cleared
-                  if (newFilters.category.length === 0 && filters.category.length > 0) {
-                    setFilters({ ...newFilters, subcategory: [] });
-                  } else {
-                    setFilters(newFilters);
-                  }
-                }} 
-                categories={categories} 
-              />
-            </aside>
-
-            {/* Services Grid */}
-            <div className="flex-1 min-w-0">
-              {/* Toolbar */}
-              <div className="flex items-center justify-between mb-4 md:mb-6 gap-2 md:gap-4 flex-wrap">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {/* Mobile Filter Button */}
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="sm" className="lg:hidden shrink-0">
-                        <SlidersHorizontal className="h-4 w-4 mr-1.5 sm:mr-2" />
-                        <span className="hidden xs:inline">{t("filters.title", "Filters")}</span>
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="left" className="w-80 p-0 flex flex-col">
-                      <SheetHeader className="px-4 py-3 border-b space-y-0 text-left">
-                        <SheetTitle className="text-base font-semibold">{t("filters.title", "Filters")}</SheetTitle>
-                      </SheetHeader>
-                      <div className="flex-1 overflow-y-auto px-4 py-3">
-                        <FilterPanel 
-                          showVerifiedOnlyFilter={false}
-                          value={filters}
-                          onFilterChange={(newFilters) => {
-                            // Clear subcategories if categories are cleared
-                            if (newFilters.category.length === 0 && filters.category.length > 0) {
-                              setFilters({ ...newFilters, subcategory: [] });
-                            } else {
-                              setFilters(newFilters);
-                            }
-                          }} 
-                          categories={categories} 
-                        />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-
-                  {/* Active Filters */}
-                  {filters.category.length > 0 && (
-                    <div className="hidden md:flex gap-2">
-                      {filters.category.map((slug) => {
-                        const cat = categories.find((c) => c.slug === slug);
-                        return (
-                          <Badge key={slug} variant="secondary">
-                            {cat?.name}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Providers / Services — in toolbar for list/grid; above map when map view */}
-                  {viewMode !== "map" && (
-                    <div className="flex border rounded-lg overflow-hidden w-full sm:w-auto">
-                      <Button
-                        variant={browseMode === "providers" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="rounded-none flex-1 sm:flex-initial"
-                        onClick={() => {
-                          setBrowseModeAndPersist("providers");
-                          setCurrentPage(1);
-                        }}
-                      >
-                        {t("providers", "Providers")}
-                      </Button>
-                      <Button
-                        variant={browseMode === "services" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="rounded-none border-l flex-1 sm:flex-initial"
-                        onClick={() => {
-                          setBrowseModeAndPersist("services");
-                          setCurrentPage(1);
-                        }}
-                      >
-                        {t("services", "Services")}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* View Toggle */}
-                  <div className="hidden sm:flex border rounded-lg">
-                    <Button
-                      variant={viewMode === "map" ? "secondary" : "ghost"}
-                      size="icon"
-                      className="rounded-r-none"
-                      onClick={() => setViewMode("map")}
-                      title={t("mapView", "Map View")}
-                      aria-label={t("switchToMapView", "Switch to map view")}
-                    >
-                      <MapIcon className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "secondary" : "ghost"}
-                      size="icon"
-                      className="rounded-l-none"
-                      onClick={() => setViewMode("list")}
-                      title={t("listView", "List View")}
-                      aria-label={t("switchToListView", "Switch to list view")}
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Services */}
-              {viewMode === "map" ? (
-                /* Map View - Always show map regardless of services count */
-                <div className="space-y-3 md:space-y-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {isLocationLoading && (
-                      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                        <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
-                        <span className="hidden sm:inline">{t("location.gettingYourLocation", "Getting your location...")}</span>
-                        <span className="sm:hidden">{t("location.getting", "Getting location...")}</span>
-                      </div>
-                    )}
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          let location: { lat: number; lng: number };
-                          if (userLocation) {
-                            location = userLocation;
-                          } else {
-                            location = await getLocationForMapCenter();
-                          }
-                          setMapOnlyUserLocation(location);
-                          setMapFlyTo({ lat: location.lat, lng: location.lng, zoom: 14 });
-                          setMapFlyRevision((n) => n + 1);
-                        } catch {
-                          // Error already handled in getLocationForMapCenter
-                        }
-                      }}
-                      disabled={isLocationLoading}
-                      className="text-xs sm:text-sm"
-                    >
-                      <Navigation className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                      <span className="hidden sm:inline">{t("location.centerOnMyLocation", "Center on My Location")}</span>
-                      <span className="sm:hidden">{t("location.myLocation", "My Location")}</span>
-                    </Button>
-                  </div>
-                  
-                  <div className="relative h-[min(58vh,560px)] sm:h-[min(65vh,680px)] md:h-[min(72vh,820px)] lg:h-[min(78vh,900px)] rounded-lg border overflow-hidden bg-muted">
-                    {viewMode === "map" && (
-                      <div className="pointer-events-none absolute top-3 left-3 z-30 max-w-[min(100%,calc(100%-1.5rem))]">
-                        <div className="pointer-events-auto flex overflow-hidden rounded-md border bg-background/95 shadow-md backdrop-blur-sm">
-                          <Button
-                            type="button"
-                            variant={browseMode === "providers" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 rounded-none px-3 text-[11px] font-semibold sm:text-xs"
-                            onClick={() => {
-                              setBrowseModeAndPersist("providers");
-                              setCurrentPage(1);
-                              setViewMode("map");
-                            }}
-                          >
-                            {t("providers", "Providers")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={browseMode === "services" ? "secondary" : "ghost"}
-                            size="sm"
-                            className="h-8 rounded-none border-l border-border px-3 text-[11px] font-semibold sm:text-xs"
-                            onClick={() => {
-                              setBrowseModeAndPersist("services");
-                              setCurrentPage(1);
-                            }}
-                          >
-                            {t("services", "Services")}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {mapReady ? (
-                      <div
-                        className="relative w-full h-full min-h-0 bg-muted"
-                        style={{
-                          display: viewMode === "map" ? "block" : "none",
-                          zIndex: viewMode === "map" ? 1 : -1,
-                        }}
-                      >
-                        <BrowseMap
-                          center={mapCenter}
-                          zoom={12}
-                          serviceMarkers={mapServiceMarkers}
-                          providerMarkers={mapProviderMarkers}
-                          userLocation={mapOnlyUserLocation ?? userLocation}
-                          browseMode={browseMode}
-                          className="rounded-lg"
-                          flyToTarget={mapFlyTo}
-                          flyToRevision={mapFlyRevision}
-                        />
-                        {viewMode === "map" && (
-                          <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[min(100%,calc(100%-1.5rem))]">
-                            <Badge
-                              variant="secondary"
-                              className="border bg-background/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-sm tabular-nums sm:text-xs"
-                              suppressHydrationWarning
-                            >
-                              {hydrated ? (
-                                <>
-                                  {mapPlottedMarkerCount}{" "}
-                                  {browseMode === "services"
-                                    ? mapPlottedMarkerCount === 1
-                                      ? t("service", "service")
-                                      : t("servicesLower", "services")
-                                    : mapPlottedMarkerCount === 1
-                                      ? t("provider", "provider")
-                                      : t("providersLower", "providers")}{" "}
-                                  {t("onMap", "on map")}
-                                </>
-                              ) : (
-                                t("onMap", "on map")
-                              )}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-full h-full min-h-0 bg-muted flex items-center justify-center" />
-                    )}
-                    {!mapReady && viewMode === "map" && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-20 p-4">
-                        <Card className="p-4 md:p-6 max-w-md w-full">
-                          <CardContent className="text-center space-y-3 md:space-y-4">
-                            <MapIcon className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground" />
-                            <div>
-                              <h3 className="text-base md:text-lg font-semibold mb-1.5 md:mb-2">Map access required</h3>
-                              <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
-                                Add a <strong>Mapbox</strong> public token (recommended for the public site) from{" "}
-                                <a
-                                  href="https://account.mapbox.com/"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary underline"
-                                >
-                                  Mapbox
-                                </a>
-                                , or a <strong>Google Maps</strong> key from{" "}
-                                <a
-                                  href="https://console.cloud.google.com/google/maps-apis"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary underline"
-                                >
-                                  Google Cloud Console
-                                </a>
-                                . For Google-only setup, enable <strong>Maps JavaScript API</strong> and{" "}
-                                <strong>Places API</strong>.
-                              </p>
-                              <div className="text-left bg-muted p-2.5 md:p-3 rounded-lg space-y-1.5 md:space-y-2">
-                                <p className="text-[11px] md:text-xs font-medium">Environment (e.g. .env.local):</p>
-                                <ul className="text-[10px] md:text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                                  <li>
-                                    <code className="px-1 py-0.5 bg-background rounded break-all">
-                                      NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=...
-                                    </code>
-                                  </li>
-                                  <li>
-                                    or{" "}
-                                    <code className="px-1 py-0.5 bg-background rounded break-all">
-                                      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
-                                    </code>
-                                  </li>
-                                </ul>
-                                <p className="text-[10px] md:text-xs text-muted-foreground">Restart the dev server after changes.</p>
-                              </div>
-                              <Button variant="outline" size="sm" onClick={() => setViewMode("grid")} className="mt-4">
-                                Switch to Grid View
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-              ) : browseMode === "providers" ? (
-                providersLoading ? (
-                  /* Loading providers skeleton */
-                  <div className="space-y-3 md:space-y-4">
-                    <div
-                      className={
-                        viewMode === "grid"
-                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
-                          : "space-y-3 md:space-y-4"
-                      }
-                    >
-                      {Array.from({ length: 6 }).map((_, index) => (
-                        <Card key={`provider-skel-${index}`} className="overflow-hidden">
-                          {viewMode === "grid" ? (
-                            <>
-                              <Skeleton className="w-full h-48" />
-                              <CardContent className="p-4 space-y-3">
-                                <Skeleton className="h-5 w-3/4" />
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-2/3" />
-                              </CardContent>
-                            </>
-                          ) : (
-                            <div className="flex gap-4 p-4">
-                              <Skeleton className="w-32 h-32 flex-shrink-0" />
-                              <div className="flex-1 space-y-3">
-                                <Skeleton className="h-6 w-3/4" />
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-2/3" />
-                              </div>
-                            </div>
-                          )}
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                ) : providersOrdered.length > 0 ? (
-                  <>
-                    <ProvidersBrowseList
-                      providers={providersOrdered}
-                      viewMode={viewMode === "list" ? "list" : "grid"}
-                      userLat={currentUserLocation?.lat}
-                      userLng={currentUserLocation?.lng}
-                      onLoadMore={loadMoreProvidersBrowse}
-                      hasMore={providersBrowseHasMore}
-                      isLoadingMore={isLoadingMoreProviders}
-                    />
-                    <p className="mt-3 text-center text-xs text-muted-foreground">
-                      Showing {providersOrdered.length} providers
-                      {providersBrowseHasMore ? " · Scroll to load more" : ""}
-                    </p>
-                    {providersBrowseHasMore && !isLoadingMoreProviders && (
-                      <div className="flex justify-center mt-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void loadMoreProvidersBrowse()}
-                        >
-                          Load more
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-10">
-                    <h3 className="text-lg font-semibold mb-2">No Providers Found</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Try changing filters or switch to Services view.
-                    </p>
-                    <div className="flex gap-2 justify-center">
-                      <Button variant="outline" onClick={() => setBrowseModeAndPersist("services")}>
-                        View Services
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() =>
-                          setFilters({
-                            category: [],
-                            subcategory: [],
-                            priceRange: [0, 5000],
-                            rating: 0,
-                            deliveryTime: [],
-                            verified: false,
-                            featured: false,
-                            location: undefined,
-                            sortBy: "relevance",
-                          })
-                        }
-                      >
-                        Clear Filters
-                      </Button>
-                    </div>
-                  </div>
-                )
-              ) : servicesLoading ? (
-                /* Loading State with Skeleton for Grid/List View */
-                <div className="space-y-3 md:space-y-4">
-                  <div
-                    className={
-                      viewMode === "grid"
-                        ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
-                        : "space-y-3 md:space-y-4"
+          <FilterToolbar
+            className="mb-4 md:mb-5"
+            value={filters}
+            categories={categories}
+            onFilterChange={(newFilters) => {
+              if (newFilters.category.length === 0 && filters.category.length > 0) {
+                setFilters({ ...newFilters, subcategory: [] });
+              } else {
+                setFilters(newFilters);
+              }
+            }}
+            trailing={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    let location: { lat: number; lng: number };
+                    if (userLocation) {
+                      location = userLocation;
+                    } else {
+                      location = await getLocationForMapCenter();
                     }
-                  >
-                    {Array.from({ length: 6 }).map((_, index) => (
-                      <Card key={index} className="overflow-hidden">
-                        {viewMode === "grid" ? (
-                          <>
-                            <Skeleton className="w-full h-48" />
-                            <CardContent className="p-4 space-y-3">
-                              <Skeleton className="h-5 w-3/4" />
-                              <Skeleton className="h-4 w-full" />
-                              <Skeleton className="h-4 w-2/3" />
-                              <div className="flex items-center justify-between pt-2">
-                                <Skeleton className="h-6 w-20" />
-                                <Skeleton className="h-4 w-16" />
-                              </div>
-                            </CardContent>
-                          </>
-                        ) : (
-                          <div className="flex gap-4 p-4">
-                            <Skeleton className="w-32 h-32 flex-shrink-0" />
-                            <div className="flex-1 space-y-3">
-                              <Skeleton className="h-6 w-3/4" />
-                              <Skeleton className="h-4 w-full" />
-                              <Skeleton className="h-4 w-2/3" />
-                              <div className="flex items-center justify-between pt-2">
-                                <Skeleton className="h-6 w-20" />
-                                <Skeleton className="h-4 w-16" />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              ) : filteredServices.length > 0 ? (
-                    /* Grid/List View */
-                    (() => {
-                      const totalCount = servicesPagination?.total ?? filteredServices.length;
-                      const totalPages = Math.ceil(totalCount / itemsPerPage);
-                      const startIndex = (currentPage - 1) * itemsPerPage + 1;
-                      const endIndexRaw = startIndex + filteredServices.length - 1;
-                      const endIndex = totalPages > 1 ? Math.min(endIndexRaw, totalCount) : endIndexRaw;
+                    setMapOnlyUserLocation(location);
+                    setMapFlyTo({ lat: location.lat, lng: location.lng, zoom: 14 });
+                    setMapFlyRevision((n) => n + 1);
+                  } catch {
+                    // Error already handled in getLocationForMapCenter
+                  }
+                }}
+                disabled={isLocationLoading}
+                className="h-10 shrink-0 gap-1.5 rounded-xl border-slate-200/90 bg-slate-50/80 px-3 text-xs font-medium text-slate-800 hover:border-slate-300 hover:bg-white sm:text-sm"
+              >
+                {isLocationLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Navigation className="h-3.5 w-3.5" />
+                )}
+                <span className="hidden sm:inline">
+                  {isLocationLoading
+                    ? t("location.getting", "Getting location...")
+                    : t("location.centerOnMyLocation", "Center on My Location")}
+                </span>
+                <span className="sm:hidden">
+                  {isLocationLoading
+                    ? t("location.getting", "Getting...")
+                    : t("location.myLocation", "My Location")}
+                </span>
+              </Button>
+            }
+          />
 
-                      // If backend doesn't compute `total`, we still allow Next/Prev using "hasMore".
-                      const hasMore = filteredServices.length === itemsPerPage;
-                      const hasAccurateTotal = typeof servicesPagination?.total === "number";
-                      
-                      return (
-                        <>
-                          <div
-                            className={
-                              viewMode === "grid"
-                                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch"
-                                : "space-y-3 md:space-y-4"
-                            }
-                          >
-                            {filteredServices.map((service, index) => (
-                              <div
-                                key={service.id || service._id}
-                                className="animate-fade-in h-full"
-                                style={{ animationDelay: `${index * 50}ms` }}
-                              >
-                                <ServiceCard 
-                                  {...service}
-                                  id={service.id || service._id}
-                                  slug={service.slug}
-                                  viewMode={viewMode}
-                                  location={service.location}
-                                  distanceKm={
-                                    typeof (service as any).distanceKm === "number" &&
-                                    Number.isFinite((service as any).distanceKm)
-                                      ? (service as any).distanceKm
-                                      : (service as any)._distance != null &&
-                                          (service as any)._distance !== Infinity
-                                        ? Math.round((service as any)._distance * 10) / 10
-                                        : undefined
-                                  }
-                                />
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {/* Pagination Info and Controls */}
-                          {(totalPages > 1 || hasMore || currentPage > 1) && (
-                            <div className="mt-6 md:mt-8 lg:mt-10 px-4 space-y-4">
-                              {/* Pagination Info */}
-                              <div className="text-center text-sm text-muted-foreground">
-                                Showing {startIndex}-{endIndex}
-                                {hasAccurateTotal ? ` of ${totalCount} services` : ""}
-                                {totalPages > 1 ? ` (Page ${currentPage} of ${totalPages})` : ""}
-                              </div>
-                              
-                              {/* Pagination Controls */}
-                              <div className="flex justify-center">
-                                <div className="flex gap-1.5 md:gap-2 flex-wrap justify-center">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-xs md:text-sm"
-                                  disabled={currentPage === 1}
-                                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                >
-                                  <span className="hidden sm:inline">Previous</span>
-                                  <span className="sm:hidden">Prev</span>
-                                </Button>
-                                
-                                {totalPages > 1 && (() => {
-                                  const pages: (number | string)[] = [];
-                                  const maxVisible = 5;
-                                  
-                                  if (totalPages <= maxVisible) {
-                                    for (let i = 1; i <= totalPages; i++) {
-                                      pages.push(i);
-                                    }
-                                  } else {
-                                    pages.push(1);
-                                    
-                                    if (currentPage > 3) {
-                                      pages.push('...');
-                                    }
-                                    
-                                    const start = Math.max(2, currentPage - 1);
-                                    const end = Math.min(totalPages - 1, currentPage + 1);
-                                    
-                                    for (let i = start; i <= end; i++) {
-                                      pages.push(i);
-                                    }
-                                    
-                                    if (currentPage < totalPages - 2) {
-                                      pages.push('...');
-                                    }
-                                    
-                                    if (totalPages > 1) {
-                                      pages.push(totalPages);
-                                    }
-                                  }
-                                  
-                                  return pages.map((page, idx) => {
-                                    if (page === '...') {
-                                      return (
-                                        <span key={`ellipsis-${idx}`} className="px-2 py-1 text-xs md:text-sm text-muted-foreground">
-                                          ...
-                                        </span>
-                                      );
-                                    }
-                                    
-                                    const pageNum = page as number;
-                                    return (
-                                      <Button
-                                        key={pageNum}
-                                        variant={currentPage === pageNum ? "secondary" : "outline"}
-                                        size="sm"
-                                        className="text-xs md:text-sm"
-                                        onClick={() => setCurrentPage(pageNum)}
-                                      >
-                                        {pageNum}
-                                      </Button>
-                                    );
-                                  });
-                                })()}
-                                
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-xs md:text-sm"
-                                  disabled={!hasMore}
-                                  onClick={() => setCurrentPage((prev) => prev + 1)}
-                                >
-                                  <span className="hidden sm:inline">Next</span>
-                                  <span className="sm:hidden">Next</span>
-                                </Button>
+          <div className="space-y-3 md:space-y-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-5">
+                <aside className="hidden w-[340px] shrink-0 lg:block xl:w-[360px]">
+                  <div className="sticky top-20 flex h-[min(78vh,900px)] flex-col overflow-hidden rounded-lg border bg-card">
+                    <div className="shrink-0 border-b px-3 py-2.5">
+                      <p className="text-sm font-semibold text-foreground">
+                        {t("providers", "Providers")}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {providersLoading
+                          ? t("loading", "Loading…")
+                          : `${providersOrdered.length}${providersBrowseHasMore ? "+" : ""} nearby`}
+                      </p>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-hidden p-2">
+                      {providersLoading ? (
+                        <div className="space-y-2">
+                          {Array.from({ length: 5 }).map((_, index) => (
+                            <Card key={`map-side-skel-${index}`} className="overflow-hidden">
+                              <div className="flex gap-3 p-3">
+                                <Skeleton className="h-16 w-16 shrink-0 rounded-md" />
+                                <div className="flex-1 space-y-2">
+                                  <Skeleton className="h-4 w-3/4" />
+                                  <Skeleton className="h-3 w-full" />
+                                  <Skeleton className="h-3 w-1/2" />
                                 </div>
                               </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()
-                  ) : (
-                <div className="text-center py-12 md:py-16 px-4">
-                  <p className="text-sm md:text-base lg:text-lg text-muted-foreground mb-3 md:mb-4">
-                    No services found matching your criteria.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 md:mt-4 text-xs md:text-sm"
-                    onClick={() =>
-                      setFilters({
-                        category: [],
-                        subcategory: [],
-                        priceRange: [0, 5000],
-                        rating: 0,
-                        deliveryTime: [],
-                        verified: false,
-                        featured: false,
-                        location: undefined,
-                        sortBy: "relevance",
-                      })
-                    }
-                  >
-                    Clear all filters
-                  </Button>
-                </div>
-              )}
+                            </Card>
+                          ))}
+                        </div>
+                      ) : providersOrdered.length > 0 ? (
+                        <ProvidersBrowseList
+                          providers={providersOrdered}
+                          viewMode="list"
+                          userLat={currentUserLocation?.lat}
+                          userLng={currentUserLocation?.lng}
+                          onLoadMore={loadMoreProvidersBrowse}
+                          hasMore={providersBrowseHasMore}
+                          isLoadingMore={isLoadingMoreProviders}
+                          className="h-full min-h-0 w-full overflow-y-auto overflow-x-hidden [&>*+*]:mt-2"
+                        />
+                      ) : (
+                        <div className="px-2 py-8 text-center">
+                          <p className="text-sm font-medium">No providers found</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Try changing filters or location.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </aside>
 
+                <div className="relative min-w-0 flex-1 h-[min(58vh,560px)] sm:h-[min(65vh,680px)] md:h-[min(72vh,820px)] lg:h-[min(78vh,900px)] rounded-lg border overflow-hidden bg-muted">
+                  {mapReady ? (
+                    <div className="relative h-full min-h-0 w-full bg-muted">
+                      <BrowseMap
+                        center={mapCenter}
+                        zoom={12}
+                        serviceMarkers={mapServiceMarkers}
+                        providerMarkers={mapProviderMarkers}
+                        userLocation={mapOnlyUserLocation ?? userLocation}
+                        browseMode={browseMode}
+                        className="rounded-lg"
+                        flyToTarget={mapFlyTo}
+                        flyToRevision={mapFlyRevision}
+                      />
+                      <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[min(100%,calc(100%-1.5rem))]">
+                        <Badge
+                          variant="secondary"
+                          className="border bg-background/95 px-2.5 py-1.5 text-[11px] font-semibold shadow-md backdrop-blur-sm tabular-nums sm:text-xs"
+                          suppressHydrationWarning
+                        >
+                          {hydrated ? (
+                            <>
+                              {mapPlottedMarkerCount}{" "}
+                              {mapPlottedMarkerCount === 1
+                                ? t("provider", "provider")
+                                : t("providersLower", "providers")}{" "}
+                              {t("onMap", "on map")}
+                            </>
+                          ) : (
+                            t("onMap", "on map")
+                          )}
+                        </Badge>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-0 w-full items-center justify-center bg-muted" />
+                  )}
+                  {!mapReady && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-muted/50 p-4">
+                      <Card className="w-full max-w-md p-4 md:p-6">
+                        <CardContent className="space-y-3 text-center md:space-y-4">
+                          <MapIcon className="mx-auto h-10 w-10 text-muted-foreground md:h-12 md:w-12" />
+                          <div>
+                            <h3 className="mb-1.5 text-base font-semibold md:mb-2 md:text-lg">
+                              Map access required
+                            </h3>
+                            <p className="mb-3 text-xs text-muted-foreground md:mb-4 md:text-sm">
+                              Add a <strong>Mapbox</strong> public token or a{" "}
+                              <strong>Google Maps</strong> key, then restart the dev server.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
         </div>
       </main>
 
