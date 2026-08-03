@@ -18,7 +18,7 @@ import {
   type ManpowerTrade,
 } from "@/lib/manpower/manpowerHubCatalog";
 import { fetchManpowerHubData, type ManpowerHubData } from "@/lib/manpower/manpowerHubApi";
-import { getManpowerTradeArtUrl } from "@/lib/manpower/manpowerTradeArt";
+import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import manpowerHeroImg from "@/assets/services/manpowers.png";
 
 const EMPTY: ManpowerHubData = {
@@ -37,7 +37,7 @@ function TradeCard({
   priceLabel?: string;
   href: string;
 }) {
-  const art = getManpowerTradeArtUrl(trade.id) || getManpowerTradeArtUrl(trade.name);
+  const art = getManpowerTradeArt(trade.id) || getManpowerTradeArt(trade.name);
   return (
     <Link
       href={href}
@@ -81,7 +81,7 @@ function SpecificTradeChip({
   metaLabel?: string;
   href: string;
 }) {
-  const art = getManpowerTradeArtUrl(trade.id) || getManpowerTradeArtUrl(trade.name);
+  const art = getManpowerTradeArt(trade.id) || getManpowerTradeArt(trade.name);
   return (
     <Link
       href={href}
