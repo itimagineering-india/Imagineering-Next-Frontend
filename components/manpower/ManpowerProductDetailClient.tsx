@@ -31,7 +31,7 @@ import {
   fetchManpowerCatalogByHireMode,
   fetchManpowerCatalogProductById,
 } from "@/lib/manpower/manpowerHubApi";
-import { getManpowerTradeArtUrl } from "@/lib/manpower/manpowerTradeArt";
+import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import { resolveManpowerMediaUrl } from "@/lib/manpower/media";
 
 type CatalogProduct = {
@@ -131,7 +131,7 @@ export function ManpowerProductDetailClient({ productId }: Props) {
     resolveManpowerTradeKey(product?.subcategory || "") ||
     resolveManpowerTradeKey(tradeName) ||
     tradeId;
-  const art = getManpowerTradeArtUrl(tradeKey) || getManpowerTradeArtUrl(title);
+  const art = getManpowerTradeArt(tradeKey) || getManpowerTradeArt(title);
   const imageUri = resolveManpowerMediaUrl(
     Array.isArray(product?.images) ? product?.images?.[0] : undefined
   );
@@ -297,6 +297,7 @@ export function ManpowerProductDetailClient({ productId }: Props) {
   const showTotalLine =
     hireMode === "one_day" || (hireMode === "specific_work" && !visiting && totalPrice > 0);
   const tradeLabel = String(product?.subcategory || tradeName || tradeKey).trim();
+  const remoteImage = Boolean(imageUri);
   const gallerySrc = imageUri || art;
 
   return (
@@ -330,7 +331,7 @@ export function ManpowerProductDetailClient({ productId }: Props) {
             <div className="grid grid-cols-1 gap-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:grid-cols-[minmax(0,420px)_1fr]">
               <div className="relative aspect-square overflow-hidden rounded-xl bg-slate-100">
                 {gallerySrc ? (
-                  gallerySrc.startsWith("http") || gallerySrc.startsWith("/") ? (
+                  remoteImage && typeof gallerySrc === "string" ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={gallerySrc} alt={title} className="h-full w-full object-cover" />
                   ) : (
