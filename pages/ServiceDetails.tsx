@@ -1239,6 +1239,7 @@ export default function ServiceDetails() {
             onOpenChange={setQuotesModalOpen}
             serviceId={service.id}
             serviceTitle={service.title}
+            priceType={service.priceType}
           />
         )}
 
