@@ -20,7 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 
-const OPEN_DELAY_MS = 2000;
+const OPEN_DELAY_MS = 10000;
 
 const inputClass =
   "h-11 rounded-xl border-slate-200 bg-white transition-all duration-200 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/25 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-950/40";
