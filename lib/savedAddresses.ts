@@ -11,6 +11,10 @@ export type SavedAddress = {
   id: string;
   label: string;
   address: string;
+  /** Flat / house / plot number */
+  houseNo?: string;
+  /** Nearby landmark */
+  landmark?: string;
   city: string;
   state: string;
   zipCode: string;
@@ -22,6 +26,21 @@ export type SavedAddress = {
 type SavedAddressPayload = {
   addresses: SavedAddress[];
 };
+
+/** Full line for display / booking payload (includes house + landmark). */
+export function formatSavedAddressLine(
+  addr: Pick<SavedAddress, "address" | "houseNo" | "landmark">
+): string {
+  const houseNo = String(addr.houseNo || "").trim();
+  const street = String(addr.address || "").trim();
+  const landmark = String(addr.landmark || "").trim();
+  const near = landmark
+    ? landmark.toLowerCase().startsWith("near ")
+      ? landmark
+      : `Near ${landmark}`
+    : "";
+  return [houseNo, street, near].filter(Boolean).join(", ");
+}
 
 function normalizeCoordinates(
   input: SavedAddress["coordinates"] | unknown
@@ -36,10 +55,14 @@ function normalizeCoordinates(
 
 function normalizeAddress(input: SavedAddress): SavedAddress {
   const coordinates = normalizeCoordinates(input.coordinates);
+  const houseNo = String(input.houseNo || "").trim();
+  const landmark = String(input.landmark || "").trim();
   return {
     id: String(input.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
     label: String(input.label || "Address").trim() || "Address",
     address: String(input.address || "").trim(),
+    ...(houseNo ? { houseNo } : {}),
+    ...(landmark ? { landmark } : {}),
     city: String(input.city || "").trim(),
     state: String(input.state || "").trim(),
     zipCode: String(input.zipCode || "").trim(),
