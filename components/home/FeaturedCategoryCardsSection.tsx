@@ -33,8 +33,8 @@ const FEATURED_CARDS = [
     image: contractorsImg,
   },
   {
-    slug: "rental-services",
-    href: "/services?category=rental-services",
+    slug: "machine-rental",
+    href: "/services?category=machine-rental",
     titleKey: "featuredCategories.machines.title",
     descKey: "featuredCategories.machines.description",
     image: machineRentalImg,
