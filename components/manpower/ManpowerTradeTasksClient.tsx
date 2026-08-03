@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 import { MANPOWER_CANVAS, MANPOWER_TEAL } from "@/components/manpower/ManpowerHireModeTabs";
 import { fetchManpowerSpecificWorksForTrade } from "@/lib/manpower/manpowerHubApi";
 import type { ManpowerSpecificWorkItem } from "@/lib/manpower/manpowerHubCatalog";
-import { getManpowerTradeArtUrl } from "@/lib/manpower/manpowerTradeArt";
+import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import { resolveManpowerTradeKey } from "@/lib/manpower/manpowerHubCatalog";
 
 type Props = {
@@ -48,7 +48,7 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
     };
   }, [displayName, key]);
 
-  const art = getManpowerTradeArtUrl(key) || getManpowerTradeArtUrl(displayName);
+  const art = getManpowerTradeArt(key) || getManpowerTradeArt(displayName);
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: MANPOWER_CANVAS }}>
