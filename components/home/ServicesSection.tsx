@@ -12,7 +12,7 @@ const DISPLAY_ORDER = [
   "construction-materials",
   "manpower",
   "technical-manpower",
-  "rental-services",
+  "machine-rental",
   "machines",
   "contractors",
   "consultants",
