@@ -58,6 +58,37 @@ export function getPriceTypeLabel(priceType: string | null | undefined): string 
   return PRICE_TYPE_LABEL[priceType] ?? priceType.replace(/_/g, " ");
 }
 
+/** Short unit noun for quantity fields (e.g. bag, kg, MT). */
+const QUANTITY_UNIT_NOUN: Record<string, string> = {
+  per_bag: "bag",
+  per_kg: "kg",
+  per_litre: "litre",
+  per_load: "load",
+  per_trip: "trip",
+  per_unit: "unit",
+  per_article: "article",
+  per_sqft: "sq ft",
+  per_sqm: "sq m",
+  per_cuft: "cu ft",
+  per_cum: "cu m",
+  per_metre: "metre",
+  metric_ton: "MT",
+  hourly: "hour",
+  daily: "day",
+  monthly: "month",
+  per_minute: "min",
+};
+
+export function getQuantityUnitNoun(priceType: string | null | undefined): string {
+  const key = String(priceType || "")
+    .trim()
+    .toLowerCase();
+  if (!key) return "";
+  if (["negotiable", "fixed", "lumpsum", "per_project"].includes(key)) return "";
+  if (QUANTITY_UNIT_NOUN[key]) return QUANTITY_UNIT_NOUN[key];
+  return key.replace(/_/g, " ").replace(/^per\s+/i, "").trim();
+}
+
 export function formatInr(amount: number): string {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount);
 }
