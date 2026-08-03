@@ -1,7 +1,32 @@
 {
+  "featuredCategories": {
+    "manpower": {
+      "title": "Hire Manpower",
+      "description": "Skilled & unskilled labour for your site"
+    },
+    "materials": {
+      "title": "Buy Materials",
+      "description": "Cement, Steel, Bricks & 1000+ materials"
+    },
+    "contractors": {
+      "title": "Find Contractors",
+      "description": "Verified contractors for your projects"
+    },
+    "machines": {
+      "title": "Rent Machines",
+      "description": "Best prices for JCB, Crane, Tractor & more"
+    }
+  },
+  "trustStats": {
+    "providers": { "value": "2,000+", "label": "Verified Providers" },
+    "projects": { "value": "1000+", "label": "Projects Completed" },
+    "cities": { "value": "05+", "label": "Cities Covered" },
+    "rating": { "value": "4.8/5", "label": "Average Rating" },
+    "trustedBy": "Trusted by thousands of happy customers across India"
+  },
   "services": {
-    "our": "Our",
-    "title": "Services",
+    "our": "Popular",
+    "title": "Categories",
     "description": "Discover a wide range of professional services across multiple categories.",
     "viewAll": "View All Services",
     "comingSoon": "Coming Soon"
