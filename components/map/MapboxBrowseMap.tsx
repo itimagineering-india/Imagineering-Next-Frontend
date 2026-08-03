@@ -14,6 +14,11 @@ import { formatServicePrice } from "@/lib/formatServicePrice";
 
 export type { ServiceMarker, ProviderMarker };
 
+/** Mapbox browse map props (extends shared browse map shape). */
+export type MapboxBrowseMapProps = GoogleMapProps & {
+  onMarkersRendered?: () => void;
+};
+
 const DEFAULT_CENTER = { lat: 28.6139, lng: 77.209 };
 const DEFAULT_ZOOM = 14;
 
@@ -88,7 +93,7 @@ export const MapboxBrowseMap = memo(function MapboxBrowseMap({
   clusteringEnabled: _clusteringEnabled = true,
   lazyWhenVisible = false,
   onMarkersRendered,
-}: GoogleMapProps) {
+}: MapboxBrowseMapProps) {
   const onMarkersRenderedRef = useRef(onMarkersRendered);
   onMarkersRenderedRef.current = onMarkersRendered;
   const containerRef = useRef<HTMLDivElement>(null);
