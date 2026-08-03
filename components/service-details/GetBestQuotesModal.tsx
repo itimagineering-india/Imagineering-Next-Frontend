@@ -6,14 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, Loader2, Calendar, Clock, Package } from "lucide-react";
+import { ChevronRight, Loader2, Calendar, Clock, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api-client";
 import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
-import { loadSavedAddresses, type SavedAddress } from "@/lib/savedAddresses";
+import {
+  formatSavedAddressLine,
+  loadSavedAddresses,
+  type SavedAddress,
+} from "@/lib/savedAddresses";
 import { setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { useAuth } from "@/contexts/AuthContext";
+import { getPriceTypeLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -34,6 +39,8 @@ type GetBestQuotesModalProps = {
   onOpenChange: (open: boolean) => void;
   serviceId: string;
   serviceTitle: string;
+  /** Product / service price unit (e.g. per_kg, per_bag) shown next to quantity. */
+  priceType?: string | null;
 };
 
 export function GetBestQuotesModal({
@@ -41,6 +48,7 @@ export function GetBestQuotesModal({
   onOpenChange,
   serviceId,
   serviceTitle,
+  priceType,
 }: GetBestQuotesModalProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -48,18 +56,15 @@ export function GetBestQuotesModal({
   const [quantity, setQuantity] = useState(1);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [stateVal, setStateVal] = useState("");
-  const [zipCode, setZipCode] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
-  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(null);
 
   const minDate = useMemo(() => formatLocalYMD(new Date()), []);
+  const quantityUnit = useMemo(() => getQuantityUnitNoun(priceType), [priceType]);
+  const quantityUnitLabel = useMemo(() => getPriceTypeLabel(priceType), [priceType]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,15 +72,12 @@ export function GetBestQuotesModal({
     loadSavedAddresses().then((saved) => {
       if (cancelled) return;
       setSavedAddresses(saved);
-      const def = saved.find((a) => a.isDefault) || saved[0];
-      if (def) {
-        setAddress(def.address);
-        setCity(def.city);
-        setStateVal(def.state);
-        setZipCode(def.zipCode || "");
-        setSelectedAddressId(def.id);
-        setCoordinates(def.coordinates || null);
-      }
+      setSelectedAddress((current) => {
+        if (current) {
+          return saved.find((a) => a.id === current.id) || current;
+        }
+        return saved.find((a) => a.isDefault) || saved[0] || null;
+      });
     });
     setDate((prev) => prev || minDate);
     return () => {
@@ -83,13 +85,21 @@ export function GetBestQuotesModal({
     };
   }, [open, minDate]);
 
+  const addressLine = useMemo(() => {
+    if (!selectedAddress) return "";
+    return formatSavedAddressLine(selectedAddress) || selectedAddress.address || "";
+  }, [selectedAddress]);
+
+  const addressMeta = useMemo(() => {
+    if (!selectedAddress) return "";
+    return [selectedAddress.city, selectedAddress.state, selectedAddress.zipCode]
+      .map((x) => String(x || "").trim())
+      .filter(Boolean)
+      .join(", ");
+  }, [selectedAddress]);
+
   const applySavedAddress = useCallback((row: SavedAddress) => {
-    setAddress(row.address);
-    setCity(row.city);
-    setStateVal(row.state);
-    setZipCode(row.zipCode || "");
-    setSelectedAddressId(row.id);
-    setCoordinates(row.coordinates || null);
+    setSelectedAddress(row);
     setAddressPickerOpen(false);
   }, []);
 
@@ -114,10 +124,15 @@ export function GetBestQuotesModal({
       });
       return;
     }
-    if (!address.trim() || !city.trim() || !stateVal.trim()) {
+    if (
+      !selectedAddress ||
+      !addressLine.trim() ||
+      !String(selectedAddress.city || "").trim() ||
+      !String(selectedAddress.state || "").trim()
+    ) {
       toast({
         title: "Address required",
-        description: "Add full address, city, and state.",
+        description: "Please select a saved address with city and state.",
         variant: "destructive",
       });
       return;
@@ -130,11 +145,11 @@ export function GetBestQuotesModal({
         quantity,
         preferredDate: date,
         preferredTime: time,
-        address: address.trim(),
-        city: city.trim(),
-        state: stateVal.trim(),
-        zipCode: zipCode.trim() || undefined,
-        coordinates: coordinates || undefined,
+        address: addressLine.trim(),
+        city: selectedAddress.city.trim(),
+        state: selectedAddress.state.trim(),
+        zipCode: selectedAddress.zipCode.trim() || undefined,
+        coordinates: selectedAddress.coordinates || undefined,
         notes: notes.trim() || undefined,
       });
 
@@ -183,14 +198,29 @@ export function GetBestQuotesModal({
             <div className="space-y-2">
               <Label htmlFor="rfq-qty" className="flex items-center gap-2">
                 <Package className="h-4 w-4" /> Quantity
+                {quantityUnitLabel ? (
+                  <span className="font-normal text-muted-foreground">· {quantityUnitLabel}</span>
+                ) : null}
               </Label>
-              <Input
-                id="rfq-qty"
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="rfq-qty"
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+                  className="flex-1"
+                  aria-describedby={quantityUnit ? "rfq-qty-unit" : undefined}
+                />
+                {quantityUnit ? (
+                  <span
+                    id="rfq-qty-unit"
+                    className="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center rounded-md border border-input bg-muted/60 px-3 text-sm font-medium text-muted-foreground"
+                  >
+                    {quantityUnit}
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -236,50 +266,57 @@ export function GetBestQuotesModal({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <Label className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> Address
-                </Label>
-                <Button
+                <Label className="text-sm font-semibold">Address</Label>
+                <button
                   type="button"
-                  variant="link"
-                  className="h-auto p-0 text-xs"
+                  className="text-[13px] font-bold text-primary hover:underline"
                   onClick={() => setAddressPickerOpen(true)}
                 >
-                  Saved addresses
-                </Button>
+                  {selectedAddress ? "Change" : "Saved addresses"}
+                </button>
               </div>
-              <Textarea
-                placeholder="Street / landmark"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  setSelectedAddressId(null);
-                }}
-                rows={2}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  placeholder="City"
-                  value={city}
-                  onChange={(e) => {
-                    setCity(e.target.value);
-                    setSelectedAddressId(null);
-                  }}
-                />
-                <Input
-                  placeholder="State"
-                  value={stateVal}
-                  onChange={(e) => {
-                    setStateVal(e.target.value);
-                    setSelectedAddressId(null);
-                  }}
-                />
-              </div>
-              <Input
-                placeholder="PIN (optional)"
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-              />
+
+              {selectedAddress ? (
+                <button
+                  type="button"
+                  onClick={() => setAddressPickerOpen(true)}
+                  className="flex w-full items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 active:opacity-95"
+                  aria-label="Change address"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-50 text-lg">
+                    📍
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-extrabold text-slate-900">
+                      {selectedAddress.label || "Address"}
+                      {selectedAddress.isDefault ? (
+                        <span className="ml-2 text-[11px] font-semibold text-primary">Default</span>
+                      ) : null}
+                    </span>
+                    <span className="mt-1 block text-[13px] font-medium leading-snug text-slate-800">
+                      {addressLine}
+                    </span>
+                    {addressMeta ? (
+                      <span className="mt-1 block truncate text-xs font-medium text-slate-500">
+                        {addressMeta}
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddressPickerOpen(true)}
+                  className="w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-left transition hover:bg-slate-50"
+                >
+                  <p className="text-sm font-extrabold text-slate-900">No address selected</p>
+                  <p className="mt-1 text-[13px] leading-snug text-slate-500">
+                    Pick a saved address for delivery / site location.
+                  </p>
+                  <p className="mt-2 text-[13px] font-bold text-primary">Choose address →</p>
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -315,7 +352,7 @@ export function GetBestQuotesModal({
         open={addressPickerOpen}
         onOpenChange={setAddressPickerOpen}
         addresses={savedAddresses}
-        selectedId={selectedAddressId}
+        selectedId={selectedAddress?.id || null}
         onAddressesChange={setSavedAddresses}
         onSelect={applySavedAddress}
       />
