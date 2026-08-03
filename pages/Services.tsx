@@ -38,6 +38,25 @@ export async function getServerSideProps() { return { props: {} }; }
 
 const toSlug = toSubcategorySlug;
 
+/** Live slug ↔ legacy seed slug so browse works with either URL. */
+const CATEGORY_SLUG_ALIASES: Record<string, string[]> = {
+  "machine-rental": ["machine-rental", "rental-services"],
+  "rental-services": ["rental-services", "machine-rental"],
+};
+
+function resolveBrowseCategorySlug(
+  requested: string,
+  cats: Array<{ slug?: string }>
+): string {
+  const raw = String(requested || "").trim();
+  if (!raw) return "";
+  if (cats.some((c) => c.slug === raw)) return raw;
+  for (const alias of CATEGORY_SLUG_ALIASES[raw] || []) {
+    if (cats.some((c) => c.slug === alias)) return alias;
+  }
+  return raw;
+}
+
 export interface ServicesCityIntro {
   title: string;
   description: string;
@@ -166,7 +185,11 @@ export default function Services(props: ServicesProps = {}) {
 
       const normalizedParam = toSlug(subcategory);
       const categoriesToSearch = categorySlug
-        ? categories.filter((cat) => cat.slug === categorySlug)
+        ? categories.filter(
+            (cat) =>
+              cat.slug === categorySlug ||
+              (CATEGORY_SLUG_ALIASES[categorySlug] || []).includes(cat.slug)
+          )
         : categories;
 
       for (const category of categoriesToSearch) {
@@ -193,11 +216,12 @@ export default function Services(props: ServicesProps = {}) {
   
   useEffect(() => {
     if (categories.length === 0) return;
-    const resolvedSubcategory = resolveSubcategoryParam(categoryParam, subcategoryParam);
+    const resolvedCategory = resolveBrowseCategorySlug(categoryParam, categories);
+    const resolvedSubcategory = resolveSubcategoryParam(resolvedCategory, subcategoryParam);
     setFilters((prev) => {
       let next = prev;
-      if (categoryParam && prev.category[0] !== categoryParam) {
-        next = { ...prev, category: [categoryParam], subcategory: [] };
+      if (resolvedCategory && prev.category[0] !== resolvedCategory) {
+        next = { ...prev, category: [resolvedCategory], subcategory: [] };
       }
       if (
         resolvedSubcategory &&
@@ -207,7 +231,7 @@ export default function Services(props: ServicesProps = {}) {
       }
       return next === prev ? prev : next;
     });
-  }, [categories.length, categoryParam, subcategoryParam, resolveSubcategoryParam]);
+  }, [categories.length, categoryParam, subcategoryParam, resolveSubcategoryParam, categories]);
 
   // Fetch categories from API (with caching and retry) - load immediately
   useEffect(() => {
@@ -302,7 +326,8 @@ export default function Services(props: ServicesProps = {}) {
   // Find category object if we have categories
   const categoryObj = useMemo(() => {
     if (categories.length > 0 && categoryParam) {
-      return categories.find((c) => c.slug === categoryParam) || null;
+      const resolved = resolveBrowseCategorySlug(categoryParam, categories);
+      return categories.find((c) => c.slug === resolved) || null;
     }
     return null;
   }, [categories, categoryParam]);
