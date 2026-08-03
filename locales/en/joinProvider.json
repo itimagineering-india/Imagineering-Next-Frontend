@@ -1,0 +1,110 @@
+{
+  "metaTitle": "Join as a Provider",
+  "hero": {
+    "badge": "For service providers",
+    "title": "Grow your business with Imagineering India",
+    "subtitle": "List your services, get verified leads, manage bookings, and reach buyers across construction, materials, logistics, and more — on web and the Imagimitra provider app.",
+    "joinCta": "Join as Provider",
+    "downloadCta": "Download Imagimitra App",
+    "loginHint": "Already registered?",
+    "loginLink": "Sign in to provider dashboard"
+  },
+  "stats": [
+    { "value": "50+", "label": "Service categories" },
+    { "value": "Pan-India", "label": "City coverage" },
+    { "value": "Verified", "label": "Provider profiles" },
+    { "value": "24/7", "label": "Lead & booking tools" }
+  ],
+  "benefits": {
+    "title": "Why providers choose us",
+    "subtitle": "Everything you need to win more work and manage it in one place.",
+    "items": [
+      {
+        "title": "Verified trust badge",
+        "description": "Stand out with KYC-verified profiles that buyers trust when comparing providers."
+      },
+      {
+        "title": "Quality leads & enquiries",
+        "description": "Get discovered by buyers searching near you — for rentals, labour, materials, and services."
+      },
+      {
+        "title": "Smart booking management",
+        "description": "Track enquiries, bookings, and job status without juggling calls and spreadsheets."
+      },
+      {
+        "title": "Transparent earnings",
+        "description": "Clear platform fees, payout tracking, and subscription plans that scale with your growth."
+      },
+      {
+        "title": "Local visibility",
+        "description": "Appear on map-based search and category listings where buyers in your city are looking."
+      },
+      {
+        "title": "Dedicated provider app",
+        "description": "Manage leads on the go with Imagimitra — built for providers in the field."
+      }
+    ]
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "subtitle": "Go live in a few simple steps.",
+    "steps": [
+      {
+        "title": "Create your profile",
+        "description": "Sign up as a provider and tell buyers what you offer."
+      },
+      {
+        "title": "Complete verification",
+        "description": "Submit KYC and business details to unlock the verified badge."
+      },
+      {
+        "title": "List your services",
+        "description": "Add pricing, photos, and service areas so buyers can find you."
+      },
+      {
+        "title": "Receive bookings",
+        "description": "Respond to leads, accept jobs, and grow repeat business."
+      }
+    ]
+  },
+  "reviews": {
+    "title": "Providers on the platform",
+    "subtitle": "Real feedback from businesses growing with Imagineering India.",
+    "items": [
+      {
+        "name": "Ramesh Contractors",
+        "role": "Civil contractor · Indore",
+        "text": "We started getting steady enquiries for labour and small civil jobs within weeks of listing. The verified badge helps us close faster."
+      },
+      {
+        "name": "Steel & Build Supplies",
+        "role": "Materials supplier · Bhopal",
+        "text": "Bulk material orders from nearby sites became easier to manage. Buyers compare and contact us directly — less middleman hassle."
+      },
+      {
+        "name": "Metro Machine Rentals",
+        "role": "Equipment rental · Pune",
+        "text": "Imagimitra keeps our team updated on new leads when we're on site. Payouts and booking history are clear in one dashboard."
+      }
+    ]
+  },
+  "app": {
+    "badge": "Imagimitra provider app",
+    "title": "Run your business from your phone",
+    "subtitle": "Download the Imagimitra app to respond to leads faster, update job status, and never miss a booking while you're on site.",
+    "features": [
+      "Instant lead & enquiry notifications",
+      "Manage services and availability",
+      "Track bookings and earnings",
+      "Chat with buyers in one place"
+    ],
+    "playStore": "Get it on Google Play",
+    "webSignup": "Or register on web"
+  },
+  "cta": {
+    "title": "Ready to list your services?",
+    "subtitle": "Join Imagineering India today and reach buyers looking for trusted providers near them.",
+    "join": "Start free registration",
+    "pricing": "View provider plans"
+  }
+}
