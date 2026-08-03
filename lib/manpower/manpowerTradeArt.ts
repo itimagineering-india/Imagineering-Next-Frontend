@@ -1,31 +1,50 @@
-import { resolveManpowerTradeKey } from "@/lib/manpower/manpowerHubCatalog";
+/**
+ * Manpower trade art from assets/services/manpower (bundled into the Next build).
+ * Prefer this over /public paths so production deploys always include the images.
+ */
 
-/** Public URLs under /public/manpower/trades (copied from mobile assets). */
-const TRADE_ART: Record<string, string> = {
-  electrician: "/manpower/trades/electrician.png",
-  plumber: "/manpower/trades/plumber.jpeg",
-  mason: "/manpower/trades/masion.jpeg",
-  carpenter: "/manpower/trades/carpenter.png",
-  cook: "/manpower/trades/cook.jpeg",
-  sweeper: "/manpower/trades/swipper.png",
-  swipper: "/manpower/trades/swipper.png",
-  helper: "/manpower/trades/helper.jpeg",
-  "tiles-mistry": "/manpower/trades/tilesMistry.png",
-  tilesmistry: "/manpower/trades/tilesMistry.png",
-  tiler: "/manpower/trades/tilesMistry.png",
-  welder: "/manpower/trades/weldor.jpeg",
-  weldor: "/manpower/trades/weldor.jpeg",
-  driver: "/manpower/trades/driver.png",
-  painter: "/manpower/trades/painter.jpeg",
-  supervisor: "/manpower/trades/supervisor.jpeg",
-  cleaner: "/manpower/trades/cleaner.jpeg",
-  "material-transport": "/manpower/trades/materialTransport.jpeg",
-  "material-transport-labour": "/manpower/trades/materialTransport.jpeg",
-  "material-transport-labor": "/manpower/trades/materialTransport.jpeg",
-  materialtransport: "/manpower/trades/materialTransport.jpeg",
+import type { StaticImageData } from "next/image";
+import { resolveManpowerTradeKey } from "@/lib/manpower/manpowerHubCatalog";
+import carpenter from "@/assets/services/manpower/carpenter.png";
+import cleaner from "@/assets/services/manpower/cleaner.jpeg";
+import cook from "@/assets/services/manpower/cook.jpeg";
+import driver from "@/assets/services/manpower/driver.png";
+import electrician from "@/assets/services/manpower/electrician.png";
+import helper from "@/assets/services/manpower/helper.jpeg";
+import mason from "@/assets/services/manpower/masion.jpeg";
+import materialTransport from "@/assets/services/manpower/materialTransport.jpeg";
+import painter from "@/assets/services/manpower/painter.jpeg";
+import plumber from "@/assets/services/manpower/plumber.jpeg";
+import supervisor from "@/assets/services/manpower/supervisor.jpeg";
+import sweeper from "@/assets/services/manpower/swipper.png";
+import tilesMistry from "@/assets/services/manpower/tilesMistry.png";
+import welder from "@/assets/services/manpower/weldor.jpeg";
+
+const TRADE_ART: Record<string, StaticImageData> = {
+  electrician,
+  plumber,
+  mason,
+  carpenter,
+  cook,
+  sweeper,
+  swipper: sweeper,
+  helper,
+  "tiles-mistry": tilesMistry,
+  tilesmistry: tilesMistry,
+  tiler: tilesMistry,
+  welder,
+  weldor: welder,
+  driver,
+  painter,
+  supervisor,
+  cleaner,
+  "material-transport": materialTransport,
+  "material-transport-labour": materialTransport,
+  "material-transport-labor": materialTransport,
+  materialtransport: materialTransport,
 };
 
-export function getManpowerTradeArtUrl(tradeIdOrName: string): string | undefined {
+export function getManpowerTradeArt(tradeIdOrName: string): StaticImageData | undefined {
   const raw = String(tradeIdOrName || "").trim();
   if (!raw) return undefined;
   const key = resolveManpowerTradeKey(raw) || raw.toLowerCase();
@@ -40,4 +59,9 @@ export function getManpowerTradeArtUrl(tradeIdOrName: string): string | undefine
     }
   }
   return undefined;
+}
+
+/** @deprecated Prefer getManpowerTradeArt for Next Image. */
+export function getManpowerTradeArtUrl(tradeIdOrName: string): string | undefined {
+  return getManpowerTradeArt(tradeIdOrName)?.src;
 }
