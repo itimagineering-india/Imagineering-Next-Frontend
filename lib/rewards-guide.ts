@@ -2,7 +2,7 @@
 
 export const REDEEM_STEPS = [
   "Book a service or add items to your cart on Imagineering India.",
-  "At checkout, turn on “Apply Imagineering Credits”.",
+  "At checkout, turn on “Apply from Imagineering Wallet”.",
   "We apply the maximum allowed credits automatically (up to the order limit).",
   "Pay the remaining amount via Razorpay or Cashfree.",
 ] as const;
