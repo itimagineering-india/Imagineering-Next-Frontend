@@ -12,7 +12,6 @@ import {
   XCircle,
   Calendar,
   CreditCard,
-  Crown,
   TrendingUp,
   Shield,
   Users,
