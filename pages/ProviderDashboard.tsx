@@ -34,6 +34,7 @@ const DASHBOARD_ICONS = {
   settings: "https://img.icons8.com/color/96/settings.png",
   trust: "https://img.icons8.com/color/96/medal2.png",
   wallet: "https://img.icons8.com/color/96/wallet.png",
+  imagineeringCredit: "https://img.icons8.com/color/96/bank-card.png",
 };
 import { useState, useEffect } from "react";
 import api from "@/lib/api-client";
@@ -42,6 +43,7 @@ import { KycLock } from "@/components/provider/KycLock";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { ProviderTrustHubTeaser } from "@/components/trust/ProviderTrustHubTeaser";
+import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -321,7 +323,7 @@ export default function ProviderDashboard() {
           {[
              { label: "Business Profile", href: "/dashboard/provider/business-profile", icon: DASHBOARD_ICONS.businessProfile },
             { label: "Trust & Growth", href: "/dashboard/provider/trust", icon: DASHBOARD_ICONS.trust },
-            { label: "Rewards", href: "/dashboard/wallet", icon: DASHBOARD_ICONS.wallet },
+            { label: IMAGINEERING_CREDIT.name, href: IMAGINEERING_CREDIT.href, icon: DASHBOARD_ICONS.imagineeringCredit },
             { label: "My Services", href: "/dashboard/provider/services", icon: DASHBOARD_ICONS.services },
             { label: "Workforce", href: "/dashboard/provider/workforce", icon: DASHBOARD_ICONS.workforce },
             { label: "Hire labour", href: "/dashboard/provider/manpower-crew", icon: DASHBOARD_ICONS.hireLabour },
