@@ -11,6 +11,7 @@ import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 import { PaymentOptionsSelector, type PaymentOption, PAYMENT_AMOUNT_LIMIT } from "@/components/payments/PaymentOptionsSelector";
 import api from "@/lib/api-client";
+import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import {
   MapPin,
   Loader2,
@@ -32,6 +33,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
+import {
+  ImagineeringCreditCheckoutPanel,
+  useImagineeringCreditAvailable,
+} from "@/components/imagineering-credit/ImagineeringCreditCheckoutPanel";
 import { useGeocoderByPolicy } from "@/hooks/useGeocoderByPolicy";
 import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
 import { loadSavedAddresses, type SavedAddress } from "@/lib/savedAddresses";
@@ -328,6 +333,38 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     ? { address, city, state: stateVal, zipCode: zip }
     : undefined;
 
+  const handleImagineeringCreditCheckout = async () => {
+    setIsPlacingOrder(true);
+    try {
+      const response = await api.bookings.createFromCart({
+        date,
+        time,
+        location,
+        requirementNote: notes,
+        notes,
+        buyerGST: buyerGST,
+        buyerPAN: buyerPAN,
+        paymentMethod: "imagineering_credit",
+      });
+      if (!response.success) {
+        throw new Error(response.error?.message || "Failed to place order");
+      }
+      toast({
+        title: "Payment successful",
+        description: `Paid using ${IMAGINEERING_CREDIT.name} · ₹${amount.toLocaleString("en-IN")}`,
+      });
+      onSuccess();
+    } catch (error: unknown) {
+      toast({
+        title: "Checkout failed",
+        description: error instanceof Error ? error.message : "Failed to place order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
   const handleCodCheckout = async () => {
     setIsPlacingOrder(true);
     try {
@@ -473,6 +510,9 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   };
 
   const paymentAmount = Math.max(0, amount - creditsDiscount);
+  const imagineeringCreditOrderTotal =
+    paymentMethod === "imagineering_credit" ? amount : paymentAmount;
+  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
 
   const canProceedToPayment = date.trim() !== "" && time.trim() !== "" && address.trim() !== "";
 
@@ -977,15 +1017,29 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                     </div>
                   </div>
                   <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
-                    <CreditsRedeemSection orderTotal={amount} onCreditsChange={handleCreditsChange} />
+                    {paymentMethod !== "imagineering_credit" && (
+                      <CreditsRedeemSection
+                        orderTotal={amount}
+                        onCreditsChange={handleCreditsChange}
+                      />
+                    )}
                     <PaymentOptionsSelector
                       value={paymentMethod}
                       onChange={(v) => {
                         setPaymentMethod(v);
+                        if (v === "imagineering_credit") {
+                          setCreditsToApply(0);
+                          setCreditsDiscount(0);
+                        }
                         if (v !== "neft") setNeftReceiptFile(null);
                         if (v !== "sbicollect") setSbiCollectReceiptFile(null);
                       }}
-                      amount={amount}
+                      amount={paymentMethod === "imagineering_credit" ? amount : paymentAmount}
+                      showImagineeringCredit={canUseImagineeringCredit}
+                    />
+                    <ImagineeringCreditCheckoutPanel
+                      orderTotal={amount}
+                      selected={paymentMethod === "imagineering_credit"}
                     />
                   </div>
                 </div>
@@ -1154,7 +1208,22 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              {paymentMethod === "cod" ? (
+              {paymentMethod === "imagineering_credit" ? (
+                <Button
+                  onClick={handleImagineeringCreditCheckout}
+                  disabled={isPlacingOrder || !canUseImagineeringCredit}
+                  className="h-12 w-full flex-1 rounded-xl bg-indigo-600 text-base font-semibold text-white shadow-md transition-all hover:bg-indigo-700 disabled:opacity-50 sm:min-w-[12rem]"
+                >
+                  {isPlacingOrder ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Confirming…
+                    </>
+                  ) : (
+                    `Confirm · ${IMAGINEERING_CREDIT.name} · ₹${amount.toLocaleString("en-IN")}`
+                  )}
+                </Button>
+              ) : paymentMethod === "cod" ? (
                 <Button
                   onClick={handleCodCheckout}
                   disabled={isPlacingOrder}
