@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2, Wallet } from "lucide-react";
 import api from "@/lib/api-client";
+import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
 
 interface CreditsRedeemSectionProps {
   orderTotal: number;
@@ -79,7 +80,7 @@ export function CreditsRedeemSection({ orderTotal, onCreditsChange }: CreditsRed
     return (
       <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading wallet credits…
+        Loading {IMAGINEERING_WALLET.name}…
       </div>
     );
   }
@@ -94,9 +95,9 @@ export function CreditsRedeemSection({ orderTotal, onCreditsChange }: CreditsRed
         <div className="flex items-start gap-2">
           <Wallet className="mt-0.5 h-4 w-4 text-emerald-600" />
           <div>
-            <p className="text-sm font-medium">Imagineering Credits</p>
+            <p className="text-sm font-medium">{IMAGINEERING_WALLET.name}</p>
             <p className="text-xs text-muted-foreground">
-              Balance: {balance} credits (₹{balance}) · up to {maxPercent}% per order
+              Partial checkout discount · not {IMAGINEERING_CREDIT.name} · Balance: {balance} pts (₹{balance}) · up to {maxPercent}% per order
             </p>
           </div>
         </div>
@@ -109,7 +110,7 @@ export function CreditsRedeemSection({ orderTotal, onCreditsChange }: CreditsRed
       </div>
       {enabled && discountInr > 0 && (
         <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
-          −₹{discountInr.toLocaleString("en-IN")} ({appliedCredits} credits) applied
+          −₹{discountInr.toLocaleString("en-IN")} ({appliedCredits} wallet pts) applied
         </p>
       )}
     </div>
