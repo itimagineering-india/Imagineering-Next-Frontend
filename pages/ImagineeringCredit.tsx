@@ -497,7 +497,7 @@ export default function ImagineeringCreditPage() {
   const { toast } = useToast();
 
   const [account, setAccount] = useState<CreditAccount | null>(null);
-  const [tagline, setTagline] = useState(IMAGINEERING_CREDIT.tagline);
+  const [tagline, setTagline] = useState<string>(IMAGINEERING_CREDIT.tagline);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState(false);
   const [transactions, setTransactions] = useState<CreditTxn[]>([]);
