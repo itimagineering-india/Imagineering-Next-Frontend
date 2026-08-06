@@ -12,7 +12,7 @@ import {
   XCircle,
   Calendar,
   CreditCard,
-  Sparkles,
+  Crown,
   TrendingUp,
   Shield,
   Users,
@@ -448,7 +448,7 @@ export default function ProviderSubscription() {
               {subscription.expiryDate && (
                 <div>
                   <p className="text-xs md:text-sm text-muted-foreground mb-1">Expiry Date</p>
-                  <div className="flex items-center gap-1.5 md:gap-2">
+                  <div className="flex items-center gap-2 md:gap-2">
                     <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground shrink-0" />
                     <p className="text-base md:text-lg font-semibold">
                       {new Date(subscription.expiryDate).toLocaleDateString()}
@@ -464,7 +464,7 @@ export default function ProviderSubscription() {
               {subscription.nextBillingDate && (
                 <div>
                   <p className="text-xs md:text-sm text-muted-foreground mb-1">Next Billing</p>
-                  <div className="flex items-center gap-1.5 md:gap-2">
+                  <div className="flex items-center gap-2 md:gap-2">
                     <CreditCard className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground shrink-0" />
                     <p className="text-base md:text-lg font-semibold">
                       {new Date(subscription.nextBillingDate).toLocaleDateString()}
@@ -504,7 +504,7 @@ export default function ProviderSubscription() {
                     </p>
                   </div>
                   <Button onClick={() => handleUpgrade("monthly")} size="sm" className="text-xs md:text-sm w-full sm:w-auto">
-                    <Crown className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                    <Crown className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                     Upgrade Now
                   </Button>
                 </div>
@@ -517,7 +517,7 @@ export default function ProviderSubscription() {
         <Card>
           <CardHeader className="p-4 md:p-6">
             <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-warning shrink-0" />
+              <Crown className="h-4 w-4 md:h-5 md:w-5 text-warning shrink-0" />
               Benefits {isPremium ? "Unlocked" : "Available"}
             </CardTitle>
             <CardDescription className="text-xs md:text-sm">
@@ -531,7 +531,7 @@ export default function ProviderSubscription() {
               {supplierFeatures.map((feature, index) => (
                 <div
                   key={index}
-                  className={`flex items-start gap-2 md:gap-3 p-2.5 md:p-3 rounded-lg border ${
+                  className={`flex items-start gap-2 md:gap-3 p-3 md:p-3 rounded-lg border ${
                     isPremium ? "bg-warning/5 border-warning/20" : "bg-muted/30"
                   }`}
                 >
@@ -571,7 +571,7 @@ export default function ProviderSubscription() {
                   <Separator />
                   <ul className="space-y-1.5 md:space-y-2">
                     {supplierFeatures.slice(0, plan.billingCycle === 'yearly' ? undefined : 4).map((feature, index) => (
-                      <li key={index} className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm">
+                      <li key={index} className="flex items-center gap-2 md:gap-2 text-xs md:text-sm">
                         <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 text-success shrink-0" />
                         <span>{feature}</span>
                       </li>
@@ -582,9 +582,9 @@ export default function ProviderSubscription() {
                     size="sm" 
                     onClick={() => handleUpgrade(plan)}
                   >
-                    {plan.billingCycle === 'yearly' && <Crown className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />}
+                    {plan.billingCycle === 'yearly' && <Crown className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />}
                     Subscribe {plan.billingCycle === 'monthly' ? 'Monthly' : 'Yearly'}
-                    <ArrowRight className="h-3 w-3 md:h-4 md:w-4 ml-1.5 md:ml-2" />
+                    <ArrowRight className="h-3 w-3 md:h-4 md:w-4 ml-2 md:ml-2" />
                   </Button>
                 </CardContent>
               </Card>
@@ -602,17 +602,17 @@ export default function ProviderSubscription() {
             <CardContent className="space-y-3 md:space-y-4 p-4 md:p-6 pt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <Button variant="outline" className="w-full text-xs md:text-sm" size="sm" disabled>
-                  <CreditCard className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  <CreditCard className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                   Update Payment Method
                 </Button>
                 <Button variant="outline" className="w-full text-xs md:text-sm" size="sm" asChild>
                   <Link href="/dashboard/provider/earnings">
-                    <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                    <FileText className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                     View Billing History
                   </Link>
                 </Button>
                 <Button variant="outline" className="w-full text-xs md:text-sm" size="sm" disabled>
-                  <TrendingUp className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                  <TrendingUp className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                   Change Plan
                 </Button>
                 <Button 
@@ -622,7 +622,7 @@ export default function ProviderSubscription() {
                   onClick={handleCancelSubscription}
                   disabled={isProcessing}
                 >
-                  {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <XCircle className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />}
+                  {isProcessing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <XCircle className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />}
                   Cancel Subscription
                 </Button>
               </div>
@@ -714,7 +714,7 @@ export default function ProviderSubscription() {
                   {isProcessing ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-2" />
                   ) : (
-                    <CreditCard className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                    <CreditCard className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
                   )}
                   {selectedGateway === "razorpay" ? "Pay with Razorpay" : "Pay with Cashfree"}
                 </Button>
