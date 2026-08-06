@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, MapPin, Shield, Sparkles, Truck } from "lucide-react";
+import { Loader2, MapPin, Shield, Target, Truck } from "lucide-react";
 import api from "@/lib/api-client";
 import { ImagineVerifiedBadge, type ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
@@ -115,7 +115,7 @@ export function BestSupplierCard({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Target className="h-4 w-4 text-primary" />
             Best match for you
           </CardTitle>
           <Badge variant="secondary" className="text-xs">
