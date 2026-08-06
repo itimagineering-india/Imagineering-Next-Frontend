@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ServiceImageUpload } from "../ServiceImageUpload";
 import { ServiceLocationInput, type ProviderBusinessAddressSnapshot } from "../ServiceLocationInput";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Wand2 } from "lucide-react";
 
 interface Location {
   address: string;
@@ -109,16 +109,16 @@ export function CommonFields({
           className={errors?.title ? "border-destructive" : ""}
         />
         {errors?.title && (
-          <p className="text-sm text-destructive">{errors.title}</p>
+          <p className="caption text-destructive">{errors.title}</p>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="caption">
           A clear, descriptive title for your service — tap a suggestion or use AI if you like.
         </p>
         {listingAssist && (
           <div className="rounded-md border border-dashed bg-muted/30 p-3 space-y-2">
             {listingAssist.titleSuggestions.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-muted-foreground">Suggested titles</p>
+                <p className="caption">Suggested titles</p>
                 <div className="flex flex-wrap gap-2">
                   {listingAssist.titleSuggestions.map((s) => (
                     <Button
@@ -126,7 +126,7 @@ export function CommonFields({
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="h-auto max-w-full whitespace-normal py-1.5 text-left text-xs font-normal"
+                      className="h-auto max-w-full whitespace-normal py-2 text-left text-xs font-normal"
                       onClick={() => listingAssist.onPickTitleSuggestion(s)}
                     >
                       {s}
@@ -140,14 +140,14 @@ export function CommonFields({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="text-xs gap-1.5"
+                className="text-xs gap-2"
                 disabled={!listingAssist.canGenerateAiTitle || listingAssist.isGeneratingTitle}
                 onClick={() => listingAssist.onGenerateAiTitle()}
               >
                 {listingAssist.isGeneratingTitle ? (
                   <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
                 ) : (
-                  <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Wand2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 )}
                 AI title
               </Button>
@@ -184,11 +184,11 @@ export function CommonFields({
           maxLength={200}
         />
         <div className="flex justify-between items-center gap-2 flex-wrap">
-          <p className="text-xs text-muted-foreground">
+          <p className="caption">
             {shortDescription.length}/200 characters
           </p>
           {errors?.shortDescription && (
-            <p className="text-sm text-destructive">{errors.shortDescription}</p>
+            <p className="caption text-destructive">{errors.shortDescription}</p>
           )}
         </div>
         {listingAssist && (
@@ -197,7 +197,7 @@ export function CommonFields({
               type="button"
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="caption"
               disabled={listingAssist.isGeneratingShortDescription}
               onClick={() => listingAssist.onTemplateShortDescription()}
             >
@@ -207,7 +207,7 @@ export function CommonFields({
               type="button"
               variant="default"
               size="sm"
-              className="text-xs gap-1.5"
+              className="text-xs gap-2"
               disabled={
                 !listingAssist.canGenerateAiShortDescription || listingAssist.isGeneratingShortDescription
               }
@@ -216,7 +216,7 @@ export function CommonFields({
               {listingAssist.isGeneratingShortDescription ? (
                 <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
               ) : (
-                <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <Wand2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
               )}
               AI description
             </Button>
@@ -238,9 +238,9 @@ export function CommonFields({
           className={errors?.detailedDescription ? "border-destructive" : ""}
         />
         {errors?.detailedDescription && (
-          <p className="text-sm text-destructive">{errors.detailedDescription}</p>
+          <p className="caption text-destructive">{errors.detailedDescription}</p>
         )}
-        <p className="text-xs text-muted-foreground">
+        <p className="caption">
           Include all relevant details that customers should know
         </p>
       </div>
