@@ -8,7 +8,7 @@ import FeatureList from "@/components/subscriptions/FeatureList";
 import FAQ from "@/components/subscriptions/FAQ";
 import { supplierFaq, supplierFeatures } from "@/data/subscription";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, MapPin, ShieldCheck } from "lucide-react";
+import { Crown, MapPin, ShieldCheck } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
@@ -70,7 +70,7 @@ export default function SubscriptionSupplier() {
         <section className="py-16 md:py-20 bg-gradient-to-br from-amber-50 via-background to-amber-100">
           <div className="container max-w-4xl text-center space-y-4">
             <Badge className="inline-flex items-center gap-2 bg-amber-100 text-amber-900 border-amber-200">
-              <Sparkles className="h-4 w-4" />
+              <Crown className="h-4 w-4" />
               Supplier Premium
             </Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-foreground">
@@ -124,7 +124,7 @@ export default function SubscriptionSupplier() {
           </div>
         </section>
 
-        <section className="py-14">
+        <section className="py-16">
           <div className="container grid lg:grid-cols-2 gap-8">
             <Card className="border-0 shadow-sm">
               <CardHeader>
@@ -141,7 +141,7 @@ export default function SubscriptionSupplier() {
             <Card className="border-0 shadow-sm">
               <CardHeader className="space-y-2">
                 <div className="flex items-center gap-2 text-amber-500">
-                  <Sparkles className="h-4 w-4" />
+                  <Crown className="h-4 w-4" />
                   <span className="text-sm font-semibold">Pricing</span>
                 </div>
                 <CardTitle className="text-xl">Supplier Premium Pricing</CardTitle>
@@ -257,7 +257,7 @@ export default function SubscriptionSupplier() {
           </div>
         </section>
 
-        <section className="py-14 bg-muted/30">
+        <section className="py-16 bg-muted/30">
           <div className="container grid lg:grid-cols-2 gap-8 items-start">
             <Card className="border-0 shadow-sm">
               <CardHeader className="space-y-2">
@@ -287,7 +287,7 @@ export default function SubscriptionSupplier() {
             <Card className="border-0 shadow-sm">
               <CardHeader className="space-y-2">
                 <div className="flex items-center gap-2 text-amber-500">
-                  <Sparkles className="h-5 w-5" />
+                  <Crown className="h-5 w-5" />
                   <span className="text-sm font-semibold">Featured Provider Preview</span>
                 </div>
                 <CardTitle className="text-xl">Gold badge & featured card</CardTitle>
@@ -314,7 +314,7 @@ export default function SubscriptionSupplier() {
           </div>
         </section>
 
-        <section className="py-14">
+        <section className="py-16">
           <div className="container max-w-3xl space-y-6">
             <h2 className="text-2xl font-bold text-foreground text-center">FAQ</h2>
             <FAQ items={supplierFaq} />
