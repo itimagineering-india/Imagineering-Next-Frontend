@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus, Users, MessageSquare, TrendingUp, Sparkles } from "lucide-react";
+import { Plus, Users, MessageSquare, TrendingUp } from "lucide-react";
 
 const HeroCommunity = () => {
   return (
@@ -43,7 +43,7 @@ const HeroCommunity = () => {
                 Create Post
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="gap-2 w-full sm:w-auto border-2 border-white/40 text-white bg-white/10 backdrop-blur-md hover:bg-white/20 hover:border-white/60 transition-all duration-300 font-semibold">
+            <Button asChild size="lg" variant="secondary" className="gap-2 w-full sm:w-auto border-2 border-white/40 text-white bg-white/10 backdrop-blur-md hover:bg-white/20 hover:border-white/60 transition-all duration-300 font-semibold">
               <Link href="/community">
                 <MessageSquare className="h-5 w-5" />
                 Browse Discussions
