@@ -9,12 +9,18 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, ArrowLeft, CreditCard, Package, Tag } from "lucide-react";
 import api from "@/lib/api-client";
+import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { PaymentOptionsSelector, type PaymentOption } from "@/components/payments/PaymentOptionsSelector";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
+import {
+  ImagineeringCreditCheckoutPanel,
+  useImagineeringCreditAvailable,
+} from "@/components/imagineering-credit/ImagineeringCreditCheckoutPanel";
+import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 import { CartOffersModal } from "@/components/cart/CartOffersModal";
 
 function formatINR(n: number) {
@@ -47,6 +53,8 @@ export default function QuoteRequestConfirmPage() {
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponUsageId, setCouponUsageId] = useState<string | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
+  const [creditsToApply, setCreditsToApply] = useState(0);
+  const [creditsDiscount, setCreditsDiscount] = useState(0);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -120,6 +128,13 @@ export default function QuoteRequestConfirmPage() {
   const effectiveDelivery = transport === "self_pickup" ? 0 : quotedDelivery;
   const subtotalBeforeOffer = productAmount + effectiveDelivery;
   const displayTotal = Math.max(0, subtotalBeforeOffer - (couponDiscount || 0));
+  const paymentAmount = Math.max(0, displayTotal - creditsDiscount);
+  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(displayTotal);
+
+  const handleCreditsChange = useCallback((credits: number, discount: number) => {
+    setCreditsToApply(credits);
+    setCreditsDiscount(discount);
+  }, []);
 
   // Transport changes the payable base — clear applied offer so user re-applies on the new total
   useEffect(() => {
@@ -197,14 +212,16 @@ export default function QuoteRequestConfirmPage() {
         setCouponUsageId(payload.couponUsageId);
       }
 
-      if (payload.requiresOnlinePayment === false || paymentOption === "cod" || paymentOption === "neft" || paymentOption === "sbicollect") {
+      if (payload.requiresOnlinePayment === false || paymentOption === "cod" || paymentOption === "neft" || paymentOption === "sbicollect" || paymentOption === "imagineering_credit") {
         clearActiveQuoteRequest(id);
         toast({
           title: "Order placed",
           description:
             paymentOption === "cod"
               ? "Pay on delivery selected. The supplier will confirm your order."
-              : "Order placed. Complete payment as selected.",
+              : paymentOption === "imagineering_credit"
+                ? `Paid with ${IMAGINEERING_CREDIT.name}. Your order is placed.`
+                : "Order placed. Complete payment as selected.",
         });
         router.push("/dashboard/buyer/orders");
         return;
@@ -297,8 +314,13 @@ export default function QuoteRequestConfirmPage() {
                 {couponCode ? ` (${couponCode})` : ""}
               </p>
             ) : null}
+            {creditsDiscount > 0 ? (
+              <p className="mt-1 text-xs font-medium text-emerald-700">
+                Wallet: −{formatINR(creditsDiscount)}
+              </p>
+            ) : null}
           </div>
-          <p className="text-xl font-bold tabular-nums">{formatINR(displayTotal)}</p>
+          <p className="text-xl font-bold tabular-nums">{formatINR(bookingId ? Math.max(0, payAmount - creditsDiscount) : paymentAmount)}</p>
         </div>
       </div>
 
@@ -369,11 +391,25 @@ export default function QuoteRequestConfirmPage() {
 
         <div className="space-y-2 border-t pt-6">
           <Label>Payment Method</Label>
+          {!bookingId && paymentOption !== "imagineering_credit" && (
+            <CreditsRedeemSection orderTotal={displayTotal} onCreditsChange={handleCreditsChange} />
+          )}
           <PaymentOptionsSelector
             value={paymentOption}
-            onChange={setPaymentOption}
-            amount={displayTotal}
+            onChange={(v) => {
+              setPaymentOption(v);
+              if (v === "imagineering_credit") {
+                setCreditsToApply(0);
+                setCreditsDiscount(0);
+              }
+            }}
+            amount={paymentOption === "imagineering_credit" ? displayTotal : paymentAmount}
+            showImagineeringCredit={canUseImagineeringCredit}
             className={bookingId ? "pointer-events-none opacity-60" : undefined}
+          />
+          <ImagineeringCreditCheckoutPanel
+            orderTotal={displayTotal}
+            selected={paymentOption === "imagineering_credit"}
           />
         </div>
 
@@ -422,14 +458,17 @@ export default function QuoteRequestConfirmPage() {
           </Button>
         ) : (
           <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
-            <p className="text-sm font-medium">Complete payment · {formatINR(payAmount)}</p>
+            <p className="text-sm font-medium">
+              Complete payment · {formatINR(Math.max(0, payAmount - creditsDiscount))}
+            </p>
             <div className="flex flex-wrap gap-2">
               {paymentOption === "razorpay" && (
                 <RazorpayCheckout
                   bookingId={bookingId}
                   bookingDescription={`Quote for ${serviceTitle}`}
-                  amount={payAmount}
+                  amount={Math.max(0, payAmount - creditsDiscount)}
                   couponUsageId={couponUsageId || undefined}
+                  creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                   onSuccess={() => {
                     toast({ title: "Payment successful", description: "Your order is placed." });
                     router.push("/dashboard/buyer/orders");
@@ -442,8 +481,9 @@ export default function QuoteRequestConfirmPage() {
                 <CashfreeCheckout
                   bookingId={bookingId}
                   bookingDescription={`Quote for ${serviceTitle}`}
-                  amount={payAmount}
+                  amount={Math.max(0, payAmount - creditsDiscount)}
                   couponUsageId={couponUsageId || undefined}
+                  creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                   onSuccess={() => {
                     toast({ title: "Payment successful", description: "Your order is placed." });
                     router.push("/dashboard/buyer/orders");
