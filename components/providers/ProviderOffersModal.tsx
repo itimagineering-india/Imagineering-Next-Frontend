@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, Sparkles, Store, Tag } from "lucide-react";
+import { Copy, Store, Tag } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -121,7 +121,7 @@ export function ProviderOffersModal({
       <DialogContent className="max-h-[min(88vh,720px)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 shrink-0 text-primary" />
+            <Tag className="h-5 w-5 shrink-0 text-primary" />
             {providerName ? `Offers from ${providerName}` : "Available offers"}
           </DialogTitle>
           <DialogDescription>
