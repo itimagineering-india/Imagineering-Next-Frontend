@@ -1,6 +1,7 @@
-import { Banknote, Lock } from "lucide-react";
+import { Banknote, CreditCard, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
 
 /** Amount limit in ₹ — above this Razorpay & Cashfree are disabled (Pay on Delivery and bank methods stay available). */
 export const PAYMENT_AMOUNT_LIMIT = 50000;
@@ -10,7 +11,8 @@ export type PaymentOption =
   | "cashfree"
   | "cod"
   | "neft"
-  | "sbicollect";
+  | "sbicollect"
+  | "imagineering_credit";
 
 export interface PaymentOptionConfig {
   value: PaymentOption;
@@ -55,6 +57,14 @@ function CodLogo() {
   );
 }
 
+function ImagineeringCreditLogo() {
+  return (
+    <div className="flex h-9 min-w-[76px] items-center justify-center rounded-md border border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 px-2.5">
+      <CreditCard className="h-4 w-4 text-indigo-700" strokeWidth={1.75} />
+    </div>
+  );
+}
+
 const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
   {
     value: "razorpay",
@@ -81,6 +91,14 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
     icon: <CodLogo />,
   },
   {
+    value: "imagineering_credit",
+    label: IMAGINEERING_CREDIT.name,
+    description: `${IMAGINEERING_CREDIT.tagline} — full order from your credit line (not ${IMAGINEERING_WALLET.name})`,
+    tags: ["BNPL", "Credit"],
+    icon: <ImagineeringCreditLogo />,
+    recommended: true,
+  },
+  {
     value: "sbicollect",
     label: "SBI Collect",
     description: "Pay via SBI Collect and upload your receipt",
@@ -94,6 +112,8 @@ type PaymentOptionsSelectorProps = {
   onChange: (value: PaymentOption) => void;
   amount?: number;
   className?: string;
+  /** When true, shows Imagineering Credit if order is within available limit */
+  showImagineeringCredit?: boolean;
 };
 
 function RadioIndicator({ selected }: { selected: boolean }) {
@@ -115,12 +135,14 @@ export function PaymentOptionsSelector({
   onChange,
   amount,
   className,
+  showImagineeringCredit = false,
 }: PaymentOptionsSelectorProps) {
   const amountNum = typeof amount === "number" && isFinite(amount) ? amount : 0;
   const aboveLimit = amountNum > PAYMENT_AMOUNT_LIMIT;
-  const visibleOptions = PAYMENT_OPTIONS.filter(
-    (opt) => !opt.limitedByAmount || !aboveLimit
-  );
+  const visibleOptions = PAYMENT_OPTIONS.filter((opt) => {
+    if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
+    return !opt.limitedByAmount || !aboveLimit;
+  });
 
   return (
     <div className={cn("space-y-3", className)}>
