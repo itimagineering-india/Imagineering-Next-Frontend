@@ -25,11 +25,11 @@ import {
   Phone,
   Mail,
   ShieldCheck,
-  Sparkles,
   Bell,
   Globe2,
   Lock,
   CreditCard,
+  Wallet as WalletIcon,
   ShoppingBag,
   Heart,
   MessageSquare,
@@ -47,11 +47,14 @@ import {
   Briefcase,
   ClipboardList,
 } from "lucide-react";
+import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
 import api from "@/lib/api-client";
 import { ServiceCard } from "@/components/ServiceCard";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGS, persistLanguage } from "@/i18n";
 import { Languages } from "lucide-react";
+import { ImagineeringCreditHomeCard } from "@/components/imagineering-credit/ImagineeringCreditHomeCard";
+import { ImagineeringWalletProfileCard } from "@/components/wallet/ImagineeringWalletProfileCard";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -578,6 +581,8 @@ const Profile = () => {
 
   const quickActions = [
     { label: "Orders", href: "/dashboard/buyer/orders", icon: ShoppingBag },
+    { label: IMAGINEERING_CREDIT.name, href: IMAGINEERING_CREDIT.href, icon: CreditCard },
+    { label: IMAGINEERING_WALLET.name, href: IMAGINEERING_WALLET.href, icon: WalletIcon },
     ...(user?.role === "buyer"
       ? [{ label: "Subscription", href: "/subscriptions/buyer", icon: Crown }]
       : []),
@@ -672,7 +677,7 @@ const Profile = () => {
                         {creditsBalance}
                       </p>
                       <Link
-                        href="/dashboard/wallet"
+                        href={IMAGINEERING_WALLET.href}
                         className="text-xs text-primary underline-offset-2 hover:underline"
                       >
                         View wallet
@@ -734,9 +739,9 @@ const Profile = () => {
                         <span className="font-medium">{referralStats.successfulReferrals ?? 0}</span>
                       </span>
                       <span>
-                        Credits earned:{" "}
+                        Credits earned from referrals:{" "}
                         <span className="font-medium">
-                          {referralStats.totalCreditsEarned ?? creditsBalance}
+                          {referralStats.totalCreditsEarned ?? 0}
                         </span>
                       </span>
                     </div>
@@ -744,6 +749,12 @@ const Profile = () => {
                 </CardContent>
               </Card>
         )}
+
+        {/* Imagineering Wallet — rewards balance for all users */}
+        <ImagineeringWalletProfileCard />
+
+        {/* Imagineering Credit — BNPL credit line for buyers */}
+        <ImagineeringCreditHomeCard alwaysShow />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
