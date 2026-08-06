@@ -25,9 +25,18 @@ import { CalendarIcon, Clock, MapPin, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
+import {
+  PaymentOptionsSelector,
+  type PaymentOption,
+} from "@/components/payments/PaymentOptionsSelector";
+import {
+  ImagineeringCreditCheckoutPanel,
+  useImagineeringCreditAvailable,
+} from "@/components/imagineering-credit/ImagineeringCreditCheckoutPanel";
 import { DynamicBookingField, BookingFieldConfig } from "@/components/booking/DynamicBookingField";
 import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
 import api from "@/lib/api-client";
+import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import { getGoogleMapsApiKey } from "@/lib/mapConfig";
 import { reverseGeocodeLatLng } from "../../lib/googleMapsClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -104,6 +113,8 @@ export function DynamicBookingModal({
   const [panNumber, setPanNumber] = useState("");
   const [creditsToApply, setCreditsToApply] = useState(0);
   const [creditsDiscount, setCreditsDiscount] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentOption>("razorpay");
+  const [payingWithCredit, setPayingWithCredit] = useState(false);
 
   const handleCreditsChange = useCallback((credits: number, discount: number) => {
     setCreditsToApply(credits);
@@ -167,6 +178,12 @@ export function DynamicBookingModal({
       totalPayable,
     };
   }, [bookingDetails?.amount, bookingDetails?.buyerFee, bookingDetails?.formData, bookingDetails?.metadata, service.price, appliedCoupon?.discountAmount]);
+
+  const orderTotalForPayment =
+    paymentMethod === "imagineering_credit"
+      ? paymentCalculation.totalPayable
+      : Math.max(0, paymentCalculation.totalPayable - creditsDiscount);
+  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(orderTotalForPayment);
 
   const {
     register,
@@ -724,6 +741,7 @@ export function DynamicBookingModal({
     setStep("details");
     setCurrentBookingId(null);
     setGstNumber("");
+    setPaymentMethod("razorpay");
     onOpenChange(false);
     // Redirect to bookings page after successful payment
     router.push("/dashboard/buyer/orders");
@@ -732,6 +750,29 @@ export function DynamicBookingModal({
       description: "Your booking has been confirmed. View it in My Bookings.",
       variant: "default",
     });
+  };
+
+  const handlePayWithImagineeringCredit = async () => {
+    if (!currentBookingId) return;
+    setPayingWithCredit(true);
+    try {
+      if (gstNumber.trim() || panNumber.trim()) {
+        await updateBookingTaxDetails();
+      }
+      const res = await api.bookings.payWithImagineeringCredit(currentBookingId);
+      if (!res.success) {
+        throw new Error(res.error?.message || `${IMAGINEERING_CREDIT.name} payment failed`);
+      }
+      handlePaymentSuccess();
+    } catch (error: unknown) {
+      toast({
+        title: "Payment failed",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setPayingWithCredit(false);
+    }
   };
 
   const handleCancel = () => {
@@ -1201,56 +1242,84 @@ export function DynamicBookingModal({
                   </div>
 
                   {/* Credits */}
-                  <CreditsRedeemSection
-                    orderTotal={paymentCalculation.totalPayable}
-                    onCreditsChange={handleCreditsChange}
-                  />
+                  {paymentMethod !== "imagineering_credit" && (
+                    <CreditsRedeemSection
+                      orderTotal={paymentCalculation.totalPayable}
+                      onCreditsChange={handleCreditsChange}
+                    />
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Payment Method</Label>
+                    <PaymentOptionsSelector
+                      value={paymentMethod}
+                      onChange={setPaymentMethod}
+                      amount={paymentCalculation.totalPayable}
+                      showImagineeringCredit={canUseImagineeringCredit}
+                    />
+                    <ImagineeringCreditCheckoutPanel
+                      orderTotal={paymentCalculation.totalPayable}
+                      selected={paymentMethod === "imagineering_credit"}
+                    />
+                  </div>
 
                   {/* Total Amount */}
                   <div className="p-4 bg-primary/5 rounded-lg border-2 border-primary/20">
                     <div className="flex justify-between items-center">
                       <span className="font-semibold text-lg">Total to Pay:</span>
                       <span className="font-bold text-xl text-primary">
-                        ₹
-                        {(
-                          actualPaymentAmount ??
-                          Math.max(0, paymentCalculation.totalPayable - creditsDiscount)
-                        ).toLocaleString()}
+                        ₹{orderTotalForPayment.toLocaleString()}
                       </span>
                     </div>
-                    {creditsDiscount > 0 && (
+                    {creditsDiscount > 0 && paymentMethod !== "imagineering_credit" && (
                       <p className="mt-1 text-xs text-emerald-600">
                         Includes ₹{creditsDiscount.toLocaleString()} credits discount
                       </p>
                     )}
                   </div>
 
-                  <RazorpayCheckout
-                    bookingId={currentBookingId}
-                    bookingDescription={service.title}
-                    amount={Math.max(0, paymentCalculation.totalPayable - creditsDiscount)}
-                    couponUsageId={couponUsageId ?? undefined}
-                    creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
-                    onAmountReceived={(amount) => {
-                      // Update display amount when backend confirms the actual amount
-                      setActualPaymentAmount(amount);
-                    }}
-                    onSuccess={handlePaymentSuccess}
-                    onBeforePayment={async () => {
-                      // Update booking with GST number and PAN number before payment
-                      if (gstNumber.trim() || panNumber.trim()) {
-                        await updateBookingTaxDetails();
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    Pay ₹
-                    {(
-                      actualPaymentAmount ??
-                      Math.max(0, paymentCalculation.totalPayable - creditsDiscount)
-                    ).toLocaleString()}{" "}
-                    Now
-                  </RazorpayCheckout>
+                  {paymentMethod === "imagineering_credit" ? (
+                    <Button
+                      type="button"
+                      className="w-full"
+                      disabled={payingWithCredit || !canUseImagineeringCredit}
+                      onClick={() => void handlePayWithImagineeringCredit()}
+                    >
+                      {payingWithCredit ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing…
+                        </>
+                      ) : (
+                        `Pay ₹${paymentCalculation.totalPayable.toLocaleString()} with ${IMAGINEERING_CREDIT.name}`
+                      )}
+                    </Button>
+                  ) : (
+                    <RazorpayCheckout
+                      bookingId={currentBookingId}
+                      bookingDescription={service.title}
+                      amount={Math.max(0, paymentCalculation.totalPayable - creditsDiscount)}
+                      couponUsageId={couponUsageId ?? undefined}
+                      creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+                      onAmountReceived={(amount) => {
+                        setActualPaymentAmount(amount);
+                      }}
+                      onSuccess={handlePaymentSuccess}
+                      onBeforePayment={async () => {
+                        if (gstNumber.trim() || panNumber.trim()) {
+                          await updateBookingTaxDetails();
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Pay ₹
+                      {(
+                        actualPaymentAmount ??
+                        Math.max(0, paymentCalculation.totalPayable - creditsDiscount)
+                      ).toLocaleString()}{" "}
+                      Now
+                    </RazorpayCheckout>
+                  )}
                 </>
               )
             ) : (
