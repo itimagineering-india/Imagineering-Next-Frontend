@@ -1057,10 +1057,11 @@ export const api = {
           minRedeemCredits: number;
         };
       }>('/api/wallet/me'),
-    getTransactions: (params?: { page?: number; limit?: number }) => {
+    getTransactions: (params?: { page?: number; limit?: number; entryType?: "credit" | "debit" }) => {
       const query = new URLSearchParams();
       if (params?.page) query.set('page', String(params.page));
       if (params?.limit) query.set('limit', String(params.limit));
+      if (params?.entryType) query.set('entryType', params.entryType);
       const qs = query.toString();
       return apiRequest<{
         transactions: Array<{
@@ -1072,9 +1073,50 @@ export const api = {
           sourceId?: string;
           description?: string;
           occurredAt: string;
+          metadata?: Record<string, unknown>;
         }>;
         pagination: { page: number; limit: number; total: number; pages: number };
       }>(`/api/wallet/me/transactions${qs ? `?${qs}` : ''}`);
+    },
+    getSummary: () =>
+      apiRequest<{
+        summary: {
+          currentBalance: number;
+          totalCredited: number;
+          totalDebited: number;
+          creditCount: number;
+          debitCount: number;
+          transactionCount: number;
+        };
+      }>('/api/wallet/me/summary'),
+    exportStatement: (params?: { limit?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.limit) query.set('limit', String(params.limit));
+      const qs = query.toString();
+      return apiRequest<{
+        summary: {
+          currentBalance: number;
+          totalCredited: number;
+          totalDebited: number;
+          creditCount: number;
+          debitCount: number;
+          transactionCount: number;
+        };
+        transactions: Array<{
+          id: string;
+          entryType: 'credit' | 'debit';
+          amount: number;
+          balanceAfter: number;
+          sourceType: string;
+          sourceId?: string;
+          description?: string;
+          occurredAt: string;
+          metadata?: Record<string, unknown>;
+        }>;
+        exportedCount: number;
+        truncated?: boolean;
+        generatedAt: string;
+      }>(`/api/wallet/me/statement-export${qs ? `?${qs}` : ''}`);
     },
     redeemPreview: (payload: { orderTotal: number; creditsToApply?: number }) =>
       apiRequest<{
@@ -1107,6 +1149,164 @@ export const api = {
           achievements: Array<{ slug: string; title: string; credits: number }>;
         };
       }>('/api/wallet/rewards-program'),
+  },
+
+  imagineeringCredit: {
+    getMe: () =>
+      apiRequest<{
+        account: {
+          id: string;
+          creditLimit: number;
+          creditUsed: number;
+          availableCredit: number;
+          outstanding: number;
+          tier: string;
+          status: string;
+          nextDueDate?: string;
+          activatedAt?: string;
+          invitedAt?: string;
+          validityType: string;
+          validUntil?: string;
+          riskScore: number;
+        } | null;
+        tagline: string;
+        hasAccount: boolean;
+      }>('/api/imagineering-credit/me'),
+    activate: () =>
+      apiRequest<{ account: Record<string, unknown> }>('/api/imagineering-credit/me/activate', {
+        method: 'POST',
+      }),
+    getTransactions: (params?: { page?: number; limit?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.page) query.set('page', String(params.page));
+      if (params?.limit) query.set('limit', String(params.limit));
+      const qs = query.toString();
+      return apiRequest<{
+        transactions: Array<{
+          id: string;
+          entryType: string;
+          amount: number;
+          limitAfter: number;
+          usedAfter: number;
+          availableAfter: number;
+          sourceId?: string;
+          description?: string;
+          occurredAt: string;
+        }>;
+        pagination: { page: number; limit: number; total: number; pages: number };
+      }>(`/api/imagineering-credit/me/transactions${qs ? `?${qs}` : ''}`);
+    },
+    getStatement: (params?: { year?: number; month?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.year) query.set('year', String(params.year));
+      if (params?.month) query.set('month', String(params.month));
+      const qs = query.toString();
+      return apiRequest<{
+        statement: {
+          year: number;
+          month: number;
+          label: string;
+          purchased: number;
+          paid: number;
+          outstanding: number;
+          entries: Array<{
+            id: string;
+            entryType: string;
+            amount: number;
+            description?: string;
+            occurredAt: string;
+          }>;
+        };
+      }>(`/api/imagineering-credit/me/statement${qs ? `?${qs}` : ''}`);
+    },
+    checkoutPreview: (payload: { orderTotal: number }) =>
+      apiRequest<{
+        account: Record<string, unknown> | null;
+        orderTotal: number;
+        availableCredit: number;
+        canPayFull: boolean;
+        amountToUse: number;
+        remainingCredit: number;
+        repayBefore?: string;
+      }>('/api/imagineering-credit/checkout-preview', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getProgram: () => apiRequest('/api/imagineering-credit/program'),
+    getEligibility: () =>
+      apiRequest<{
+        underwriting: {
+          eligible: boolean;
+          score: number;
+          recommendedTier: string;
+          recommendedLimit: number;
+          signals: Array<{ key: string; label: string; points: number; maxPoints: number; value?: unknown }>;
+          reasons: string[];
+        };
+        hasAccount: boolean;
+        account: Record<string, unknown> | null;
+        application?: { phase: string; kycStatus?: string };
+        completedOrders?: number;
+        minOrdersRequired?: number;
+        canApply?: boolean;
+        canSubmitKyc?: boolean;
+        awaitingKycReview?: boolean;
+      }>('/api/imagineering-credit/me/eligibility'),
+    getApplication: () => apiRequest('/api/imagineering-credit/me/application'),
+    apply: () =>
+      apiRequest<{ applied?: boolean; message?: string; account?: Record<string, unknown> }>(
+        '/api/imagineering-credit/me/apply',
+        { method: 'POST' }
+      ),
+    uploadKycDocument: async (file: File, documentType: 'panCard' | 'aadhaar') => {
+      const formData = new FormData();
+      formData.append('document', file);
+      formData.append('documentType', documentType);
+      const token = getAuthToken();
+      const headers: HeadersInit = { ...bearerAuthHeaders(token) };
+      return fetch(`${API_BASE_URL}/api/imagineering-credit/me/kyc/upload`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: formData,
+      }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error?.message || 'Upload failed');
+        }
+        return data as {
+          success: boolean;
+          data?: { documentType: string; url: string; filename?: string };
+        };
+      });
+    },
+    submitKyc: (payload: {
+      fullName: string;
+      panNumber: string;
+      gstNumber?: string;
+      address?: string;
+      city?: string;
+      state?: string;
+      documents: {
+        panCard: { url: string };
+        aadhaar?: { url: string };
+      };
+    }) =>
+      apiRequest('/api/imagineering-credit/me/kyc', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    submitRepaymentRequest: (payload: {
+      amount: number;
+      paymentReference?: string;
+      paymentMethod?: string;
+      notes?: string;
+    }) =>
+      apiRequest('/api/imagineering-credit/me/repayment-request', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getRepaymentRequests: () => apiRequest('/api/imagineering-credit/me/repayment-requests'),
   },
 
   finance: {
@@ -1276,6 +1476,10 @@ export const api = {
       apiRequest('/api/bookings/cart', {
         method: 'POST',
         body: JSON.stringify(bookingData),
+      }),
+    payWithImagineeringCredit: (bookingId: string) =>
+      apiRequest(`/api/bookings/${bookingId}/pay-with-imagineering-credit`, {
+        method: 'POST',
       }),
     uploadNeftReceipt: (file: File) => {
       const formData = new FormData();
