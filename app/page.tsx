@@ -10,6 +10,7 @@ import { ConstructionCalculatorBannerSection } from "@/components/home/Construct
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
 import { CategorySections } from "@/components/home/CategorySections";
 import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
+import { ImagineeringCreditHomeSection } from "@/components/home/ImagineeringCreditHomeSection";
 import { BASE_URL } from "@/lib/constants";
 import {
   getHomeBanners,
@@ -44,6 +45,7 @@ export default async function Home() {
         <HeroSection initialBanners={banners} />
         <SearchBarSection />
         <FeaturedCategoryCardsSection />
+        <ImagineeringCreditHomeSection />
         <TrustStatsSection />
         <ServicesSection />
         <ConstructionCalculatorBannerSection />
