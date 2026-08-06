@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Download, FileText, Shield, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, FileText, Shield, Lightbulb } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -260,7 +260,7 @@ const DashboardSubscription = () => {
                   <Progress value={42} />
                 </div>
                 <div className="p-3 rounded-lg border bg-muted/40 text-sm text-muted-foreground flex items-start gap-2">
-                  <Sparkles className="h-4 w-4 text-primary mt-1" />
+                  <Lightbulb className="h-4 w-4 text-primary mt-1" />
                   Tip: Premium providers are shown first; try contacting the top 3 for faster responses.
                 </div>
               </CardContent>
