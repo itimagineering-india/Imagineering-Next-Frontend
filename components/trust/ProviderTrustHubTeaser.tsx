@@ -87,7 +87,7 @@ export function ProviderTrustHubTeaser() {
                   )}
                   <span className="inline-flex items-center gap-1">
                     <Wallet className="h-3 w-3" />
-                    <Link href="/dashboard/wallet" className="font-medium text-foreground hover:underline">
+                    <Link href="/profile/wallet" className="font-medium text-foreground hover:underline">
                       {creditsBalance}
                     </Link>{" "}
                     credits
