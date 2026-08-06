@@ -14,7 +14,7 @@ import {
   Shield,
   Lock,
   Phone,
-  Sparkles,
+  Eye,
   CheckCircle2,
   Crown,
   ArrowRight,
@@ -53,9 +53,9 @@ function planIdMatches(plan: SubscriptionPlan | undefined, activeId: string | nu
 
 function CurrentPlanSubscribed({ subtitle }: { subtitle: string }) {
   return (
-    <div className="flex w-full flex-col items-center gap-1.5">
+    <div className="flex w-full flex-col items-center gap-2">
       <div
-        className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white"
+        className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-3 text-sm font-semibold text-white"
         role="status"
       >
         <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
@@ -232,7 +232,7 @@ export default function SubscriptionBuyer() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:gap-8 items-stretch">
                   {monthly && (
                     <Card className="flex flex-col border-2 shadow-sm transition-shadow hover:shadow-md">
-                      <CardHeader className="space-y-1 p-5 sm:p-6">
+                      <CardHeader className="space-y-1 p-6 sm:p-6">
                         <div className="flex items-start justify-between gap-2">
                           <CardTitle className="text-lg sm:text-xl">{monthly.name || "Monthly"}</CardTitle>
                           <Badge variant="secondary" className="shrink-0 text-xs">
@@ -243,7 +243,7 @@ export default function SubscriptionBuyer() {
                           <CardDescription className="text-sm">{monthly.description}</CardDescription>
                         )}
                       </CardHeader>
-                      <CardContent className="flex flex-1 flex-col space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
+                      <CardContent className="flex flex-1 flex-col space-y-4 p-6 pt-0 sm:p-6 sm:pt-0">
                         <div>
                           <p className="text-3xl font-bold tracking-tight sm:text-4xl">
                             ₹{effectiveBuyerPlanCharge(monthly).toLocaleString("en-IN")}
@@ -303,13 +303,13 @@ export default function SubscriptionBuyer() {
 
                   {yearly && (
                     <Card className="relative flex flex-col border-2 border-primary/35 bg-primary/5 shadow-md transition-shadow hover:shadow-lg ring-1 ring-primary/10">
-                      <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 sm:-top-3.5">
+                      <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 sm:-top-4">
                         <Badge className="gap-1 bg-primary px-3 py-1 text-primary-foreground shadow-sm">
                           <Crown className="h-3.5 w-3.5" />
                           Best value
                         </Badge>
                       </div>
-                      <CardHeader className="space-y-1 p-5 pt-8 sm:p-6 sm:pt-9">
+                      <CardHeader className="space-y-1 p-6 pt-8 sm:p-6 sm:pt-12">
                         <div className="flex items-start justify-between gap-2">
                           <CardTitle className="text-lg sm:text-xl">{yearly.name || "Yearly"}</CardTitle>
                           <Badge variant="outline" className="shrink-0 border-primary/40 text-xs text-primary">
@@ -320,7 +320,7 @@ export default function SubscriptionBuyer() {
                           <CardDescription className="text-sm">{yearly.description}</CardDescription>
                         )}
                       </CardHeader>
-                      <CardContent className="flex flex-1 flex-col space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
+                      <CardContent className="flex flex-1 flex-col space-y-4 p-6 pt-0 sm:p-6 sm:pt-0">
                         <div>
                           <p className="text-3xl font-bold tracking-tight sm:text-4xl">
                             ₹{effectiveBuyerPlanCharge(yearly).toLocaleString("en-IN")}
@@ -398,13 +398,13 @@ export default function SubscriptionBuyer() {
           <div className="container px-4 sm:px-6">
             <div className="mx-auto max-w-3xl">
               <Card className="border shadow-sm">
-                <CardHeader className="p-5 sm:p-6">
+                <CardHeader className="p-6 sm:p-6">
                   <CardTitle className="text-xl sm:text-2xl">Everything included</CardTitle>
                   <CardDescription className="text-sm sm:text-base">
                     Full Buyer Premium feature list for every paid plan.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6 p-5 pt-0 sm:p-6 sm:pt-0">
+                <CardContent className="space-y-6 p-6 pt-0 sm:p-6 sm:pt-0">
                   <FeatureList items={buyerFeatures} />
                   <div className="flex gap-3 rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
                     <Lock className="h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -421,7 +421,7 @@ export default function SubscriptionBuyer() {
 
         <section className="py-12 md:py-16">
           <div className="container px-4 sm:px-6">
-            <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-2 lg:gap-10 lg:items-start">
+            <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-2 lg:gap-12 lg:items-start">
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold text-foreground sm:text-3xl">Before vs after Premium</h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
@@ -467,15 +467,15 @@ export default function SubscriptionBuyer() {
               </div>
 
               <Card className="border-2 border-primary/15 shadow-md">
-                <CardHeader className="space-y-2 p-5 sm:p-6">
+                <CardHeader className="space-y-2 p-6 sm:p-6">
                   <div className="flex items-center gap-2 text-primary">
-                    <Sparkles className="h-5 w-5 shrink-0" aria-hidden />
+                    <Eye className="h-5 w-5 shrink-0" aria-hidden />
                     <span className="text-sm font-semibold">Contact preview</span>
                   </div>
                   <CardTitle className="text-xl sm:text-2xl">Blurred → visible</CardTitle>
                   <CardDescription>What you see on Free vs Buyer Premium.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 p-5 pt-0 sm:p-6 sm:pt-0">
+                <CardContent className="space-y-4 p-6 pt-0 sm:p-6 sm:pt-0">
                   <div className="space-y-2 rounded-xl border bg-muted/30 p-4">
                     <p className="text-sm text-muted-foreground line-through">+91 98XX-XX-4321</p>
                     <p className="text-xs text-muted-foreground">Free tier (blurred)</p>
