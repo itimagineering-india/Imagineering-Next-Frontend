@@ -25,7 +25,6 @@ import {
   FolderOpen,
   Shield,
   Calendar,
-  Wallet as WalletIcon,
   Crown,
   Award,
   Bell,
@@ -34,7 +33,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-
 interface DashboardLayoutProps {
   children: React.ReactNode;
   type: "buyer" | "provider" | "admin";
@@ -49,7 +47,6 @@ const buyerNavItems = [
   { label: "Consumption Insights", href: "/dashboard/buyer/consumption", icon: BarChart3 },
   { label: "Favorites", href: "/profile#favorites", icon: Heart },
   { label: "Messages", href: "/chat", icon: MessageSquare },
-  { label: "Rewards & Credits", href: "/dashboard/wallet", icon: WalletIcon },
   { label: "Subscription", href: "/dashboard/subscription", icon: CreditCard },
   { label: "Settings", href: "/profile", icon: Settings },
 ];
@@ -70,7 +67,6 @@ const providerNavItems = [
   { label: "Support", href: "/dashboard/provider/support", icon: HelpCircle },
   { label: "Earnings", href: "/dashboard/provider/earnings", icon: CreditCard },
   { label: "Payouts", href: "/dashboard/provider/payouts", icon: Store },
-  { label: "Rewards & Credits", href: "/dashboard/wallet", icon: WalletIcon },
   { label: "Subscription", href: "/dashboard/provider/subscription", icon: Crown },
   { label: "Settings", href: "/dashboard/provider/settings", icon: Settings },
 ];
