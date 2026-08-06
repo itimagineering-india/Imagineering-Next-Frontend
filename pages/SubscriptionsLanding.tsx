@@ -3,7 +3,7 @@ import PricingGrid from "@/components/subscriptions/PricingGrid";
 import ComparisonTable from "@/components/subscriptions/ComparisonTable";
 import { buyerFeatures, supplierFeatures } from "@/data/subscription";
 import { Button } from "@/components/ui/button";
-import { Shield, Sparkles } from "lucide-react";
+import { Shield, Crown } from "lucide-react";
 import FeatureList from "@/components/subscriptions/FeatureList";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -36,13 +36,13 @@ const SubscriptionsLanding = () => {
           </div>
         </section>
 
-        <section className="py-14">
+        <section className="py-16">
           <div className="container space-y-8">
             <PricingGrid />
           </div>
         </section>
 
-        <section className="py-14 bg-muted/30">
+        <section className="py-16 bg-muted/30">
           <div className="container grid gap-8 lg:grid-cols-2">
             <div className="rounded-2xl border bg-card p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4 text-primary">
@@ -57,7 +57,7 @@ const SubscriptionsLanding = () => {
             </div>
             <div className="rounded-2xl border bg-card p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4 text-amber-500">
-                <Sparkles className="h-5 w-5" />
+                <Crown className="h-5 w-5" />
                 <span className="text-sm font-semibold">Supplier Premium</span>
               </div>
               <h3 className="text-xl font-semibold mb-2">Featured Visibility</h3>
@@ -69,7 +69,7 @@ const SubscriptionsLanding = () => {
           </div>
         </section>
 
-        <section className="py-14">
+        <section className="py-16">
           <div className="container space-y-6">
             <h2 className="text-3xl font-bold text-foreground text-center">Compare plans</h2>
             <ComparisonTable />
