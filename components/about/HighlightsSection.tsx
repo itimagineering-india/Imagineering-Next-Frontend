@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, ShieldCheck, MapPin, Clock3, Headphones, ClipboardCheck } from "lucide-react";
+import { ShieldCheck, MapPin, Clock3, Headphones, ClipboardCheck, Lightbulb } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const highlights = [
@@ -39,7 +39,7 @@ const highlights = [
   {
     title: "Built with User Feedback",
     description: "We roll out continuous improvements based on real feedback from buyers and providers.",
-    icon: Sparkles,
+    icon: Lightbulb,
     badge: "Iteration",
   },
 ];
@@ -52,11 +52,11 @@ const HighlightsSection = () => {
       <div className="container px-4 sm:px-6">
         <div 
           ref={ref}
-          className={`text-center max-w-3xl mx-auto mb-8 sm:mb-10 md:mb-12 transition-all duration-700 ${
+          className={`text-center max-w-3xl mx-auto mb-8 sm:mb-12 md:mb-12 transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           }`}
         >
-          <Badge variant="outline" className="px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs uppercase tracking-wide">
+          <Badge variant="outline" className="px-3 sm:px-3 py-1 text-[10px] sm:text-xs uppercase tracking-wide">
           Why Teams Choose Imagineering India
           </Badge>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mt-3 sm:mt-4">
@@ -79,7 +79,7 @@ const HighlightsSection = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-[hsl(var(--red-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
               <CardHeader className="space-y-2 sm:space-y-3 p-4 sm:p-6 relative z-10">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-semibold px-2.5 sm:px-3 py-1 group-hover:bg-primary/20 group-hover:scale-105 transition-all duration-300">
+                <div className="inline-flex items-center gap-2 sm:gap-2 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-semibold px-3 sm:px-3 py-1 group-hover:bg-primary/20 group-hover:scale-105 transition-all duration-300">
                   <item.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:rotate-12 transition-transform duration-300" />
                   {item.badge}
                 </div>
