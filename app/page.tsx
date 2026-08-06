@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
 };
 
-/** Home layout: Hero → Search → Featured categories → Services → Top providers → Categories */
+/** Home layout: Hero → Search → Featured categories → Services → Top providers → Categories → Imagineering Credit */
 export default async function Home() {
   const [banners, categorySections, topProviders] = await Promise.all([
     getHomeBanners("home"),
@@ -45,13 +45,13 @@ export default async function Home() {
         <HeroSection initialBanners={banners} />
         <SearchBarSection />
         <FeaturedCategoryCardsSection />
-        <ImagineeringCreditHomeSection />
         <TrustStatsSection />
         <ServicesSection />
         <ConstructionCalculatorBannerSection />
         <HomePromoBannersSection />
         <TopProvidersSection initialProviders={topProviders} />
         <CategorySections initialSections={categorySections} />
+        <ImagineeringCreditHomeSection />
         <PlatformAudienceSection />
       </main>
     </div>
