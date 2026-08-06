@@ -157,7 +157,7 @@ export default function ProviderTrustHub() {
                   <div className="text-right shrink-0">
                     <p className="text-xs text-muted-foreground">Balance</p>
                     <p className="text-lg font-semibold">{creditsBalance}</p>
-                    <Link href="/dashboard/wallet" className="text-xs text-primary hover:underline">
+                    <Link href="/profile/wallet" className="text-xs text-primary hover:underline">
                       Rewards guide
                     </Link>
                   </div>
@@ -186,7 +186,7 @@ export default function ProviderTrustHub() {
                   <p className="text-xs text-muted-foreground">
                     Invited {referralStats.totalReferred ?? 0} · Successful{" "}
                     {referralStats.successfulReferrals ?? 0} · Earned{" "}
-                    {referralStats.totalCreditsEarned ?? creditsBalance} credits
+                    {referralStats.totalCreditsEarned ?? 0} credits
                   </p>
                 )}
               </CardContent>
