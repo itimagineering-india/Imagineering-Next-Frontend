@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
+import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import {
   formatSavedAddressLine,
   loadSavedAddresses,
@@ -35,6 +36,11 @@ import {
 } from "@/components/payments/PaymentOptionsSelector";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
+import {
+  ImagineeringCreditCheckoutPanel,
+  useImagineeringCreditAvailable,
+} from "@/components/imagineering-credit/ImagineeringCreditCheckoutPanel";
+import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 import { MANPOWER_TEAL } from "@/components/manpower/ManpowerHireModeTabs";
 import { MANPOWER_HOUR_OPTIONS, type ManpowerHireMode } from "@/lib/manpower/manpowerHubCatalog";
 
@@ -94,6 +100,8 @@ export function ManpowerCheckoutClient() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [offersOpen, setOffersOpen] = useState(false);
+  const [creditsToApply, setCreditsToApply] = useState(0);
+  const [creditsDiscount, setCreditsDiscount] = useState(0);
   const appliedCouponRef = useRef<AppliedCoupon | null>(null);
   appliedCouponRef.current = appliedCoupon;
 
@@ -191,6 +199,15 @@ export function ManpowerCheckoutClient() {
     }
     return Math.max(0, Number(preview?.total || 0));
   }, [appliedCoupon, preview?.total]);
+
+  const paymentAmount = Math.max(0, payableTotal - creditsDiscount);
+
+  const handleCreditsChange = useCallback((credits: number, discount: number) => {
+    setCreditsToApply(credits);
+    setCreditsDiscount(discount);
+  }, []);
+
+  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(payableTotal);
 
   useEffect(() => {
     if (payableTotal > PAYMENT_AMOUNT_LIMIT && (paymentMethod === "razorpay" || paymentMethod === "cashfree")) {
@@ -350,6 +367,13 @@ export function ManpowerCheckoutClient() {
         setPendingPayBookingId(created.bookingId);
         return;
       }
+      toast({
+        title: paymentMethod === "imagineering_credit" ? "Payment successful" : t("checkoutSuccessTitle"),
+        description:
+          paymentMethod === "imagineering_credit"
+            ? `Paid using ${IMAGINEERING_CREDIT.name} · ₹${payableTotal.toLocaleString("en-IN")}`
+            : undefined,
+      });
       goWaiting(created.bookingId);
     } catch (err) {
       toast({
@@ -371,12 +395,16 @@ export function ManpowerCheckoutClient() {
     );
   }
 
-  const total = payableTotal;
+  const total = paymentAmount;
   const showOnlinePay =
     pendingPayBookingId && (paymentMethod === "razorpay" || paymentMethod === "cashfree");
 
   const confirmLabel =
-    paymentMethod === "cod" ? t("checkoutConfirmCod") : t("checkoutPay");
+    paymentMethod === "cod"
+      ? t("checkoutConfirmCod")
+      : paymentMethod === "imagineering_credit"
+        ? `Confirm · ${IMAGINEERING_CREDIT.name}`
+        : t("checkoutPay");
 
   const renderPayButton = () => {
     if (showOnlinePay && paymentMethod === "razorpay" && pendingPayBookingId) {
@@ -385,6 +413,7 @@ export function ManpowerCheckoutClient() {
           bookingId={pendingPayBookingId}
           amount={total}
           couponUsageId={appliedCoupon?.usageId}
+          creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
           bookingDescription={`Manpower · ${tradeName}`}
           className="h-11 w-full rounded-xl font-semibold"
           onSuccess={() => goWaiting(pendingPayBookingId)}
@@ -402,6 +431,7 @@ export function ManpowerCheckoutClient() {
           bookingId={pendingPayBookingId}
           amount={total}
           couponUsageId={appliedCoupon?.usageId}
+          creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
           bookingDescription={`Manpower · ${tradeName}`}
           className="h-11 w-full rounded-xl font-semibold"
           onSuccess={() => goWaiting(pendingPayBookingId)}
@@ -416,7 +446,12 @@ export function ManpowerCheckoutClient() {
     return (
       <Button
         type="button"
-        disabled={submitting || !catalogProductId || !paymentMethod}
+        disabled={
+          submitting ||
+          !catalogProductId ||
+          !paymentMethod ||
+          (paymentMethod === "imagineering_credit" && !canUseImagineeringCredit)
+        }
         className="h-11 w-full rounded-xl font-semibold text-white"
         style={{ backgroundColor: MANPOWER_TEAL }}
         onClick={() => void onConfirmCod()}
@@ -492,10 +527,18 @@ export function ManpowerCheckoutClient() {
                 </span>
               </div>
             ) : null}
+            {creditsDiscount > 0 ? (
+              <div className="flex justify-between gap-3">
+                <span className="text-emerald-700">Wallet points</span>
+                <span className="font-medium text-emerald-700">
+                  -₹{creditsDiscount.toLocaleString("en-IN")}
+                </span>
+              </div>
+            ) : null}
             <div className="flex justify-between gap-3 border-t border-slate-100 pt-3 text-base font-bold">
               <span className="text-slate-900">{t("checkoutTotal")}</span>
               <span style={{ color: MANPOWER_TEAL }}>
-                ₹{payableTotal.toLocaleString("en-IN")}
+                ₹{paymentAmount.toLocaleString("en-IN")}
               </span>
             </div>
           </>
@@ -715,10 +758,29 @@ export function ManpowerCheckoutClient() {
 
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="mb-4 text-lg font-bold text-foreground">{t("checkoutPayment")}</h2>
+              {paymentMethod !== "imagineering_credit" && (
+                <div className="mb-4">
+                  <CreditsRedeemSection
+                    orderTotal={payableTotal}
+                    onCreditsChange={handleCreditsChange}
+                  />
+                </div>
+              )}
               <PaymentOptionsSelector
                 value={paymentMethod}
-                onChange={setPaymentMethod}
-                amount={payableTotal}
+                onChange={(v) => {
+                  setPaymentMethod(v);
+                  if (v === "imagineering_credit") {
+                    setCreditsToApply(0);
+                    setCreditsDiscount(0);
+                  }
+                }}
+                amount={paymentMethod === "imagineering_credit" ? payableTotal : paymentAmount}
+                showImagineeringCredit={canUseImagineeringCredit}
+              />
+              <ImagineeringCreditCheckoutPanel
+                orderTotal={payableTotal}
+                selected={paymentMethod === "imagineering_credit"}
               />
             </section>
 
@@ -740,7 +802,7 @@ export function ManpowerCheckoutClient() {
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-slate-500">{t("checkoutTotal")}</p>
             <p className="truncate text-lg font-bold text-slate-900">
-              {preview ? `₹${payableTotal.toLocaleString("en-IN")}` : "—"}
+              {preview ? `₹${paymentAmount.toLocaleString("en-IN")}` : "—"}
             </p>
           </div>
           <div className="w-[min(100%,220px)] shrink-0">{renderPayButton()}</div>
