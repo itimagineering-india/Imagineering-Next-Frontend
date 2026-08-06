@@ -2,7 +2,7 @@
 
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import heroBackground from "@/assets/20945858.jpg";
-import { Shield, MapPin, CheckCircle2, Sparkles } from "lucide-react";
+import { Shield, MapPin, CheckCircle2, Bot } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Link from "next/link";
 
@@ -65,7 +65,7 @@ const HeroAbout = () => {
           {[
             { icon: MapPin, text: t("about.locationFirst", "Location-first matching across 50+ cities") },
             { icon: CheckCircle2, text: t("about.verifiedPricing", "Verified providers & transparent pricing") },
-            { icon: Sparkles, text: t("about.smartSupport", "Human support plus smart automation") }
+            { icon: Bot, text: t("about.smartSupport", "Human support plus smart automation") }
           ].map((item, index) => (
             <div 
               key={index}
