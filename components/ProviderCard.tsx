@@ -25,6 +25,7 @@ interface ProviderCardProps {
   responseTime: string;
   skills: string[];
   imagineScore?: ImagineScoreData | null;
+  isOnline?: boolean;
   className?: string;
 }
 
@@ -43,6 +44,7 @@ export function ProviderCard({
   responseTime,
   skills,
   imagineScore,
+  isOnline,
   className,
 }: ProviderCardProps) {
   const providerUrl = `/provider/${slug || id}`;
@@ -78,6 +80,11 @@ export function ProviderCard({
                 <Badge className="bg-warning text-warning-foreground">
                   <Award className="h-3 w-3 mr-1" />
                   Top Rated
+                </Badge>
+              )}
+              {isOnline === false && (
+                <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                  Offline
                 </Badge>
               )}
             </div>
