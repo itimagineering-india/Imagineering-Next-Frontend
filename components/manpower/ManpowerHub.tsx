@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronLeft, ChevronRight, Loader2, Search, Star } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Loader2, MapPin, Search, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ManpowerHireModeTabs, MANPOWER_CANVAS, MANPOWER_TEAL } from "@/components/manpower/ManpowerHireModeTabs";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 import { fetchManpowerHubData, type ManpowerHubData } from "@/lib/manpower/manpowerHubApi";
 import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import manpowerHeroImg from "@/assets/services/manpowers.png";
+import { useUserLocation } from "@/contexts/UserLocationContext";
 
 const EMPTY: ManpowerHubData = {
   trades: [],
@@ -157,6 +158,8 @@ export function ManpowerHub() {
   const { t } = useTranslation("manpower");
   const router = useRouter();
   const { toast } = useToast();
+  const { userLocation, radiusKm } = useUserLocation();
+  const pricingCity = userLocation?.city?.trim() || "";
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ManpowerHubData>(EMPTY);
   const [hireMode, setHireMode] = useState<ManpowerHireMode>("custom_duration");
@@ -177,7 +180,12 @@ export function ManpowerHub() {
     (async () => {
       setLoading(true);
       try {
-        const hub = await fetchManpowerHubData();
+        const hub = await fetchManpowerHubData({
+          city: pricingCity || undefined,
+          lat: userLocation?.lat,
+          lng: userLocation?.lng,
+          radiusKm,
+        });
         if (!cancelled) setData(hub);
       } catch {
         if (!cancelled) {
@@ -194,7 +202,7 @@ export function ManpowerHub() {
     return () => {
       cancelled = true;
     };
-  }, [t, toast]);
+  }, [pricingCity, radiusKm, t, toast, userLocation?.lat, userLocation?.lng]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -287,6 +295,11 @@ export function ManpowerHub() {
               <p className="mt-2 max-w-lg text-sm leading-relaxed text-teal-50/90 sm:text-base">
                 {t("heroSubtitle")}
               </p>
+              {pricingCity ? (
+                <p className="mt-1.5 text-xs font-medium text-teal-100/90">
+                  {t("pricesForCity", { city: pricingCity })}
+                </p>
+              ) : null}
               <form
                 className="mt-4 flex max-w-xl flex-col gap-2 sm:flex-row"
                 onSubmit={(e) => {
@@ -449,18 +462,20 @@ export function ManpowerHub() {
           <div className="flex items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900">{t("topProviders")}</h2>
-              <p className="mt-1 text-sm text-slate-500">{t("topProvidersSub")}</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {pricingCity ? t("topProvidersSubCity", { city: pricingCity }) : t("topProvidersSub")}
+              </p>
             </div>
-            <Link
-              href="/services?category=manpower&view=providers"
-              className="text-sm font-semibold text-teal-800 hover:underline"
-            >
-              {t("viewAllProviders")}
-            </Link>
+            {!loading && data.providers.length > 0 ? (
+              <Link
+                href="/services?category=manpower&view=providers"
+                className="text-sm font-semibold text-teal-800 hover:underline"
+              >
+                {t("viewAllProviders")}
+              </Link>
+            ) : null}
           </div>
-          {loading ? null : data.providers.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">{t("providersEmpty")}</p>
-          ) : (
+          {loading ? null : data.providers.length > 0 ? (
             <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
               {data.providers.slice(0, 12).map((p) => (
                 <Link
@@ -487,6 +502,34 @@ export function ManpowerHub() {
                   </div>
                 </Link>
               ))}
+            </div>
+          ) : (
+            <div className="relative mt-4 overflow-hidden rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50 via-white to-emerald-50 px-5 py-8 sm:px-10 sm:py-10">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-teal-200/30 blur-2xl" />
+              <div className="pointer-events-none absolute -bottom-12 -left-8 h-32 w-32 rounded-full bg-emerald-200/25 blur-2xl" />
+              <div className="relative mx-auto flex max-w-lg flex-col items-center text-center">
+                <span
+                  className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-sm"
+                  style={{ backgroundColor: MANPOWER_TEAL }}
+                >
+                  <MapPin className="h-6 w-6" />
+                </span>
+                <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                  {pricingCity
+                    ? t("comingSoonTitle", { city: pricingCity })
+                    : t("comingSoonTitleGeneric")}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                  {pricingCity ? t("comingSoonBody", { city: pricingCity }) : t("comingSoonBodyGeneric")}
+                </p>
+                <Button
+                  asChild
+                  className="mt-5 h-10 rounded-xl px-5 font-semibold text-white hover:opacity-95"
+                  style={{ backgroundColor: MANPOWER_TEAL }}
+                >
+                  <Link href="/requirement/submit">{t("comingSoonCta")}</Link>
+                </Button>
+              </div>
             </div>
           )}
         </section>
