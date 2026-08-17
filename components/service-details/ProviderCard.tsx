@@ -29,6 +29,7 @@ interface ProviderCardProps {
     rating: number;
     trustBadges?: string[];
     imagineScore?: Partial<ImagineScoreData> | null;
+    isOnline?: boolean;
   };
   onSave?: () => void;
   isSaved?: boolean;
@@ -70,6 +71,11 @@ export function ProviderCard({
               <ImagineVerifiedBadge
                 score={provider.imagineScore ?? { isImagineeringVerified: provider.isVerified }}
               />
+              {provider.isOnline === false && (
+                <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                  Offline
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-1 text-xs sm:text-sm">
               <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-warning text-warning" />
