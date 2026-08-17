@@ -170,6 +170,7 @@ interface ServiceData {
     completedJobs?: number;
     trustBadges?: string[];
     imagineScore?: ImagineScoreData | null;
+    isOnline?: boolean;
   };
   location?: {
     address: string;
@@ -347,6 +348,7 @@ export default function ServiceDetails() {
               completedJobs: serviceData.provider?.completedJobs,
               trustBadges: serviceData.provider?.trustBadges,
               imagineScore: serviceData.provider?.imagineScore,
+              isOnline: serviceData.provider?.isOnline !== false,
             },
             location: serviceData.location,
             rating: serviceData.rating || 0,
@@ -418,7 +420,10 @@ export default function ServiceDetails() {
   }, [service]);
   
   const showPricing = useMemo(() => shouldShowPricing(serviceWithInteraction), [serviceWithInteraction]);
-  const canBook = useMemo(() => canBookDirectly(serviceWithInteraction), [serviceWithInteraction]);
+  const canBook = useMemo(
+    () => canBookDirectly(serviceWithInteraction) && service?.provider?.isOnline !== false,
+    [serviceWithInteraction, service?.provider?.isOnline]
+  );
   const helperText = useMemo(() => getHelperText(serviceWithInteraction), [serviceWithInteraction]);
   const formattedServicePrice = useMemo(
     () => (service ? formatServicePrice(service) : ""),
@@ -524,6 +529,14 @@ export default function ServiceDetails() {
     
     // Check if service allows direct booking
     if (service && !canBook) {
+      if (service.provider?.isOnline === false) {
+        toast({
+          title: "Provider offline",
+          description: "This provider is currently offline and not accepting new bookings.",
+          variant: "destructive",
+        });
+        return;
+      }
       // For CONTACT_ONLY services, show contact options instead of booking modal
       toast({
         title: "Contact Required",
@@ -1107,6 +1120,7 @@ export default function ServiceDetails() {
                       rating: service.provider.rating ?? service.rating,
                       trustBadges: service.provider.trustBadges,
                       imagineScore: service.provider.imagineScore,
+                      isOnline: service.provider.isOnline,
                     }}
                     onSave={handleToggleFavorite}
                     isSaved={isSaved}
@@ -1197,6 +1211,7 @@ export default function ServiceDetails() {
                       rating: service.provider.rating ?? service.rating,
                       trustBadges: service.provider.trustBadges,
                       imagineScore: service.provider.imagineScore,
+                      isOnline: service.provider.isOnline,
                     }}
                     onSave={handleToggleFavorite}
                     isSaved={isSaved}
