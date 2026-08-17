@@ -34,6 +34,51 @@ export type ManpowerHubData = {
   specificWorks: ManpowerSpecificWorkItem[];
 };
 
+export type ManpowerHubFetchOpts = {
+  city?: string | null;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+};
+
+function normalizeCityToken(raw?: string | null): string {
+  return String(raw || "")
+    .toLowerCase()
+    .split(",")[0]
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+const CITY_ALIASES: Record<string, string> = {
+  bengaluru: "bangalore",
+  "new-delhi": "delhi",
+  ncr: "delhi",
+  bombay: "mumbai",
+  madras: "chennai",
+  calcutta: "kolkata",
+  poona: "pune",
+  cochin: "kochi",
+  gurgaon: "gurugram",
+};
+
+function canonicalCityToken(raw?: string | null): string {
+  const key = normalizeCityToken(raw);
+  return CITY_ALIASES[key] || key;
+}
+
+function providerMatchesCity(providerCity: string | undefined, targetCity: string): boolean {
+  const target = canonicalCityToken(targetCity);
+  if (!target) return true;
+  const raw = String(providerCity || "").trim();
+  if (!raw || /^nearby$/i.test(raw)) return false;
+  const city = canonicalCityToken(raw);
+  if (!city) return false;
+  return city === target || city.includes(target) || target.includes(city);
+}
+
 type CatalogProductRaw = {
   _id?: string;
   id?: string;
@@ -412,7 +457,11 @@ function mapProvider(raw: Record<string, unknown>, index: number): ManpowerTopPr
   const distanceKm = Number(raw?.distanceKm);
   const loc = raw?.location as { city?: string } | undefined;
   const addr = raw?.address as { city?: string } | undefined;
-  const city = String(loc?.city || raw?.city || addr?.city || "").trim();
+  const business = raw?.businessAddress as { city?: string } | undefined;
+  const userLoc = (raw?.user as { location?: { city?: string } } | undefined)?.location;
+  const city = String(
+    loc?.city || raw?.city || addr?.city || business?.city || userLoc?.city || ""
+  ).trim();
   const primaryCategory = raw?.primaryCategory as { name?: string } | undefined;
 
   return {
@@ -432,15 +481,22 @@ function mapProvider(raw: Record<string, unknown>, index: number): ManpowerTopPr
   };
 }
 
+export function cityForManpowerPricing(raw?: string | null): string | undefined {
+  const text = String(raw || "").trim();
+  return text || undefined;
+}
+
 export async function fetchManpowerCatalogByHireMode(
-  hireMode: ManpowerCatalogHireMode
+  hireMode: ManpowerCatalogHireMode,
+  city?: string | null
 ): Promise<CatalogProductRaw[]> {
   try {
     const res = await api.productCatalog.list({
       categorySlug: MANPOWER_CATEGORY_SLUG,
       hireMode,
-      limit: 100,
+      limit: 250,
       page: 1,
+      city: cityForManpowerPricing(city),
     });
     if (!res.success) return [];
     const list = (res.data as { products?: CatalogProductRaw[] } | undefined)?.products;
@@ -452,20 +508,24 @@ export async function fetchManpowerCatalogByHireMode(
 
 export async function fetchManpowerSpecificWorksForTrade(
   tradeId: string,
-  tradeName?: string
+  tradeName?: string,
+  city?: string | null
 ): Promise<ManpowerSpecificWorkItem[]> {
-  const products = await fetchManpowerCatalogByHireMode("specific_work");
+  const products = await fetchManpowerCatalogByHireMode("specific_work", city);
   const works = mapSpecificWorksFromCatalog(products);
   return filterManpowerSpecificWorks(works, { tradeId, tradeName });
 }
 
 export async function fetchManpowerCatalogProductById(
-  id: string
+  id: string,
+  city?: string | null
 ): Promise<CatalogProductRaw | null> {
   const productId = String(id || "").trim();
   if (!productId) return null;
   try {
-    const res = await api.productCatalog.getById(productId);
+    const res = await api.productCatalog.getById(productId, {
+      city: cityForManpowerPricing(city),
+    });
     if (!res.success) return null;
     const product = (res.data as { product?: CatalogProductRaw } | undefined)?.product;
     return product || null;
@@ -541,7 +601,18 @@ export async function findManpowerServiceForCatalogProduct(
   }
 }
 
-export async function fetchManpowerHubData(): Promise<ManpowerHubData> {
+export async function fetchManpowerHubData(
+  cityOrOpts?: string | null | ManpowerHubFetchOpts
+): Promise<ManpowerHubData> {
+  const opts: ManpowerHubFetchOpts =
+    cityOrOpts && typeof cityOrOpts === "object"
+      ? cityOrOpts
+      : { city: typeof cityOrOpts === "string" ? cityOrOpts : undefined };
+  const cityQuery = cityForManpowerPricing(opts.city);
+  const lat = Number(opts.lat);
+  const lng = Number(opts.lng);
+  const hasGeo = Number.isFinite(lat) && Number.isFinite(lng);
+  const radiusKm = Number(opts.radiusKm) > 0 ? Number(opts.radiusKm) : 50;
   const [subRes, servicesRes, providersRes, catalogRes] = await Promise.allSettled([
     api.categories.getSubcategories(MANPOWER_CATEGORY_SLUG),
     api.services.getAll({
@@ -552,14 +623,16 @@ export async function fetchManpowerHubData(): Promise<ManpowerHubData> {
     }),
     api.providers.getAll({
       categorySlug: MANPOWER_CATEGORY_SLUG,
-      limit: 16,
+      limit: 24,
       page: 1,
-      sort: "rating",
+      sort: hasGeo ? "distance" : "rating",
+      ...(hasGeo ? { lat, lng, radiusKm } : {}),
     }),
     api.productCatalog.list({
       categorySlug: MANPOWER_CATEGORY_SLUG,
-      limit: 200,
+      limit: 250,
       page: 1,
+      city: cityQuery,
     }),
   ]);
 
@@ -620,9 +693,15 @@ export async function fetchManpowerHubData(): Promise<ManpowerHubData> {
     }
   }
 
-  if (providers.length === 0 && services.length > 0) {
+  if (cityQuery) {
+    providers = providers.filter((p) => providerMatchesCity(p.city, cityQuery));
+  }
+
+  const hasLocation = Boolean(cityQuery || hasGeo);
+  if (hasLocation && providers.length === 0 && services.length > 0 && cityQuery) {
     const seen = new Map<string, ManpowerTopProvider>();
     services.forEach((s, i) => {
+      if (!providerMatchesCity(s.city, cityQuery)) return;
       const pid = String(s.providerId || "").trim();
       if (!pid || seen.has(pid)) return;
       seen.set(pid, {
@@ -630,7 +709,7 @@ export async function fetchManpowerHubData(): Promise<ManpowerHubData> {
         name: s.providerName || "Provider",
         mark: manpowerMarkFromName(s.providerName || "P"),
         specialty: s.tradeLabel || "Manpower",
-        city: s.city || "Nearby",
+        city: s.city || cityQuery,
         rating: s.rating && s.rating > 0 ? s.rating : 4.5,
         reviewCount: s.reviewCount || 0,
         responseMins: 45,
