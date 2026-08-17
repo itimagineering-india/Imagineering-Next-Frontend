@@ -33,6 +33,7 @@ import {
 } from "@/lib/manpower/manpowerHubApi";
 import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import { resolveManpowerMediaUrl } from "@/lib/manpower/media";
+import { useUserLocation } from "@/contexts/UserLocationContext";
 
 type CatalogProduct = {
   _id?: string;
@@ -73,6 +74,8 @@ export function ManpowerProductDetailClient({ productId }: Props) {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const { userLocation } = useUserLocation();
+  const pricingCity = userLocation?.city?.trim() || "";
 
   const sp = searchParams ?? new URLSearchParams();
   const hireMode = parseHireMode(sp.get("hireMode"));
@@ -87,10 +90,10 @@ export function ManpowerProductDetailClient({ productId }: Props) {
     (async () => {
       setLoading(true);
       try {
-        let found = await fetchManpowerCatalogProductById(productId);
+        let found = await fetchManpowerCatalogProductById(productId, pricingCity || undefined);
         if (!found) {
           const hireQuery = hireMode === "specific_work" ? "specific_work" : "rate_card";
-          const list = await fetchManpowerCatalogByHireMode(hireQuery);
+          const list = await fetchManpowerCatalogByHireMode(hireQuery, pricingCity || undefined);
           const tradeKey =
             resolveManpowerTradeKey(tradeId) || resolveManpowerTradeKey(tradeName);
           found =
@@ -122,7 +125,7 @@ export function ManpowerProductDetailClient({ productId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [hireMode, productId, tradeId, tradeName]);
+  }, [hireMode, pricingCity, productId, tradeId, tradeName]);
 
   const catalogId = String(product?._id || product?.id || "").trim();
   const title = String(product?.name || tradeName || "").trim() || t("title");
@@ -355,6 +358,11 @@ export function ManpowerProductDetailClient({ productId }: Props) {
                   <h1 className="mt-3 text-2xl font-bold leading-tight tracking-tight text-foreground xl:text-3xl">
                     {title}
                   </h1>
+                  {pricingCity ? (
+                    <p className="mt-1.5 text-xs font-medium text-teal-800">
+                      {t("pricesForCity", { city: pricingCity })}
+                    </p>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1 font-semibold text-foreground">
                       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
