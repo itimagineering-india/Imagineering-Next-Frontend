@@ -867,6 +867,7 @@ export const api = {
       materialTypeKey?: string;
       hireMode?: string;
       search?: string;
+      city?: string;
       page?: number;
       limit?: number;
     }) => {
@@ -881,7 +882,10 @@ export const api = {
       const qs = queryParams.toString();
       return apiRequest(`/api/product-catalog${qs ? `?${qs}` : ""}`);
     },
-    getById: (id: string) => apiRequest(`/api/product-catalog/${id}`),
+    getById: (id: string, params?: { city?: string }) => {
+      const qs = params?.city ? `?city=${encodeURIComponent(params.city)}` : "";
+      return apiRequest(`/api/product-catalog/${id}${qs}`);
+    },
   },
 
   // Search
@@ -1562,6 +1566,7 @@ export const api = {
       catalogProductId: string;
       hireMode: string;
       hours?: number;
+      city?: string;
     }) =>
       apiRequest<{
         subtotal: number;
