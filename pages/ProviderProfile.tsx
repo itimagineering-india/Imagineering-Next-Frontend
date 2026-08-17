@@ -73,6 +73,7 @@ interface ProviderData {
   portfolio?: Array<{ id: string; title: string; image: string }>;
   verified?: boolean;
   topRated?: boolean;
+  isOnline?: boolean;
   rating?: number;
   reviewCount?: number;
   completedJobs?: number;
@@ -390,6 +391,7 @@ export default function ProviderProfile() {
       portfolio: provider.portfolio || [],
       verified: provider.verified || provider.user?.verified || false,
       topRated: provider.topRated || false,
+      isOnline: provider.isOnline !== false,
       rating: provider.rating || 0,
       reviewCount: provider.reviewCount || 0,
       completedJobs: provider.completedJobs || 0,
@@ -549,6 +551,11 @@ export default function ProviderProfile() {
                           {t("topRated", "Top Rated")}
                         </Badge>
                       )}
+                      {providerDisplay.isOnline === false && (
+                        <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                          {t("offline", "Offline")}
+                        </Badge>
+                      )}
                       <ImagineVerifiedBadge score={provider?.imagineScore} />
                     </div>
                     {provider?.imagineScore?.isImagineeringVerified && provider?.slug && (
@@ -676,6 +683,14 @@ export default function ProviderProfile() {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {providerDisplay.isOnline === false && (
+                    <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                      {t(
+                        "offlineNotice",
+                        "This provider is currently offline and not accepting new bookings."
+                      )}
+                    </p>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
