@@ -10,6 +10,7 @@ import { fetchManpowerSpecificWorksForTrade } from "@/lib/manpower/manpowerHubAp
 import type { ManpowerSpecificWorkItem } from "@/lib/manpower/manpowerHubCatalog";
 import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import { resolveManpowerTradeKey } from "@/lib/manpower/manpowerHubCatalog";
+import { useUserLocation } from "@/contexts/UserLocationContext";
 
 type Props = {
   tradeKey: string;
@@ -17,6 +18,8 @@ type Props = {
 
 export function ManpowerTradeTasksClient({ tradeKey }: Props) {
   const { t } = useTranslation("manpower");
+  const { userLocation } = useUserLocation();
+  const pricingCity = userLocation?.city?.trim() || "";
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<ManpowerSpecificWorkItem[]>([]);
 
@@ -35,7 +38,7 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
     (async () => {
       setLoading(true);
       try {
-        const list = await fetchManpowerSpecificWorksForTrade(key, displayName);
+        const list = await fetchManpowerSpecificWorksForTrade(key, displayName, pricingCity || undefined);
         if (!cancelled) setTasks(list);
       } catch {
         if (!cancelled) setTasks([]);
@@ -46,7 +49,7 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [displayName, key]);
+  }, [displayName, key, pricingCity]);
 
   const art = getManpowerTradeArt(key) || getManpowerTradeArt(displayName);
 
@@ -75,6 +78,9 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
               {t("tasksFor", { name: displayName })}
             </h1>
             <p className="text-sm text-slate-500">{t("tasksCount", { count: tasks.length })}</p>
+            {pricingCity ? (
+              <p className="text-xs font-medium text-teal-800">{t("pricesForCity", { city: pricingCity })}</p>
+            ) : null}
           </div>
         </div>
 
