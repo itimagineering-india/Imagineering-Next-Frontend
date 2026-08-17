@@ -139,6 +139,7 @@ export function ManpowerCheckoutClient() {
         catalogProductId,
         hireMode,
         hours: needsHours ? hours : undefined,
+        city: selectedAddress?.city,
       })
       .then((res) => {
         if (cancelled) return;
@@ -165,7 +166,7 @@ export function ManpowerCheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [catalogProductId, hireMode, hours, isAuthenticated, needsHours]);
+  }, [catalogProductId, hireMode, hours, isAuthenticated, needsHours, selectedAddress?.city]);
 
   // Hours / listing change → coupon must be re-applied on the new amount
   const skipCouponResetOnMount = useRef(true);
@@ -588,6 +589,11 @@ export function ManpowerCheckoutClient() {
           <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
             {t("checkoutSubtitle")}
           </p>
+          {selectedAddress?.city ? (
+            <p className="mt-1.5 text-xs font-medium text-teal-800">
+              {t("pricesForCity", { city: selectedAddress.city })}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
