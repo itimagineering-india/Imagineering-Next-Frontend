@@ -1,1 +1,22 @@
-{"searchPlaceholder":"Search Services","searchCategory":"Search Category","searchProvider":"Search Provider","forProviders":"For Providers","dashboard":"Dashboard","myProfile":"My Profile","logout":"Log Out","loggedOut":"Logged out","loggedOutDescription":"You have been successfully logged out","login":"Login","signUp":"Sign Up","category":"Category","provider":"Provider","location":"Location","home":"Home","exploreServices":"Explore Services"}
+{
+  "searchPlaceholder": "Search Services",
+  "searchCategory": "Search Category",
+  "searchProvider": "Search Provider",
+  "forProviders": "For Providers",
+  "dashboard": "Dashboard",
+  "myProfile": "My Profile",
+  "logout": "Log Out",
+  "loggedOut": "Logged out",
+  "loggedOutDescription": "You have been successfully logged out",
+  "login": "Login",
+  "signUp": "Sign Up",
+  "category": "Category",
+  "provider": "Provider",
+  "location": "Location",
+  "home": "Home",
+  "exploreServices": "Explore Services",
+  "appPromptTitle": "Get the Imagineering India app",
+  "appPromptBody": "Book services faster and get a better experience on your phone.",
+  "appPromptCta": "Download",
+  "appPromptDismiss": "Dismiss"
+}
