@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import createGlobe from "cobe";
 import { cn } from "@/lib/utils";
 
@@ -105,10 +105,12 @@ export function GlobeAnalytics({
     let resizeObserver: ResizeObserver | null = null;
 
     function init() {
-      const width = canvas.offsetWidth;
-      if (width === 0 || globe) return;
+      const el = canvasRef.current;
+      if (!el || globe) return;
+      const width = el.offsetWidth;
+      if (width === 0) return;
 
-      globe = createGlobe(canvas, {
+      globe = createGlobe(el, {
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         width,
         height: width,
@@ -140,7 +142,7 @@ export function GlobeAnalytics({
       };
       animate();
       window.setTimeout(() => {
-        if (canvas) canvas.style.opacity = "1";
+        if (canvasRef.current) canvasRef.current.style.opacity = "1";
       }, 0);
     }
 
@@ -182,26 +184,27 @@ export function GlobeAnalytics({
         ? data.map((m) => (
             <div
               key={m.id}
-              style={{
-                position: "absolute",
-                // @ts-expect-error CSS Anchor Positioning
-                positionAnchor: `--cobe-${m.id}`,
-                bottom: "anchor(top)",
-                left: "anchor(center)",
-                translate: "-50% 0",
-                marginBottom: 6,
-                display: "flex",
-                alignItems: "baseline",
-                gap: "0.35rem",
-                padding: "0.3rem 0.5rem",
-                background: "rgba(0,0,0,0.85)",
-                borderRadius: 4,
-                pointerEvents: "none" as const,
-                whiteSpace: "nowrap" as const,
-                opacity: `var(--cobe-visible-${m.id}, 0)`,
-                filter: `blur(calc((1 - var(--cobe-visible-${m.id}, 0)) * 8px))`,
-                transition: "opacity 0.3s, filter 0.3s",
-              }}
+              style={
+                {
+                  position: "absolute",
+                  positionAnchor: `--cobe-${m.id}`,
+                  bottom: "anchor(top)",
+                  left: "anchor(center)",
+                  translate: "-50% 0",
+                  marginBottom: 6,
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "0.35rem",
+                  padding: "0.3rem 0.5rem",
+                  background: "rgba(0,0,0,0.85)",
+                  borderRadius: 4,
+                  pointerEvents: "none",
+                  whiteSpace: "nowrap",
+                  opacity: `var(--cobe-visible-${m.id}, 0)`,
+                  filter: `blur(calc((1 - var(--cobe-visible-${m.id}, 0)) * 8px))`,
+                  transition: "opacity 0.3s, filter 0.3s",
+                } as CSSProperties
+              }
             >
               <span
                 style={{
