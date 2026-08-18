@@ -112,7 +112,7 @@ function StoreButton({ href, label, store }: StoreLink) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-foreground"
+      className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-foreground"
     >
       {store === "app" ? (
         <AppStoreIcon className="h-4 w-4" />
@@ -134,19 +134,17 @@ function PathCtas({
   stores: StoreLink[];
 }) {
   return (
-    <div className="mt-auto flex flex-col gap-2.5 pt-6">
+    <div className="mt-auto flex flex-nowrap items-center gap-2 overflow-x-auto pt-6">
       <Link
         href={primaryHref}
-        className="inline-flex h-11 min-h-11 w-fit items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
       >
         {primaryLabel}
         <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
-      <div className="flex flex-wrap gap-2.5">
-        {stores.map((store) => (
-          <StoreButton key={store.href} {...store} />
-        ))}
-      </div>
+      {stores.map((store) => (
+        <StoreButton key={store.href} {...store} />
+      ))}
     </div>
   );
 }
