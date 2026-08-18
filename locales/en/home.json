@@ -42,27 +42,29 @@
     "empty": "No top providers available yet."
   },
   "audience": {
-    "heading": "Find Services or Grow Your Business",
-    "description": "Choose the experience that fits your goal: hire trusted professionals with Imagineering India or grow as a provider with Imagimitra.",
-    "usersLabel": "For Users",
-    "usersTitle": "Imagineering India",
-    "usersDescription": "Find verified services near you in minutes.",
+    "heading": "Choose your goal",
+    "description": "Everything you need to build or expand your construction business—in one place.",
+    "usersLabel": "For project owners",
+    "usersTitle": "Hire trusted pros. Get work done on time.",
+    "usersDescription": "Find verified contractors, skilled labour, machinery, and quality materials near you.",
     "usersBenefits": [
-      "Verified providers for every major category",
-      "Trusted services with clear ratings and reviews",
-      "Fast booking with quick response options"
+      "100% Verified Pros",
+      "Rated & Reviewed",
+      "Fast Bookings"
     ],
     "exploreServices": "Explore Services",
-    "providersLabel": "For Providers",
-    "providersTitle": "Imagimitra",
-    "providersDescription": "Get more work and manage your provider growth in one app.",
+    "getTheApp": "Get the App",
+    "providersLabel": "For service providers",
+    "providersTitle": "Get direct leads. Grow your business.",
+    "providersDescription": "Showcase your work, get instant leads from local project owners, and manage bookings effortlessly.",
     "providersBenefits": [
-      "Verified provider profile for trust and visibility",
-      "Smart lead and booking management tools",
-      "Faster customer response and conversion flow"
+      "Direct Client Leads",
+      "Zero Hidden Fees",
+      "Easy Management"
     ],
-    "joinProvider": "Join as Provider",
-    "downloadApp": "Download App (Play Store)"
+    "joinProvider": "Join ImagiMitra",
+    "downloadApp": "Play Store",
+    "appStore": "App Store"
   },
   "search": {
     "locationUnavailable": "Location search unavailable",
