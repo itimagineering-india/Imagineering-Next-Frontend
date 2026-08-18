@@ -20,6 +20,9 @@ const PROVIDER_BANNER =
   "https://dwkazjggpovin.cloudfront.net/banners/Screenshot%202026-04-22%20at%205.32.54%E2%80%AFPM.png";
 const USER_APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.servicespheremobile";
 const PROVIDER_APP_DOWNLOAD_URL = "https://play.google.com/store/apps/details?id=com.imagineeringindia.imagimitra";
+const PROVIDER_IOS_APP_URL =
+  process.env.NEXT_PUBLIC_IMAGIMITRA_IOS_APP_URL ||
+  "https://apps.apple.com/search?term=ImagiMitra";
 
 const USER_BENEFIT_ICONS = [ShieldCheck, Star, Zap] as const;
 const PROVIDER_BENEFIT_ICONS = [Target, IndianRupee, CalendarCheck] as const;
@@ -86,35 +89,64 @@ function DevicePreview({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+function AppStoreIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M16.37 12.64c.03-2.54 2.08-3.76 2.17-3.81-1.18-1.73-3.02-1.97-3.67-2-1.56-.16-3.05.92-3.84.92-.79 0-2.02-.9-3.32-.87-1.71.03-3.29 1-4.17 2.53-1.78 3.08-.45 7.64 1.28 10.14.84 1.22 1.85 2.59 3.17 2.54 1.27-.05 1.75-.82 3.28-.82 1.53 0 1.97.82 3.32.79 1.37-.02 2.24-1.24 3.08-2.47.97-1.42 1.37-2.8 1.39-2.87-.03-.01-2.67-1.03-2.7-4.08ZM14.7 5.4c.7-.85 1.17-2.03 1.04-3.21-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.96-1.07 3.11 1.13.09 2.28-.57 2.98-1.42Z"
+      />
+    </svg>
+  );
+}
+
+type StoreLink = {
+  href: string;
+  label: string;
+  store: "play" | "app";
+};
+
+function StoreButton({ href, label, store }: StoreLink) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-foreground"
+    >
+      {store === "app" ? (
+        <AppStoreIcon className="h-4 w-4" />
+      ) : (
+        <PlayStoreIcon className="h-4 w-4" />
+      )}
+      {label}
+    </a>
+  );
+}
+
 function PathCtas({
   primaryHref,
   primaryLabel,
-  secondaryHref,
-  secondaryLabel,
+  stores,
 }: {
   primaryHref: string;
   primaryLabel: string;
-  secondaryHref: string;
-  secondaryLabel: string;
+  stores: StoreLink[];
 }) {
   return (
-    <div className="mt-auto flex flex-col gap-2.5 pt-6 sm:flex-row sm:items-center">
+    <div className="mt-auto flex flex-col gap-2.5 pt-6">
       <Link
         href={primaryHref}
-        className="inline-flex h-11 min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        className="inline-flex h-11 min-h-11 w-fit items-center justify-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
       >
         {primaryLabel}
         <ArrowRight className="h-4 w-4" aria-hidden />
       </Link>
-      <a
-        href={secondaryHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex h-11 min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-foreground"
-      >
-        <PlayStoreIcon className="h-4 w-4" />
-        {secondaryLabel}
-      </a>
+      <div className="flex flex-wrap gap-2.5">
+        {stores.map((store) => (
+          <StoreButton key={store.href} {...store} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -129,8 +161,7 @@ function AudiencePath({
   imageAlt,
   primaryHref,
   primaryLabel,
-  secondaryHref,
-  secondaryLabel,
+  stores,
 }: {
   eyebrow: string;
   title: string;
@@ -141,8 +172,7 @@ function AudiencePath({
   imageAlt: string;
   primaryHref: string;
   primaryLabel: string;
-  secondaryHref: string;
-  secondaryLabel: string;
+  stores: StoreLink[];
 }) {
   return (
     <article
@@ -169,8 +199,7 @@ function AudiencePath({
       <PathCtas
         primaryHref={primaryHref}
         primaryLabel={primaryLabel}
-        secondaryHref={secondaryHref}
-        secondaryLabel={secondaryLabel}
+        stores={stores}
       />
     </article>
   );
@@ -204,8 +233,13 @@ export function PlatformAudienceSection() {
             imageAlt="Imagineering India for users"
             primaryHref="/services"
             primaryLabel={t("audience.exploreServices")}
-            secondaryHref={USER_APP_DOWNLOAD_URL}
-            secondaryLabel={t("audience.getTheApp")}
+            stores={[
+              {
+                href: USER_APP_DOWNLOAD_URL,
+                label: t("audience.getTheApp"),
+                store: "play",
+              },
+            ]}
           />
           <AudiencePath
             eyebrow={t("audience.providersLabel")}
@@ -217,8 +251,18 @@ export function PlatformAudienceSection() {
             imageAlt="Imagimitra for providers"
             primaryHref="/join-provider"
             primaryLabel={t("audience.joinProvider")}
-            secondaryHref={PROVIDER_APP_DOWNLOAD_URL}
-            secondaryLabel={t("audience.downloadApp")}
+            stores={[
+              {
+                href: PROVIDER_APP_DOWNLOAD_URL,
+                label: t("audience.downloadApp"),
+                store: "play",
+              },
+              {
+                href: PROVIDER_IOS_APP_URL,
+                label: t("audience.appStore"),
+                store: "app",
+              },
+            ]}
           />
         </div>
       </div>
