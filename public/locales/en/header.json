@@ -14,5 +14,9 @@
   "provider": "Provider",
   "location": "Location",
   "home": "Home",
-  "exploreServices": "Explore Services"
+  "exploreServices": "Explore Services",
+  "appPromptTitle": "Get the Imagineering India app",
+  "appPromptBody": "Book services faster and get a better experience on your phone.",
+  "appPromptCta": "Download",
+  "appPromptDismiss": "Dismiss"
 }
