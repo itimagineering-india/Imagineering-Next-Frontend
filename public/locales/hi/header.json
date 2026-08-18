@@ -14,5 +14,9 @@
   "provider": "प्रदाता",
   "location": "स्थान",
   "home": "होम",
-  "exploreServices": "सेवाएं देखें"
+  "exploreServices": "सेवाएं देखें",
+  "appPromptTitle": "Imagineering India ऐप डाउनलोड करें",
+  "appPromptBody": "बेहतर अनुभव के लिए ऐप से सेवाएं बुक करें।",
+  "appPromptCta": "डाउनलोड",
+  "appPromptDismiss": "बंद करें"
 }
