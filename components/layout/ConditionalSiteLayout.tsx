@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
+import { AppDownloadPrompt } from "./AppDownloadPrompt";
 
 /** Hide site Header/Footer on dashboard routes (they have their own layout) */
 export function ConditionalSiteLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export function ConditionalSiteLayout({ children }: { children: React.ReactNode 
   if (isAuthFlow) {
     return (
       <>
+        <AppDownloadPrompt />
         <main className="flex min-h-0 flex-1 flex-col">{children}</main>
         <Footer />
       </>
@@ -31,6 +33,7 @@ export function ConditionalSiteLayout({ children }: { children: React.ReactNode 
 
   return (
     <>
+      <AppDownloadPrompt />
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />
