@@ -3,7 +3,14 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus } from "lucide-react";
+import { FilePenLine, Loader2, Package, Plus } from "lucide-react";
+import {
+ Dialog,
+ DialogContent,
+ DialogDescription,
+ DialogHeader,
+ DialogTitle,
+} from "@/components/ui/dialog";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -108,6 +115,7 @@ export default function ProviderServices() {
  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
  const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
  const [addServiceDialogOpen, setAddServiceDialogOpen] = useState(false);
+ const [addModeChooserOpen, setAddModeChooserOpen] = useState(false);
  const [businessProfileGate, setBusinessProfileGate] = useState<null | "basic" | "primary_category">(null);
  const [providerPrimaryCategoryIdForForm, setProviderPrimaryCategoryIdForForm] = useState<string | null>(null);
  const [isCheckingBusinessProfile, setIsCheckingBusinessProfile] = useState(false);
@@ -237,7 +245,7 @@ export default function ProviderServices() {
    const primaryCat = categories.find((c) => String(c._id) === String(primary));
    const catSlug = primaryCat?.slug ?? "";
    if (usesCatalogSelectFlow(catSlug)) {
-    router.push("/dashboard/provider/services/add");
+    setAddModeChooserOpen(true);
     return;
    }
    setAddServiceDialogOpen(true);
@@ -421,6 +429,48 @@ export default function ProviderServices() {
       }}
      />
     )}
+
+    <Dialog open={addModeChooserOpen} onOpenChange={setAddModeChooserOpen}>
+     <DialogContent className="mx-3 sm:mx-4 max-w-lg">
+      <DialogHeader>
+       <DialogTitle>How do you want to add a listing?</DialogTitle>
+       <DialogDescription>
+        Catalog products match buyer search. A custom listing shows on your profile — set an exact
+        price so buyers can add it to cart.
+       </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-3 sm:grid-cols-2">
+       <button
+        type="button"
+        className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+        onClick={() => {
+         setAddModeChooserOpen(false);
+         router.push("/dashboard/provider/services/add");
+        }}
+       >
+        <Package className="mb-2 h-5 w-5 text-primary" />
+        <p className="font-semibold text-foreground">From catalog</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pick a standard product or task. Details fill in automatically.
+        </p>
+       </button>
+       <button
+        type="button"
+        className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+        onClick={() => {
+         setAddModeChooserOpen(false);
+         setAddServiceDialogOpen(true);
+        }}
+       >
+        <FilePenLine className="mb-2 h-5 w-5 text-primary" />
+        <p className="font-semibold text-foreground">Custom listing</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Add your own title, photos, and price — like before.
+        </p>
+       </button>
+      </div>
+     </DialogContent>
+    </Dialog>
 
     {/* Add Service Dialog */}
     <MultiStepServiceForm
