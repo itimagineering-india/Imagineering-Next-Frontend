@@ -239,7 +239,8 @@ export default function MyRequirements() {
   };
 
   return (
-          <div className="p-4 md:p-6 space-y-6">
+    <>
+      <div className="p-4 md:p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">My requirements</h1>
@@ -675,5 +676,6 @@ export default function MyRequirements() {
           ) : null}
         </DialogContent>
       </Dialog>
+    </>
   );
 }
