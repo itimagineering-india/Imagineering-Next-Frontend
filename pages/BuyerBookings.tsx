@@ -32,6 +32,7 @@ import {
   FileText,
   ExternalLink,
   Star,
+  Copy,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -94,6 +95,7 @@ interface Booking {
   };
   requirementNote?: string;
   createdAt: string;
+  deliveryOtp?: string;
 }
 
 export default function BuyerBookings() {
@@ -622,6 +624,7 @@ export default function BuyerBookings() {
       location: booking.location || undefined,
       requirementNote: booking.notes || booking.description || "",
       createdAt: booking.createdAt,
+      deliveryOtp: String(booking.deliveryOtp || "").trim() || undefined,
     };
   };
 
@@ -968,6 +971,15 @@ export default function BuyerBookings() {
     }
   };
 
+  const copyDeliveryOtp = async (otp: string) => {
+    try {
+      await navigator.clipboard.writeText(otp);
+      toast({ title: "OTP copied", description: "Share this code with the provider." });
+    } catch {
+      toast({ title: "Could not copy OTP", variant: "destructive" });
+    }
+  };
+
   return (
     <DashboardLayout type="buyer">
       <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
@@ -1292,6 +1304,20 @@ export default function BuyerBookings() {
                         )}
                       </div>
 
+                      {booking.deliveryOtp ? (
+                        <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Delivery OTP
+                          </p>
+                          <p className="mt-0.5 text-lg font-bold tracking-[0.22em] tabular-nums">
+                            {booking.deliveryOtp}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Share with the provider when the job is complete
+                          </p>
+                        </div>
+                      ) : null}
+
                       <div className="flex items-center gap-4 text-sm flex-wrap">
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground w-20">Booking:</span>
@@ -1348,6 +1374,30 @@ export default function BuyerBookings() {
             </DialogHeader>
             {selectedBooking && (
               <div className="space-y-6">
+                {selectedBooking.deliveryOtp ? (
+                  <div className="rounded-xl border border-primary/25 bg-primary/5 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Delivery OTP
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-2xl font-bold tracking-[0.28em] tabular-nums text-foreground">
+                        {selectedBooking.deliveryOtp}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void copyDeliveryOtp(selectedBooking.deliveryOtp!)}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </Button>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Share this OTP with the provider when the job is complete.
+                    </p>
+                  </div>
+                ) : null}
                 {/* Service Info */}
                 <div>
                   <h3 className="font-semibold mb-3">Service Information</h3>
