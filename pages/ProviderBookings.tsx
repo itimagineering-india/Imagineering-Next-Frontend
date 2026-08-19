@@ -97,6 +97,7 @@ interface Booking {
     amount: number;
     status: "pending" | "completed";
   }>;
+  simplifiedBookingFlow?: boolean;
 }
 
 interface ProviderService {
@@ -181,6 +182,7 @@ export default function ProviderBookings() {
           hasGST: booking.hasGST || false,
           location: booking.location,
           progress: booking.progress,
+          simplifiedBookingFlow: !!booking.simplifiedBookingFlow,
         }));
         setBookings(formattedBookings);
       } else {
@@ -284,12 +286,7 @@ export default function ProviderBookings() {
       const matchesStatus = statusFilter === "all" || booking.status === statusFilter;
       
       // Show all payment types: paid, hold (partial), and pending (pay on delivery)
-      const matchesPayment =
-        booking.paymentStatus === "paid" ||
-        booking.paymentStatus === "hold" ||
-        booking.paymentStatus === "pending";
-      
-      return matchesSearch && matchesStatus && matchesPayment;
+      return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, statusFilter]);
 
@@ -304,8 +301,6 @@ export default function ProviderBookings() {
       b.status === "CANCELLED_BY_USER" || 
       b.status === "CANCELLED_BY_ADMIN"
     ).length,
-    totalEarnings: bookings.reduce((sum, b) => sum + b.netEarnings, 0),
-    totalCommission: bookings.reduce((sum, b) => sum + b.commission, 0),
   }), [bookings]);
 
   const formatInr = (amount: number) =>
@@ -662,26 +657,27 @@ export default function ProviderBookings() {
     }
   };
 
-  const getNextStatuses = (currentStatus: string): string[] => {
+  const getNextStatuses = (currentStatus: string, simplified?: boolean): string[] => {
     switch (currentStatus) {
       case "CONFIRMED":
         return ["IN_PROGRESS"];
       case "IN_PROGRESS":
-        return ["OUT_FOR_DELIVERY"];
+        return simplified ? ["DELIVERED"] : ["OUT_FOR_DELIVERY"];
       case "OUT_FOR_DELIVERY":
         return ["DELIVERED"];
       case "DELIVERED":
         return [];
       case "COMPLETED":
-        return []; // No further status updates
+        return [];
       default:
-        // For any other status, allow common transitions
         if (currentStatus !== "COMPLETED" && 
             currentStatus !== "CANCELLED_BY_USER" && 
             currentStatus !== "CANCELLED_BY_ADMIN" && 
             currentStatus !== "CANCELLED_BY_SYSTEM" &&
             currentStatus !== "REJECTED_BY_PROVIDER") {
-          return ["IN_PROGRESS", "OUT_FOR_DELIVERY", "DELIVERED"];
+          return simplified
+            ? ["IN_PROGRESS", "DELIVERED"]
+            : ["IN_PROGRESS", "OUT_FOR_DELIVERY", "DELIVERED"];
         }
         return [];
     }
@@ -1113,7 +1109,10 @@ export default function ProviderBookings() {
                       <SelectValue placeholder="Select new status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getNextStatuses(selectedBooking.status).map((status) => (
+                      {getNextStatuses(
+                        selectedBooking.status,
+                        selectedBooking.simplifiedBookingFlow,
+                      ).map((status) => (
                         <SelectItem key={status} value={status}>
                           {status === "IN_PROGRESS" && "In Progress"}
                           {status === "OUT_FOR_DELIVERY" && "Out for Delivery"}
@@ -1128,7 +1127,7 @@ export default function ProviderBookings() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Service Invoice File (Optional)
+                        Service invoice / bill (optional)
                       </label>
                       <input
                         type="file"
@@ -1140,7 +1139,8 @@ export default function ProviderBookings() {
                         className="w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-2 file:text-xs file:font-medium hover:file:bg-muted"
                       />
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Optional. Max size 10MB. Allowed formats: PDF, JPG, PNG, WebP.
+                        Optional. Upload a bill if you have one — you can continue without it.
+                        Max 10MB. PDF, JPG, PNG, or WebP.
                       </p>
                     </div>
                   </div>
