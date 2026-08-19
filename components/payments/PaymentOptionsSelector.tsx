@@ -1,18 +1,23 @@
+"use client";
+
 import { Banknote, CreditCard, Lock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import api from "@/lib/api-client";
 import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
+import {
+  FALLBACK_PAYMENT_METHODS,
+  isPaymentMethodAvailable,
+  pickFallbackPaymentMethod,
+  type PaymentMethodsMap,
+  type PaymentOption,
+} from "@/lib/paymentMethodSettings";
 
-/** Amount limit in ₹ — above this Razorpay & Cashfree are disabled (Pay on Delivery and bank methods stay available). */
+export type { PaymentOption };
+
+/** @deprecated Limits now come from admin settings. Kept for older imports. */
 export const PAYMENT_AMOUNT_LIMIT = 50000;
-
-export type PaymentOption =
-  | "razorpay"
-  | "cashfree"
-  | "cod"
-  | "neft"
-  | "sbicollect"
-  | "imagineering_credit";
 
 export interface PaymentOptionConfig {
   value: PaymentOption;
@@ -20,8 +25,6 @@ export interface PaymentOptionConfig {
   description: string;
   icon: ReactNode;
   tags?: string[];
-  /** When true, hidden if amount > PAYMENT_AMOUNT_LIMIT (online card gateways only). */
-  limitedByAmount?: boolean;
   recommended?: boolean;
 }
 
@@ -72,7 +75,6 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
     description: "UPI, credit / debit cards, net banking",
     tags: ["UPI", "Cards", "Net Banking"],
     icon: <RazorpayLogo />,
-    limitedByAmount: true,
     recommended: true,
   },
   {
@@ -81,7 +83,6 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
     description: "UPI, cards, wallets & EMI",
     tags: ["UPI", "Cards", "Wallets"],
     icon: <CashfreeLogo />,
-    limitedByAmount: true,
   },
   {
     value: "cod",
@@ -138,20 +139,77 @@ export function PaymentOptionsSelector({
   showImagineeringCredit = false,
 }: PaymentOptionsSelectorProps) {
   const amountNum = typeof amount === "number" && isFinite(amount) ? amount : 0;
-  const aboveLimit = amountNum > PAYMENT_AMOUNT_LIMIT;
-  const visibleOptions = PAYMENT_OPTIONS.filter((opt) => {
-    if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
-    return !opt.limitedByAmount || !aboveLimit;
-  });
+  const [rules, setRules] = useState<PaymentMethodsMap>(FALLBACK_PAYMENT_METHODS);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.settings
+      .getPaymentMethods()
+      .then((res) => {
+        if (cancelled || !res.success || !res.data?.methods) return;
+        const next = { ...FALLBACK_PAYMENT_METHODS };
+        for (const key of Object.keys(next) as PaymentOption[]) {
+          const raw = res.data.methods[key];
+          if (!raw) continue;
+          next[key] = {
+            enabled: raw.enabled !== false,
+            maxAmount: Number(raw.maxAmount) >= 0 ? Number(raw.maxAmount) : next[key].maxAmount,
+            message: typeof raw.message === "string" ? raw.message : "",
+          };
+        }
+        setRules(next);
+      })
+      .catch(() => {
+        /* keep fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const visibleOptions = useMemo(
+    () =>
+      PAYMENT_OPTIONS.filter((opt) => {
+        if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
+        return isPaymentMethodAvailable(opt.value, amountNum, rules);
+      }),
+    [amountNum, rules, showImagineeringCredit]
+  );
+
+  useEffect(() => {
+    if (!value) return;
+    if (isPaymentMethodAvailable(value, amountNum, rules)) return;
+    const fallback = pickFallbackPaymentMethod(amountNum, rules, value);
+    if (fallback !== value) onChange(fallback);
+  }, [amountNum, onChange, rules, value]);
+
+  const limitedNotes = useMemo(() => {
+    return PAYMENT_OPTIONS.filter((opt) => {
+      if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
+      const rule = rules[opt.value];
+      if (!rule?.enabled) return false;
+      return rule.maxAmount > 0 && amountNum > rule.maxAmount;
+    }).map((opt) => {
+      const rule = rules[opt.value];
+      return `${opt.label} up to ₹${rule.maxAmount.toLocaleString("en-IN")}`;
+    });
+  }, [amountNum, rules, showImagineeringCredit]);
 
   return (
     <div className={cn("space-y-3", className)}>
-      {aboveLimit ? (
+      {limitedNotes.length > 0 ? (
         <p className="rounded-md border border-amber-200/80 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
-          Orders above ₹50,000 cannot use Razorpay or Cashfree. Please choose Pay on Delivery, SBI Collect, or NEFT/IMPS.
+          {limitedNotes.join(". ")}. Please choose another method for this amount.
         </p>
       ) : null}
 
+      {visibleOptions.length === 0 ? (
+        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+          No payment methods are available for this amount. Please contact support.
+        </p>
+      ) : null}
+
+      {visibleOptions.length > 0 ? (
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         {visibleOptions.map((option, index) => {
           const selected = value === option.value;
@@ -171,7 +229,7 @@ export function PaymentOptionsSelector({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-slate-900">{option.label}</p>
-                  {option.recommended && !aboveLimit ? (
+                  {option.recommended ? (
                     <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700">
                       Popular
                     </span>
@@ -195,6 +253,7 @@ export function PaymentOptionsSelector({
           );
         })}
       </div>
+      ) : null}
 
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
         <Lock className="h-3 w-3 shrink-0" strokeWidth={2} />
