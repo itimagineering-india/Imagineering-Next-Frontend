@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +41,7 @@ export default function UserJobPostsDashboard() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.replace(`/login?redirect=${encodeURIComponent("/dashboard/buyer/job-posts")}`);
+      router.replace(`/login?redirect=${encodeURIComponent("/buyer/job-posts")}`);
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -121,17 +120,14 @@ export default function UserJobPostsDashboard() {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <DashboardLayout type="buyer">
-        <div className="flex min-h-[40vh] items-center justify-center p-8">
+              <div className="flex min-h-[40vh] items-center justify-center p-8">
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
-      </DashboardLayout>
-    );
+      );
   }
 
   return (
-    <DashboardLayout type="buyer">
-      <div className="page-shell">
+          <div className="page-shell">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-xl md:text-2xl font-semibold">My Job Posts</h1>
@@ -140,7 +136,7 @@ export default function UserJobPostsDashboard() {
             </p>
           </div>
           <Button size="sm" asChild>
-            <Link href="/dashboard/buyer/job-posts/new">
+            <Link href="/buyer/job-posts/new">
               <Plus className="h-4 w-4 mr-2" />
               New job
             </Link>
@@ -170,7 +166,7 @@ export default function UserJobPostsDashboard() {
                 Post your first job to get responses from trusted providers near you.
               </p>
               <Button size="sm" className="mt-3" asChild>
-                <Link href="/dashboard/buyer/job-posts/new">
+                <Link href="/buyer/job-posts/new">
                   <Plus className="h-4 w-4 mr-2" />
                   Post a job
                 </Link>
@@ -184,7 +180,7 @@ export default function UserJobPostsDashboard() {
             <Card
               key={job._id}
               className="cursor-pointer transition-colors hover:bg-muted/50"
-              onClick={() => router.push(`/dashboard/buyer/job-posts/${job._id}`)}
+              onClick={() => router.push(`/buyer/job-posts/${job._id}`)}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-3">
@@ -246,7 +242,7 @@ export default function UserJobPostsDashboard() {
                     variant="secondary"
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/dashboard/buyer/job-posts/${job._id}`);
+                      router.push(`/buyer/job-posts/${job._id}`);
                     }}
                   >
                     View applications
@@ -257,6 +253,5 @@ export default function UserJobPostsDashboard() {
           ))}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
