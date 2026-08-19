@@ -323,7 +323,7 @@ export default function UserJobDetails() {
                           <p className="text-sm font-medium">You posted this job</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             You cannot apply to your own job. View applications in{" "}
-                            <Link href="/dashboard/buyer/job-posts" className="text-primary hover:underline">
+                            <Link href="/buyer/job-posts" className="text-primary hover:underline">
                               My Job Posts
                             </Link>
                             .
