@@ -13,13 +13,16 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      // Legacy Vite buyer URLs → App Router dashboard (bookmarks, emails, mobile webviews)
-      { source: "/buyer/orders", destination: "/dashboard/buyer/orders", permanent: true },
-      { source: "/buyer/requirements", destination: "/dashboard/buyer/requirements", permanent: true },
-      { source: "/buyer/tickets", destination: "/dashboard/buyer/tickets", permanent: true },
-      { source: "/buyer/job-posts", destination: "/dashboard/buyer/job-posts", permanent: true },
-      { source: "/buyer/job-posts/new", destination: "/dashboard/buyer/job-posts/new", permanent: true },
-      { source: "/buyer/job-posts/:id", destination: "/dashboard/buyer/job-posts/:id", permanent: true },
+      // Buyer pages are independent — no dashboard shell
+      { source: "/dashboard/buyer", destination: "/buyer/orders", permanent: true },
+      { source: "/dashboard/buyer/orders", destination: "/buyer/orders", permanent: true },
+      { source: "/dashboard/buyer/requirements", destination: "/buyer/requirements", permanent: true },
+      { source: "/dashboard/buyer/tickets", destination: "/buyer/tickets", permanent: true },
+      { source: "/dashboard/buyer/tickets/:id", destination: "/buyer/tickets", permanent: true },
+      { source: "/dashboard/buyer/consumption", destination: "/buyer/consumption", permanent: true },
+      { source: "/dashboard/buyer/job-posts", destination: "/buyer/job-posts", permanent: true },
+      { source: "/dashboard/buyer/job-posts/new", destination: "/buyer/job-posts/new", permanent: true },
+      { source: "/dashboard/buyer/job-posts/:id", destination: "/buyer/job-posts/:id", permanent: true },
       // Single canonical URL for service detail (avoid duplicate content with /service/:slug)
       { source: "/services/:service", destination: "/service/:service", permanent: true },
       // Construction Materials hub
