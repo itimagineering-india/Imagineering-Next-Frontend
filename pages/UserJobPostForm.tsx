@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,7 +44,7 @@ export default function UserJobPostForm() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.replace(`/login?redirect=${encodeURIComponent("/dashboard/buyer/job-posts/new")}`);
+      router.replace(`/login?redirect=${encodeURIComponent("/buyer/job-posts/new")}`);
     }
   }, [authLoading, isAuthenticated, router]);
 
@@ -105,15 +104,13 @@ export default function UserJobPostForm() {
 
   if (authLoading) {
     return (
-      <DashboardLayout type="buyer">
-        <div className="flex min-h-[40vh] items-center justify-center p-8">
+              <div className="flex min-h-[40vh] items-center justify-center p-8">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-sm text-muted-foreground">Loading...</p>
           </div>
         </div>
-      </DashboardLayout>
-    );
+      );
   }
 
   if (!isAuthenticated) {
@@ -188,7 +185,7 @@ export default function UserJobPostForm() {
           title: "Job posted",
           description: "Your job is now visible to nearby providers.",
         });
-        router.push("/dashboard/buyer/job-posts");
+        router.push("/buyer/job-posts");
       } else {
         toast({
           title: "Error",
@@ -208,10 +205,9 @@ export default function UserJobPostForm() {
   };
 
   return (
-    <DashboardLayout type="buyer">
-      <div className="w-full max-w-2xl mx-auto px-4 py-6 md:py-10">
+          <div className="w-full max-w-2xl mx-auto px-4 py-6 md:py-12">
         <Button variant="ghost" size="sm" className="mb-4 -ml-2" asChild>
-          <Link href="/dashboard/buyer/job-posts">
+          <Link href="/buyer/job-posts">
             ← My job posts
           </Link>
         </Button>
@@ -272,9 +268,9 @@ export default function UserJobPostForm() {
               <div className="space-y-2">
                 <Label htmlFor="address">Address / Location *</Label>
                 <div className="relative">
-                  <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground z-10" />
+                  <MapPin className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground z-10" />
                   {!mapsLoaded && (
-                    <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground animate-spin z-10" />
+                    <Loader2 className="absolute right-2.5 top-3 h-4 w-4 text-muted-foreground animate-spin z-10" />
                   )}
                   <Input
                     id="address"
@@ -283,7 +279,7 @@ export default function UserJobPostForm() {
                         ? "Start typing for address suggestions (street, area, city)"
                         : "Loading location services..."
                     }
-                    className="pl-9 pr-9"
+                    className="pl-12 pr-12"
                     value={form.address}
                     onChange={(e) => {
                       setForm((f) => ({ ...f, address: e.target.value }));
@@ -305,7 +301,7 @@ export default function UserJobPostForm() {
                         <button
                           key={s.id || i}
                           type="button"
-                          className="w-full px-3 py-2.5 text-left text-sm hover:bg-muted transition-colors first:rounded-t-md last:rounded-b-md"
+                          className="w-full px-3 py-3 text-left text-sm hover:bg-muted transition-colors first:rounded-t-md last:rounded-b-md"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             selectSuggestion(s);
@@ -339,10 +335,10 @@ export default function UserJobPostForm() {
               <div className="space-y-2">
                 <Label htmlFor="durationText">Estimated duration</Label>
                 <div className="relative">
-                  <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Clock className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="durationText"
-                    className="pl-7"
+                    className="pl-8"
                     placeholder='e.g. "2 days", "3 hours", "Monthly"'
                     value={form.durationText}
                     onChange={(e) => setForm((f) => ({ ...f, durationText: e.target.value }))}
@@ -362,13 +358,12 @@ export default function UserJobPostForm() {
                   {isSubmitting ? "Posting..." : "Post job"}
                 </Button>
                 <Button type="button" variant="outline" asChild>
-                  <Link href="/dashboard/buyer/job-posts">View my jobs</Link>
+                  <Link href="/buyer/job-posts">View my jobs</Link>
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
   );
 }
