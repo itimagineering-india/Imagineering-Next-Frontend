@@ -364,7 +364,7 @@ export function Header() {
   const role = user.role || "buyer";
   if (role === "admin") return "/dashboard/admin";
   if (role === "provider") return "/dashboard/provider";
-  return "/dashboard/buyer/orders"; // Buyer goes to orders page
+  return "/buyer/orders"; // Buyer goes to orders page
  };
 
  const getUserInitials = () => {
@@ -1111,27 +1111,33 @@ export function Header() {
           {user.role === "buyer" && (
            <>
             <DropdownMenuItem asChild>
-             <Link href="/dashboard/buyer/orders" className="flex items-center cursor-pointer">
+             <Link href="/buyer/orders" className="flex items-center cursor-pointer">
               <LayoutDashboard className="mr-2 h-4 w-4" />
               {t("services:myOrders")}
              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-             <Link href="/dashboard/buyer/requirements" className="flex items-center cursor-pointer">
+             <Link href="/buyer/requirements" className="flex items-center cursor-pointer">
               <FileText className="mr-2 h-4 w-4" />
               {t("services:myRequirements")}
              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-             <Link href="/dashboard/buyer/job-posts/new" className="flex items-center cursor-pointer">
+             <Link href="/buyer/job-posts/new" className="flex items-center cursor-pointer">
               <Briefcase className="mr-2 h-4 w-4" />
               {t("services:postJob")}
              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-             <Link href="/dashboard/buyer/job-posts" className="flex items-center cursor-pointer">
+             <Link href="/buyer/job-posts" className="flex items-center cursor-pointer">
               <FileText className="mr-2 h-4 w-4" />
               {t("services:myJobPosts")}
+             </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+             <Link href="/buyer/tickets" className="flex items-center cursor-pointer">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              {t("services:myTickets")}
              </Link>
             </DropdownMenuItem>
            </>
@@ -1294,32 +1300,39 @@ export function Header() {
            {user.role === "buyer" && (
             <>
              <Link
-              href="/dashboard/buyer/orders"
+              href="/buyer/orders"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
               {t("services:myOrders")}
              </Link>
              <Link
-              href="/dashboard/buyer/requirements"
+              href="/buyer/requirements"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
               {t("services:myRequirements")}
              </Link>
              <Link
-              href="/dashboard/buyer/job-posts/new"
+              href="/buyer/job-posts/new"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
               {t("services:postJob")}
              </Link>
              <Link
-              href="/dashboard/buyer/job-posts"
+              href="/buyer/job-posts"
               className="subtitle"
               onClick={() => setIsOpen(false)}
              >
               {t("services:myJobPosts")}
+             </Link>
+             <Link
+              href="/buyer/tickets"
+              className="subtitle"
+              onClick={() => setIsOpen(false)}
+             >
+              {t("services:myTickets")}
              </Link>
             </>
            )}
