@@ -31,7 +31,6 @@ import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPic
 import { CartOffersModal } from "@/components/cart/CartOffersModal";
 import {
   PaymentOptionsSelector,
-  PAYMENT_AMOUNT_LIMIT,
   type PaymentOption,
 } from "@/components/payments/PaymentOptionsSelector";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
@@ -209,12 +208,6 @@ export function ManpowerCheckoutClient() {
   }, []);
 
   const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(payableTotal);
-
-  useEffect(() => {
-    if (payableTotal > PAYMENT_AMOUNT_LIMIT && (paymentMethod === "razorpay" || paymentMethod === "cashfree")) {
-      setPaymentMethod("cod");
-    }
-  }, [paymentMethod, payableTotal]);
 
   const addressLine = useMemo(
     () => (selectedAddress ? formatSavedAddressLine(selectedAddress) : ""),
