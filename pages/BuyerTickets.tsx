@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -244,8 +243,7 @@ export default function BuyerTickets() {
   const canReply = selectedTicket && !["Closed", "Resolved"].includes(selectedTicket.status);
 
   return (
-    <DashboardLayout type="buyer">
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+          <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">My Support Tickets</h1>
@@ -403,7 +401,6 @@ export default function BuyerTickets() {
           onReply={handleReply}
         />
       </div>
-    </DashboardLayout>
   );
 }
 
