@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingDown, TrendingUp, Minus, BarChart3 } from "lucide-react";
@@ -41,8 +40,7 @@ export default function BuyerConsumptionPage() {
         : Minus;
 
   return (
-    <DashboardLayout type="buyer">
-      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+          <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Consumption Insights</h1>
           <p className="text-sm text-muted-foreground">
@@ -126,6 +124,5 @@ export default function BuyerConsumptionPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }
