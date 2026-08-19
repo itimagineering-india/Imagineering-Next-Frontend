@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle2, ChevronLeft, Loader2, Package } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronLeft, FilePenLine, Loader2, Package } from "lucide-react";
+import { MultiStepServiceForm } from "@/components/services/form";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -87,6 +88,7 @@ export function CatalogProductsPage({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ subcategory?: string; products?: string }>({});
+  const [customFormOpen, setCustomFormOpen] = useState(false);
 
   const isEdit = mode === "edit";
 
@@ -372,7 +374,20 @@ export function CatalogProductsPage({
             <p className="text-sm text-destructive">{errors.subcategory}</p>
           )}
 
-          <div className="flex justify-end pt-2">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+            {!isEdit ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-muted-foreground"
+                onClick={() => setCustomFormOpen(true)}
+              >
+                <FilePenLine className="mr-2 h-4 w-4" />
+                Can&apos;t find it? Add a custom listing
+              </Button>
+            ) : (
+              <span />
+            )}
             <Button onClick={goToProducts} disabled={!subcategory.trim()} className="min-w-[120px]">
               Next
             </Button>
@@ -419,6 +434,18 @@ export function CatalogProductsPage({
                   Back
                 </Button>
               )}
+              {!isEdit && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-muted-foreground hidden sm:inline-flex"
+                  onClick={() => setCustomFormOpen(true)}
+                  disabled={submitting}
+                >
+                  <FilePenLine className="mr-2 h-4 w-4" />
+                  Custom listing
+                </Button>
+              )}
               <Button
                 className="flex-1"
                 onClick={handleSubmit}
@@ -441,6 +468,27 @@ export function CatalogProductsPage({
           </div>
         </div>
       )}
+
+      {category && !isEdit ? (
+        <MultiStepServiceForm
+          open={customFormOpen}
+          onOpenChange={setCustomFormOpen}
+          categories={[category]}
+          providerPrimaryCategoryId={category._id}
+          onSuccess={() => {
+            setCustomFormOpen(false);
+            router.push("/dashboard/provider/services");
+          }}
+          initialData={
+            subcategory.trim()
+              ? {
+                  category: category._id,
+                  subcategory,
+                }
+              : { category: category._id }
+          }
+        />
+      ) : null}
     </div>
   );
 }
