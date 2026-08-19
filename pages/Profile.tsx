@@ -580,14 +580,17 @@ const Profile = () => {
   }
 
   const quickActions = [
-    { label: "Orders", href: "/dashboard/buyer/orders", icon: ShoppingBag },
+    { label: "Orders", href: "/buyer/orders", icon: ShoppingBag },
     { label: IMAGINEERING_CREDIT.name, href: IMAGINEERING_CREDIT.href, icon: CreditCard },
     { label: IMAGINEERING_WALLET.name, href: IMAGINEERING_WALLET.href, icon: WalletIcon },
     ...(user?.role === "buyer"
       ? [{ label: "Subscription", href: "/subscriptions/buyer", icon: Crown }]
       : []),
-    { label: "Post Job", href: "/dashboard/buyer/job-posts/new", icon: Briefcase },
-    { label: "My Job Posts", href: "/dashboard/buyer/job-posts", icon: ClipboardList },
+    { label: "Post Job", href: "/buyer/job-posts/new", icon: Briefcase },
+    { label: "My Job Posts", href: "/buyer/job-posts", icon: ClipboardList },
+    { label: "Requirements", href: "/buyer/requirements", icon: ClipboardList },
+    { label: "Tickets", href: "/buyer/tickets", icon: HelpCircle },
+    { label: "Insights", href: "/buyer/consumption", icon: TrendingUp },
     { label: "Favorites", href: "/profile#favorites", icon: Heart },
     { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Help", href: "/help", icon: HelpCircle },
@@ -855,7 +858,7 @@ const Profile = () => {
                   <CardDescription className="text-xs md:text-sm">Your latest service requests</CardDescription>
                 </div>
                 <Button variant="ghost" size="sm" className="text-xs md:text-sm self-start sm:self-auto" asChild>
-                  <Link href="/dashboard/buyer/orders">View all</Link>
+                  <Link href="/buyer/orders">View all</Link>
                 </Button>
               </CardHeader>
               <CardContent className="p-4 sm:p-6 pt-0">
