@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Check, CheckCircle2, ChevronLeft, Loader2, Search } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, ChevronLeft, FilePenLine, Loader2, Search } from "lucide-react";
+import { MultiStepServiceForm } from "@/components/services/form";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -105,6 +106,7 @@ export function ManpowerCatalogPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ worker?: string; tasks?: string }>({});
+  const [customFormOpen, setCustomFormOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -408,6 +410,16 @@ export function ManpowerCatalogPage() {
           )}
 
           {errors.worker && <p className="text-sm text-destructive">{errors.worker}</p>}
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={() => setCustomFormOpen(true)}
+          >
+            <FilePenLine className="mr-2 h-4 w-4" />
+            Can&apos;t find it? Add a custom listing
+          </Button>
         </div>
       ) : (
         <div className="space-y-6">
@@ -490,6 +502,16 @@ export function ManpowerCatalogPage() {
                 Back
               </Button>
               <Button
+                type="button"
+                variant="ghost"
+                className="text-muted-foreground hidden sm:inline-flex"
+                onClick={() => setCustomFormOpen(true)}
+                disabled={submitting}
+              >
+                <FilePenLine className="mr-2 h-4 w-4" />
+                Custom listing
+              </Button>
+              <Button
                 className="flex-1"
                 onClick={() => void handleSubmit()}
                 disabled={submitting || selectedTasks.length === 0}
@@ -509,6 +531,24 @@ export function ManpowerCatalogPage() {
           </div>
         </div>
       )}
+
+      {category ? (
+        <MultiStepServiceForm
+          open={customFormOpen}
+          onOpenChange={setCustomFormOpen}
+          categories={[category]}
+          providerPrimaryCategoryId={category._id}
+          onSuccess={() => {
+            setCustomFormOpen(false);
+            router.push("/dashboard/provider/services");
+          }}
+          initialData={
+            selectedWorker
+              ? { category: category._id, subcategory: selectedWorker.label }
+              : { category: category._id }
+          }
+        />
+      ) : null}
     </div>
   );
 }
