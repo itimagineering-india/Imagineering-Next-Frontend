@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,7 +72,7 @@ export default function UserJobPostDetail() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.replace(`/login?redirect=${encodeURIComponent(`/dashboard/buyer/job-posts/${id || ""}`)}`);
+      router.replace(`/login?redirect=${encodeURIComponent(`/buyer/job-posts/${id || ""}`)}`);
     }
   }, [authLoading, isAuthenticated, router, id]);
 
@@ -91,7 +90,7 @@ export default function UserJobPostDetail() {
           description: res.error?.message || "Please try again.",
           variant: "destructive",
         });
-        router.push("/dashboard/buyer/job-posts");
+        router.push("/buyer/job-posts");
       }
     } catch (err: unknown) {
       toast({
@@ -99,7 +98,7 @@ export default function UserJobPostDetail() {
         description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       });
-      router.push("/dashboard/buyer/job-posts");
+      router.push("/buyer/job-posts");
     } finally {
       setIsLoading(false);
     }
@@ -150,29 +149,24 @@ export default function UserJobPostDetail() {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <DashboardLayout type="buyer">
-        <div className="flex min-h-[40vh] items-center justify-center p-8">
+              <div className="flex min-h-[40vh] items-center justify-center p-8">
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
-      </DashboardLayout>
-    );
+      );
   }
 
   if (isLoading || !job) {
     return (
-      <DashboardLayout type="buyer">
-        <div className="flex min-h-[40vh] items-center justify-center p-8">
+              <div className="flex min-h-[40vh] items-center justify-center p-8">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      </DashboardLayout>
-    );
+      );
   }
 
   return (
-    <DashboardLayout type="buyer">
-      <div className="page-shell">
+          <div className="page-shell">
         <Button variant="ghost" size="sm" className="mb-4 -ml-2" asChild>
-          <Link href="/dashboard/buyer/job-posts">
+          <Link href="/buyer/job-posts">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to My Job Posts
           </Link>
@@ -342,6 +336,5 @@ export default function UserJobPostDetail() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
