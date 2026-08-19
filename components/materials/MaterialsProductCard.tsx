@@ -35,7 +35,7 @@ export function MaterialsProductCard({ product, onCta, ctaLabel, ctaLoading }: P
           <p className="truncate text-[10px] font-bold uppercase tracking-wide text-orange-600">
             {product.brand}
           </p>
-          <p className="line-clamp-2 h-[2.5em] text-xs font-bold leading-[1.25] text-slate-900">
+          <p className="truncate text-xs font-bold leading-[1.25] text-slate-900">
             {product.name}
           </p>
           <p className="truncate text-xs font-semibold text-slate-900">{product.priceRange}</p>
