@@ -3207,6 +3207,10 @@ export const api = {
       apiRequest<{ accountName: string; accountNo: string; ifsc: string; upi: string }>('/api/settings/neft-bank-details'),
     getSbiCollectDetails: () =>
       apiRequest<{ paymentLink?: string; instructions?: string }>('/api/settings/sbicollect-details'),
+    getPaymentMethods: () =>
+      apiRequest<{ methods: Record<string, { enabled?: boolean; maxAmount?: number; message?: string }> }>(
+        '/api/settings/payment-methods'
+      ),
   },
 
   // Cart (longer timeout: pricing + populate can be slow)
