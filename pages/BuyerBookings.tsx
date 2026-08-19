@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -370,7 +369,7 @@ export default function BuyerBookings() {
     const subject = `Booking Support: ${booking.service?.title || "Service"} (${formatBookingId(
       booking._id
     )})`;
-    router.push(`/dashboard/buyer/tickets?orderId=${encodeURIComponent(booking._id)}&subject=${encodeURIComponent(subject)}`);
+    router.push(`/buyer/tickets?orderId=${encodeURIComponent(booking._id)}&subject=${encodeURIComponent(subject)}`);
   };
 
   const formatBookingId = (id?: string) => {
@@ -981,8 +980,7 @@ export default function BuyerBookings() {
   };
 
   return (
-    <DashboardLayout type="buyer">
-      <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
+          <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
           <div>
@@ -1944,6 +1942,5 @@ export default function BuyerBookings() {
         </Dialog>
 
       </div>
-    </DashboardLayout>
   );
 }
