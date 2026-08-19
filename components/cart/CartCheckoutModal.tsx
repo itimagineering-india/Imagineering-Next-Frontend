@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
-import { PaymentOptionsSelector, type PaymentOption, PAYMENT_AMOUNT_LIMIT } from "@/components/payments/PaymentOptionsSelector";
+import { PaymentOptionsSelector, type PaymentOption } from "@/components/payments/PaymentOptionsSelector";
 import api from "@/lib/api-client";
 import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import {
@@ -212,15 +212,6 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     () => savedAddresses.find((s) => s.id === selectedAddressId) ?? null,
     [savedAddresses, selectedAddressId],
   );
-
-  // When amount exceeds limit, switch to sbicollect if currently on limited methods
-  useEffect(() => {
-    if (amount > PAYMENT_AMOUNT_LIMIT && ["razorpay", "cashfree"].includes(paymentMethod)) {
-      setPaymentMethod("sbicollect");
-      setNeftReceiptFile(null);
-      setSbiCollectReceiptFile(null);
-    }
-  }, [amount, paymentMethod]);
 
   // Fetch NEFT bank details from backend when NEFT is selected (security: not in frontend)
   useEffect(() => {
