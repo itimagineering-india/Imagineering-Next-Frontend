@@ -17,10 +17,31 @@ export function isConstructionMaterialsCategorySlug(slug: string | undefined): b
   return normalizeCategorySlugLikeApp(slug || "") === "construction-materials";
 }
 
-const TRADERS_CATEGORY_SLUGS = new Set(["traders", "b2b-traders", "vendors", "b2b-trader"]);
+const TRADERS_CATEGORY_SLUGS = new Set([
+  "traders",
+  "b2b-traders",
+  "vendors",
+  "b2b-trader",
+  "b2b",
+  "b2b-services",
+]);
+
+export const CONSTRUCTION_MATERIALS_CATALOG_SLUG = "construction-materials";
+
+/** Fallback labels when the Construction Materials category is missing or only has B2B channel names. */
+export const DEFAULT_CONSTRUCTION_MATERIAL_TYPES = [
+  "Cement & Concrete",
+  "Steel & Iron",
+  "Bricks & Blocks",
+  "Sand",
+  "Aggregate",
+  "Tiles & Flooring",
+  "Paint & Finishes",
+] as const;
 
 export function isTradersCategorySlug(slug: string | undefined): boolean {
-  return TRADERS_CATEGORY_SLUGS.has(normalizeCategorySlugLikeApp(slug || ""));
+  const s = normalizeCategorySlugLikeApp(slug || "");
+  return TRADERS_CATEGORY_SLUGS.has(s) || s.includes("trader");
 }
 
 export function isMaterialSupplierSubcategory(subcategory: string): boolean {
@@ -34,6 +55,15 @@ export function isMaterialSupplierSubcategory(subcategory: string): boolean {
     n.includes("construction material") ||
     n === "cement & concrete"
   );
+}
+
+export function isB2bMaterialSuppliersSubcategory(subcategory: string): boolean {
+  const n = String(subcategory || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!n) return false;
+  return n.includes("material supplier");
 }
 
 export function shouldShowConstructionMaterialFields(
@@ -55,13 +85,62 @@ export function resolveMaterialTypeKeyForServiceForm(
   subcategory: string,
   itemType: string,
 ): string {
-  if (isConstructionMaterialsCategorySlug(categorySlug)) {
+  if (isConstructionMaterialsCategorySlug(categorySlug) && !isB2bMaterialSuppliersSubcategory(subcategory)) {
     return resolveConstructionMaterialTypeKeyFromSubcategory(subcategory);
   }
-  if (isTradersCategorySlug(categorySlug) && isMaterialSupplierSubcategory(subcategory)) {
+  if (isB2bMaterialSuppliersSubcategory(subcategory) || (isTradersCategorySlug(categorySlug) && isMaterialSupplierSubcategory(subcategory))) {
     return resolveConstructionMaterialTypeKeySlugOnly(itemType);
   }
   return "";
+}
+
+/**
+ * B2B Material Suppliers share the Construction Materials catalog (same SKUs).
+ * Do not query traders / "Material Suppliers" as if it were a product subcategory.
+ */
+export function usesSharedConstructionMaterialsCatalog(
+  categorySlug: string | undefined,
+  subcategory: string,
+): boolean {
+  if (isB2bMaterialSuppliersSubcategory(subcategory)) return true;
+  return isTradersCategorySlug(categorySlug) && isB2bMaterialSuppliersSubcategory(subcategory);
+}
+
+export function resolveProductCatalogListParams(
+  categorySlug: string | undefined,
+  subcategory: string,
+  itemType = "",
+): { categorySlug: string; subcategory?: string; materialTypeKey?: string } {
+  const slug = normalizeCategorySlugLikeApp(categorySlug || "");
+  const sub = String(subcategory || "").trim();
+  const item = String(itemType || "").trim();
+
+  if (usesSharedConstructionMaterialsCatalog(slug, sub)) {
+    const keySource = item && !isB2bMaterialSuppliersSubcategory(item) ? item : "";
+    if (keySource) {
+      return {
+        categorySlug: CONSTRUCTION_MATERIALS_CATALOG_SLUG,
+        materialTypeKey: resolveConstructionMaterialTypeKeyFromSubcategory(keySource),
+      };
+    }
+    return { categorySlug: CONSTRUCTION_MATERIALS_CATALOG_SLUG };
+  }
+
+  if (isConstructionMaterialsCategorySlug(slug)) {
+    return {
+      categorySlug: CONSTRUCTION_MATERIALS_CATALOG_SLUG,
+      materialTypeKey: resolveConstructionMaterialTypeKeyFromSubcategory(sub),
+    };
+  }
+
+  const materialTypeKey = resolveMaterialTypeKeyForServiceForm(slug, sub, item);
+  if (materialTypeKey) {
+    return { categorySlug: slug, materialTypeKey };
+  }
+  return {
+    categorySlug: slug,
+    ...(sub ? { subcategory: sub } : {}),
+  };
 }
 
 /** Keys stored in provider form `dynamicData` and sent inside `metadata` on submit */
