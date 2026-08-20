@@ -335,6 +335,7 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
           serviceId={quoteService.id}
           serviceTitle={quoteService.title}
           priceType={quoteService.priceType}
+          noCountdown
         />
       ) : null}
     </div>
