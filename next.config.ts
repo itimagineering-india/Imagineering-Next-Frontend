@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
       // Construction Materials hub
       { source: "/category/construction-materials", destination: "/construction-materials", permanent: false },
       { source: "/category/manpower", destination: "/manpower", permanent: false },
+      { source: "/category/b2b-services", destination: "/b2b-services", permanent: false },
       { source: "/dashboard/imagineering-credit", destination: "/imagineering-credit", permanent: true },
     ];
   },
