@@ -7,13 +7,16 @@ import { ManpowerCatalogPage } from "@/components/services/catalog/ManpowerCatal
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { isManpowerCategorySlug } from "@/lib/manpowerCatalog";
+import { isMachineRentalCategorySlug } from "@/lib/machineRental";
+import { MachineRentalFormPage } from "@/components/services/catalog/MachineRentalFormPage";
 
 export async function getServerSideProps() {
   return { props: {} };
 }
 
-type CatalogKind = "cm" | "manpower" | "unknown";
+type CatalogKind = "cm" | "manpower" | "rental" | "unknown";
 
 export default function ProviderAddCatalogProducts() {
   const { user } = useAuth();
@@ -65,8 +68,10 @@ export default function ProviderAddCatalogProducts() {
 
         if (isManpowerCategorySlug(slug)) {
           setKind("manpower");
-        } else if (isConstructionMaterialsCategorySlug(slug)) {
+        } else if (isConstructionMaterialsCategorySlug(slug) || isB2bCategorySlug(slug)) {
           setKind("cm");
+        } else if (isMachineRentalCategorySlug(slug)) {
+          setKind("rental");
         } else {
           setKind("unknown");
         }
@@ -89,6 +94,10 @@ export default function ProviderAddCatalogProducts() {
 
   if (kind === "manpower") {
     return <ManpowerCatalogPage />;
+  }
+
+  if (kind === "rental") {
+    return <MachineRentalFormPage />;
   }
 
   return <CatalogProductsPage mode="add" />;
