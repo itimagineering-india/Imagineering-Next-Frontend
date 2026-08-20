@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { Users, ClipboardCheck, MapPin, Star } from "lucide-react";
+import { Users, MapPin, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { GlobeAnalytics } from "@/components/ui/cobe-globe-analytics";
+import { GlobeAnalytics, type AnalyticsMarker } from "@/components/ui/cobe-globe-analytics";
+import type { ProviderGlobeMarker } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const STATS = [
@@ -13,11 +14,6 @@ const STATS = [
     icon: Users,
     valueKey: "trustStats.providers.value",
     labelKey: "trustStats.providers.label",
-  },
-  {
-    icon: ClipboardCheck,
-    valueKey: "trustStats.projects.value",
-    labelKey: "trustStats.projects.label",
   },
   {
     icon: MapPin,
@@ -39,14 +35,25 @@ const AVATARS = [
   "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=96&h=96&fit=crop&crop=face",
 ] as const;
 
-const INDIA_MARKERS = [
-  { id: "del", location: [28.6139, 77.209] as [number, number], visitors: 0, trend: 0 },
-  { id: "mum", location: [19.076, 72.8777] as [number, number], visitors: 0, trend: 0 },
-  { id: "blr", location: [12.9716, 77.5946] as [number, number], visitors: 0, trend: 0 },
-  { id: "hyd", location: [17.385, 78.4867] as [number, number], visitors: 0, trend: 0 },
-  { id: "chn", location: [13.0827, 80.2707] as [number, number], visitors: 0, trend: 0 },
-  { id: "kol", location: [22.5726, 88.3639] as [number, number], visitors: 0, trend: 0 },
+const FALLBACK_MARKERS: AnalyticsMarker[] = [
+  { id: "del", location: [28.6139, 77.209], visitors: 0, trend: 0, label: "Delhi" },
+  { id: "mum", location: [19.076, 72.8777], visitors: 0, trend: 0, label: "Mumbai" },
+  { id: "blr", location: [12.9716, 77.5946], visitors: 0, trend: 0, label: "Bengaluru" },
+  { id: "hyd", location: [17.385, 78.4867], visitors: 0, trend: 0, label: "Hyderabad" },
+  { id: "chn", location: [13.0827, 80.2707], visitors: 0, trend: 0, label: "Chennai" },
+  { id: "kol", location: [22.5726, 88.3639], visitors: 0, trend: 0, label: "Kolkata" },
 ];
+
+function toGlobeMarkers(rows: ProviderGlobeMarker[]): AnalyticsMarker[] {
+  return rows.map((row) => ({
+    id: row.id,
+    location: [row.lat, row.lng],
+    visitors: row.count,
+    trend: 0,
+    label: row.city || undefined,
+    size: row.size ?? Math.min(0.11, 0.028 + Math.sqrt(Math.max(1, row.count)) * 0.012),
+  }));
+}
 
 type ParsedStat = {
   end: number;
@@ -155,9 +162,14 @@ function StatValue({
   );
 }
 
-export function TrustStatsSection() {
+export function TrustStatsSection({
+  globeMarkers = [],
+}: {
+  globeMarkers?: ProviderGlobeMarker[];
+}) {
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
   const { t } = useTranslation("home");
+  const markers = globeMarkers.length > 0 ? toGlobeMarkers(globeMarkers) : FALLBACK_MARKERS;
 
   return (
     <section className="relative pb-8 md:pb-10">
@@ -178,7 +190,7 @@ export function TrustStatsSection() {
           />
 
           <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6 lg:gap-8">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 sm:gap-x-6 md:flex md:flex-1 md:items-center md:justify-between md:gap-4 min-w-0">
+            <div className="grid grid-cols-3 gap-x-4 gap-y-4 sm:gap-x-6 md:flex md:flex-1 md:items-center md:justify-between md:gap-4 min-w-0">
               {STATS.map((stat, i) => {
                 const Icon = stat.icon;
                 const isRating = stat.icon === Star;
@@ -223,18 +235,19 @@ export function TrustStatsSection() {
 
             <div
               className={cn(
-                "flex items-center justify-center gap-4 md:shrink-0 md:pl-2 transition-all duration-700",
+                "flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4 md:shrink-0 md:pl-2 transition-all duration-700",
                 isVisible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
               )}
               style={{ transitionDelay: "520ms" }}
             >
-              <div className="h-[112px] w-[112px] shrink-0 sm:h-[132px] sm:w-[132px]">
+              <div className="h-[200px] w-[200px] shrink-0 sm:h-[240px] sm:w-[240px] md:h-[280px] md:w-[280px]">
                 {isVisible ? (
                   <GlobeAnalytics
                     className="w-full"
-                    markers={INDIA_MARKERS}
-                    speed={0.0025}
+                    markers={markers}
+                    speed={0.002}
                     showLabels={false}
+                    liveUpdates={false}
                     phiStart={2.72}
                   />
                 ) : null}
