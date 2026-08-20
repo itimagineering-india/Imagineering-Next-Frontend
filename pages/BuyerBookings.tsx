@@ -77,7 +77,15 @@ interface Booking {
   paymentStatus: "pending" | "partial" | "paid" | "failed" | "refunded";
   totalAmount: number;
   outstandingAmount?: number;
+  couponCode?: string;
+  couponDiscount?: number;
+  creditsApplied?: number;
+  creditsDiscountInr?: number;
+  quoteDeliveryCharge?: number;
+  quoteDeliveryOption?: string;
+  transport?: string;
   metadata?: {
+    source?: string;
     buyerGST?: string;
     buyerPAN?: string;
     providerGST?: string;
@@ -85,6 +93,17 @@ interface Booking {
     providerPAN?: string;
     previousTotalAmountWithGst?: number;
     totalAmountWithGst?: number;
+    quoteProductAmount?: number;
+    quoteGstAmount?: number;
+    quoteGstPercent?: number;
+    quoteDeliveryCharge?: number;
+    quoteQuotedDeliveryCharge?: number;
+    quoteDeliveryOption?: string;
+    transport?: string;
+    couponCode?: string;
+    couponDiscount?: number;
+    creditsApplied?: number;
+    creditsDiscountInr?: number;
   };
   location?: {
     address: string;
@@ -191,6 +210,11 @@ export default function BuyerBookings() {
         (bookingRes.data as any).booking ||
         (bookingRes.data as any).data?.booking ||
         (bookingRes.data as any);
+
+      if (bookingData && (bookingData._id || bookingData.id)) {
+        setSelectedBooking(normalizeBookingDetail(bookingData));
+      }
+
       const meta = bookingData?.metadata || {};
 
       if (!meta.providerInvoiceFileUrl) return;
@@ -511,11 +535,74 @@ export default function BuyerBookings() {
   const getPlatformFeeGst = (booking: Booking) =>
     Math.round(getPlatformFee(booking) * 0.18 * 100) / 100;
 
-  const getGst = (booking: Booking) =>
-    Number((getServiceGst(booking) + getPlatformFeeGst(booking)).toFixed(2));
+  const formatBillInr = (amount: number) =>
+    `₹${Number(amount || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
 
-  const getComputedTotal = (booking: Booking) =>
-    Number((getSubtotal(booking) + getPlatformFee(booking) + getGst(booking)).toFixed(2));
+  const getDeliveryBill = (booking: Booking) => {
+    const meta = booking.metadata || {};
+    const charged = Number(booking.quoteDeliveryCharge ?? meta.quoteDeliveryCharge) || 0;
+    const quoted = Number(meta.quoteQuotedDeliveryCharge) || 0;
+    const option = String(booking.quoteDeliveryOption || meta.quoteDeliveryOption || "").toLowerCase();
+    const transport = String(booking.transport || meta.transport || "").toLowerCase();
+    if (transport === "self_pickup") {
+      return { label: "Delivery (self pickup)", value: formatBillInr(0) };
+    }
+    if (charged > 0 || option === "paid") {
+      return { label: "Delivery", value: formatBillInr(charged || quoted) };
+    }
+    if (option === "not_available") return { label: "Delivery", value: "Not available" };
+    if (option === "free" || meta.source === "quote_request") {
+      return { label: "Delivery", value: "Free" };
+    }
+    return { label: "Delivery", value: formatBillInr(charged) };
+  };
+
+  const getCouponDiscount = (booking: Booking) => {
+    const n = Number(booking.couponDiscount ?? booking.metadata?.couponDiscount ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
+  const getWalletDiscount = (booking: Booking) => {
+    const n = Number(
+      booking.creditsDiscountInr ??
+        booking.metadata?.creditsDiscountInr ??
+        booking.creditsApplied ??
+        booking.metadata?.creditsApplied ??
+        0
+    );
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
+  const isQuoteBooking = (booking: Booking) =>
+    booking.metadata?.source === "quote_request" ||
+    Number(booking.metadata?.quoteProductAmount || 0) > 0 ||
+    Boolean(booking.metadata?.quoteDeliveryOption);
+
+  const getComputedTotal = (booking: Booking) => {
+    const stored = Number(booking.totalAmount);
+    const coupon = getCouponDiscount(booking);
+    const wallet = getWalletDiscount(booking);
+    const serviceGst = isQuoteBooking(booking) ? 0 : getServiceGst(booking);
+    const gross = Number(
+      (
+        getSubtotal(booking) +
+        getPlatformFee(booking) +
+        getPlatformFeeGst(booking) +
+        serviceGst
+      ).toFixed(2)
+    );
+    const discounted = Number((Math.max(0, gross - coupon - wallet)).toFixed(2));
+    if (Number.isFinite(stored) && stored > 0) {
+      if ((coupon > 0 || wallet > 0) && stored > discounted + 0.05) {
+        return discounted;
+      }
+      return stored;
+    }
+    return discounted;
+  };
 
   const getTotal = (booking: Booking) => getComputedTotal(booking);
 
@@ -604,12 +691,24 @@ export default function BuyerBookings() {
       },
       services,
       metadata: {
+        ...(booking.metadata && typeof booking.metadata === "object" ? booking.metadata : {}),
         buyerGST: booking.metadata?.buyerGST || booking.metadata?.buyerGSTIN || "",
         buyerPAN: booking.metadata?.buyerPAN || "",
         providerGST: booking.metadata?.providerGST || "",
+        providerGSTRegistered: Boolean(booking.metadata?.providerGSTRegistered),
         providerPAN: booking.metadata?.providerPAN || "",
         previousTotalAmountWithGst: booking.metadata?.previousTotalAmountWithGst || 0,
       },
+      couponCode: booking.couponCode || booking.metadata?.couponCode,
+      couponDiscount: Number(booking.couponDiscount ?? booking.metadata?.couponDiscount ?? 0) || 0,
+      creditsApplied: Number(booking.creditsApplied ?? booking.metadata?.creditsApplied ?? 0) || 0,
+      creditsDiscountInr:
+        Number(booking.creditsDiscountInr ?? booking.metadata?.creditsDiscountInr ?? 0) || 0,
+      quoteDeliveryCharge: Number(
+        booking.quoteDeliveryCharge ?? booking.metadata?.quoteDeliveryCharge ?? 0
+      ),
+      quoteDeliveryOption: booking.quoteDeliveryOption || booking.metadata?.quoteDeliveryOption,
+      transport: booking.transport || booking.metadata?.transport,
       providerGST: booking.providerGST || booking.provider?.gstNumber || "",
       providerPAN: booking.providerPAN || booking.provider?.panNumber || "",
       date: bookingDate,
@@ -1476,23 +1575,72 @@ export default function BuyerBookings() {
                               </div>
                             ))}
                           </div>
-                        <div className="px-3 py-2 text-sm border-t">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Subtotal</span>
-                            <span>₹{getSubtotal(selectedBooking).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Platform Fee (incl. GST)</span>
-                            <span>
-                              ₹{(getPlatformFee(selectedBooking) + getPlatformFeeGst(selectedBooking)).toLocaleString()}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">GST (18%)</span>
-                            <span>
-                              ₹{getGst(selectedBooking).toLocaleString()}
-                            </span>
-                          </div>
+                        <div className="px-3 py-2 text-sm border-t space-y-1">
+                                {(() => {
+                                  const delivery = getDeliveryBill(selectedBooking);
+                                  const quoteGst = Number(selectedBooking.metadata?.quoteGstAmount || 0);
+                                  const quoteGstPercent = selectedBooking.metadata?.quoteGstPercent;
+                                  const quoteProduct = Number(selectedBooking.metadata?.quoteProductAmount || 0);
+                                  const coupon = getCouponDiscount(selectedBooking);
+                                  const wallet = getWalletDiscount(selectedBooking);
+                                  const couponCode = String(
+                                    selectedBooking.couponCode || selectedBooking.metadata?.couponCode || ""
+                                  ).trim();
+                                  const quote = isQuoteBooking(selectedBooking);
+                                  return (
+                                    <>
+                                      {quote && quoteProduct > 0 ? (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Product</span>
+                                          <span>{formatBillInr(quoteProduct)}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Subtotal</span>
+                                          <span>{formatBillInr(getSubtotal(selectedBooking))}</span>
+                                        </div>
+                                      )}
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">
+                                          {delivery?.label || "Delivery"}
+                                        </span>
+                                        <span>{delivery?.value || formatBillInr(0)}</span>
+                                      </div>
+                                      {quoteGst > 0 ? (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">
+                                            GST
+                                            {quoteGstPercent != null && Number(quoteGstPercent) > 0
+                                              ? ` (${quoteGstPercent}%)`
+                                              : ""}
+                                          </span>
+                                          <span>{formatBillInr(quoteGst)}</span>
+                                        </div>
+                                      ) : !quote && getServiceGst(selectedBooking) > 0 ? (
+                                        <div className="flex justify-between">
+                                          <span className="text-muted-foreground">GST (18%)</span>
+                                          <span>{formatBillInr(getServiceGst(selectedBooking))}</span>
+                                        </div>
+                                      ) : null}
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Platform fee (excl. GST)</span>
+                                        <span>{formatBillInr(getPlatformFee(selectedBooking))}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">GST on platform fee (18%)</span>
+                                        <span>{formatBillInr(getPlatformFeeGst(selectedBooking))}</span>
+                                      </div>
+                                      <div className="flex justify-between text-emerald-700">
+                                        <span>{couponCode ? `Offer (${couponCode})` : "Offer"}</span>
+                                        <span>{coupon > 0 ? `−${formatBillInr(coupon)}` : "None"}</span>
+                                      </div>
+                                      <div className="flex justify-between text-emerald-700">
+                                        <span>Imagineering wallet</span>
+                                        <span>{wallet > 0 ? `−${formatBillInr(wallet)}` : "None"}</span>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
                         </div>
                         {(() => {
                           const previousTotal = getPreviousTotal(selectedBooking);
@@ -1503,7 +1651,7 @@ export default function BuyerBookings() {
                               <div className="grid grid-cols-12 gap-2 px-3 py-2 text-sm font-semibold border-t">
                                 <div className="col-span-8 text-right">Total</div>
                                 <div className="col-span-4 text-right">
-                                  ₹{computedTotal.toLocaleString()}
+                                  {formatBillInr(computedTotal)}
                                 </div>
                               </div>
                               {showPrevious && (
