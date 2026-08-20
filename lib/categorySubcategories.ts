@@ -41,6 +41,44 @@ export function getSubcategoryNames(subcategories: unknown): string[] {
   return normalizeSubcategories(subcategories).map((entry) => entry.name);
 }
 
+/** Business-profile primarySubcategory may be a string[] or a single string. */
+export function normalizePrimarySubcategoryList(raw: unknown): string[] {
+  if (Array.isArray(raw)) return getSubcategoryNames(raw);
+  if (typeof raw === "string" && raw.trim()) return [raw.trim()];
+  return [];
+}
+
+/**
+ * Provider listing pickers should only show subcategories saved on the business profile,
+ * not the full category catalog.
+ */
+export function filterSubcategoriesToProfile(
+  categorySubcategories: unknown,
+  profileSubcategories: unknown,
+  options?: { include?: string | null }
+): string[] {
+  const categoryNames = getSubcategoryNames(categorySubcategories);
+  const profileNames = normalizePrimarySubcategoryList(profileSubcategories);
+  const include = String(options?.include || "").trim();
+  const keys = new Set(profileNames.map((s) => s.toLowerCase()));
+  if (include) keys.add(include.toLowerCase());
+  if (keys.size === 0) return [];
+
+  const matched = categoryNames.filter((s) => keys.has(s.toLowerCase()));
+  if (matched.length > 0) {
+    if (include && !matched.some((s) => s.toLowerCase() === include.toLowerCase())) {
+      return [...matched, include];
+    }
+    return matched;
+  }
+
+  const fallback = [...profileNames];
+  if (include && !fallback.some((s) => s.toLowerCase() === include.toLowerCase())) {
+    fallback.push(include);
+  }
+  return fallback;
+}
+
 export function getSubcategoryLabel(subcategory: unknown): string {
   if (typeof subcategory === 'string') return subcategory.trim();
   if (subcategory && typeof subcategory === 'object') {
