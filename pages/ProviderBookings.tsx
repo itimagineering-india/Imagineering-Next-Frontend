@@ -52,7 +52,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
-import { providerSettlement, quoteDeliveryForProvider } from "@/lib/providerSettlement";
+import { providerCommissionBreakup, providerSettlement, quoteDeliveryForProvider } from "@/lib/providerSettlement";
 import {
   BookingFilters,
   BookingStatsCards,
@@ -988,6 +988,10 @@ export default function ProviderBookings() {
                   <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Amounts</h3>
                   {(() => {
                     const settlement = providerSettlement(selectedBooking);
+                    const commissionBreakup = providerCommissionBreakup(
+                      selectedBooking.commission,
+                      selectedBooking.amount
+                    );
                     const delivery = quoteDeliveryForProvider({
                       source: selectedBooking.quoteSource,
                       deliveryCharge: selectedBooking.deliveryCharge,
@@ -1039,6 +1043,24 @@ export default function ProviderBookings() {
                               }`}
                             >
                               {delivery.status === 'included' ? formatInr(delivery.charged) : '₹0.00'}
+                            </p>
+                          </div>
+                        ) : null}
+                        {commissionBreakup.total > 0 ? (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-slate-50/80">
+                            <div>
+                              <p className="text-sm font-semibold">Provider commission</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatInr(commissionBreakup.taxable)}
+                                {commissionBreakup.ratePercent > 0
+                                  ? ` (${commissionBreakup.ratePercent}%)`
+                                  : ""}
+                                {" + 18% GST "}
+                                {formatInr(commissionBreakup.gst)}
+                              </p>
+                            </div>
+                            <p className="text-lg md:text-xl font-bold tabular-nums text-slate-800">
+                              {formatInr(commissionBreakup.total)}
                             </p>
                           </div>
                         ) : null}
