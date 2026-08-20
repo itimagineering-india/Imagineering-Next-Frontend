@@ -216,20 +216,25 @@ export function B2BServicesHub() {
         const rows = (res.data as { services?: unknown[] } | undefined)?.services;
         const mapped: ListingCard[] = Array.isArray(rows)
           ? rows
-              .map((row) => {
+              .map((row): ListingCard | null => {
                 const r = row as Record<string, unknown>;
                 const id = String(r._id || r.id || "").trim();
                 if (!id) return null;
-                return {
+                const card: ListingCard = {
                   id,
-                  title: String(r.title || "Listing").trim(),
-                  image: listingImage(r),
-                  price: Number(r.price) || undefined,
-                  priceType: String(r.priceType || "") || undefined,
-                  subcategory: String(r.subcategory || "") || undefined,
-                } satisfies ListingCard;
+                  title: String(r.title || "Listing").trim() || "Listing",
+                };
+                const image = listingImage(r);
+                if (image) card.image = image;
+                const price = Number(r.price);
+                if (Number.isFinite(price) && price > 0) card.price = price;
+                const priceType = String(r.priceType || "").trim();
+                if (priceType) card.priceType = priceType;
+                const subcategory = String(r.subcategory || "").trim();
+                if (subcategory) card.subcategory = subcategory;
+                return card;
               })
-              .filter((x): x is ListingCard => Boolean(x))
+              .filter((x): x is ListingCard => x !== null)
           : [];
         setListings(mapped);
       } catch {
