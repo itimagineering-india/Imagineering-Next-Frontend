@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import api from "@/lib/api-client";
 import { quoteLineKey, quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
+import { parseQuoteQuantity } from "@/lib/quoteQuantity";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -157,7 +158,7 @@ export default function ProviderLeads() {
     () =>
       activeQuoteLines.reduce((sum, line, idx) => {
         const rate = Number(quoteLineRates[quoteLineKey(line, idx)] || 0);
-        const qty = Math.max(1, Number(line.quantity) || 1);
+        const qty = parseQuoteQuantity(line.quantity);
         if (!Number.isFinite(rate) || rate < 0.01) return sum;
         return sum + rate * qty;
       }, 0),
@@ -173,7 +174,7 @@ export default function ProviderLeads() {
             serviceId: String(line.serviceId || ""),
             unitPrice: Number(quoteLineRates[quoteLineKey(line, idx)] || 0),
             title: String(line.title || "Product"),
-            quantity: Math.max(1, Number(line.quantity) || 1),
+            quantity: parseQuoteQuantity(line.quantity),
           }))
         : [];
     const missing = offerItems.filter((line) => !line.serviceId || !Number.isFinite(line.unitPrice) || line.unitPrice < 0.01);
@@ -534,7 +535,7 @@ export default function ProviderLeads() {
                       <div className="space-y-2 rounded-lg border p-3">
                         {activeQuoteLines.map((line, idx) => {
                           const key = quoteLineKey(line, idx);
-                          const qty = Math.max(1, Number(line.quantity) || 1);
+                          const qty = parseQuoteQuantity(line.quantity);
                           const rate = Number(quoteLineRates[key] || 0);
                           const lineTotal =
                             Number.isFinite(rate) && rate > 0 ? Math.round(rate * qty * 100) / 100 : 0;
