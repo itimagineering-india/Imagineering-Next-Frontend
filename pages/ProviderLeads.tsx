@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { MapPin, Calendar, Clock, Package, Loader2, ImagePlus, X, Navigation } from "lucide-react";
@@ -26,6 +26,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import api from "@/lib/api-client";
+import { quoteLineKey, quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -54,6 +55,7 @@ export default function ProviderLeads() {
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [activeQuote, setActiveQuote] = useState<any>(null);
   const [quoteAmount, setQuoteAmount] = useState("");
+  const [quoteLineRates, setQuoteLineRates] = useState<Record<string, string>>({});
   const [quoteNotes, setQuoteNotes] = useState("");
   const [quoteDelivery, setQuoteDelivery] = useState("");
   const [quoteDeliveryOption, setQuoteDeliveryOption] = useState<"free" | "paid" | "not_available">("free");
@@ -90,6 +92,17 @@ export default function ProviderLeads() {
         }
         setActiveQuote(row);
         setQuoteSecondsLeft(Number(row?.secondsRemaining || 0));
+        const requestLines = quoteRequestItems(row);
+        const offered = quoteOfferItems(row?.myOffer);
+        const rates: Record<string, string> = {};
+        requestLines.forEach((line, idx) => {
+          const key = quoteLineKey(line, idx);
+          const match =
+            offered.find((o) => o.serviceId && o.serviceId === line.serviceId) ||
+            offered.find((o) => o.title && o.title === line.title);
+          rates[key] = match?.unitPrice != null ? String(match.unitPrice) : "";
+        });
+        setQuoteLineRates(rates);
         setQuoteAmount(row?.myOffer?.amount != null ? String(row.myOffer.amount) : "");
         setQuoteNotes(row?.myOffer?.notes || "");
         setQuoteDelivery(row?.myOffer?.estimatedDelivery || "");
@@ -139,9 +152,43 @@ export default function ProviderLeads() {
     return () => clearInterval(t);
   }, [quoteDialogOpen, activeQuote?.windowOpen, activeQuote?.expiresAt]);
 
+  const activeQuoteLines = useMemo(() => quoteRequestItems(activeQuote), [activeQuote]);
+  const lineQuoteTotal = useMemo(
+    () =>
+      activeQuoteLines.reduce((sum, line, idx) => {
+        const rate = Number(quoteLineRates[quoteLineKey(line, idx)] || 0);
+        const qty = Math.max(1, Number(line.quantity) || 1);
+        if (!Number.isFinite(rate) || rate < 0.01) return sum;
+        return sum + rate * qty;
+      }, 0),
+    [activeQuoteLines, quoteLineRates]
+  );
+
   const submitQuoteOffer = async () => {
     if (!activeQuote?.id) return;
-    const amount = Number(quoteAmount);
+    const requestLines = quoteRequestItems(activeQuote);
+    const offerItems =
+      requestLines.length > 0
+        ? requestLines.map((line, idx) => ({
+            serviceId: String(line.serviceId || ""),
+            unitPrice: Number(quoteLineRates[quoteLineKey(line, idx)] || 0),
+            title: String(line.title || "Product"),
+            quantity: Math.max(1, Number(line.quantity) || 1),
+          }))
+        : [];
+    const missing = offerItems.filter((line) => !line.serviceId || !Number.isFinite(line.unitPrice) || line.unitPrice < 0.01);
+    if (requestLines.length > 0 && missing.length) {
+      toast({
+        title: "Enter a rate for each product",
+        description: missing.map((m) => m.title).join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+    const amount =
+      offerItems.length > 0
+        ? Math.round(offerItems.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0) * 100) / 100
+        : Number(quoteAmount);
     if (!Number.isFinite(amount) || amount < 1) {
       toast({ title: "Enter a valid price (min ₹1)", variant: "destructive" });
       return;
@@ -161,6 +208,10 @@ export default function ProviderLeads() {
     try {
       const res = await api.quoteRequests.submitOffer(String(activeQuote.id), {
         amount,
+        items:
+          offerItems.length > 0
+            ? offerItems.map((line) => ({ serviceId: line.serviceId, unitPrice: line.unitPrice }))
+            : undefined,
         notes: quoteNotes.trim() || undefined,
         estimatedDelivery: quoteDelivery.trim() || undefined,
         deliveryOption: quoteDeliveryOption,
@@ -271,10 +322,8 @@ export default function ProviderLeads() {
             ) : (
               <div className="space-y-3">
                 {quoteRequests.map((item: any) => {
-                  const title =
-                    item?.service && typeof item.service === "object"
-                      ? item.service.title
-                      : "Quote request";
+                  const title = quoteRequestHeadline(item);
+                  const lines = quoteRequestItems(item);
                   const closed = !item?.windowOpen;
                   return (
                     <div
@@ -295,7 +344,8 @@ export default function ProviderLeads() {
                         <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-muted-foreground md:text-xs">
                           <div className="flex flex-wrap gap-x-4 gap-y-1">
                             <span className="inline-flex items-center gap-1">
-                              <Package className="h-3 w-3" /> Qty {item.quantity}
+                              <Package className="h-3 w-3" />
+                              {lines.length > 1 ? `${lines.length} products` : `Qty ${item.quantity}`}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
@@ -428,21 +478,36 @@ export default function ProviderLeads() {
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {activeQuote?.service && typeof activeQuote.service === "object"
-                  ? activeQuote.service.title
-                  : "Submit quote"}
+                {activeQuote ? quoteRequestHeadline(activeQuote) : "Submit quote"}
               </DialogTitle>
               <DialogDescription>
-                Share your total price for this buyer request. Window closes after 30 minutes.
+                {activeQuoteLines.length > 0
+                  ? "Enter a rate for each product. Buyer will see item-wise prices."
+                  : "Share your total price for this buyer request. Window closes after 30 minutes."}
               </DialogDescription>
             </DialogHeader>
 
             {activeQuote ? (
               <div className="space-y-4">
                 <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground space-y-1">
-                  <p>
-                    Qty {activeQuote.quantity} · {activeQuote.preferredDate} · {activeQuote.preferredTime}
-                  </p>
+                  {quoteRequestItems(activeQuote).length > 1 ? (
+                    <ul className="space-y-1 text-foreground">
+                      {quoteRequestItems(activeQuote).map((line, idx) => (
+                        <li key={`${line.title}-${idx}`}>
+                          {line.title} · Qty {line.quantity ?? 1}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>
+                      Qty {activeQuote.quantity} · {activeQuote.preferredDate} · {activeQuote.preferredTime}
+                    </p>
+                  )}
+                  {quoteRequestItems(activeQuote).length > 1 ? (
+                    <p>
+                      {activeQuote.preferredDate} · {activeQuote.preferredTime}
+                    </p>
+                  ) : null}
                   <p>
                     {activeQuote.addressLabel ||
                       [activeQuote.address?.address, activeQuote.address?.city, activeQuote.address?.state, activeQuote.address?.zipCode]
@@ -463,15 +528,58 @@ export default function ProviderLeads() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="quote-amount">Your price (₹)</Label>
-                  <Input
-                    id="quote-amount"
-                    type="number"
-                    min={1}
-                    value={quoteAmount}
-                    onChange={(e) => setQuoteAmount(e.target.value)}
-                    disabled={!activeQuote.windowOpen}
-                  />
+                  {activeQuoteLines.length > 0 ? (
+                    <>
+                      <Label>Rate per product (₹)</Label>
+                      <div className="space-y-2 rounded-lg border p-3">
+                        {activeQuoteLines.map((line, idx) => {
+                          const key = quoteLineKey(line, idx);
+                          const qty = Math.max(1, Number(line.quantity) || 1);
+                          const rate = Number(quoteLineRates[key] || 0);
+                          const lineTotal =
+                            Number.isFinite(rate) && rate > 0 ? Math.round(rate * qty * 100) / 100 : 0;
+                          return (
+                            <div key={key} className="grid grid-cols-[1fr_7rem] items-center gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">{line.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Qty {qty}
+                                  {lineTotal > 0 ? ` · ${formatINR(lineTotal)}` : ""}
+                                </p>
+                              </div>
+                              <Input
+                                type="number"
+                                min={0.01}
+                                step="0.01"
+                                placeholder="Rate"
+                                value={quoteLineRates[key] || ""}
+                                onChange={(e) =>
+                                  setQuoteLineRates((prev) => ({ ...prev, [key]: e.target.value }))
+                                }
+                                disabled={!activeQuote.windowOpen}
+                                aria-label={`Rate for ${line.title}`}
+                              />
+                            </div>
+                          );
+                        })}
+                        <p className="border-t pt-2 text-sm font-semibold text-foreground">
+                          Materials total {formatINR(lineQuoteTotal)}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="quote-amount">Your price (₹)</Label>
+                      <Input
+                        id="quote-amount"
+                        type="number"
+                        min={1}
+                        value={quoteAmount}
+                        onChange={(e) => setQuoteAmount(e.target.value)}
+                        disabled={!activeQuote.windowOpen}
+                      />
+                    </>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="quote-notes">Notes (optional)</Label>
