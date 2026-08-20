@@ -24,6 +24,7 @@ import {
   isMetaBreakdownKey,
   metaBreakdownLabel,
 } from "@/lib/parseRequirementLineItems";
+import { quoteRequestHeadline } from "@/lib/b2b/quoteRequestDisplay";
 import { RequirementSummary, RequirementDetail, RequirementStatus } from "@/types/requirements";
 import {
   FileText,
@@ -48,6 +49,8 @@ export async function getServerSideProps() { return { props: {} }; }
 export default function MyRequirements() {
   const { toast } = useToast();
   const [list, setList] = useState<RequirementSummary[]>([]);
+  const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
+  const [tab, setTab] = useState<"quotes" | "admin">("quotes");
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -61,11 +64,19 @@ export default function MyRequirements() {
   const fetchList = async () => {
     setIsLoading(true);
     try {
-      const res = await api.requirements.getAll({
-        status: statusFilter !== "all" ? statusFilter : undefined,
-      });
-      if (res.success && res.data) {
-        setList(Array.isArray(res.data) ? (res.data as RequirementSummary[]) : []);
+      const [reqRes, quoteRes] = await Promise.all([
+        api.requirements.getAll({
+          status: statusFilter !== "all" ? statusFilter : undefined,
+        }),
+        api.quoteRequests.getMine(),
+      ]);
+      if (reqRes.success && reqRes.data) {
+        setList(Array.isArray(reqRes.data) ? (reqRes.data as RequirementSummary[]) : []);
+      }
+      if (quoteRes.success && Array.isArray((quoteRes as any).data)) {
+        setQuoteRequests((quoteRes as any).data);
+      } else {
+        setQuoteRequests([]);
       }
     } catch (e) {
       toast({
@@ -245,7 +256,7 @@ export default function MyRequirements() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-foreground">My requirements</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Submit a requirement and get a quote from admin. Approve to let admin arrange everything.
+              Track Get Best Quote requests and admin quotes from one place.
             </p>
           </div>
           <Button asChild className="flex items-center gap-2 shrink-0">
@@ -256,10 +267,86 @@ export default function MyRequirements() {
           </Button>
         </div>
 
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={tab === "quotes" ? "default" : "outline"}
+            onClick={() => setTab("quotes")}
+          >
+            Quote requests
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={tab === "admin" ? "default" : "outline"}
+            onClick={() => setTab("admin")}
+          >
+            Admin quotes
+          </Button>
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : tab === "quotes" ? (
+          quoteRequests.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="font-medium">No quote requests yet</p>
+                <p className="text-sm mt-1">
+                  Get Best Quote from B2B / product listings stays here. Open anytime to see supplier offers.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {quoteRequests.map((item: any) => {
+                const id = String(item.id || "");
+                const offers = Number(item.offersReceived ?? item.offers?.length ?? 0);
+                const notified = Number(item.notifiedProviderCount || 0);
+                return (
+                  <Link key={id} href={`/quote-requests/${id}`} className="block">
+                    <Card className="transition-colors hover:bg-muted/50">
+                      <CardHeader className="pb-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <CardTitle className="text-base line-clamp-2">
+                            {quoteRequestHeadline(item)}
+                          </CardTitle>
+                          <Badge variant={item.status === "open" ? "default" : "secondary"}>
+                            {item.status === "open"
+                              ? "Open"
+                              : item.status === "ordered"
+                                ? "Ordered"
+                                : item.status === "cancelled"
+                                  ? "Cancelled"
+                                  : "Closed"}
+                          </Badge>
+                        </div>
+                        <CardDescription>
+                          {offers} / {notified || "—"} quotes received
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="pt-0 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "—"}
+                        </span>
+                        {item.address?.city ? (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {[item.address.city, item.address.state].filter(Boolean).join(", ")}
+                          </span>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          )
         ) : list.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
