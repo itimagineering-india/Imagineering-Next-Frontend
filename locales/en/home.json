@@ -19,7 +19,6 @@
   },
   "trustStats": {
     "providers": { "value": "2,000+", "label": "Verified Providers" },
-    "projects": { "value": "1000+", "label": "Projects Completed" },
     "cities": { "value": "05+", "label": "Cities Covered" },
     "rating": { "value": "4.8/5", "label": "Average Rating" },
     "trustedBy": "Trusted by thousands of happy customers across India"
