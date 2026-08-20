@@ -13,6 +13,8 @@ export type AuthUser = {
   phone?: string;
   avatar?: string;
   role?: string;
+  gstNumber?: string;
+  panNumber?: string;
   [key: string]: unknown;
 } | null;
 
