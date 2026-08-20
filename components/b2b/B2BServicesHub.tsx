@@ -294,6 +294,7 @@ export function B2BServicesHub() {
       for (const line of quoteCart) {
         let serviceId = line.serviceId || "";
         let title = line.title;
+        let priceType = line.priceType;
         if (!serviceId && line.catalogProductId) {
           const linked = await findServiceIdForCatalogProduct(line.catalogProductId, {
             excludeProviderUserId: buyerId,
@@ -304,6 +305,7 @@ export function B2BServicesHub() {
           }
           serviceId = linked.serviceId;
           title = linked.title || title;
+          priceType = linked.priceType || priceType;
         }
         if (!serviceId) {
           missing.push(line.title);
@@ -313,7 +315,7 @@ export function B2BServicesHub() {
           serviceId,
           title,
           quantity: line.quantity,
-          priceType: line.priceType,
+          priceType,
           catalogProductId: line.catalogProductId,
         });
       }
@@ -672,6 +674,7 @@ export function B2BServicesHub() {
           priceType={quoteService.priceType}
           items={quoteService.items}
           onSubmitted={() => setQuoteCart(clearB2bQuoteCart())}
+          noCountdown
         />
       ) : null}
     </div>
