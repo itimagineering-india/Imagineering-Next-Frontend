@@ -45,12 +45,14 @@ import {
   Loader2,
   Search,
   Filter,
+  Copy,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
+import { providerSettlement, quoteDeliveryForProvider } from "@/lib/providerSettlement";
 import {
   BookingFilters,
   BookingStatsCards,
@@ -61,6 +63,8 @@ export async function getServerSideProps() { return { props: {} }; }
 
 interface Booking {
   id: string;
+  bookingNumber?: string;
+  displayId?: string;
   jobTitle: string;
   buyerName: string;
   buyerAvatar?: string;
@@ -85,6 +89,14 @@ interface Booking {
   netEarnings: number;
   basePriceWithGst: number;
   hasGST: boolean;
+  outstandingAmount?: number;
+  requiresOfflinePaymentConfirmation?: boolean;
+  paymentMethod?: string;
+  quoteSource?: string;
+  deliveryCharge?: number;
+  quotedDeliveryCharge?: number;
+  deliveryOption?: string;
+  transport?: string;
   location?: {
     address: string;
     city: string;
@@ -161,6 +173,8 @@ export default function ProviderBookings() {
         const bookingsData = response.data as any;
         const formattedBookings = (bookingsData.bookings || []).map((booking: any) => ({
           id: booking.id || booking._id,
+          bookingNumber: booking.bookingNumber || undefined,
+          displayId: booking.displayId || booking.bookingNumber || undefined,
           jobTitle: booking.jobTitle,
           buyerName: booking.buyerName,
           buyerAvatar: booking.buyerAvatar,
@@ -180,6 +194,16 @@ export default function ProviderBookings() {
           netEarnings: booking.netEarnings || 0,
           basePriceWithGst: booking.basePriceWithGst || booking.amount || 0,
           hasGST: booking.hasGST || false,
+          outstandingAmount: Number(booking.outstandingAmount || 0),
+          requiresOfflinePaymentConfirmation: !!booking.requiresOfflinePaymentConfirmation,
+          paymentMethod: booking.metadata?.paymentMethod || booking.metadata?.paymentOption,
+          quoteSource: booking.metadata?.source,
+          deliveryCharge: Number(booking.metadata?.quoteDeliveryCharge || 0),
+          quotedDeliveryCharge: Number(
+            booking.metadata?.quoteQuotedDeliveryCharge ?? booking.metadata?.quoteDeliveryCharge ?? 0
+          ),
+          deliveryOption: booking.metadata?.quoteDeliveryOption,
+          transport: booking.metadata?.transport,
           location: booking.location,
           progress: booking.progress,
           simplifiedBookingFlow: !!booking.simplifiedBookingFlow,
@@ -309,14 +333,18 @@ export default function ProviderBookings() {
       maximumFractionDigits: 2,
     })}`;
 
-  const getPlatformFeeBreakup = (commission: number) => {
-    const taxable = Number(commission || 0);
-    const gst = Math.round(taxable * 0.18 * 100) / 100;
-    return {
-      taxable,
-      gst,
-      total: Math.round((taxable + gst) * 100) / 100,
-    };
+  const bookingDisplayId = (booking: Booking) =>
+    String(booking.displayId || booking.bookingNumber || '').trim() ||
+    (booking.id ? `#${String(booking.id).slice(-8).toUpperCase()}` : '—');
+
+  const copyId = async (label: string, value: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({ title: `Could not copy ${label}`, variant: 'destructive' });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -768,9 +796,27 @@ export default function ProviderBookings() {
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
             <DialogHeader>
               <DialogTitle className="text-base md:text-lg">Booking Details</DialogTitle>
-              <DialogDescription className="text-xs md:text-sm">
-                Complete information about this booking
-              </DialogDescription>
+              {selectedBooking ? (
+                <DialogDescription className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                  <span className="font-mono font-semibold text-foreground">
+                    Booking ID {bookingDisplayId(selectedBooking)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => void copyId('Booking ID', bookingDisplayId(selectedBooking))}
+                    title="Copy booking ID"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </DialogDescription>
+              ) : (
+                <DialogDescription className="text-xs md:text-sm">
+                  Complete information about this booking
+                </DialogDescription>
+              )}
             </DialogHeader>
             {selectedBooking && (
               <div className="space-y-4 md:space-y-6">
@@ -849,12 +895,29 @@ export default function ProviderBookings() {
                   <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Job Information</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <div>
+                      <p className="text-xs md:text-sm text-muted-foreground">Booking ID</p>
+                      <p className="font-medium font-mono text-sm md:text-base">
+                        {bookingDisplayId(selectedBooking)}
+                      </p>
+                      {selectedBooking.id &&
+                      bookingDisplayId(selectedBooking) !== selectedBooking.id ? (
+                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5 break-all">
+                          Ref {selectedBooking.id}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div>
                       <p className="text-xs md:text-sm text-muted-foreground">Job Title</p>
                       <p className="font-medium text-sm md:text-base">{selectedBooking.jobTitle}</p>
                     </div>
                     <div>
                       <p className="text-xs md:text-sm text-muted-foreground">Service</p>
                       <p className="font-medium text-sm md:text-base">{selectedBooking.serviceName}</p>
+                      {selectedBooking.serviceId ? (
+                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5 break-all">
+                          Service ID {selectedBooking.serviceId}
+                        </p>
+                      ) : null}
                     </div>
                     <div>
                       <p className="text-xs md:text-sm text-muted-foreground">Booking Date</p>
@@ -880,16 +943,26 @@ export default function ProviderBookings() {
                         <span className="text-right">Price</span>
                       </div>
                       <div className="divide-y">
-                        {selectedBooking.services.map((item, idx) => (
-                          <div key={`${item.service?._id || idx}`} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
-                            <span className="truncate">{item.service?.title || "Service"}</span>
+                        {selectedBooking.services.map((item, idx) => {
+                          const serviceId = item.service?._id || (idx === 0 ? selectedBooking.serviceId : '');
+                          return (
+                          <div key={`${serviceId || idx}`} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
+                            <div className="min-w-0">
+                              <span className="block truncate">{item.service?.title || "Service"}</span>
+                              {serviceId ? (
+                                <span className="block text-[11px] text-muted-foreground font-mono break-all">
+                                  ID {serviceId}
+                                </span>
+                              ) : null}
+                            </div>
                             <span className="text-right">{item.quantity || 1}</span>
                             <span className="text-right">
                               ₹{(item.price || 0).toLocaleString()}
                               {item.priceType ? `/${item.priceType}` : ""}
                             </span>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -910,50 +983,93 @@ export default function ProviderBookings() {
                   </div>
                 </div>
 
-                {/* Payment & Commission */}
+                {/* Settlement — same 3 lines as Imagi Mitra */}
                 <div>
-                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Payment & Commission Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                    <Card>
-                      <CardContent className="pt-4 md:pt-6">
-                        <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                          Base Price
-                        </p>
-                        <p className="text-xl md:text-2xl font-bold">
-                          ₹{(selectedBooking.amount || selectedBooking.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          GST not included
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4 md:pt-6">
-                        {(() => {
-                          const platformFee = getPlatformFeeBreakup(selectedBooking.commission);
-                          return (
-                            <>
-                              <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                                Platform Fee
+                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Amounts</h3>
+                  {(() => {
+                    const settlement = providerSettlement(selectedBooking);
+                    const delivery = quoteDeliveryForProvider({
+                      source: selectedBooking.quoteSource,
+                      deliveryCharge: selectedBooking.deliveryCharge,
+                      quotedDeliveryCharge: selectedBooking.quotedDeliveryCharge,
+                      deliveryOption: selectedBooking.deliveryOption,
+                      transport: selectedBooking.transport,
+                    });
+                    return (
+                      <div className="rounded-xl border overflow-hidden">
+                        {settlement.needsCollect ? (
+                          <div className="px-4 py-2 bg-amber-50 border-b">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                              Collect at delivery
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50/60">
+                          <div>
+                            <p className="text-sm font-semibold">
+                              {settlement.needsCollect ? 'Collect from customer' : 'Customer paid'}
+                            </p>
+                            {settlement.needsCollect ? (
+                              <p className="text-xs text-muted-foreground">Cash to take from the buyer</p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">Already paid to Imagineering India</p>
+                            )}
+                          </div>
+                          <p className="text-lg md:text-xl font-bold text-amber-800 tabular-nums">
+                            {formatInr(settlement.collectFromCustomer)}
+                          </p>
+                        </div>
+                        {delivery ? (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                            <div>
+                              <p className="text-sm font-semibold">Delivery</p>
+                              <p className="text-xs text-muted-foreground">
+                                {delivery.status === 'included'
+                                  ? 'Included in your keep — you get this amount'
+                                  : delivery.status === 'pickup'
+                                    ? delivery.quoted > 0
+                                      ? `Customer chose pickup — your quoted ${formatInr(delivery.quoted)} was not charged`
+                                      : 'Customer chose pickup — no delivery amount'
+                                    : 'Free delivery — no extra amount'}
                               </p>
-                              <p className="text-xl md:text-2xl font-bold text-warning">
-                                {formatInr(platformFee.total)}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Taxable: {formatInr(platformFee.taxable)} + GST 18%: {formatInr(platformFee.gst)}
-                              </p>
-                            </>
-                          );
-                        })()}
-                      </CardContent>
-                    </Card>
-                    <Card className="col-span-1 sm:col-span-2">
-                      <CardContent className="pt-4 md:pt-6">
-                        <p className="text-xs md:text-sm text-muted-foreground mb-1">Net Earnings</p>
-                        <p className="text-xl md:text-2xl font-bold text-success">₹{selectedBooking.netEarnings.toLocaleString()}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                            </div>
+                            <p
+                              className={`text-lg md:text-xl font-bold tabular-nums ${
+                                delivery.status === 'included' ? 'text-emerald-700' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {delivery.status === 'included' ? formatInr(delivery.charged) : '₹0.00'}
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                          <div>
+                            <p className="text-sm font-semibold">You keep</p>
+                            <p className="text-xs text-muted-foreground">
+                              {settlement.needsCollect ? 'Keep this from the cash' : 'Your net for this order'}
+                              {delivery?.status === 'included' ? ' (includes delivery)' : ''}
+                            </p>
+                          </div>
+                          <p className="text-lg md:text-xl font-bold text-emerald-700 tabular-nums">
+                            {formatInr(settlement.youKeep)}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                          <div>
+                            <p className="text-sm font-semibold">Pay to Imagineering India</p>
+                            <p className="text-xs text-muted-foreground">
+                              {settlement.needsCollect
+                                ? 'Give this remaining cash to the company'
+                                : 'Company share on this order'}
+                            </p>
+                          </div>
+                          <p className="text-lg md:text-xl font-bold tabular-nums">
+                            {formatInr(settlement.payToCompany)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="mt-3 md:mt-4">
                     <p className="text-xs md:text-sm text-muted-foreground mb-2">Payment Status</p>
                     {getPaymentBadge(selectedBooking.paymentStatus)}
@@ -1429,7 +1545,7 @@ function BookingsTable({
           <TableHeader>
             <TableRow>
               <TableHead>Booking ID</TableHead>
-              <TableHead>Base Price</TableHead>
+              <TableHead>Amounts</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Payment</TableHead>
               <TableHead>Date</TableHead>
@@ -1440,20 +1556,48 @@ function BookingsTable({
             {bookings.map((booking) => (
               <TableRow key={booking.id}>
                 <TableCell>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    #{booking.id.slice(-8).toUpperCase()}
-                  </span>
+                  <div>
+                    <p className="text-xs font-mono font-semibold">
+                      {booking.displayId || booking.bookingNumber || `#${booking.id.slice(-8).toUpperCase()}`}
+                    </p>
+                    {booking.id ? (
+                      <p className="text-[10px] font-mono text-muted-foreground break-all">
+                        {booking.id}
+                      </p>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <div>
-                    <p className="font-semibold">₹{booking.basePriceWithGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Base price
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Net: ₹{booking.netEarnings.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
+                  {(() => {
+                    const settlement = providerSettlement(booking);
+                    const delivery = quoteDeliveryForProvider({
+                      source: booking.quoteSource,
+                      deliveryCharge: booking.deliveryCharge,
+                      quotedDeliveryCharge: booking.quotedDeliveryCharge,
+                      deliveryOption: booking.deliveryOption,
+                      transport: booking.transport,
+                    });
+                    return (
+                      <div className="text-xs space-y-0.5">
+                        <p className="font-semibold text-amber-800">
+                          {settlement.needsCollect ? 'Collect' : 'Customer'} {`₹${settlement.collectFromCustomer.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </p>
+                        {delivery?.status === 'included' ? (
+                          <p className="text-emerald-700">
+                            Delivery ₹{delivery.charged.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} included
+                          </p>
+                        ) : delivery?.status === 'pickup' ? (
+                          <p className="text-muted-foreground">Delivery not charged (pickup)</p>
+                        ) : null}
+                        <p className="text-emerald-700">
+                          You keep ₹{settlement.youKeep.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-muted-foreground">
+                          Company ₹{settlement.payToCompany.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </TableCell>
                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
                 <TableCell>{getPaymentBadge(booking.paymentStatus)}</TableCell>
