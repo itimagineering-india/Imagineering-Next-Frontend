@@ -183,26 +183,8 @@ export function PaymentOptionsSelector({
     if (fallback !== value) onChange(fallback);
   }, [amountNum, onChange, rules, value]);
 
-  const limitedNotes = useMemo(() => {
-    return PAYMENT_OPTIONS.filter((opt) => {
-      if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
-      const rule = rules[opt.value];
-      if (!rule?.enabled) return false;
-      return rule.maxAmount > 0 && amountNum > rule.maxAmount;
-    }).map((opt) => {
-      const rule = rules[opt.value];
-      return `${opt.label} up to ₹${rule.maxAmount.toLocaleString("en-IN")}`;
-    });
-  }, [amountNum, rules, showImagineeringCredit]);
-
   return (
     <div className={cn("space-y-3", className)}>
-      {limitedNotes.length > 0 ? (
-        <p className="rounded-md border border-amber-200/80 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900">
-          {limitedNotes.join(". ")}. Please choose another method for this amount.
-        </p>
-      ) : null}
-
       {visibleOptions.length === 0 ? (
         <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
           No payment methods are available for this amount. Please contact support.
