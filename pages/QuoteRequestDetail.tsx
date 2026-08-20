@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
 import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
+import { cn } from "@/lib/utils";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
