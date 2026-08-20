@@ -89,6 +89,11 @@ export function getQuantityUnitNoun(priceType: string | null | undefined): strin
   return key.replace(/_/g, " ").replace(/^per\s+/i, "").trim();
 }
 
+export function formatQuoteQtyLabel(quantity: number, priceType?: string | null): string {
+  const unit = getQuantityUnitNoun(priceType);
+  return unit ? `Qty ${quantity} ${unit}` : `Qty ${quantity}`;
+}
+
 export function formatInr(amount: number): string {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount);
 }
