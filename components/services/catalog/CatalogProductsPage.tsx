@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { useToast } from "@/hooks/use-toast";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
+import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
 import { cn } from "@/lib/utils";
 import { getSubcategoryImageUrl } from "@/lib/subcategoryImages";
 import {
@@ -91,6 +92,7 @@ export function CatalogProductsPage({
   const [customFormOpen, setCustomFormOpen] = useState(false);
 
   const isEdit = mode === "edit";
+  const isCm = isConstructionMaterialsCategorySlug(category?.slug);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +186,7 @@ export function CatalogProductsPage({
 
   const goToProducts = () => {
     if (!subcategory.trim()) {
-      setErrors({ subcategory: "Please select a material type" });
+      setErrors({ subcategory: isCm ? "Please select a material type" : "Please select a subcategory" });
       return;
     }
     setErrors({});
@@ -288,7 +290,9 @@ export function CatalogProductsPage({
   if (!category) {
     return (
       <div className="p-3 sm:p-4 md:p-6 lg:p-8 py-16 text-center">
-        <p className="text-muted-foreground">Construction Materials category not found on your profile.</p>
+        <p className="text-muted-foreground">
+          This category is not set on your business profile.
+        </p>
         <Button variant="outline" className="mt-4" onClick={() => router.push("/dashboard/provider/services")}>
           Back to services
         </Button>
@@ -306,7 +310,7 @@ export function CatalogProductsPage({
         className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        {step === 2 && !isEdit ? "Back to material type" : "Back to my services"}
+        {step === 2 && !isEdit ? (isCm ? "Back to material type" : "Back to subcategory") : "Back to my services"}
       </button>
 
       <div className="mb-6 space-y-3">
@@ -322,9 +326,11 @@ export function CatalogProductsPage({
       {step === 1 ? (
         <div className="space-y-6">
           <div>
-            <h2 className="text-base font-medium">Choose material type</h2>
+            <h2 className="text-base font-medium">{isCm ? "Choose material type" : "Choose subcategory"}</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              What kind of construction material do you sell?
+              {isCm
+                ? "What kind of construction material do you sell?"
+                : `What kind of ${category.name.toLowerCase()} do you sell?`}
             </p>
           </div>
 
@@ -408,7 +414,7 @@ export function CatalogProductsPage({
             {!isEdit && (
               <Button variant="ghost" size="sm" onClick={() => setStep(1)}>
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Change type
+                Change {isCm ? "type" : "subcategory"}
               </Button>
             )}
           </div>
