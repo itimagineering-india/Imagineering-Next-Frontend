@@ -8,9 +8,20 @@ type Props = {
   onCta?: (product: MaterialsProduct) => void;
   ctaLabel?: string;
   ctaLoading?: boolean;
+  hidePrice?: boolean;
+  onAddToQuote?: (product: MaterialsProduct) => void;
+  inQuoteList?: boolean;
 };
 
-export function MaterialsProductCard({ product, onCta, ctaLabel, ctaLoading }: Props) {
+export function MaterialsProductCard({
+  product,
+  onCta,
+  ctaLabel,
+  ctaLoading,
+  hidePrice,
+  onAddToQuote,
+  inQuoteList,
+}: Props) {
   const href = `/construction-materials/product/${product.id}`;
   const label =
     ctaLabel || (product.isPriceRange ? "Get Best Quote" : "Add to Cart");
@@ -38,10 +49,25 @@ export function MaterialsProductCard({ product, onCta, ctaLabel, ctaLoading }: P
           <p className="truncate text-xs font-bold leading-[1.25] text-slate-900">
             {product.name}
           </p>
-          <p className="truncate text-xs font-semibold text-slate-900">{product.priceRange}</p>
+          {hidePrice ? null : (
+            <p className="truncate text-xs font-semibold text-slate-900">{product.priceRange}</p>
+          )}
         </div>
       </Link>
-      <div className="px-2 pb-2">
+      <div className="space-y-1 px-2 pb-2">
+        {onAddToQuote ? (
+          <button
+            type="button"
+            onClick={() => onAddToQuote(product)}
+            className={`inline-flex h-7 w-full items-center justify-center rounded-lg px-2 text-[10px] font-semibold transition ${
+              inQuoteList
+                ? "border border-emerald-300 bg-emerald-50 text-emerald-800"
+                : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+            }`}
+          >
+            {inQuoteList ? "Added to quote" : "Add to quote"}
+          </button>
+        ) : null}
         {onCta ? (
           <button
             type="button"
@@ -51,7 +77,7 @@ export function MaterialsProductCard({ product, onCta, ctaLabel, ctaLoading }: P
           >
             {ctaLoading ? "…" : label}
           </button>
-        ) : (
+        ) : onAddToQuote ? null : (
           <Link
             href={href}
             className="inline-flex h-7 w-full items-center justify-center rounded-lg bg-[hsl(var(--red-accent))] px-2 text-[10px] font-semibold text-white transition hover:brightness-110"
