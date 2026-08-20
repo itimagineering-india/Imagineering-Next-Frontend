@@ -1127,6 +1127,8 @@ export const api = {
         balance: number;
         orderTotal: number;
         maxApplicableCredits: number;
+        maxRedeemOrderPercent?: number;
+        orderCapInr?: number;
         creditsApplied: number;
         discountInr: number;
         payableAfterCredits: number;
@@ -2111,6 +2113,21 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+    verifyQuoteRequest: (payload: {
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+      paymentId: string;
+    }) =>
+      apiRequest<{
+        bookingId: string;
+        amount: number;
+        alreadyVerified?: boolean;
+        payment?: { id: string; status: string; amount: number; paidAt?: Date };
+      }>('/api/payments/verify-quote-request', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
   },
 
   // Chat (block / report)
@@ -2767,6 +2784,7 @@ export const api = {
       apiRequest<{ data: any }>('/api/quote-requests', {
         method: 'POST',
         body: JSON.stringify(data),
+        timeoutMs: 45000,
       }),
     getMine: () => apiRequest<{ data: any[] }>('/api/quote-requests/mine'),
     getById: (id: string) => apiRequest<{ data: any }>(`/api/quote-requests/${id}`),
@@ -2800,11 +2818,27 @@ export const api = {
       deliveryCharge?: number;
       sampleImages?: string[];
       items?: Array<{ serviceId: string; unitPrice: number }>;
+      gstPercent?: number;
+      gstAmount?: number;
+      priceIncludesGst?: boolean;
     }) =>
       apiRequest<{ data: any }>(`/api/quote-requests/${id}/offers`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    previewOffer: (id: string, offerId: string, transport: 'supplier' | 'self_pickup') =>
+      apiRequest<{
+        productAmount: number;
+        deliveryCharge: number;
+        supplierGst: number;
+        gstPercent: number | null;
+        subtotal: number;
+        platformFee: number;
+        platformFeeGst: number;
+        gst: number;
+        total: number;
+        quantity: number;
+      }>(`/api/quote-requests/${id}/offers/${offerId}/preview?transport=${encodeURIComponent(transport)}`),
     payOffer: (
       id: string,
       offerId: string,
@@ -2813,6 +2847,7 @@ export const api = {
         transport?: 'supplier' | 'self_pickup';
         paymentOption?: string;
         couponUsageId?: string;
+        creditsToApply?: number;
       }
     ) =>
       apiRequest<{
