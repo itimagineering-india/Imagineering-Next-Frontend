@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle2, ChevronLeft, FilePenLine, Loader2, Package } from "lucide-react";
@@ -10,8 +11,14 @@ import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { useToast } from "@/hooks/use-toast";
-import { getSubcategoryNames } from "@/lib/categorySubcategories";
-import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { filterSubcategoriesToProfile, getSubcategoryNames, normalizePrimarySubcategoryList } from "@/lib/categorySubcategories";
+import {
+  CONSTRUCTION_MATERIALS_CATALOG_SLUG,
+  DEFAULT_CONSTRUCTION_MATERIAL_TYPES,
+  isB2bMaterialSuppliersSubcategory,
+  isConstructionMaterialsCategorySlug,
+  usesSharedConstructionMaterialsCatalog,
+} from "@/lib/constructionMaterials";
 import { cn } from "@/lib/utils";
 import { getSubcategoryImageUrl } from "@/lib/subcategoryImages";
 import {
@@ -83,7 +90,10 @@ export function CatalogProductsPage({
 
   const [step, setStep] = useState<1 | 2>(mode === "edit" && initialSubcategory ? 2 : 1);
   const [category, setCategory] = useState<Category | null>(null);
+  const [cmCategory, setCmCategory] = useState<Category | null>(null);
+  const [profileSubcategories, setProfileSubcategories] = useState<string[]>([]);
   const [subcategory, setSubcategory] = useState(initialSubcategory);
+  const [materialType, setMaterialType] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<CatalogProductItem[]>([]);
   const [businessAddress, setBusinessAddress] = useState<ProviderBusinessAddressSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,6 +103,19 @@ export function CatalogProductsPage({
 
   const isEdit = mode === "edit";
   const isCm = isConstructionMaterialsCategorySlug(category?.slug);
+  const needsCmTypePicker = usesSharedConstructionMaterialsCatalog(category?.slug, subcategory);
+
+  const cmMaterialTypes = useMemo(() => {
+    const names = getSubcategoryNames(cmCategory?.subcategories).filter(
+      (n) => !isB2bMaterialSuppliersSubcategory(n) && !/equipment\s+vendor/i.test(n),
+    );
+    return names.length > 0 ? names : [...DEFAULT_CONSTRUCTION_MATERIAL_TYPES];
+  }, [cmCategory]);
+
+  useEffect(() => {
+    if (!needsCmTypePicker || materialType || cmMaterialTypes.length !== 1) return;
+    setMaterialType(cmMaterialTypes[0]);
+  }, [needsCmTypePicker, materialType, cmMaterialTypes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,6 +163,9 @@ export function CatalogProductsPage({
 
         const match = categories.find((c) => String(c._id) === String(primaryId));
         if (match) setCategory(match);
+        const cm = categories.find((c) => isConstructionMaterialsCategorySlug(c.slug));
+        if (cm) setCmCategory(cm);
+        setProfileSubcategories(normalizePrimarySubcategoryList(provider?.primarySubcategory));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -158,7 +184,12 @@ export function CatalogProductsPage({
       const product =
         (res.data as { product?: CatalogProductItem })?.product ?? res.data;
       if (product && typeof product === "object" && "_id" in product) {
-        setSelectedProducts([product as CatalogProductItem]);
+        const item = product as CatalogProductItem;
+        setSelectedProducts([item]);
+        const fromProduct = String(item.subcategory || "").trim();
+        if (fromProduct && !isB2bMaterialSuppliersSubcategory(fromProduct)) {
+          setMaterialType(fromProduct);
+        }
       }
     });
     return () => {
@@ -167,9 +198,11 @@ export function CatalogProductsPage({
   }, [isEdit, initialCatalogProductId]);
 
   const subcategories = useMemo(() => {
-    if (!category?.subcategories) return [];
-    return getSubcategoryNames(category.subcategories);
-  }, [category]);
+    if (!category) return [];
+    return filterSubcategoriesToProfile(category.subcategories, profileSubcategories, {
+      include: isEdit ? initialSubcategory : undefined,
+    });
+  }, [category, profileSubcategories, isEdit, initialSubcategory]);
 
   const handleToggleProduct = useCallback(
     (product: CatalogProductItem) => {
@@ -191,6 +224,9 @@ export function CatalogProductsPage({
     }
     setErrors({});
     setSelectedProducts([]);
+    if (!usesSharedConstructionMaterialsCatalog(category?.slug, subcategory)) {
+      setMaterialType("");
+    }
     setStep(2);
   };
 
@@ -211,6 +247,7 @@ export function CatalogProductsPage({
           categoryId: category._id,
           categorySlug: category.slug,
           subcategory,
+          itemType: materialType,
           location,
         });
         const response = await api.services.update(serviceId, payload);
@@ -234,6 +271,7 @@ export function CatalogProductsPage({
               categoryId: category._id,
               categorySlug: category.slug,
               subcategory,
+              itemType: materialType,
               location,
             }),
           ),
@@ -329,11 +367,22 @@ export function CatalogProductsPage({
             <h2 className="text-base font-medium">{isCm ? "Choose material type" : "Choose subcategory"}</h2>
             <p className="text-sm text-muted-foreground mt-1">
               {isCm
-                ? "What kind of construction material do you sell?"
-                : `What kind of ${category.name.toLowerCase()} do you sell?`}
+                ? "Material types from your Business Profile."
+                : "Only the subcategories you selected on your Business Profile."}
             </p>
           </div>
 
+          {subcategories.length === 0 ? (
+            <div className="rounded-xl border border-dashed bg-muted/30 px-4 py-8 text-center">
+              <p className="text-sm font-medium">No subcategory on your Business Profile</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose the types you sell there, then come back to add listings.
+              </p>
+              <Button asChild className="mt-4">
+                <Link href="/dashboard/provider/business-profile">Go to Business Profile</Link>
+              </Button>
+            </div>
+          ) : (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
             {subcategories.map((sub) => {
               const selected = subcategory === sub;
@@ -344,6 +393,7 @@ export function CatalogProductsPage({
                   type="button"
                   onClick={() => {
                     setSubcategory(sub);
+                    setMaterialType("");
                     setErrors((e) => ({ ...e, subcategory: undefined }));
                   }}
                   className={cn(
@@ -375,13 +425,14 @@ export function CatalogProductsPage({
               );
             })}
           </div>
+          )}
 
           {errors.subcategory && (
             <p className="text-sm text-destructive">{errors.subcategory}</p>
           )}
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
-            {!isEdit ? (
+            {!isEdit && subcategories.length > 0 ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -394,7 +445,7 @@ export function CatalogProductsPage({
             ) : (
               <span />
             )}
-            <Button onClick={goToProducts} disabled={!subcategory.trim()} className="min-w-[120px]">
+            <Button onClick={goToProducts} disabled={!subcategory.trim() || subcategories.length === 0} className="min-w-[120px]">
               Next
             </Button>
           </div>
@@ -404,39 +455,106 @@ export function CatalogProductsPage({
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-medium">
-                {isEdit ? "Pick product" : "Select products"}
+                {needsCmTypePicker && !materialType
+                  ? "Choose material type"
+                  : isEdit
+                    ? "Pick product"
+                    : "Select products"}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {subcategory}
-                {!isEdit && " — tap all products you sell"}
+                {needsCmTypePicker && !materialType
+                  ? "Construction materials from the shared catalog."
+                  : `${needsCmTypePicker && materialType ? materialType : subcategory}${
+                      !isEdit ? " — tap all products you sell" : ""
+                    }`}
               </p>
             </div>
             {!isEdit && (
-              <Button variant="ghost" size="sm" onClick={() => setStep(1)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (needsCmTypePicker && materialType) {
+                    setMaterialType("");
+                    setSelectedProducts([]);
+                    return;
+                  }
+                  setStep(1);
+                }}
+              >
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Change {isCm ? "type" : "subcategory"}
+                {needsCmTypePicker && materialType
+                  ? "Change type"
+                  : `Change ${isCm ? "type" : "subcategory"}`}
               </Button>
             )}
           </div>
 
-          <ProductCatalogPicker
-            categorySlug={category.slug}
-            subcategory={subcategory}
-            multiple
-            selectedProductIds={selectedProducts.map((p) => p._id)}
-            onToggleProduct={handleToggleProduct}
-            catalogOnlyMode
-            layout="grid"
-          />
+          {needsCmTypePicker && !materialType ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+              {cmMaterialTypes.map((type) => {
+                const img = getSubcategoryImageUrl(CONSTRUCTION_MATERIALS_CATALOG_SLUG, type);
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setMaterialType(type);
+                      setSelectedProducts([]);
+                      setErrors((e) => ({ ...e, products: undefined }));
+                    }}
+                    className="group relative overflow-hidden rounded-lg border border-border text-left transition-all hover:border-primary/40"
+                  >
+                    <div className="aspect-[5/3] overflow-hidden bg-muted">
+                      <img
+                        src={img}
+                        alt=""
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                    <div className="px-2 py-1.5">
+                      <p className="text-xs font-medium leading-tight line-clamp-2">{type}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <ProductCatalogPicker
+              categorySlug={needsCmTypePicker ? CONSTRUCTION_MATERIALS_CATALOG_SLUG : category.slug}
+              subcategory={needsCmTypePicker ? materialType : subcategory}
+              multiple
+              selectedProductIds={selectedProducts.map((p) => p._id)}
+              onToggleProduct={handleToggleProduct}
+              catalogOnlyMode
+              layout="grid"
+            />
+          )}
 
           {errors.products && (
             <p className="text-sm text-destructive">{errors.products}</p>
           )}
 
-          <div className="sticky bottom-0 -mx-3 border-t bg-background/95 px-3 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+          {!(needsCmTypePicker && !materialType) ? (
+            <div className="sticky bottom-0 -mx-3 border-t bg-background/95 px-3 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
             <div className="flex gap-3">
               {!isEdit && (
-                <Button variant="outline" className="flex-1" onClick={() => setStep(1)} disabled={submitting}>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    if (needsCmTypePicker && materialType) {
+                      setMaterialType("");
+                      setSelectedProducts([]);
+                      return;
+                    }
+                    setStep(1);
+                  }}
+                  disabled={submitting}
+                >
                   Back
                 </Button>
               )}
@@ -471,7 +589,8 @@ export function CatalogProductsPage({
                 )}
               </Button>
             </div>
-          </div>
+            </div>
+          ) : null}
         </div>
       )}
 
