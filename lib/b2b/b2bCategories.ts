@@ -60,6 +60,7 @@ export function isB2bCategorySlug(slug: string | undefined): boolean {
   if (s.includes("electrical")) return true;
   if (s === "furniture" || s.startsWith("furniture-")) return true;
   if (s === "hardware" || s.startsWith("hardware-")) return true;
+  if (s.includes("trader") || s === "vendors" || s === "b2b" || s === "b2b-services") return true;
   return false;
 }
 
