@@ -77,7 +77,15 @@ const ChatWidget = forwardRef<ChatWidgetHandle>((props, ref) => {
   // Save messages to localStorage
   useEffect(() => {
     if (messages.length > 1) {
-      localStorage.setItem("chatMessages", JSON.stringify(messages));
+      try {
+        localStorage.setItem("chatMessages", JSON.stringify(messages));
+      } catch {
+        try {
+          localStorage.removeItem("chatMessages");
+        } catch {
+          /* ignore quota */
+        }
+      }
     }
   }, [messages]);
 
