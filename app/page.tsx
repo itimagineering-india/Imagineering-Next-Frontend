@@ -15,6 +15,7 @@ import { BASE_URL } from "@/lib/constants";
 import {
   getHomeBanners,
   getHomeCategorySections,
+  getHomeProviderGlobeMarkers,
   getHomeTopProviders,
 } from "@/lib/api";
 
@@ -32,10 +33,11 @@ export const metadata: Metadata = {
 
 /** Home layout: Hero → Search → Featured categories → Services → Top providers → Categories → Imagineering Credit */
 export default async function Home() {
-  const [banners, categorySections, topProviders] = await Promise.all([
+  const [banners, categorySections, topProviders, globeMarkers] = await Promise.all([
     getHomeBanners("home"),
     getHomeCategorySections({ limit: 9 }),
     getHomeTopProviders(10),
+    getHomeProviderGlobeMarkers(),
   ]);
 
   return (
@@ -45,7 +47,7 @@ export default async function Home() {
         <HeroSection initialBanners={banners} />
         <SearchBarSection />
         <FeaturedCategoryCardsSection />
-        <TrustStatsSection />
+        <TrustStatsSection globeMarkers={globeMarkers} />
         <ServicesSection />
         <ConstructionCalculatorBannerSection />
         <HomePromoBannersSection />
