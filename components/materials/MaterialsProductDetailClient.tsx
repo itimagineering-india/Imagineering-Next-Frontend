@@ -316,6 +316,7 @@ export function MaterialsProductDetailClient({ productId }: Props) {
           serviceId={linkedServiceId}
           serviceTitle={linkedServiceTitle || mapped.name}
           priceType={(raw?.suggestedPriceType as string) || mapped.unitType}
+          noCountdown
         />
       ) : null}
     </div>
