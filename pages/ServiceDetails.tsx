@@ -624,7 +624,7 @@ export default function ServiceDetails() {
       redirectToLogin();
       toast({
         title: "Login Required",
-        description: "Please login to get quotes from nearby providers",
+        description: "Please login to get quotes from listed suppliers",
         variant: "destructive",
       });
       return;
