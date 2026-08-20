@@ -491,6 +491,7 @@ export function ConstructionMaterialsHub() {
           serviceId={quoteService.id}
           serviceTitle={quoteService.title}
           priceType={quoteService.priceType}
+          noCountdown
         />
       ) : null}
     </div>
