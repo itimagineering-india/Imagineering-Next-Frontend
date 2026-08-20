@@ -15,6 +15,7 @@ import {
   getManpowerServiceOfferPresetsForSubcategory,
   humanizeManpowerTaskId,
 } from "@/config/manpowerServiceOfferPresets";
+import { isMachineRentalCategorySlug } from "@/lib/machineRental";
 
 interface Location {
   address: string;
@@ -189,6 +190,7 @@ export function SubmitReview({
                 <p className="caption">Enquiry-only listing</p>
               )}
             </div>
+            {!isMachineRentalCategorySlug(formData.categorySlug) ? (
             <div>
               <Label className="caption">Availability</Label>
               <div className="mt-1 space-y-1">
@@ -208,6 +210,7 @@ export function SubmitReview({
                 )}
               </div>
             </div>
+            ) : null}
           </CardContent>
         </Card>
 
