@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
 import { parseHeaderSearchQuery } from "@/lib/searchNavigation";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
+import { filterB2bCategories } from "@/lib/b2b/b2bCategories";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -175,32 +176,7 @@ export function Header() {
     const normalized = Array.isArray(cats) ? cats : [];
     const activeCategoriesForExplore = normalized.filter((c: any) => c?.isActive !== false);
 
-       // B2B categories come from admin-configured categories (subcategories too),
-       // even if they are not active yet.
-       // We filter by category name to keep this UI aligned with what admins add in the Categories admin panel.
-       const b2bNameSet = new Set([
-        "construction material",
-        "construction materials",
-        "electrical & lighting",
-        "electrical & lightening",
-        "furniture",
-        "furniture & hardware",
-        "furniture and hardware",
-        "hardware and senitary",
-        "hardware",
-       ]);
-       const filteredB2b = normalized.filter((c: any) => {
-        const name = (c?.name ?? "").toString().toLowerCase().replace(/\s+/g, " ").trim();
-        const interactionType = (c?.interactionType ?? "").toString();
-        const matchesName =
-         b2bNameSet.has(name) ||
-         // Allow minor formatting differences (e.g. electrical-lighting vs electrical & lighting).
-         name.replace(/&/g, "").trim() === "electrical lighting" ||
-         name.replace(/&/g, "").trim() === "electrical lightening";
-
-        // Only show categories that admins marked for purchase flow.
-        return matchesName && (!interactionType || interactionType === "PURCHASE_ONLY");
-       });
+       const filteredB2b = filterB2bCategories(normalized);
        const withSubcategoryNames = (category: any) => ({
         ...category,
         subcategories: getSubcategoryNames(category?.subcategories),
