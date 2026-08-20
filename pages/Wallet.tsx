@@ -361,7 +361,7 @@ export default function WalletPage() {
                   ) : (
                     <ul className="mt-2 space-y-1 text-muted-foreground">
                       <li>Minimum {displayMinRedeem} points to apply</li>
-                      <li>Maximum {displayMaxPercent}% of order total per booking</li>
+                      <li>Maximum {displayMaxPercent}% of wallet points per booking</li>
                       <li>Debited only after payment succeeds</li>
                     </ul>
                   )}
