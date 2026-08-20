@@ -2756,6 +2756,13 @@ export const api = {
       zipCode?: string;
       coordinates?: { lat: number; lng: number };
       notes?: string;
+      items?: Array<{
+        serviceId: string;
+        title?: string;
+        quantity: number;
+        priceType?: string;
+        catalogProductId?: string;
+      }>;
     }) =>
       apiRequest<{ data: any }>('/api/quote-requests', {
         method: 'POST',
@@ -2792,6 +2799,7 @@ export const api = {
       deliveryOption?: 'free' | 'paid' | 'not_available';
       deliveryCharge?: number;
       sampleImages?: string[];
+      items?: Array<{ serviceId: string; unitPrice: number }>;
     }) =>
       apiRequest<{ data: any }>(`/api/quote-requests/${id}/offers`, {
         method: 'POST',
