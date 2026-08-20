@@ -22,6 +22,7 @@ import {
 } from "@/components/imagineering-credit/ImagineeringCreditCheckoutPanel";
 import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 import { CartOffersModal } from "@/components/cart/CartOffersModal";
+import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -100,11 +101,9 @@ export default function QuoteRequestConfirmPage() {
     else setTransport("supplier");
   }, [offer?.id, deliveryUnavailable]);
 
-  const serviceTitle = useMemo(() => {
-    const s = data?.service;
-    if (s && typeof s === "object") return s.title || "your request";
-    return "your request";
-  }, [data?.service]);
+  const serviceTitle = useMemo(() => quoteRequestHeadline(data) || "your request", [data]);
+  const requestItems = useMemo(() => quoteRequestItems(data), [data]);
+  const offerLines = useMemo(() => quoteOfferItems(offer), [offer]);
 
   const serviceId = useMemo(() => {
     const s = data?.service;
@@ -223,7 +222,7 @@ export default function QuoteRequestConfirmPage() {
                 ? `Paid with ${IMAGINEERING_CREDIT.name}. Your order is placed.`
                 : "Order placed. Complete payment as selected.",
         });
-        router.push("/dashboard/buyer/orders");
+        router.push("/buyer/orders");
         return;
       }
 
@@ -271,7 +270,7 @@ export default function QuoteRequestConfirmPage() {
           You already selected a quote for this request.
         </p>
         <Button asChild className="mt-4">
-          <Link href="/dashboard/buyer/orders">View orders</Link>
+          <Link href="/buyer/orders">View orders</Link>
         </Button>
       </main>
     );
@@ -296,8 +295,29 @@ export default function QuoteRequestConfirmPage() {
           <div>
             <p className="font-semibold">Quote {offerIndex + 1}</p>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Package className="h-3.5 w-3.5" /> Qty {data.quantity}
+              <Package className="h-3.5 w-3.5" />
+              {requestItems.length > 1
+                ? `${requestItems.length} products`
+                : `Qty ${data.quantity}`}
             </p>
+            {offerLines.length > 0 ? (
+              <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                {offerLines.map((item, idx) => (
+                  <li key={`${item.serviceId || item.title}-${idx}`}>
+                    {item.title} · Qty {item.quantity ?? 1} × {formatINR(Number(item.unitPrice || 0))} ={" "}
+                    {formatINR(Number(item.lineTotal || 0))}
+                  </li>
+                ))}
+              </ul>
+            ) : requestItems.length > 1 ? (
+              <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                {requestItems.map((item, idx) => (
+                  <li key={`${item.title}-${idx}`}>
+                    {item.title} × {item.quantity ?? 1}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <p className="mt-1 text-xs text-muted-foreground">
               Product: {formatINR(productAmount)}
               {transport === "supplier" && quotedDelivery > 0
@@ -471,7 +491,7 @@ export default function QuoteRequestConfirmPage() {
                   creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                   onSuccess={() => {
                     toast({ title: "Payment successful", description: "Your order is placed." });
-                    router.push("/dashboard/buyer/orders");
+                    router.push("/buyer/orders");
                   }}
                 >
                   <CreditCard className="h-4 w-4" /> Pay with Razorpay
@@ -486,7 +506,7 @@ export default function QuoteRequestConfirmPage() {
                   creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
                   onSuccess={() => {
                     toast({ title: "Payment successful", description: "Your order is placed." });
-                    router.push("/dashboard/buyer/orders");
+                    router.push("/buyer/orders");
                   }}
                 >
                   <CreditCard className="h-4 w-4" /> Pay with Cashfree
