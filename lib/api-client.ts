@@ -1478,6 +1478,8 @@ export const api = {
       buyerPAN?: string;
       paymentMethod?: string;
       receiptUrl?: string;
+      couponUsageId?: string;
+      creditsToApply?: number;
     }) =>
       apiRequest('/api/bookings/cart', {
         method: 'POST',
