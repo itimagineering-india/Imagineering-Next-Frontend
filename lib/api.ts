@@ -323,6 +323,35 @@ export async function getHomeCategorySections(params?: {
   );
 }
 
+/** Homepage globe: city clusters of real provider coordinates (no PII). */
+export type ProviderGlobeMarker = {
+  id: string;
+  lat: number;
+  lng: number;
+  count: number;
+  city?: string;
+  size?: number;
+};
+
+export async function getHomeProviderGlobeMarkers(): Promise<ProviderGlobeMarker[]> {
+  const json = await fetchJsonMaybe<
+    BackendResponse<{ markers?: ProviderGlobeMarker[] }>
+  >("/api/providers/globe-markers", {
+    next: { revalidate: 300 },
+  });
+  const list = json?.data?.markers;
+  if (!json?.success || !Array.isArray(list)) return [];
+  return list.filter(
+    (m) =>
+      Number.isFinite(m.lat) &&
+      Number.isFinite(m.lng) &&
+      m.lat >= -90 &&
+      m.lat <= 90 &&
+      m.lng >= -180 &&
+      m.lng <= 180
+  );
+}
+
 /** Top providers for homepage marquee (verified/top-rated with fallbacks). */
 export async function getHomeTopProviders(limit = 10): Promise<HomeTopProvider[]> {
   const attempts = [
