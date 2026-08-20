@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const { id } = await params;
   return {
     title: `Quote request | Imagineering India`,
-    description: "Compare nearby provider quotes and pay to place your order.",
+    description: "Compare quotes from listed suppliers and pay to place your order.",
     robots: { index: false, follow: false },
     alternates: { canonical: `/quote-requests/${id}` },
   };
