@@ -42,7 +42,7 @@ import {
 import { isMachineRentalCategorySlug } from "@/lib/machineRental";
 import { getManpowerServiceOfferPresetsForSubcategory } from "@/config/manpowerServiceOfferPresets";
 import api from "@/lib/api-client";
-import { getItemTypesForSubcategory, getSubcategoryNames } from "@/lib/categorySubcategories";
+import { filterSubcategoriesToProfile, getItemTypesForSubcategory, getSubcategoryNames, normalizePrimarySubcategoryList } from "@/lib/categorySubcategories";
 import {
  buildToolsServicePayload,
  EMPTY_TOOLS_FIELDS,
@@ -205,6 +205,7 @@ export function MultiStepServiceForm({
  const [providerBusinessAddress, setProviderBusinessAddress] = useState<
   ProviderBusinessAddressSnapshot | null | undefined
  >(undefined);
+ const [profileSubcategories, setProfileSubcategories] = useState<string[]>([]);
  const { toast } = useToast();
  const { user } = useAuth();
  const { status: kycStatus } = useProviderKycStatus();
@@ -370,6 +371,8 @@ export function MultiStepServiceForm({
     }
     if (cancelled) return;
 
+    setProfileSubcategories(normalizePrimarySubcategoryList(provider?.primarySubcategory));
+
     const ba = provider?.businessAddress as Record<string, unknown> | undefined;
     if (!ba) {
      setProviderBusinessAddress(null);
@@ -393,7 +396,10 @@ export function MultiStepServiceForm({
       Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0) ? { lat, lng } : undefined,
     });
    } catch {
-    if (!cancelled) setProviderBusinessAddress(null);
+    if (!cancelled) {
+     setProfileSubcategories([]);
+     setProviderBusinessAddress(null);
+    }
    }
   })();
 
@@ -524,9 +530,12 @@ export function MultiStepServiceForm({
  );
 
  const availableSubcategories = useMemo(() => {
-  if (!selectedCategory?.subcategories) return [];
-  return getSubcategoryNames(selectedCategory.subcategories);
- }, [selectedCategory]);
+  if (!selectedCategory) return [];
+  if (adminMode) return getSubcategoryNames(selectedCategory.subcategories);
+  return filterSubcategoriesToProfile(selectedCategory.subcategories, profileSubcategories, {
+   include: editMode ? (formData.subcategory || initialData?.subcategory) : undefined,
+  });
+ }, [selectedCategory, adminMode, profileSubcategories, editMode, formData.subcategory, initialData?.subcategory]);
 
  const availableItemTypes = useMemo(() => {
   if (!selectedCategory?.subcategories || !formData.subcategory) return [];
@@ -1230,9 +1239,11 @@ export function MultiStepServiceForm({
          disabled={categorySelectLocked}
         />
         {selectedCategory ? (
+         <>
          <SubCategorySelector
           subcategories={availableSubcategories}
           selectedSubcategory={formData.subcategory}
+          lockToList={!adminMode}
           onSubcategoryChange={(subcategory) => {
            setSelectedCatalogProductId(null);
            setCatalogCustomFields([]);
@@ -1251,6 +1262,14 @@ export function MultiStepServiceForm({
           }}
           categoryName={selectedCategory.name}
          />
+         {!adminMode ? (
+          <p className="text-xs text-muted-foreground">
+            {availableSubcategories.length > 0
+              ? "Only subcategories from your Business Profile are listed."
+              : "No subcategory on your Business Profile yet. Add them there, then come back."}
+          </p>
+         ) : null}
+         </>
         ) : (
          <div className="space-y-2">
           <Label htmlFor="subcategory">
