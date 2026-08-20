@@ -9,6 +9,8 @@ export interface AnalyticsMarker {
   location: [number, number];
   visitors: number;
   trend: number;
+  label?: string;
+  size?: number;
 }
 
 export interface GlobeAnalyticsProps {
@@ -16,6 +18,7 @@ export interface GlobeAnalyticsProps {
   className?: string;
   speed?: number;
   showLabels?: boolean;
+  liveUpdates?: boolean;
   phiStart?: number;
 }
 
@@ -33,6 +36,7 @@ export function GlobeAnalytics({
   className = "",
   speed = 0.003,
   showLabels = true,
+  liveUpdates = false,
   phiStart = 0,
 }: GlobeAnalyticsProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,7 +52,11 @@ export function GlobeAnalytics({
   }, [phiStart]);
 
   useEffect(() => {
-    if (!showLabels) return;
+    setData(initialMarkers);
+  }, [initialMarkers]);
+
+  useEffect(() => {
+    if (!showLabels || !liveUpdates) return;
     const interval = setInterval(() => {
       setData((prev) =>
         prev.map((m) => ({
@@ -59,7 +67,7 @@ export function GlobeAnalytics({
       );
     }, 3000);
     return () => clearInterval(interval);
-  }, [showLabels]);
+  }, [showLabels, liveUpdates]);
 
   const handlePointerDown = useCallback((e: PointerEvent<HTMLCanvasElement>) => {
     pointerInteracting.current = { x: e.clientX, y: e.clientY };
@@ -124,7 +132,11 @@ export function GlobeAnalytics({
         markerColor: [0.3, 0.85, 0.45],
         glowColor: [0.94, 0.93, 0.91],
         markerElevation: 0,
-        markers: initialMarkers.map((m) => ({ location: m.location, size: 0.04, id: m.id })),
+        markers: initialMarkers.map((m) => ({
+          location: m.location,
+          size: m.size ?? 0.04,
+          id: m.id,
+        })),
         arcs: [],
         arcColor: [0.25, 0.9, 0.5],
         arcWidth: 0.5,
@@ -209,7 +221,7 @@ export function GlobeAnalytics({
               <span
                 style={{
                   fontFamily: "monospace",
-                  fontSize: "0.85rem",
+                  fontSize: "0.7rem",
                   fontWeight: 600,
                   color: "#fff",
                   letterSpacing: "-0.02em",
@@ -217,17 +229,33 @@ export function GlobeAnalytics({
               >
                 {m.visitors}
               </span>
-              <span
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "0.55rem",
-                  fontWeight: 500,
-                  letterSpacing: "0.02em",
-                  color: m.trend >= 0 ? "#34d399" : "#f87171",
-                }}
-              >
-                {m.trend >= 0 ? "↑" : "↓"} {Math.abs(m.trend)}%
-              </span>
+              {m.label ? (
+                <span
+                  style={{
+                    fontFamily: "sans-serif",
+                    fontSize: "0.58rem",
+                    fontWeight: 500,
+                    color: "rgba(255,255,255,0.78)",
+                    maxWidth: 88,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {m.label}
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "0.55rem",
+                    fontWeight: 500,
+                    letterSpacing: "0.02em",
+                    color: m.trend >= 0 ? "#34d399" : "#f87171",
+                  }}
+                >
+                  {m.trend >= 0 ? "↑" : "↓"} {Math.abs(m.trend)}%
+                </span>
+              )}
             </div>
           ))
         : null}
