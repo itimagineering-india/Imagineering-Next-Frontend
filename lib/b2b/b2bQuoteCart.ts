@@ -1,3 +1,5 @@
+import { parseQuoteQuantity } from "@/lib/quoteQuantity";
+
 export const B2B_QUOTE_CART_MAX = 30;
 const STORAGE_KEY = "ii-b2b-quote-cart";
 
@@ -25,7 +27,7 @@ function safeParse(raw: string | null): B2bQuoteCartLine[] {
           serviceId: String(row?.serviceId || "").trim() || undefined,
           catalogProductId: String(row?.catalogProductId || "").trim() || undefined,
           title,
-          quantity: Math.min(999999, Math.max(1, Math.floor(Number(row?.quantity) || 1))),
+          quantity: parseQuoteQuantity(row?.quantity),
           priceType: String(row?.priceType || "").trim() || undefined,
         } satisfies B2bQuoteCartLine;
       })
@@ -67,7 +69,7 @@ export function upsertB2bQuoteCartLine(
 ): { lines: B2bQuoteCartLine[]; added: boolean; error?: "full" } {
   const existing = lines.find((l) => l.key === incoming.key);
   if (existing) {
-    existing.quantity = Math.min(999999, existing.quantity + Math.max(1, incoming.quantity || 1));
+    existing.quantity = parseQuoteQuantity(existing.quantity + parseQuoteQuantity(incoming.quantity));
     if (incoming.serviceId) existing.serviceId = incoming.serviceId;
     if (incoming.catalogProductId) existing.catalogProductId = incoming.catalogProductId;
     if (incoming.priceType) existing.priceType = incoming.priceType;
@@ -85,7 +87,7 @@ export function upsertB2bQuoteCartLine(
         serviceId: incoming.serviceId,
         catalogProductId: incoming.catalogProductId,
         title: incoming.title,
-        quantity: Math.max(1, incoming.quantity || 1),
+        quantity: parseQuoteQuantity(incoming.quantity),
         priceType: incoming.priceType,
       },
     ]),
