@@ -20,6 +20,14 @@ import { setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPriceTypeLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
 
+export type QuoteModalLine = {
+  serviceId: string;
+  title: string;
+  quantity?: number;
+  priceType?: string | null;
+  catalogProductId?: string;
+};
+
 function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
@@ -41,6 +49,9 @@ type GetBestQuotesModalProps = {
   serviceTitle: string;
   /** Product / service price unit (e.g. per_kg, per_bag) shown next to quantity. */
   priceType?: string | null;
+  /** Multi-product RFQ. When set, quantities are per line. */
+  items?: QuoteModalLine[];
+  onSubmitted?: () => void;
 };
 
 export function GetBestQuotesModal({
@@ -49,11 +60,14 @@ export function GetBestQuotesModal({
   serviceId,
   serviceTitle,
   priceType,
+  items,
+  onSubmitted,
 }: GetBestQuotesModalProps) {
   const { toast } = useToast();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const [quantity, setQuantity] = useState(1);
+  const [lineQuantities, setLineQuantities] = useState<number[]>([]);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -63,8 +77,20 @@ export function GetBestQuotesModal({
   const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(null);
 
   const minDate = useMemo(() => formatLocalYMD(new Date()), []);
+  const quoteLines = useMemo(
+    () => (Array.isArray(items) && items.length > 0 ? items : null),
+    [items]
+  );
+  const isMulti = Boolean(quoteLines && quoteLines.length > 1);
+  const headline = isMulti ? `${quoteLines!.length} products` : serviceTitle;
   const quantityUnit = useMemo(() => getQuantityUnitNoun(priceType), [priceType]);
   const quantityUnitLabel = useMemo(() => getPriceTypeLabel(priceType), [priceType]);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuantity(Math.max(1, quoteLines?.[0]?.quantity || 1));
+    setLineQuantities((quoteLines || []).map((line) => Math.max(1, line.quantity || 1)));
+  }, [open, quoteLines]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,8 +138,30 @@ export function GetBestQuotesModal({
       });
       return;
     }
-    if (!quantity || quantity < 1) {
+    const payloadItems =
+      quoteLines?.map((line, idx) => ({
+        serviceId: line.serviceId,
+        title: line.title,
+        quantity: Math.max(
+          1,
+          Number(
+            isMulti
+              ? lineQuantities[idx] || line.quantity || 1
+              : idx === 0
+                ? quantity
+                : lineQuantities[idx] || line.quantity || 1
+          )
+        ),
+        priceType: line.priceType || undefined,
+        catalogProductId: line.catalogProductId,
+      })) || undefined;
+    const firstQty = payloadItems?.[0]?.quantity || quantity;
+    if (!payloadItems && (!quantity || quantity < 1)) {
       toast({ title: "Quantity required", description: "Enter at least 1.", variant: "destructive" });
+      return;
+    }
+    if (payloadItems?.some((line) => !line.quantity || line.quantity < 1)) {
+      toast({ title: "Quantity required", description: "Each product needs at least quantity 1.", variant: "destructive" });
       return;
     }
     if (!date || !time) {
@@ -141,8 +189,9 @@ export function GetBestQuotesModal({
     setSubmitting(true);
     try {
       const res = await api.quoteRequests.create({
-        serviceId,
-        quantity,
+        serviceId: payloadItems?.[0]?.serviceId || serviceId,
+        quantity: firstQty,
+        items: payloadItems,
         preferredDate: date,
         preferredTime: time,
         address: addressLine.trim(),
@@ -161,13 +210,16 @@ export function GetBestQuotesModal({
       setActiveQuoteRequest({
         id: String(id),
         expiresAt: (res as any)?.data?.expiresAt,
-        serviceTitle,
+        serviceTitle: headline,
       });
 
+      onSubmitted?.();
       onOpenChange(false);
       toast({
         title: "Request sent",
-        description: "Providers who list this product will share prices within 30 minutes.",
+        description: isMulti
+          ? "Listed suppliers will share a combined quote within 30 minutes."
+          : "Providers who list this product will share prices within 30 minutes.",
       });
       router.push(`/quote-requests/${id}`);
     } catch (err: any) {
@@ -188,13 +240,52 @@ export function GetBestQuotesModal({
           <DialogHeader>
             <DialogTitle>Get Best Quotes</DialogTitle>
             <DialogDescription>
-              Share quantity, schedule, and delivery address for{" "}
-              <span className="font-medium text-foreground">{serviceTitle}</span>. Nearby verified
-              suppliers will send prices within 30 minutes.
+              {isMulti ? (
+                <>
+                  Share quantities, schedule, and delivery address for these{" "}
+                  <span className="font-medium text-foreground">{quoteLines!.length} products</span>.
+                  Listed suppliers will send a combined quote within 30 minutes.
+                </>
+              ) : (
+                <>
+                  Share quantity, schedule, and delivery address for{" "}
+                  <span className="font-medium text-foreground">{serviceTitle}</span>. Nearby verified
+                  suppliers will send prices within 30 minutes.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {isMulti ? (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Package className="h-4 w-4" /> Products
+                </Label>
+                <ul className="divide-y divide-border overflow-hidden rounded-lg border">
+                  {quoteLines!.map((line, idx) => (
+                    <li key={line.serviceId + idx} className="flex items-center gap-3 px-3 py-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.title}</p>
+                      <Input
+                        type="number"
+                        min={1}
+                        aria-label={`Quantity for ${line.title}`}
+                        className="h-9 w-20"
+                        value={lineQuantities[idx] ?? line.quantity ?? 1}
+                        onChange={(e) => {
+                          const next = Math.max(1, Number(e.target.value) || 1);
+                          setLineQuantities((prev) => {
+                            const copy = [...prev];
+                            copy[idx] = next;
+                            return copy;
+                          });
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
             <div className="space-y-2">
               <Label htmlFor="rfq-qty" className="flex items-center gap-2">
                 <Package className="h-4 w-4" /> Quantity
@@ -222,6 +313,7 @@ export function GetBestQuotesModal({
                 ) : null}
               </div>
             </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
