@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { MapPin, Calendar, Clock, Package, Loader2, ImagePlus, X, Navigation } from "lucide-react";
+import { MapPin, Calendar, Clock, Package, Loader2, ImagePlus, X, Navigation, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,8 +26,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import api from "@/lib/api-client";
-import { quoteLineKey, quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
+import { quoteLineKey, quoteOfferItems, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
 import { parseQuoteQuantity } from "@/lib/quoteQuantity";
+import { formatQuoteQtyLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
+import {
+  parseQuoteGstAmount,
+  parseQuoteGstPercent,
+  QUOTE_GST_SLABS,
+  suggestedQuoteGstAmount,
+} from "@/lib/quoteGst";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -62,9 +69,13 @@ export default function ProviderLeads() {
   const [quoteDeliveryOption, setQuoteDeliveryOption] = useState<"free" | "paid" | "not_available">("free");
   const [quoteDeliveryCharge, setQuoteDeliveryCharge] = useState("");
   const [quoteSampleImages, setQuoteSampleImages] = useState<string[]>([]);
+  const [quoteGstPercent, setQuoteGstPercent] = useState<number | null>(null);
+  const [quoteGstAmount, setQuoteGstAmount] = useState("");
+  const [quoteGstAmountEdited, setQuoteGstAmountEdited] = useState(false);
   const [quoteImageUploading, setQuoteImageUploading] = useState(false);
   const [quoteSubmitting, setQuoteSubmitting] = useState(false);
   const [quoteSecondsLeft, setQuoteSecondsLeft] = useState(0);
+  const [quoteSummaryExpanded, setQuoteSummaryExpanded] = useState(false);
 
   const fetchQuoteRequests = useCallback(async () => {
     setQuotesLoading(true);
@@ -120,6 +131,12 @@ export default function ProviderLeads() {
         setQuoteSampleImages(
           Array.isArray(row?.myOffer?.sampleImages) ? row.myOffer.sampleImages.filter(Boolean) : []
         );
+        const savedPercent = parseQuoteGstPercent(row?.myOffer?.gstPercent);
+        setQuoteGstPercent(savedPercent ?? null);
+        const savedGstAmount = parseQuoteGstAmount(row?.myOffer?.gstAmount);
+        setQuoteGstAmount(savedGstAmount != null ? String(savedGstAmount) : "");
+        setQuoteGstAmountEdited(savedGstAmount != null);
+        setQuoteSummaryExpanded(false);
         setQuoteDialogOpen(true);
       } catch (err: any) {
         toast({
@@ -148,10 +165,10 @@ export default function ProviderLeads() {
   }, [searchParams, openQuoteDialog, router]);
 
   useEffect(() => {
-    if (!quoteDialogOpen || !activeQuote?.windowOpen) return;
+    if (!quoteDialogOpen || !activeQuote?.windowOpen || !isTimedQuoteWindow(activeQuote)) return;
     const t = setInterval(() => setQuoteSecondsLeft((p) => Math.max(0, p - 1)), 1000);
     return () => clearInterval(t);
-  }, [quoteDialogOpen, activeQuote?.windowOpen, activeQuote?.expiresAt]);
+  }, [quoteDialogOpen, activeQuote?.windowOpen, activeQuote?.expiresAt, activeQuote]);
 
   const activeQuoteLines = useMemo(() => quoteRequestItems(activeQuote), [activeQuote]);
   const lineQuoteTotal = useMemo(
@@ -164,6 +181,14 @@ export default function ProviderLeads() {
       }, 0),
     [activeQuoteLines, quoteLineRates]
   );
+
+  const taxableForGst = activeQuoteLines.length > 0 ? lineQuoteTotal : Number(quoteAmount) || 0;
+
+  useEffect(() => {
+    if (quoteGstPercent == null || quoteGstAmountEdited) return;
+    const suggested = suggestedQuoteGstAmount(taxableForGst, quoteGstPercent);
+    setQuoteGstAmount(suggested > 0 ? String(suggested) : "0");
+  }, [quoteGstPercent, taxableForGst, quoteGstAmountEdited]);
 
   const submitQuoteOffer = async () => {
     if (!activeQuote?.id) return;
@@ -198,6 +223,19 @@ export default function ProviderLeads() {
       toast({ title: "Quote window closed", description: "You can no longer submit a price.", variant: "destructive" });
       return;
     }
+    if (quoteGstPercent == null) {
+      toast({
+        title: "Select GST slab",
+        description: "Choose 0%, 5%, 12%, 18% or 28%. GST amount fills in automatically.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const gstAmount = Number(quoteGstAmount);
+    if (!Number.isFinite(gstAmount) || gstAmount < 0) {
+      toast({ title: "Enter a valid GST amount (₹0 or more)", variant: "destructive" });
+      return;
+    }
     if (quoteDeliveryOption === "paid") {
       const charge = Number(quoteDeliveryCharge);
       if (!Number.isFinite(charge) || charge < 1) {
@@ -218,6 +256,8 @@ export default function ProviderLeads() {
         deliveryOption: quoteDeliveryOption,
         deliveryCharge: quoteDeliveryOption === "paid" ? Number(quoteDeliveryCharge) : 0,
         sampleImages: quoteSampleImages,
+        gstPercent: quoteGstPercent,
+        gstAmount,
       });
       if (!res.success) throw new Error((res as any)?.error?.message || "Failed to submit");
       toast({ title: "Quote sent", description: "Buyer will see your price on Imagineering India." });
@@ -303,7 +343,7 @@ export default function ProviderLeads() {
               <div>
                 <CardTitle className="text-base md:text-lg">Best Quote Requests</CardTitle>
                 <CardDescription className="text-xs md:text-sm">
-                  Nearby buyers asking for your price — submit within 30 minutes
+                  Nearby buyers asking for your price
                 </CardDescription>
               </div>
               {!quotesLoading ? (
@@ -326,6 +366,7 @@ export default function ProviderLeads() {
                   const title = quoteRequestHeadline(item);
                   const lines = quoteRequestItems(item);
                   const closed = !item?.windowOpen;
+                  const timed = isTimedQuoteWindow(item);
                   return (
                     <div
                       key={String(item.id)}
@@ -352,7 +393,7 @@ export default function ProviderLeads() {
                               <Calendar className="h-3 w-3" />
                               {item.preferredDate} · {item.preferredTime}
                             </span>
-                            {!closed ? (
+                            {!closed && timed ? (
                               <span className="inline-flex items-center gap-1 font-medium text-foreground">
                                 <Clock className="h-3 w-3" />
                                 {formatCountdown(Number(item.secondsRemaining || 0))} left
@@ -484,31 +525,55 @@ export default function ProviderLeads() {
               <DialogDescription>
                 {activeQuoteLines.length > 0
                   ? "Enter a rate for each product. Buyer will see item-wise prices."
-                  : "Share your total price for this buyer request. Window closes after 30 minutes."}
+                  : isTimedQuoteWindow(activeQuote)
+                    ? "Share your total price for this buyer request. Window closes after 30 minutes."
+                    : "Share your total price for this buyer request."}
               </DialogDescription>
             </DialogHeader>
 
             {activeQuote ? (
               <div className="space-y-4">
                 <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground space-y-1">
-                  {quoteRequestItems(activeQuote).length > 1 ? (
-                    <ul className="space-y-1 text-foreground">
-                      {quoteRequestItems(activeQuote).map((line, idx) => (
-                        <li key={`${line.title}-${idx}`}>
-                          {line.title} · Qty {line.quantity ?? 1}
-                        </li>
-                      ))}
-                    </ul>
+                  {activeQuoteLines.length > 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-2 text-left font-medium text-foreground"
+                        onClick={() => setQuoteSummaryExpanded((open) => !open)}
+                        aria-expanded={quoteSummaryExpanded}
+                      >
+                        <span>
+                          {activeQuoteLines.length} products
+                          {!quoteSummaryExpanded ? " · tap to view" : ""}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 transition-transform ${
+                            quoteSummaryExpanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                      {quoteSummaryExpanded ? (
+                        <ul className="space-y-1 text-foreground">
+                          {activeQuoteLines.map((line, idx) => (
+                            <li key={`${line.title}-${idx}`}>
+                              {line.title} · {formatQuoteQtyLabel(parseQuoteQuantity(line.quantity), line.priceType)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      <p>
+                        {activeQuote.preferredDate} · {activeQuote.preferredTime}
+                      </p>
+                    </>
                   ) : (
                     <p>
-                      Qty {activeQuote.quantity} · {activeQuote.preferredDate} · {activeQuote.preferredTime}
+                      {formatQuoteQtyLabel(
+                        parseQuoteQuantity(activeQuote.quantity),
+                        activeQuoteLines[0]?.priceType
+                      )}{" "}
+                      · {activeQuote.preferredDate} · {activeQuote.preferredTime}
                     </p>
                   )}
-                  {quoteRequestItems(activeQuote).length > 1 ? (
-                    <p>
-                      {activeQuote.preferredDate} · {activeQuote.preferredTime}
-                    </p>
-                  ) : null}
                   <p>
                     {activeQuote.addressLabel ||
                       [activeQuote.address?.address, activeQuote.address?.city, activeQuote.address?.state, activeQuote.address?.zipCode]
@@ -521,45 +586,57 @@ export default function ProviderLeads() {
                     </p>
                   ) : null}
                   {activeQuote.notes ? <p>Notes: {activeQuote.notes}</p> : null}
-                  <p className="font-mono text-base font-semibold text-foreground">
-                    {activeQuote.windowOpen
-                      ? `${formatCountdown(quoteSecondsLeft)} left`
-                      : "Quote window closed"}
-                  </p>
+                  {isTimedQuoteWindow(activeQuote) ? (
+                    <p className="font-mono text-base font-semibold text-foreground">
+                      {activeQuote.windowOpen
+                        ? `${formatCountdown(quoteSecondsLeft)} left`
+                        : "Quote window closed"}
+                    </p>
+                  ) : !activeQuote.windowOpen ? (
+                    <p className="font-semibold text-foreground">Request closed</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
                   {activeQuoteLines.length > 0 ? (
                     <>
-                      <Label>Rate per product (₹)</Label>
+                      <Label>Rate per unit (₹)</Label>
                       <div className="space-y-2 rounded-lg border p-3">
                         {activeQuoteLines.map((line, idx) => {
                           const key = quoteLineKey(line, idx);
                           const qty = parseQuoteQuantity(line.quantity);
+                          const unit = getQuantityUnitNoun(line.priceType);
                           const rate = Number(quoteLineRates[key] || 0);
                           const lineTotal =
                             Number.isFinite(rate) && rate > 0 ? Math.round(rate * qty * 100) / 100 : 0;
                           return (
-                            <div key={key} className="grid grid-cols-[1fr_7rem] items-center gap-2">
+                            <div key={key} className="grid grid-cols-[1fr_7.5rem] items-center gap-2">
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium text-foreground">{line.title}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  Qty {qty}
+                                  {formatQuoteQtyLabel(qty, line.priceType)}
                                   {lineTotal > 0 ? ` · ${formatINR(lineTotal)}` : ""}
                                 </p>
                               </div>
-                              <Input
-                                type="number"
-                                min={0.01}
-                                step="0.01"
-                                placeholder="Rate"
-                                value={quoteLineRates[key] || ""}
-                                onChange={(e) =>
-                                  setQuoteLineRates((prev) => ({ ...prev, [key]: e.target.value }))
-                                }
-                                disabled={!activeQuote.windowOpen}
-                                aria-label={`Rate for ${line.title}`}
-                              />
+                              <div className="space-y-0.5">
+                                <Input
+                                  type="number"
+                                  min={0.01}
+                                  step="0.01"
+                                  placeholder={unit ? `₹/${unit}` : "Rate"}
+                                  value={quoteLineRates[key] || ""}
+                                  onChange={(e) =>
+                                    setQuoteLineRates((prev) => ({ ...prev, [key]: e.target.value }))
+                                  }
+                                  disabled={!activeQuote.windowOpen}
+                                  aria-label={`Rate for ${line.title}${unit ? ` per ${unit}` : ""}`}
+                                />
+                                {unit ? (
+                                  <p className="text-center text-[10px] font-medium text-muted-foreground">
+                                    per {unit}
+                                  </p>
+                                ) : null}
+                              </div>
                             </div>
                           );
                         })}
@@ -581,6 +658,57 @@ export default function ProviderLeads() {
                       />
                     </>
                   )}
+                </div>
+                <div className="space-y-2">
+                  <Label>GST slab</Label>
+                  <p className="text-xs text-muted-foreground">
+                    <i>
+                      GST amount fills in from this slab. You can edit the amount if needed. Buyer
+                      will see GST and a total that includes it.
+                    </i>
+                  </p>
+                  <Select
+                    value={quoteGstPercent == null ? undefined : String(quoteGstPercent)}
+                    onValueChange={(v) => {
+                      setQuoteGstPercent(Number(v));
+                      setQuoteGstAmountEdited(false);
+                    }}
+                    disabled={!activeQuote.windowOpen}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select GST %" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QUOTE_GST_SLABS.map((pct) => (
+                        <SelectItem key={pct} value={String(pct)}>
+                          {pct === 0 ? "0% (Without GST)" : `${pct}%`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Label htmlFor="quote-gst-amount">GST amount (₹)</Label>
+                  <Input
+                    id="quote-gst-amount"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={quoteGstAmount}
+                    onChange={(e) => {
+                      setQuoteGstAmount(e.target.value);
+                      setQuoteGstAmountEdited(true);
+                    }}
+                    disabled={!activeQuote.windowOpen || quoteGstPercent == null}
+                    placeholder={quoteGstPercent == null ? "Select a slab first" : "e.g. 1800"}
+                  />
+                  {quoteGstPercent != null && taxableForGst > 0 ? (
+                    <p className="text-sm font-semibold text-foreground">
+                      Materials {formatINR(taxableForGst)}
+                      {" + "}
+                      GST {formatINR(Number(quoteGstAmount) || 0)}
+                      {" = "}
+                      {formatINR(taxableForGst + (Number(quoteGstAmount) || 0))}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="quote-notes">Notes (optional)</Label>
