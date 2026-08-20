@@ -31,7 +31,7 @@ export type MaterialsHubData = {
 export async function findServiceIdForCatalogProduct(
   catalogProductId: string,
   opts?: { excludeProviderUserId?: string | null }
-): Promise<{ serviceId: string; title: string } | null> {
+): Promise<{ serviceId: string; title: string; priceType?: string } | null> {
   const id = String(catalogProductId || "").trim();
   if (!id) return null;
   const exclude = String(opts?.excludeProviderUserId || "").trim();
@@ -64,9 +64,11 @@ export async function findServiceIdForCatalogProduct(
     }) as Record<string, unknown> | undefined;
 
     if (other) {
+      const priceType = String(other?.priceType || "").trim();
       return {
         serviceId: serviceIdOf(other),
         title: String(other?.title || "").trim(),
+        ...(priceType ? { priceType } : {}),
       };
     }
     return null;
