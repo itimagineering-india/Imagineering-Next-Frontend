@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { cn } from "@/lib/utils";
+import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -82,6 +82,7 @@ function OfferCard({
   const delivery = Number(offer.deliveryCharge || 0);
   const score = Number(offer.offerScore || 0);
   const recommended = Boolean(offer.isRecommended);
+  const lineItems = quoteOfferItems(offer);
 
   return (
     <article
@@ -149,6 +150,23 @@ function OfferCard({
 
       {expanded ? (
         <div className="mt-4 space-y-2 border-t border-stone-200 pt-3 text-sm">
+          {lineItems.length > 0 ? (
+            <ul className="space-y-1.5 pb-2">
+              {lineItems.map((item, idx) => (
+                <li key={`${item.serviceId || item.title}-${idx}`} className="flex justify-between gap-3">
+                  <span className="min-w-0 text-stone-600">
+                    <span className="block truncate font-medium text-stone-800">{item.title}</span>
+                    <span className="text-xs text-stone-500">
+                      Qty {item.quantity ?? 1} × {formatINR(Number(item.unitPrice || 0))}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-semibold tabular-nums text-stone-900">
+                    {formatINR(Number(item.lineTotal || (item.unitPrice || 0) * (item.quantity || 1)))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <div className="flex justify-between gap-3">
             <span className="text-stone-500">Material</span>
             <span className="font-semibold tabular-nums text-stone-900">{formatINR(material)}</span>
@@ -207,7 +225,7 @@ function OfferCard({
       ) : null}
       {isOrdered && offer.status === "selected" ? (
         <Button className="mt-4 h-11 w-full" asChild>
-          <Link href="/dashboard/buyer/orders">View order</Link>
+          <Link href="/buyer/orders">View order</Link>
         </Button>
       ) : null}
     </article>
@@ -241,8 +259,7 @@ export default function QuoteRequestPage() {
         setActiveQuoteRequest({
           id: String(row.id),
           expiresAt: row.expiresAt,
-          serviceTitle:
-            typeof row.service === "object" && row.service?.title ? row.service.title : undefined,
+          serviceTitle: quoteRequestHeadline(row),
         });
       }
     },
@@ -298,12 +315,8 @@ export default function QuoteRequestPage() {
     });
   }, [id, isAuthenticated, applyRow, fetchDetail]);
 
-  const serviceTitle = useMemo(() => {
-    const s = data?.service;
-    if (!s) return "Your request";
-    if (typeof s === "object") return s.title || "Your request";
-    return "Your request";
-  }, [data?.service]);
+  const serviceTitle = useMemo(() => quoteRequestHeadline(data), [data]);
+  const requestItems = useMemo(() => quoteRequestItems(data), [data]);
 
   const offers = useMemo(() => (Array.isArray(data?.offers) ? data.offers : []), [data?.offers]);
 
@@ -367,7 +380,17 @@ export default function QuoteRequestPage() {
           <h1 className="mt-1 text-xl font-bold tracking-tight text-stone-900 sm:text-2xl">
             {serviceTitle}
           </h1>
-          <p className="mt-2 text-sm font-medium text-stone-800">Qty {data.quantity}</p>
+          {requestItems.length > 1 ? (
+            <ul className="mt-2 space-y-1 text-sm font-medium text-stone-800">
+              {requestItems.map((item, idx) => (
+                <li key={`${item.title}-${idx}`}>
+                  {item.title} · Qty {item.quantity ?? 1}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm font-medium text-stone-800">Qty {data.quantity}</p>
+          )}
           <p className="mt-1 text-sm text-stone-600">{shortLocation(data)}</p>
           {data.createdAt ? (
             <p className="mt-1 text-xs text-stone-500">Requested {formatCreatedAt(data.createdAt)}</p>
@@ -405,10 +428,10 @@ export default function QuoteRequestPage() {
             <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-10 text-center">
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-700" />
               <p className="mt-3 text-sm font-semibold text-stone-900">
-                Searching verified suppliers…
+                Searching listed suppliers…
               </p>
               <p className="mt-1 text-sm text-stone-500">
-                {notified} suppliers notified.
+                {notified} listed suppliers notified.
                 <br />
                 Waiting for responses…
               </p>
