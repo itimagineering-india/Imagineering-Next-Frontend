@@ -38,7 +38,6 @@ export async function findServiceIdForCatalogProduct(
   try {
     const res = await api.services.getAll({
       catalogProductId: id,
-      category: MATERIALS_CATEGORY_SLUG,
       limit: 30,
       page: 1,
     });
