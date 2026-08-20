@@ -139,6 +139,10 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     setCreditsToApply(credits);
     setCreditsDiscount(discount);
   }, []);
+  const cartDiscountPayload = {
+    couponUsageId: couponUsageId || undefined,
+    creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
+  };
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [neftReceiptFile, setNeftReceiptFile] = useState<File | null>(null);
   const [neftBankDetails, setNeftBankDetails] = useState<{ accountName: string; accountNo: string; ifsc: string; upi: string } | null>(null);
@@ -336,6 +340,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         buyerGST: buyerGST,
         buyerPAN: buyerPAN,
         paymentMethod: "imagineering_credit",
+        ...cartDiscountPayload,
       });
       if (!response.success) {
         throw new Error(response.error?.message || "Failed to place order");
@@ -368,6 +373,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         buyerGST: buyerGST,
         buyerPAN: buyerPAN,
         paymentMethod: "cod",
+        ...cartDiscountPayload,
       });
       if (!response.success) {
         throw new Error(response.error?.message || "Failed to place order");
@@ -414,6 +420,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         buyerPAN: buyerPAN,
         paymentMethod: "neft",
         receiptUrl,
+        ...cartDiscountPayload,
       });
       if (!response.success) {
         throw new Error(response.error?.message || "Failed to place order");
@@ -479,6 +486,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         buyerPAN: buyerPAN,
         paymentMethod: "sbicollect",
         receiptUrl,
+        ...cartDiscountPayload,
       });
       if (!response.success) {
         throw new Error((response as any).error?.message || "Failed to place order");
