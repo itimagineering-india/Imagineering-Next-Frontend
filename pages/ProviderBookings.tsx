@@ -1046,7 +1046,11 @@ export default function ProviderBookings() {
                           <div>
                             <p className="text-sm font-semibold">You keep</p>
                             <p className="text-xs text-muted-foreground">
-                              {settlement.needsCollect ? 'Keep this from the cash' : 'Your net for this order'}
+                              {settlement.companyPaysYou > 0
+                                ? 'Your net for this order'
+                                : settlement.needsCollect
+                                  ? 'Keep this from the cash'
+                                  : 'Your net for this order'}
                               {delivery?.status === 'included' ? ' (includes delivery)' : ''}
                             </p>
                           </div>
@@ -1054,19 +1058,33 @@ export default function ProviderBookings() {
                             {formatInr(settlement.youKeep)}
                           </p>
                         </div>
-                        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
-                          <div>
-                            <p className="text-sm font-semibold">Pay to Imagineering India</p>
-                            <p className="text-xs text-muted-foreground">
-                              {settlement.needsCollect
-                                ? 'Give this remaining cash to the company'
-                                : 'Company share on this order'}
+                        {settlement.companyPaysYou > 0 ? (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-emerald-50/70">
+                            <div>
+                              <p className="text-sm font-semibold">Imagineering India pays you</p>
+                              <p className="text-xs text-muted-foreground">
+                                Buyer used an offer/wallet. Keep all collected cash; we add the rest to your payout.
+                              </p>
+                            </div>
+                            <p className="text-lg md:text-xl font-bold text-emerald-800 tabular-nums">
+                              {formatInr(settlement.companyPaysYou)}
                             </p>
                           </div>
-                          <p className="text-lg md:text-xl font-bold tabular-nums">
-                            {formatInr(settlement.payToCompany)}
-                          </p>
-                        </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                            <div>
+                              <p className="text-sm font-semibold">Pay to Imagineering India</p>
+                              <p className="text-xs text-muted-foreground">
+                                {settlement.needsCollect
+                                  ? 'Give this remaining cash to the company'
+                                  : 'Company share on this order'}
+                              </p>
+                            </div>
+                            <p className="text-lg md:text-xl font-bold tabular-nums">
+                              {formatInr(settlement.payToCompany)}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -1592,9 +1610,15 @@ function BookingsTable({
                         <p className="text-emerald-700">
                           You keep ₹{settlement.youKeep.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
-                        <p className="text-muted-foreground">
-                          Company ₹{settlement.payToCompany.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
+                        {settlement.companyPaysYou > 0 ? (
+                          <p className="text-emerald-800">
+                            Company pays you ₹{settlement.companyPaysYou.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            Company ₹{settlement.payToCompany.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        )}
                       </div>
                     );
                   })()}
