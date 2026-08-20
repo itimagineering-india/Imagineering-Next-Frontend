@@ -39,6 +39,24 @@ export type ProviderSettlementBooking = {
   paymentMethod?: string;
 };
 
+export function providerCommissionBreakup(
+  commission: number,
+  serviceAmount?: number
+): {
+  taxable: number;
+  gst: number;
+  total: number;
+  ratePercent: number;
+} {
+  const taxable = Math.max(0, Number(commission) || 0);
+  const gst = roundMoney(taxable * COMMISSION_GST_RATE);
+  const total = roundMoney(taxable + gst);
+  const amount = Number(serviceAmount) || 0;
+  const ratePercent =
+    amount > 0 && taxable > 0 ? Math.round((taxable / amount) * 10000) / 100 : 0;
+  return { taxable, gst, total, ratePercent };
+}
+
 export function providerSettlement(booking: ProviderSettlementBooking): {
   collectFromCustomer: number;
   youKeep: number;
