@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
+import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
 import { cn } from "@/lib/utils";
 
 function formatINR(n: number) {
@@ -103,7 +103,9 @@ function OfferCard({
         <p className="text-[32px] font-extrabold leading-none tracking-tight text-stone-900 tabular-nums sm:text-4xl">
           {formatINR(total)}
         </p>
-        <p className="mt-1 text-xs text-stone-500">Total · material + delivery</p>
+        <p className="mt-1 text-xs text-stone-500">
+          {Number(offer.gstAmount) > 0 ? "Total · material + GST + delivery" : "Total · material + delivery"}
+        </p>
         {score > 0 ? <ScoreMeter score={score} /> : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {offer.verified ? (
@@ -124,6 +126,11 @@ function OfferCard({
           {offer.onTimePercent != null ? (
             <span className="text-xs font-medium text-stone-500">
               {offer.onTimePercent}% on-time
+            </span>
+          ) : null}
+          {offer.gstLabel ? (
+            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
+              {offer.gstLabel}
             </span>
           ) : null}
         </div>
@@ -183,8 +190,14 @@ function OfferCard({
             </span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-stone-500">GST</span>
-            <span className="font-semibold text-stone-900">{offer.gstLabel || "GST Included"}</span>
+            <span className="text-stone-500">
+              GST{offer.gstPercent != null && Number(offer.gstPercent) > 0 ? ` (${offer.gstPercent}%)` : ""}
+            </span>
+            <span className="font-semibold tabular-nums text-stone-900">
+              {Number(offer.gstAmount) > 0
+                ? formatINR(Number(offer.gstAmount))
+                : offer.gstLabel || "Without GST"}
+            </span>
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-stone-500">Transport</span>
@@ -261,6 +274,7 @@ export default function QuoteRequestPage() {
           id: String(row.id),
           expiresAt: row.expiresAt,
           serviceTitle: quoteRequestHeadline(row),
+          persistent: !isTimedQuoteWindow(row),
         });
       }
     },
@@ -300,10 +314,10 @@ export default function QuoteRequestPage() {
   }, [authLoading, isAuthenticated, fetchDetail, id, router]);
 
   useEffect(() => {
-    if (!data?.windowOpen) return;
+    if (!data?.windowOpen || !isTimedQuoteWindow(data)) return;
     const t = setInterval(() => setSecondsLeft((prev) => Math.max(0, prev - 1)), 1000);
     return () => clearInterval(t);
-  }, [data?.windowOpen, data?.expiresAt]);
+  }, [data?.windowOpen, data?.expiresAt, data]);
 
   useEffect(() => {
     if (!id || !isAuthenticated) return;
@@ -345,7 +359,10 @@ export default function QuoteRequestPage() {
   const notified = Number(data?.notifiedProviderCount || 0);
   const received = Number(data?.offersReceived ?? offers.length);
   const progress = notified > 0 ? Math.min(100, Math.round((received / notified) * 100)) : 0;
-  const windowClosed = Boolean(data && (!data.windowOpen || data.status === "expired"));
+  const timed = isTimedQuoteWindow(data);
+  const windowClosed = Boolean(
+    data && timed && (!data.windowOpen || data.status === "expired")
+  );
   const isOrdered = data?.status === "ordered" || Boolean(data?.booking);
 
   if (loading || authLoading) {
@@ -399,16 +416,23 @@ export default function QuoteRequestPage() {
         </header>
 
         <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
-          {windowClosed || isOrdered ? (
-            <p className="text-base font-semibold text-stone-900">
-              {isOrdered ? "Order in progress" : "Quote window closed"}
-            </p>
-          ) : (
+          {isOrdered ? (
+            <p className="text-base font-semibold text-stone-900">Order in progress</p>
+          ) : data.status === "cancelled" ? (
+            <p className="text-base font-semibold text-stone-900">Request cancelled</p>
+          ) : windowClosed ? (
+            <p className="text-base font-semibold text-stone-900">Quote window closed</p>
+          ) : timed ? (
             <>
               <p className="font-mono text-3xl font-extrabold tabular-nums tracking-tight text-[#B91C1C]">
                 {formatCountdown(secondsLeft)}
               </p>
               <p className="mt-1 text-xs font-medium text-stone-500">Window open · auto-closes</p>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-semibold text-stone-900">Open — waiting for quotes</p>
+              <p className="mt-1 text-xs font-medium text-stone-500">No time limit</p>
             </>
           )}
           <p className="mt-4 text-sm font-semibold text-stone-900">
