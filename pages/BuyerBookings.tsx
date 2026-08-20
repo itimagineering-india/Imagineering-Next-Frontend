@@ -102,6 +102,8 @@ interface Booking {
     couponDiscount?: number;
     creditsApplied?: number;
     creditsDiscountInr?: number;
+    paymentMethod?: string;
+    paymentOption?: string;
   };
   location?: {
     address: string;
@@ -675,10 +677,8 @@ export default function BuyerBookings() {
         priceType: item.priceType || item.service?.priceType || "",
       })) || [];
 
-    const normalizedPaymentStatus =
-      booking.outstandingAmount > 0 && paymentMap[booking.paymentStatus] === "pending"
-        ? "partial"
-        : paymentMap[booking.paymentStatus] || "pending";
+    // Unpaid bookings always have outstanding > 0. That is pending, not partial.
+    const normalizedPaymentStatus = paymentMap[booking.paymentStatus] || "pending";
 
     return {
       _id: booking._id?.toString() || "",
@@ -1054,7 +1054,24 @@ export default function BuyerBookings() {
     }
   };
 
-  const getPaymentBadge = (status: string) => {
+  const isPayOnDeliveryBooking = (booking: Booking) => {
+    const method = String(
+      booking.metadata?.paymentMethod || booking.metadata?.paymentOption || ""
+    )
+      .toLowerCase()
+      .replace(/[\s_-]+/g, "");
+    return (
+      method === "cod" ||
+      method.includes("payondelivery") ||
+      method.includes("cashondelivery")
+    );
+  };
+
+  const getPaymentBadge = (booking: Booking) => {
+    const status = booking.paymentStatus;
+    if (isPayOnDeliveryBooking(booking) && (status === "pending" || status === "partial")) {
+      return <Badge className="bg-amber-600 text-white">Pay on delivery</Badge>;
+    }
     switch (status) {
       case "paid":
         return <Badge className="bg-green-500 text-white">Paid</Badge>;
@@ -1284,7 +1301,7 @@ export default function BuyerBookings() {
 
                       <div className="flex flex-wrap gap-2">
                         {getStatusBadge(booking.status, booking.rawStatus)}
-                        {getPaymentBadge(booking.paymentStatus)}
+                        {getPaymentBadge(booking)}
                       </div>
 
                       <div className="flex flex-wrap gap-2">
@@ -1392,7 +1409,7 @@ export default function BuyerBookings() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-muted-foreground w-20">Payment:</span>
-                          {getPaymentBadge(booking.paymentStatus)}
+                          {getPaymentBadge(booking)}
                         </div>
                       </div>
 
@@ -1663,7 +1680,7 @@ export default function BuyerBookings() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Payment Status</p>
-                      {getPaymentBadge(selectedBooking.paymentStatus)}
+                      {getPaymentBadge(selectedBooking)}
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Amount</p>
