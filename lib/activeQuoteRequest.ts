@@ -9,6 +9,8 @@ export type ActiveQuoteRequest = {
   id: string;
   expiresAt?: string;
   serviceTitle?: string;
+  /** When true, FAB shows Open / offer count instead of a 30-minute countdown */
+  persistent?: boolean;
 };
 
 function canUseStorage() {
@@ -26,6 +28,7 @@ export function getActiveQuoteRequest(): ActiveQuoteRequest | null {
       id: String(parsed.id),
       expiresAt: parsed.expiresAt ? String(parsed.expiresAt) : undefined,
       serviceTitle: parsed.serviceTitle ? String(parsed.serviceTitle) : undefined,
+      persistent: Boolean(parsed.persistent),
     };
   } catch {
     return null;
@@ -38,6 +41,7 @@ export function setActiveQuoteRequest(row: ActiveQuoteRequest): void {
     id: String(row.id),
     expiresAt: row.expiresAt ? String(row.expiresAt) : undefined,
     serviceTitle: row.serviceTitle ? String(row.serviceTitle) : undefined,
+    persistent: Boolean(row.persistent),
   };
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   window.dispatchEvent(new CustomEvent("active-quote-changed", { detail: payload }));
