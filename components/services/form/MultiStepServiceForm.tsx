@@ -39,6 +39,7 @@ import {
  shouldShowConstructionMaterialFields,
  validateConstructionMaterials,
 } from "@/lib/constructionMaterials";
+import { isMachineRentalCategorySlug } from "@/lib/machineRental";
 import { getManpowerServiceOfferPresetsForSubcategory } from "@/config/manpowerServiceOfferPresets";
 import api from "@/lib/api-client";
 import { getItemTypesForSubcategory, getSubcategoryNames } from "@/lib/categorySubcategories";
@@ -403,19 +404,28 @@ export function MultiStepServiceForm({
 
  const effectiveCategories = useMemo(() => {
   if (adminMode || !providerPrimaryCategoryId) return categories;
-  return categories.filter((c) => String(c._id) === String(providerPrimaryCategoryId));
+  return categories.filter(
+   (c) => String((c as { _id?: string; id?: string })._id ?? (c as { id?: string }).id) === String(providerPrimaryCategoryId)
+  );
  }, [adminMode, providerPrimaryCategoryId, categories]);
 
  const categorySelectLocked = !adminMode && !!providerPrimaryCategoryId;
 
  const selectedCategory = useMemo(() => {
-  if (!formData.category || effectiveCategories.length === 0) return null;
-  return effectiveCategories.find((cat) => String(cat._id) === String(formData.category)) || null;
- }, [formData.category, effectiveCategories]);
+  if (effectiveCategories.length === 0) return null;
+  if (formData.category) {
+   const match = effectiveCategories.find(
+    (cat) => String(cat._id ?? (cat as { id?: string }).id) === String(formData.category)
+   );
+   if (match) return match;
+  }
+  if (categorySelectLocked && effectiveCategories.length === 1) return effectiveCategories[0];
+  return null;
+ }, [formData.category, effectiveCategories, categorySelectLocked]);
 
  const showCatalogProductPicker = useMemo(
   () => isConstructionMaterialsCategorySlug(selectedCategory?.slug) && adminMode,
-  [selectedCategory?.slug, adminMode],
+  [selectedCategory?.slug, adminMode]
  );
 
  const handleCatalogProductSelect = useCallback(
@@ -524,6 +534,10 @@ export function MultiStepServiceForm({
  }, [selectedCategory, formData.subcategory]);
 
  const isTools = useMemo(() => isToolsCategory(selectedCategory), [selectedCategory]);
+ const isMachineRental = useMemo(
+  () => isMachineRentalCategorySlug(selectedCategory?.slug),
+  [selectedCategory?.slug],
+ );
 
  const showItemTypeSelector = useMemo(() => {
   if (!formData.subcategory || availableItemTypes.length === 0) return false;
@@ -617,8 +631,15 @@ export function MultiStepServiceForm({
     description: "Choose the account, marketplace category, and optional subcategory for this listing.",
    };
   }
+  if (currentStep === 3 && isMachineRental) {
+   return {
+    ...base,
+    title: "Pricing",
+    description: "How you quote this machine rental listing.",
+   };
+  }
   return base;
- }, [currentStep, categorySelectLocked, adminMode]);
+ }, [currentStep, categorySelectLocked, adminMode, isMachineRental]);
 
  const toggleManpowerOfferTask = (id: string) => {
   setFormData((prev) => {
@@ -1201,6 +1222,8 @@ export function MultiStepServiceForm({
          onCategoryChange={(categoryId) => {
           setFormData({ ...formData, category: categoryId, subcategory: "", itemType: "" });
           setToolsFields(EMPTY_TOOLS_FIELDS);
+          setSelectedCatalogProductId(null);
+          setCatalogCustomFields([]);
           setErrors({ ...errors, category: undefined });
          }}
          error={errors.category}
@@ -1559,8 +1582,12 @@ export function MultiStepServiceForm({
     return (
      <Card>
       <CardHeader className="pb-2">
-       <CardTitle className="subtitle">Pricing & availability</CardTitle>
-       <CardDescription>How you quote this job and when buyers can reach you.</CardDescription>
+       <CardTitle className="subtitle">{isMachineRental ? "Pricing" : "Pricing & availability"}</CardTitle>
+       <CardDescription>
+        {isMachineRental
+         ? "How you quote this machine rental listing."
+         : "How you quote this job and when buyers can reach you."}
+       </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
        <PricingSection
@@ -1570,6 +1597,7 @@ export function MultiStepServiceForm({
         priceMin={formData.priceMin}
         priceMax={formData.priceMax}
         availability={formData.availability}
+        showAvailability={!isMachineRental}
         onPriceModeChange={(value) => {
          setFormData({ ...formData, priceMode: value });
          setErrors({ ...errors, priceMode: undefined, startingPrice: undefined, priceMin: undefined, priceMax: undefined });
