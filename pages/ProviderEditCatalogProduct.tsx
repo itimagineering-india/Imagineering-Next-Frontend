@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api-client";
 import { CatalogProductsPage } from "@/components/services/catalog/CatalogProductsPage";
+import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
 
 export async function getServerSideProps() {
@@ -50,7 +51,7 @@ export default function ProviderEditCatalogProduct() {
           cat && typeof cat === "object" && cat !== null && "slug" in cat
             ? String((cat as { slug?: string }).slug ?? "")
             : "";
-        if (!isConstructionMaterialsCategorySlug(catSlug)) {
+        if (!isConstructionMaterialsCategorySlug(catSlug) && !isB2bCategorySlug(catSlug)) {
           router.replace("/dashboard/provider/services");
           return;
         }
