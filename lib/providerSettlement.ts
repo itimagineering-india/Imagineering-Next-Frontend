@@ -42,7 +42,9 @@ export type ProviderSettlementBooking = {
 export function providerSettlement(booking: ProviderSettlementBooking): {
   collectFromCustomer: number;
   youKeep: number;
+  youKeepFromCash: number;
   payToCompany: number;
+  companyPaysYou: number;
   needsCollect: boolean;
 } {
   const serviceAmount = Number(booking.amount) || 0;
@@ -72,10 +74,17 @@ export function providerSettlement(booking: ProviderSettlementBooking): {
   }
   collectFromCustomer = roundMoney(collectFromCustomer);
 
+  const gap = roundMoney(collectFromCustomer - youKeep);
+  const payToCompany = Math.max(0, gap);
+  const companyPaysYou = Math.max(0, roundMoney(-gap));
+  const youKeepFromCash = roundMoney(Math.min(youKeep, collectFromCustomer));
+
   return {
     collectFromCustomer,
     youKeep,
-    payToCompany: Math.max(0, roundMoney(collectFromCustomer - youKeep)),
+    youKeepFromCash,
+    payToCompany,
+    companyPaysYou,
     needsCollect,
   };
 }
