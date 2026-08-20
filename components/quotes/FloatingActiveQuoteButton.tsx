@@ -57,6 +57,12 @@ export function FloatingActiveQuoteButton() {
         setActive(null);
         return;
       }
+      const persistent = Boolean(
+        data?.timedWindow === false ||
+          data?.persistentQuote ||
+          data?.source === "contractor_hub" ||
+          data?.matchMode === "category"
+      );
       const next: ActiveQuoteRequest = {
         id: String(data.id || row.id),
         expiresAt: data.expiresAt || row.expiresAt,
@@ -64,6 +70,7 @@ export function FloatingActiveQuoteButton() {
           typeof data.service === "object" && data.service?.title
             ? data.service.title
             : row.serviceTitle,
+        persistent,
       };
       setActiveQuoteRequest(next);
       setActive(next);
@@ -95,15 +102,15 @@ export function FloatingActiveQuoteButton() {
   }, [authLoading, isAuthenticated, refreshStatus]);
 
   useEffect(() => {
-    if (!active?.expiresAt) {
-      setSecondsLabel(null);
+    if (!active?.expiresAt || active.persistent) {
+      setSecondsLabel(active?.persistent ? (offerCount > 0 ? `${offerCount} offers` : "Open") : null);
       return;
     }
     const tick = () => setSecondsLabel(formatCountdown(active.expiresAt));
     tick();
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, [active?.expiresAt, active?.id]);
+  }, [active?.expiresAt, active?.id, active?.persistent, offerCount]);
 
   if (!isAuthenticated || !active?.id) return null;
 
