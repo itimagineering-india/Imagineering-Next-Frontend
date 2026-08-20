@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,8 @@ interface SubCategorySelectorProps {
   onSubcategoryChange: (subcategory: string) => void;
   categoryName?: string;
   error?: string;
+  /** When true, only the given list can be chosen (no free-text subcategory). */
+  lockToList?: boolean;
 }
 
 export function SubCategorySelector({
@@ -25,6 +27,7 @@ export function SubCategorySelector({
   onSubcategoryChange,
   categoryName,
   error,
+  lockToList = false,
 }: SubCategorySelectorProps) {
   const [inputMode, setInputMode] = useState(false);
   const [manualInput, setManualInput] = useState(selectedSubcategory);
@@ -33,10 +36,10 @@ export function SubCategorySelector({
   useEffect(() => {
     setManualInput(selectedSubcategory);
     // If the selected subcategory is in the list, make sure we are not in manual input mode
-    if (selectedSubcategory && subcategories.includes(selectedSubcategory)) {
+    if (lockToList || (selectedSubcategory && subcategories.includes(selectedSubcategory))) {
       setInputMode(false);
     }
-  }, [selectedSubcategory, subcategories]);
+  }, [selectedSubcategory, subcategories, lockToList]);
 
   // Check if selected subcategory is from the list or manually entered
   const isManualEntry = selectedSubcategory && !subcategories.includes(selectedSubcategory);
@@ -47,7 +50,7 @@ export function SubCategorySelector({
         <Label htmlFor="subcategory">
           Subcategory <span className="text-muted-foreground">(Optional)</span>
         </Label>
-        {subcategories.length > 0 && (
+        {subcategories.length > 0 && !lockToList && (
           <button
             type="button"
             onClick={() => {
@@ -63,7 +66,13 @@ export function SubCategorySelector({
         )}
       </div>
 
-      {inputMode || subcategories.length === 0 ? (
+      {lockToList && subcategories.length === 0 ? (
+        <div className="rounded-md border border-dashed bg-muted/40 p-3">
+          <p className="text-sm text-muted-foreground">
+            No subcategory on your Business Profile for this category.
+          </p>
+        </div>
+      ) : inputMode || subcategories.length === 0 ? (
         <div className="space-y-2">
           <Input
             id="subcategory"
@@ -76,10 +85,10 @@ export function SubCategorySelector({
             className={error ? "border-destructive" : ""}
           />
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="caption text-destructive">{error}</p>
           )}
           {!categoryName && (
-            <p className="text-xs text-muted-foreground">
+            <p className="caption">
               Please select a category first to see predefined subcategories.
             </p>
           )}
@@ -120,20 +129,20 @@ export function SubCategorySelector({
             </SelectContent>
           </Select>
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="caption text-destructive">{error}</p>
           )}
           {!error && selectedSubcategory && (
-            <p className="text-xs text-muted-foreground">
+            <p className="caption">
               Dynamic fields will be loaded based on your selection
             </p>
           )}
         </div>
       )}
 
-      {isManualEntry && !inputMode && (
+      {isManualEntry && !inputMode && !lockToList && (
         <div className="p-2 rounded-md bg-muted/50 border border-dashed">
-          <p className="text-xs text-muted-foreground">
-            Current: <span className="font-medium">{selectedSubcategory}</span> (manually entered)
+          <p className="caption">
+            Current: <span className="body">{selectedSubcategory}</span> (manually entered)
           </p>
         </div>
       )}
