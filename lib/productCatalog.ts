@@ -53,11 +53,9 @@ export function mapCatalogProductToListingForm(
   const hasRange =
     min != null && max != null && min > 0 && max > 0 && max > min;
 
-  const materialTypeKey = resolveMaterialTypeKeyForServiceForm(
-    categorySlug,
-    subcategory,
-    itemType,
-  );
+  const materialTypeKey =
+    resolveMaterialTypeKeyForServiceForm(categorySlug, subcategory, itemType) ||
+    String(product.materialTypeKey || "").trim();
 
   const dynamicData: Record<string, unknown> = { ...constructionMeta };
   if (product.brand?.trim() && !dynamicData.brand) {
@@ -129,11 +127,12 @@ export function buildServicePayloadFromCatalogProduct(
   const isRange = patch.priceMode === "range" && priceMin > 0 && priceMax > 0;
   const exactPrice = Number.isFinite(min) && min > 0 ? min : 1;
 
-  const mt = resolveMaterialTypeKeyForServiceForm(
-    opts.categorySlug,
-    opts.subcategory,
-    opts.itemType || "",
-  );
+  const mt =
+    resolveMaterialTypeKeyForServiceForm(
+      opts.categorySlug,
+      opts.subcategory,
+      opts.itemType || "",
+    ) || String(product.materialTypeKey || "").trim();
   const meta = buildConstructionMetadataPayload(
     mt,
     extractConstructionStrings(patch.dynamicData),
@@ -143,7 +142,7 @@ export function buildServicePayloadFromCatalogProduct(
     title: patch.title,
     description,
     category: opts.categoryId,
-    subcategory: product.subcategory || opts.subcategory,
+    subcategory: opts.subcategory || product.subcategory,
     priceMode: isRange ? "range" : "exact",
     price: isRange ? priceMin : exactPrice,
     ...(isRange ? { priceMin, priceMax } : {}),
