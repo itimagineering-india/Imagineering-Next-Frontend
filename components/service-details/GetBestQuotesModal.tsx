@@ -20,6 +20,7 @@ import { setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPriceTypeLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
 import { parseQuoteQuantity, QUOTE_QTY_MIN } from "@/lib/quoteQuantity";
+import { pickRecoveredQuoteRequestId } from "@/lib/b2b/quoteRequestDisplay";
 
 export type QuoteModalLine = {
   serviceId: string;
@@ -53,6 +54,8 @@ type GetBestQuotesModalProps = {
   /** Multi-product RFQ. When set, quantities are per line. */
   items?: QuoteModalLine[];
   onSubmitted?: () => void;
+  /** B2B product RFQs have no 30-minute countdown. */
+  noCountdown?: boolean;
 };
 
 export function GetBestQuotesModal({
@@ -63,6 +66,7 @@ export function GetBestQuotesModal({
   priceType,
   items,
   onSubmitted,
+  noCountdown = false,
 }: GetBestQuotesModalProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -209,21 +213,49 @@ export function GetBestQuotesModal({
         id: String(id),
         expiresAt: (res as any)?.data?.expiresAt,
         serviceTitle: headline,
+        persistent: noCountdown || (res as any)?.data?.timedWindow === false,
       });
 
       onSubmitted?.();
       onOpenChange(false);
       toast({
         title: "Request sent",
-        description: isMulti
-          ? "Listed suppliers will share a combined quote within 30 minutes."
-          : "Providers who list this product will share prices within 30 minutes.",
+        description: noCountdown || (res as any)?.data?.timedWindow === false
+          ? isMulti
+            ? "Listed suppliers will share a combined quote. There is no time limit."
+            : "Providers who list this product will share prices. There is no time limit."
+          : isMulti
+            ? "Listed suppliers will share a combined quote within 30 minutes."
+            : "Providers who list this product will share prices within 30 minutes.",
       });
       router.push(`/quote-requests/${id}`);
     } catch (err: any) {
+      try {
+        const mine = await api.quoteRequests.getMine();
+        const recoveredId = pickRecoveredQuoteRequestId((mine as any)?.data);
+        if (recoveredId) {
+          setActiveQuoteRequest({
+            id: recoveredId,
+            serviceTitle: headline,
+            persistent: noCountdown,
+          });
+          onSubmitted?.();
+          onOpenChange(false);
+          toast({
+            title: "Request sent",
+            description: "Listed suppliers received your request. Track it from My requirements.",
+          });
+          router.push(`/quote-requests/${recoveredId}`);
+          return;
+        }
+      } catch {
+        /* keep original error */
+      }
       toast({
         title: "Could not send request",
-        description: err?.message || "Please try again.",
+        description:
+          err?.message ||
+          "Please try again. If suppliers were already notified, open My requirements to see this request.",
         variant: "destructive",
       });
     } finally {
@@ -242,13 +274,17 @@ export function GetBestQuotesModal({
                 <>
                   Share quantities, schedule, and delivery address for these{" "}
                   <span className="font-medium text-foreground">{quoteLines!.length} products</span>.
-                  Listed suppliers will send a combined quote within 30 minutes.
+                  {noCountdown
+                    ? " Listed suppliers will send a combined quote."
+                    : " Listed suppliers will send a combined quote within 30 minutes."}
                 </>
               ) : (
                 <>
                   Share quantity, schedule, and delivery address for{" "}
-                  <span className="font-medium text-foreground">{serviceTitle}</span>. Nearby verified
-                  suppliers will send prices within 30 minutes.
+                  <span className="font-medium text-foreground">{serviceTitle}</span>.{" "}
+                  {noCountdown
+                    ? "Listed suppliers will send prices."
+                    : "Nearby verified suppliers will send prices within 30 minutes."}
                 </>
               )}
             </DialogDescription>
@@ -261,15 +297,17 @@ export function GetBestQuotesModal({
                   <Package className="h-4 w-4" /> Products
                 </Label>
                 <ul className="divide-y divide-border overflow-hidden rounded-lg border">
-                  {quoteLines!.map((line, idx) => (
-                    <li key={line.serviceId + idx} className="flex items-center gap-3 px-3 py-2">
+                  {quoteLines!.map((line, idx) => {
+                    const unit = getQuantityUnitNoun(line.priceType);
+                    return (
+                    <li key={line.serviceId + idx} className="flex items-center gap-2 px-3 py-2">
                       <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.title}</p>
                       <Input
                         type="number"
                         min={QUOTE_QTY_MIN}
                         step="0.01"
                         aria-label={`Quantity for ${line.title}`}
-                        className="h-9 w-20"
+                        className="h-9 w-20 shrink-0"
                         value={lineQuantities[idx] ?? line.quantity ?? 1}
                         onChange={(e) => {
                           const n = Number(e.target.value);
@@ -280,8 +318,14 @@ export function GetBestQuotesModal({
                           });
                         }}
                       />
+                      {unit ? (
+                        <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">
+                          {unit}
+                        </span>
+                      ) : null}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </div>
             ) : (
