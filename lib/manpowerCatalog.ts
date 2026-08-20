@@ -3,6 +3,7 @@ import {
   normalizeManpowerWorkerTypeKey,
   type ManpowerServiceOfferPreset,
 } from "@/config/manpowerServiceOfferPresets";
+import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { normalizeCategorySlugLikeApp } from "@/lib/constructionMaterials";
 
 export type ManpowerWorkerTypeOption = {
@@ -38,10 +39,10 @@ export function isManpowerCategorySlug(slug: string | undefined): boolean {
   return normalizeCategorySlugLikeApp(slug || "") === "manpower";
 }
 
-/** True when Add Service should open catalog/select instead of the dialog form. */
+/** True when Add Service should offer catalog vs manual listing. */
 export function usesCatalogSelectFlow(slug: string | undefined): boolean {
   const s = normalizeCategorySlugLikeApp(slug || "");
-  return s === "construction-materials" || s === "manpower";
+  return s === "manpower" || isB2bCategorySlug(s);
 }
 
 function labelForWorkerKey(key: string): string {
