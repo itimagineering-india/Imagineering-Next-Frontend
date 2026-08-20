@@ -51,6 +51,7 @@ import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal"
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import { useTranslation } from "react-i18next";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import type { ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -1255,6 +1256,7 @@ export default function ServiceDetails() {
             serviceId={service.id}
             serviceTitle={service.title}
             priceType={service.priceType}
+            noCountdown={isB2bCategorySlug(categorySlug)}
           />
         )}
 
