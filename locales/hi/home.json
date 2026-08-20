@@ -19,7 +19,6 @@
   },
   "trustStats": {
     "providers": { "value": "50,000+", "label": "वेरिफाइड प्रोवाइडर" },
-    "projects": { "value": "10,000+", "label": "प्रोजेक्ट पूरे" },
     "cities": { "value": "500+", "label": "शहर कवर" },
     "rating": { "value": "4.8/5", "label": "औसत रेटिंग" },
     "trustedBy": "भारत भर में हज़ारों खुश ग्राहकों का भरोसा"
