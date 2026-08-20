@@ -2,6 +2,8 @@ export type QuoteRequestItemLike = {
   serviceId?: string;
   title?: string;
   quantity?: number;
+  /** Product listing unit (Service.priceType). */
+  priceType?: string;
 };
 
 export type QuoteOfferItemLike = {
@@ -38,4 +40,40 @@ export function quoteRequestHeadline(data: {
   const s = data?.service;
   if (s && typeof s === "object") return s.title || "Quote request";
   return "Quote request";
+}
+
+/** If create timed out after the RFQ was saved, recover the newest open request. */
+export function pickRecoveredQuoteRequestId(
+  rows: unknown,
+  maxAgeMs = 3 * 60 * 1000
+): string | null {
+  const list = Array.isArray(rows) ? rows : [];
+  const newest = list
+    .map((row) => {
+      const r = row as { id?: string; status?: string; createdAt?: string };
+      return {
+        id: String(r?.id || "").trim(),
+        status: String(r?.status || ""),
+        t: r?.createdAt ? new Date(r.createdAt).getTime() : 0,
+      };
+    })
+    .filter((row) => row.id && row.status === "open" && Number.isFinite(row.t) && row.t > 0)
+    .sort((a, b) => b.t - a.t)[0];
+  if (!newest || Date.now() - newest.t > maxAgeMs) return null;
+  return newest.id;
+}
+
+/** False when B2B / contractor RFQs have no 30-minute countdown. */
+export function isTimedQuoteWindow(data: {
+  timedWindow?: boolean;
+  persistentQuote?: boolean;
+  source?: string;
+  matchMode?: string;
+} | null | undefined): boolean {
+  if (!data) return true;
+  if (data.timedWindow === false) return false;
+  if (data.persistentQuote || data.source === "contractor_hub" || data.matchMode === "category") {
+    return false;
+  }
+  return true;
 }
