@@ -35,6 +35,8 @@ import {
  pickConstructionMetadataFields,
 } from "@/lib/constructionMaterials";
 import { usesCatalogSelectFlow } from "@/lib/manpowerCatalog";
+import { isB2bCategorySlug, usesB2bCatalogOrManualListing } from "@/lib/b2b/b2bCategories";
+import { isMachineRentalCategorySlug } from "@/lib/machineRental";
 import { parseToolsFieldsFromService } from "@/lib/toolsService";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -46,14 +48,50 @@ function isProviderBusinessProfileComplete(provider: unknown): boolean {
 }
 
 function providerPrimaryCategoryIdFromDoc(provider: unknown): string | null {
- if (!provider || typeof provider !== "object") return null;
- const raw = (provider as { primaryCategory?: unknown }).primaryCategory;
- if (raw == null || raw === "") return null;
- if (typeof raw === "object" && raw !== null && "_id" in (raw as object)) {
-  const id = (raw as { _id?: unknown })._id;
-  return id != null && String(id) ? String(id) : null;
+ const meta = resolveProviderPrimaryCategory(provider, []);
+ return meta.id || null;
+}
+
+function categoryIdOf(cat: { _id?: unknown; id?: unknown } | null | undefined): string {
+ if (!cat) return "";
+ return String(cat._id ?? cat.id ?? "").trim();
+}
+
+function resolveProviderPrimaryCategory(
+ provider: unknown,
+ categories: Array<{ _id?: unknown; id?: unknown; slug?: string; name?: string; interactionType?: string }>,
+): { id: string; slug: string; name: string; interactionType: string } {
+ if (!provider || typeof provider !== "object") {
+  return { id: "", slug: "", name: "", interactionType: "" };
  }
- return String(raw);
+ const raw = (provider as { primaryCategory?: unknown }).primaryCategory;
+ let id = "";
+ let slug = "";
+ let name = "";
+ let interactionType = "";
+ if (raw && typeof raw === "object") {
+  const o = raw as {
+   _id?: unknown;
+   id?: unknown;
+   slug?: unknown;
+   name?: unknown;
+   interactionType?: unknown;
+  };
+  id = String(o._id ?? o.id ?? "").trim();
+  slug = String(o.slug ?? "").trim();
+  name = String(o.name ?? "").trim();
+  interactionType = String(o.interactionType ?? "").trim();
+ } else if (raw) {
+  id = String(raw).trim();
+ }
+ const match = categories.find((c) => categoryIdOf(c) === id);
+ if (match) {
+  slug = slug || String(match.slug || "").trim();
+  name = name || String(match.name || "").trim();
+  interactionType = interactionType || String(match.interactionType || "").trim();
+  id = id || categoryIdOf(match);
+ }
+ return { id, slug, name, interactionType };
 }
 
 async function fetchProviderRecordForUser(userId: string): Promise<unknown | null> {
@@ -198,9 +236,15 @@ export default function ProviderServices() {
     return;
    }
    setProviderPrimaryCategoryIdForForm(primary);
-   const primaryCat = categories.find((c) => String(c._id) === String(primary));
-   const catSlug = primaryCat?.slug ?? "";
-   if (isConstructionMaterialsCategorySlug(catSlug)) {
+   const primaryCat = resolveProviderPrimaryCategory(provider, categories);
+   const catSlug = primaryCat.slug;
+   const catalogProductId = String(
+    (service as { catalogProductId?: string }).catalogProductId || ""
+   ).trim();
+   if (
+    isConstructionMaterialsCategorySlug(catSlug) ||
+    (isB2bCategorySlug(catSlug) && catalogProductId)
+   ) {
     router.push(`/dashboard/provider/services/${service._id}/edit`);
     return;
    }
@@ -242,9 +286,22 @@ export default function ProviderServices() {
     return;
    }
    setProviderPrimaryCategoryIdForForm(primary);
-   const primaryCat = categories.find((c) => String(c._id) === String(primary));
-   const catSlug = primaryCat?.slug ?? "";
-   if (usesCatalogSelectFlow(catSlug)) {
+   let cats = categories;
+   if (!cats.length) {
+    const response = await api.categories.getAll(true, { includeSubcategories: true });
+    cats =
+     response.success && response.data
+      ? ((response.data as { categories?: typeof categories }).categories || [])
+      : [];
+    if (cats.length) setCategories(cats);
+   }
+   const primaryCat = resolveProviderPrimaryCategory(provider, cats);
+   const catSlug = primaryCat.slug;
+   if (isMachineRentalCategorySlug(catSlug)) {
+    router.push("/dashboard/provider/services/add");
+    return;
+   }
+   if (usesCatalogSelectFlow(catSlug) || usesB2bCatalogOrManualListing(primaryCat)) {
     setAddModeChooserOpen(true);
     return;
    }
@@ -435,8 +492,8 @@ export default function ProviderServices() {
       <DialogHeader>
        <DialogTitle>How do you want to add a listing?</DialogTitle>
        <DialogDescription>
-        Catalog products match buyer search. A custom listing shows on your profile — set an exact
-        price so buyers can add it to cart.
+        Pick a catalog product so buyers can find the same item, or list a service manually with your
+        own title and photos.
        </DialogDescription>
       </DialogHeader>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -449,9 +506,9 @@ export default function ProviderServices() {
         }}
        >
         <Package className="mb-2 h-5 w-5 text-primary" />
-        <p className="font-semibold text-foreground">From catalog</p>
+        <p className="font-semibold text-foreground">Select from catalog</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Pick a standard product or task. Details fill in automatically.
+          Choose a standard product. Title, photos and specs fill in automatically.
         </p>
        </button>
        <button
@@ -463,9 +520,9 @@ export default function ProviderServices() {
         }}
        >
         <FilePenLine className="mb-2 h-5 w-5 text-primary" />
-        <p className="font-semibold text-foreground">Custom listing</p>
+        <p className="font-semibold text-foreground">List manually</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Add your own title, photos, and price — like before.
+          Enter your own title, photos, and price.
         </p>
        </button>
       </div>
