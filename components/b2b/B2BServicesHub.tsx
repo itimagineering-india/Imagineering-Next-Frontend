@@ -15,6 +15,7 @@ import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import {
   filterB2bCategories,
   isConstructionMaterialsB2bSlug,
+  type B2bCategoryLike,
 } from "@/lib/b2b/b2bCategories";
 import {
   fetchMaterialsHubData,
@@ -116,12 +117,12 @@ export function B2BServicesHub() {
       .getAll(false, { includeSubcategories: true, admin: true })
       .then((res) => {
         if (cancelled) return;
-        const cats = (res.data as { categories?: unknown[] } | undefined)?.categories || [];
+        const cats = (res.data as { categories?: B2bCategoryLike[] } | undefined)?.categories || [];
         const filtered = filterB2bCategories(Array.isArray(cats) ? cats : []).map((c) => ({
           _id: String((c as { _id?: string })._id || ""),
-          name: String((c as { name?: string }).name || ""),
-          slug: String((c as { slug?: string }).slug || ""),
-          subcategories: getSubcategoryNames((c as { subcategories?: unknown }).subcategories),
+          name: String(c.name || ""),
+          slug: String(c.slug || ""),
+          subcategories: getSubcategoryNames(c.subcategories),
         }));
         setCategories(filtered);
         const fromUrl = filtered.find((c) => c.slug === urlCategory);
