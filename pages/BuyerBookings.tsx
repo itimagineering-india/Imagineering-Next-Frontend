@@ -37,8 +37,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
-import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
-import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -560,11 +558,6 @@ export default function BuyerBookings() {
     return { label: "Delivery", value: formatBillInr(charged) };
   };
 
-  const getCouponDiscount = (booking: Booking) => {
-    const n = Number(booking.couponDiscount ?? booking.metadata?.couponDiscount ?? 0);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  };
-
   const getWalletDiscount = (booking: Booking) => {
     const n = Number(
       booking.creditsDiscountInr ??
@@ -574,6 +567,15 @@ export default function BuyerBookings() {
         0
     );
     return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
+  const getCouponDiscount = (booking: Booking) => {
+    const n = Number(booking.couponDiscount ?? booking.metadata?.couponDiscount ?? 0);
+    if (!(Number.isFinite(n) && n > 0)) return 0;
+    const wallet = getWalletDiscount(booking);
+    const code = String(booking.couponCode || booking.metadata?.couponCode || "").trim();
+    if (!code && wallet > 0 && Math.abs(n - wallet) <= 0.05) return 0;
+    return n;
   };
 
   const isQuoteBooking = (booking: Booking) =>
@@ -1316,38 +1318,6 @@ export default function BuyerBookings() {
                             )}
                           </Button>
                         )}
-                        {getOutstanding(booking) > 0 && (
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <RazorpayCheckout
-                              bookingId={booking._id}
-                              bookingPaymentStage="balance"
-                              bookingDescription={`Balance payment for ${booking.service?.title || "Booking"}`}
-                              amount={getOutstanding(booking) || getTotal(booking)}
-                              variant="outline"
-                              onSuccess={() => {
-                                fetchBookings();
-                                fetchInvoices();
-                                fetchPaymentHistory(booking._id);
-                              }}
-                            >
-                              Pay Balance (₹{getOutstanding(booking).toLocaleString()}) – Razorpay
-                            </RazorpayCheckout>
-                            <CashfreeCheckout
-                              bookingId={booking._id}
-                              bookingPaymentStage="balance"
-                              bookingDescription={`Balance payment for ${booking.service?.title || "Booking"}`}
-                              amount={getOutstanding(booking) || getTotal(booking)}
-                              variant="outline"
-                              onSuccess={() => {
-                                fetchBookings();
-                                fetchInvoices();
-                                fetchPaymentHistory(booking._id);
-                              }}
-                            >
-                              Pay Balance (₹{getOutstanding(booking).toLocaleString()}) – Cashfree
-                            </CashfreeCheckout>
-                          </div>
-                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -1706,36 +1676,6 @@ export default function BuyerBookings() {
                         </p>
                       )}
                     </div>
-                    {getOutstanding(selectedBooking) > 0 && (
-                      <div className="col-span-2 flex flex-col sm:flex-row gap-2">
-                        <RazorpayCheckout
-                          bookingId={selectedBooking._id}
-                          bookingPaymentStage="balance"
-                          bookingDescription={`Balance payment for ${selectedBooking.service?.title || "Booking"}`}
-                          amount={getOutstanding(selectedBooking) || getTotal(selectedBooking)}
-                          onSuccess={() => {
-                            fetchBookings();
-                            fetchInvoices();
-                            fetchPaymentHistory(selectedBooking._id);
-                          }}
-                        >
-                          Pay Remaining Balance (₹{getOutstanding(selectedBooking).toLocaleString()}) – Razorpay
-                        </RazorpayCheckout>
-                        <CashfreeCheckout
-                          bookingId={selectedBooking._id}
-                          bookingPaymentStage="balance"
-                          bookingDescription={`Balance payment for ${selectedBooking.service?.title || "Booking"}`}
-                          amount={getOutstanding(selectedBooking) || getTotal(selectedBooking)}
-                          onSuccess={() => {
-                            fetchBookings();
-                            fetchInvoices();
-                            fetchPaymentHistory(selectedBooking._id);
-                          }}
-                        >
-                          Pay Remaining Balance (₹{getOutstanding(selectedBooking).toLocaleString()}) – Cashfree
-                        </CashfreeCheckout>
-                      </div>
-                    )}
                     {canCancelBooking(selectedBooking) && (
                       <div className="col-span-2">
                         <Button
