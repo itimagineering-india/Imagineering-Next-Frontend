@@ -10,6 +10,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { FloatingActiveQuoteButton } from "@/components/quotes/FloatingActiveQuoteButton";
+import { OpenNativeApp } from "@/components/layout/OpenNativeApp";
 import { useEffect, useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -35,6 +36,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               <CartProvider>
                 <Toaster />
                 <Sonner />
+                <OpenNativeApp />
                 {children}
                 <FloatingActiveQuoteButton />
               </CartProvider>
