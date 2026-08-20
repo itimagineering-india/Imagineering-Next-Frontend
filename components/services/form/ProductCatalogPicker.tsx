@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Package, CheckCircle2 } from "lucide-react";
 import api from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { resolveMaterialTypeKeyForServiceForm } from "@/lib/constructionMaterials";
+import { resolveProductCatalogListParams } from "@/lib/constructionMaterials";
 import { type CatalogProductItem } from "@/lib/productCatalog";
 import { getSubcategoryImageUrl } from "@/lib/subcategoryImages";
 
@@ -61,11 +61,7 @@ export function ProductCatalogPicker({
       return;
     }
 
-    const materialTypeKey = resolveMaterialTypeKeyForServiceForm(
-      categorySlug,
-      subcategory,
-      itemType,
-    );
+    const listParams = resolveProductCatalogListParams(categorySlug, subcategory, itemType);
 
     let cancelled = false;
     setLoading(true);
@@ -73,9 +69,8 @@ export function ProductCatalogPicker({
 
     api.productCatalog
       .list({
-        categorySlug,
-        ...(materialTypeKey ? { materialTypeKey } : { subcategory }),
-        limit: 50,
+        ...listParams,
+        limit: 100,
       })
       .then((res) => {
         if (cancelled) return;
