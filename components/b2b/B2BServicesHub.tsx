@@ -79,8 +79,8 @@ export function B2BServicesHub() {
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
 
-  const urlCategory = searchParams.get("category") || "";
-  const urlSubcategory = searchParams.get("subcategory") || "";
+  const urlCategory = searchParams?.get("category") || "";
+  const urlSubcategory = searchParams?.get("subcategory") || "";
 
   const [categories, setCategories] = useState<B2bCategory[]>([]);
   const [activeSlug, setActiveSlug] = useState("");
