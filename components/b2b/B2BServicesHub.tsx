@@ -97,7 +97,7 @@ export function B2BServicesHub() {
   const [quoteService, setQuoteService] = useState<{
     id: string;
     title: string;
-    priceType?: string;
+    priceType?: string | null;
     items?: QuoteModalLine[];
   } | null>(null);
 
@@ -337,7 +337,7 @@ export function B2BServicesHub() {
         id: resolved[0].serviceId,
         title:
           resolved.length > 1 ? `${resolved.length} products` : resolved[0].title,
-        priceType: resolved[0].priceType,
+        priceType: resolved[0].priceType ?? undefined,
         items: resolved,
       });
       setQuoteOpen(true);
