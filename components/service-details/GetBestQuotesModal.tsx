@@ -19,6 +19,7 @@ import {
 import { setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPriceTypeLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
+import { parseQuoteQuantity, QUOTE_QTY_MIN } from "@/lib/quoteQuantity";
 
 export type QuoteModalLine = {
   serviceId: string;
@@ -88,8 +89,8 @@ export function GetBestQuotesModal({
 
   useEffect(() => {
     if (!open) return;
-    setQuantity(Math.max(1, quoteLines?.[0]?.quantity || 1));
-    setLineQuantities((quoteLines || []).map((line) => Math.max(1, line.quantity || 1)));
+    setQuantity(parseQuoteQuantity(quoteLines?.[0]?.quantity));
+    setLineQuantities((quoteLines || []).map((line) => parseQuoteQuantity(line.quantity)));
   }, [open, quoteLines]);
 
   useEffect(() => {
@@ -142,26 +143,23 @@ export function GetBestQuotesModal({
       quoteLines?.map((line, idx) => ({
         serviceId: line.serviceId,
         title: line.title,
-        quantity: Math.max(
-          1,
-          Number(
-            isMulti
-              ? lineQuantities[idx] || line.quantity || 1
-              : idx === 0
-                ? quantity
-                : lineQuantities[idx] || line.quantity || 1
-          )
+        quantity: parseQuoteQuantity(
+          isMulti
+            ? lineQuantities[idx] || line.quantity
+            : idx === 0
+              ? quantity
+              : lineQuantities[idx] || line.quantity
         ),
         priceType: line.priceType || undefined,
         catalogProductId: line.catalogProductId,
       })) || undefined;
     const firstQty = payloadItems?.[0]?.quantity || quantity;
-    if (!payloadItems && (!quantity || quantity < 1)) {
-      toast({ title: "Quantity required", description: "Enter at least 1.", variant: "destructive" });
+    if (!payloadItems && (!quantity || quantity < QUOTE_QTY_MIN)) {
+      toast({ title: "Quantity required", description: "Enter a quantity greater than 0.", variant: "destructive" });
       return;
     }
-    if (payloadItems?.some((line) => !line.quantity || line.quantity < 1)) {
-      toast({ title: "Quantity required", description: "Each product needs at least quantity 1.", variant: "destructive" });
+    if (payloadItems?.some((line) => !line.quantity || line.quantity < QUOTE_QTY_MIN)) {
+      toast({ title: "Quantity required", description: "Each product needs a quantity greater than 0.", variant: "destructive" });
       return;
     }
     if (!date || !time) {
@@ -268,15 +266,16 @@ export function GetBestQuotesModal({
                       <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.title}</p>
                       <Input
                         type="number"
-                        min={1}
+                        min={QUOTE_QTY_MIN}
+                        step="0.01"
                         aria-label={`Quantity for ${line.title}`}
                         className="h-9 w-20"
                         value={lineQuantities[idx] ?? line.quantity ?? 1}
                         onChange={(e) => {
-                          const next = Math.max(1, Number(e.target.value) || 1);
+                          const n = Number(e.target.value);
                           setLineQuantities((prev) => {
                             const copy = [...prev];
-                            copy[idx] = next;
+                            copy[idx] = Number.isFinite(n) && n > 0 ? n : QUOTE_QTY_MIN;
                             return copy;
                           });
                         }}
@@ -297,9 +296,13 @@ export function GetBestQuotesModal({
                 <Input
                   id="rfq-qty"
                   type="number"
-                  min={1}
+                  min={QUOTE_QTY_MIN}
+                  step="0.01"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    setQuantity(Number.isFinite(n) && n > 0 ? n : QUOTE_QTY_MIN);
+                  }}
                   className="flex-1"
                   aria-describedby={quantityUnit ? "rfq-qty-unit" : undefined}
                 />
