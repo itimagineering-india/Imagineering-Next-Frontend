@@ -77,6 +77,27 @@ export async function findServiceIdForCatalogProduct(
   }
 }
 
+/** Unit / price type from admin catalog product (suggestedPriceType). */
+export async function fetchCatalogProductPriceType(
+  catalogProductId: string
+): Promise<string | undefined> {
+  const id = String(catalogProductId || "").trim();
+  if (!id) return undefined;
+  try {
+    const res = await api.productCatalog.getById(id);
+    if (!res.success) return undefined;
+    const data = res.data as { product?: Record<string, unknown> } | Record<string, unknown> | undefined;
+    const product =
+      data && typeof data === "object" && "product" in data && data.product
+        ? (data.product as Record<string, unknown>)
+        : (data as Record<string, unknown> | undefined);
+    const unit = String(product?.suggestedPriceType || "").trim();
+    return unit || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function pickTint(index: number): string {
   return MATERIALS_CATEGORY_TINTS[index % MATERIALS_CATEGORY_TINTS.length];
 }
