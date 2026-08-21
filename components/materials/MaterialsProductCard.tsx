@@ -11,6 +11,8 @@ type Props = {
   hidePrice?: boolean;
   onAddToQuote?: (product: MaterialsProduct) => void;
   inQuoteList?: boolean;
+  /** Override product detail link (default: construction-materials). */
+  detailHref?: string;
 };
 
 export function MaterialsProductCard({
@@ -21,8 +23,9 @@ export function MaterialsProductCard({
   hidePrice,
   onAddToQuote,
   inQuoteList,
+  detailHref,
 }: Props) {
-  const href = `/construction-materials/product/${product.id}`;
+  const href = detailHref || `/construction-materials/product/${product.id}`;
   const label =
     ctaLabel || (product.isPriceRange ? "Get Best Quote" : "Add to Cart");
 
