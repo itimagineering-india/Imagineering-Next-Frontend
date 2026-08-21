@@ -70,6 +70,13 @@ export interface ConstructionMaterialProductLayoutProps {
   similarHrefBase?: string;
   /** Breadcrumb middle link override */
   categoryHref?: string;
+  /** Related products "view all" link */
+  viewAllHref?: string;
+  /** B2B: quote-list CTAs instead of cart */
+  onAddToQuote?: () => void;
+  inQuoteList?: boolean;
+  /** When true, always show quote CTAs (no add-to-cart). */
+  forceQuoteCtas?: boolean;
 }
 
 const WHY_BUY_POINTS = [
@@ -117,11 +124,22 @@ export function ConstructionMaterialProductLayout({
   responsive = false,
   similarHrefBase = "/service",
   categoryHref,
+  viewAllHref,
+  onAddToQuote,
+  inQuoteList = false,
+  forceQuoteCtas = false,
 }: ConstructionMaterialProductLayoutProps) {
   const [overviewExpanded, setOverviewExpanded] = useState(false);
-  const canAddToCart = showPricing && !isRangePrice && Boolean(service.id);
-  const showGetBestQuotes = isRangePrice;
+  const canAddToCart = !forceQuoteCtas && showPricing && !isRangePrice && Boolean(service.id);
+  const showGetBestQuotes = forceQuoteCtas || isRangePrice;
   const categoryLink = categoryHref || `/services?category=${categorySlug}`;
+  const relatedViewAll =
+    viewAllHref ||
+    (similarHrefBase.includes("construction-materials")
+      ? "/construction-materials"
+      : similarHrefBase.includes("b2b-services")
+        ? "/b2b-services"
+        : "/services");
 
   const shortDescription =
     service.description.length > 320 && !overviewExpanded
@@ -222,7 +240,23 @@ export function ConstructionMaterialProductLayout({
                 })}
               </div>
 
-              {canAddToCart ? (
+              {onAddToQuote ? (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    size="lg"
+                    variant={inQuoteList ? "secondary" : "outline"}
+                    className="h-12 w-full text-base font-semibold"
+                    onClick={onAddToQuote}
+                  >
+                    {inQuoteList ? "Added to quote" : "Add to quote"}
+                  </Button>
+                  {showGetBestQuotes ? (
+                    <Button size="lg" className="h-12 w-full text-base font-semibold" onClick={onGetQuotes}>
+                      Get Best Quotes
+                    </Button>
+                  ) : null}
+                </div>
+              ) : canAddToCart ? (
                 <AddToCartButton
                   serviceId={service.id}
                   providerName={service.provider?.name || service.provider?.businessName}
@@ -283,13 +317,8 @@ export function ConstructionMaterialProductLayout({
                 services={similarServices as never}
                 title="Related Products"
                 hrefBase={similarHrefBase}
-                viewAllHref={
-                  similarHrefBase.includes("construction-materials")
-                    ? "/construction-materials"
-                    : "/services"
-                }
-              />
-            </div>
+                viewAllHref={relatedViewAll}
+              />            </div>
           )}
 
           <Card className="rounded-2xl border shadow-sm">
@@ -327,6 +356,15 @@ export function ConstructionMaterialProductLayout({
                       </li>
                     ))}
                   </ul>
+                  {onAddToQuote ? (
+                    <Button
+                      variant={inQuoteList ? "secondary" : "outline"}
+                      className="h-11 w-full font-semibold"
+                      onClick={onAddToQuote}
+                    >
+                      {inQuoteList ? "Added to quote" : "Add to quote"}
+                    </Button>
+                  ) : null}
                   <Button className="h-11 w-full font-semibold" onClick={onGetQuotes}>
                     Get Best Quotes
                   </Button>
@@ -454,6 +492,20 @@ export function ConstructionMaterialProductLayout({
               label="Add to Cart"
               className="h-10 w-auto min-w-[120px] max-w-[180px] shrink-0 px-4 text-sm font-semibold sm:min-w-[140px] sm:px-5"
             />
+          ) : onAddToQuote ? (
+            <div className="flex shrink-0 gap-2">
+              <Button
+                size="sm"
+                variant={inQuoteList ? "secondary" : "outline"}
+                className="h-10 px-3 text-sm font-semibold"
+                onClick={onAddToQuote}
+              >
+                {inQuoteList ? "Added" : "Add to quote"}
+              </Button>
+              <Button size="sm" className="h-10 px-4 text-sm font-semibold" onClick={onGetQuotes}>
+                Get Best Quotes
+              </Button>
+            </div>
           ) : showGetBestQuotes ? (
             <Button
               size="sm"
