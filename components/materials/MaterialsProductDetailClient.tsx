@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   formatMaterialsPriceRange,
   isMaterialsCatalogPriceRange,
+  MATERIALS_CATEGORY_SLUG,
   resolveMaterialsMaterialTypeKey,
   type MaterialsProduct,
 } from "@/lib/materials/constructionMaterialsCatalog";
@@ -22,8 +23,18 @@ import {
   mapCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
 import { resolveMaterialsMediaUrl } from "@/lib/materials/media";
+import {
+  B2B_QUOTE_CART_MAX,
+  loadB2bQuoteCart,
+  normalizeB2bQuoteItemType,
+  upsertB2bQuoteCartLine,
+} from "@/lib/b2b/b2bQuoteCart";
 
-type Props = { productId: string };
+type Props = {
+  productId: string;
+  /** materials = /construction-materials/… ; b2b = /b2b-services/products/… */
+  surface?: "materials" | "b2b";
+};
 
 function toReadableText(raw: unknown): string {
   if (raw == null) return "—";
@@ -60,11 +71,18 @@ function similarToServiceCard(product: MaterialsProduct) {
   };
 }
 
-export function MaterialsProductDetailClient({ productId }: Props) {
+export function MaterialsProductDetailClient({ productId, surface = "materials" }: Props) {
   const { t } = useTranslation("materials");
   const router = useRouter();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+  const isB2b = surface === "b2b";
+  const productPath = isB2b
+    ? `/b2b-services/products/${productId}`
+    : `/construction-materials/product/${productId}`;
+  const hubHref = isB2b ? "/b2b-services" : "/construction-materials";
+  const hubLabel = isB2b ? "B2B Services" : "Construction Materials";
+  const productHrefBase = isB2b ? "/b2b-services/products" : "/construction-materials/product";
 
   const [loading, setLoading] = useState(true);
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
@@ -73,6 +91,12 @@ export function MaterialsProductDetailClient({ productId }: Props) {
   const [linkedServiceTitle, setLinkedServiceTitle] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [inQuoteList, setInQuoteList] = useState(false);
+
+  useEffect(() => {
+    if (!isB2b) return;
+    setInQuoteList(loadB2bQuoteCart().some((l) => l.key === `catalog:${productId}`));
+  }, [isB2b, productId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,17 +226,48 @@ export function MaterialsProductDetailClient({ productId }: Props) {
       return;
     }
     if (!isAuthenticated) {
-      router.push(
-        `/login?redirect=${encodeURIComponent(`/construction-materials/product/${productId}`)}`
-      );
+      router.push(`/login?redirect=${encodeURIComponent(productPath)}`);
       return;
     }
     setQuoteOpen(true);
-  }, [isAuthenticated, linkedServiceId, productId, router, t, toast]);
+  }, [isAuthenticated, linkedServiceId, productPath, router, t, toast]);
+
+  const handleAddToQuote = useCallback(() => {
+    if (!mapped) return;
+    const result = upsertB2bQuoteCartLine(loadB2bQuoteCart(), {
+      key: `catalog:${mapped.id}`,
+      catalogProductId: mapped.id,
+      title: mapped.name,
+      priceType: mapped.unitType || String(raw?.suggestedPriceType || "").trim() || undefined,
+      itemType: normalizeB2bQuoteItemType(mapped.categoryId),
+    });
+    if (result.error === "full") {
+      toast({
+        title: "Quote list is full",
+        description: `You can add up to ${B2B_QUOTE_CART_MAX} products in one request.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (result.error === "mixed_item_type") {
+      toast({
+        title: "Different item type",
+        description:
+          "This quote list is for one item type only. Clear the list on B2B Services to add a different type.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setInQuoteList(true);
+    toast({
+      title: result.added ? "Added to quote list" : "Quantity updated",
+      description: mapped.name,
+    });
+  }, [mapped, raw?.suggestedPriceType, toast]);
 
   const handleShare = useCallback(async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
-    const title = mapped?.name || "Construction material";
+    const title = mapped?.name || (isB2b ? "B2B product" : "Construction material");
     try {
       if (navigator.share) {
         await navigator.share({ title, url });
@@ -223,13 +278,11 @@ export function MaterialsProductDetailClient({ productId }: Props) {
     } catch {
       /* user cancelled share */
     }
-  }, [mapped?.name, toast]);
+  }, [isB2b, mapped?.name, toast]);
 
   const handleFavorite = useCallback(() => {
     if (!isAuthenticated) {
-      router.push(
-        `/login?redirect=${encodeURIComponent(`/construction-materials/product/${productId}`)}`
-      );
+      router.push(`/login?redirect=${encodeURIComponent(productPath)}`);
       return;
     }
     setIsSaved((v) => !v);
@@ -237,7 +290,7 @@ export function MaterialsProductDetailClient({ productId }: Props) {
       title: isSaved ? "Removed from saved" : "Saved",
       description: mapped?.name,
     });
-  }, [isAuthenticated, isSaved, mapped?.name, productId, router, toast]);
+  }, [isAuthenticated, isSaved, mapped?.name, productPath, router, toast]);
 
   if (loading) {
     return (
@@ -254,10 +307,10 @@ export function MaterialsProductDetailClient({ productId }: Props) {
       <div className="home-shell py-16 text-center">
         <p className="text-slate-600">{t("productNotFound")}</p>
         <Link
-          href="/construction-materials"
+          href={hubHref}
           className="mt-4 inline-block font-semibold text-[hsl(var(--red-accent))]"
         >
-          {t("backToHub")}
+          {isB2b ? "Back to B2B Services" : t("backToHub")}
         </Link>
       </div>
     );
@@ -265,17 +318,24 @@ export function MaterialsProductDetailClient({ productId }: Props) {
 
   const priceMin = Number(raw.suggestedPriceMin) || 0;
   const priceMax = Number(raw.suggestedPriceMax) || priceMin;
+  const b2bCategoryHref = typeKey
+    ? `/b2b-services?category=${encodeURIComponent(MATERIALS_CATEGORY_SLUG)}&subcategory=${encodeURIComponent(typeKey)}`
+    : hubHref;
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
       <div className="layout-shell overflow-x-clip pb-28 pt-4 sm:pt-6 md:pt-8">
         <ConstructionMaterialProductLayout
           responsive
-          similarHrefBase="/construction-materials/product"
+          forceQuoteCtas={isB2b}
+          similarHrefBase={productHrefBase}
+          viewAllHref={hubHref}
           categoryHref={
-            typeKey
-              ? `/construction-materials/${encodeURIComponent(typeKey)}`
-              : "/construction-materials"
+            isB2b
+              ? b2bCategoryHref
+              : typeKey
+                ? `/construction-materials/${encodeURIComponent(typeKey)}`
+                : hubHref
           }
           service={{
             id: linkedServiceId || "",
@@ -294,15 +354,17 @@ export function MaterialsProductDetailClient({ productId }: Props) {
             subcategory: subcategoryLabel,
             provider: { name: mapped.brand, businessName: mapped.brand },
           }}
-          categoryName="Construction Materials"
-          categorySlug="construction-materials"
+          categoryName={hubLabel}
+          categorySlug={isB2b ? "b2b-services" : "construction-materials"}
           formattedPrice={priceLabel}
-          isRangePrice={isRange}
+          isRangePrice={isB2b ? true : isRange}
           showPricing
           specFields={specs}
           similarServices={similar.map(similarToServiceCard)}
           cityLabel="your city"
           onGetQuotes={handleGetQuotes}
+          onAddToQuote={isB2b ? handleAddToQuote : undefined}
+          inQuoteList={inQuoteList}
           onShare={handleShare}
           onFavorite={handleFavorite}
           isSaved={isSaved}
