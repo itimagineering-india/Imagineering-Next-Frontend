@@ -18,6 +18,7 @@ import {
   type B2bCategoryLike,
 } from "@/lib/b2b/b2bCategories";
 import {
+  fetchCatalogProductPriceType,
   fetchMaterialsHubData,
   findServiceIdForCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
@@ -25,7 +26,10 @@ import type { MaterialsProduct } from "@/lib/materials/constructionMaterialsCata
 import {
   B2B_QUOTE_CART_MAX,
   clearB2bQuoteCart,
+  getB2bQuoteCartItemType,
   loadB2bQuoteCart,
+  normalizeB2bQuoteItemType,
+  saveB2bQuoteCart,
   upsertB2bQuoteCartLine,
   type B2bQuoteCartLine,
 } from "@/lib/b2b/b2bQuoteCart";
@@ -266,6 +270,17 @@ export function B2BServicesHub() {
         });
         return;
       }
+      if (result.error === "mixed_item_type") {
+        const current = getB2bQuoteCartItemType(quoteCart);
+        toast({
+          title: "Different item type",
+          description: current
+            ? `This quote list is for ${current.replace(/-/g, " ")} only. Clear the list to add a different item type.`
+            : "Add products of only one item type (e.g. sand or steel) in a single quote request.",
+          variant: "destructive",
+        });
+        return;
+      }
       setQuoteCart(result.lines);
       toast({
         title: result.added ? "Added to quote list" : "Quantity updated",
@@ -290,25 +305,29 @@ export function B2BServicesHub() {
         (user as { id?: string } | null)?.id ||
         null;
       const resolved: QuoteModalLine[] = [];
-      const missing: string[] = [];
+      const missing: { key: string; title: string }[] = [];
       for (const line of quoteCart) {
         let serviceId = line.serviceId || "";
-        let title = line.title;
+        // Prefer admin catalog unit; never use provider listing unit for RFQ qty label.
         let priceType = line.priceType;
+        if (line.catalogProductId) {
+          const catalogUnit = await fetchCatalogProductPriceType(line.catalogProductId);
+          if (catalogUnit) priceType = catalogUnit;
+        }
+        // Keep catalog/cart title so the quote form matches what the buyer added.
+        const title = line.title;
         if (!serviceId && line.catalogProductId) {
           const linked = await findServiceIdForCatalogProduct(line.catalogProductId, {
             excludeProviderUserId: buyerId,
           });
           if (!linked?.serviceId) {
-            missing.push(line.title);
+            missing.push({ key: line.key, title: line.title });
             continue;
           }
           serviceId = linked.serviceId;
-          title = linked.title || title;
-          priceType = linked.priceType || priceType;
         }
         if (!serviceId) {
-          missing.push(line.title);
+          missing.push({ key: line.key, title: line.title });
           continue;
         }
         resolved.push({
@@ -328,11 +347,18 @@ export function B2BServicesHub() {
         return;
       }
       if (missing.length) {
+        const missingKeys = new Set(missing.map((m) => m.key));
+        const kept = quoteCart.filter((l) => !missingKeys.has(l.key));
+        setQuoteCart(saveB2bQuoteCart(kept));
         toast({
-          title: `${missing.length} product${missing.length === 1 ? "" : "s"} skipped`,
-          description: `No listed suppliers for: ${missing.slice(0, 3).join(", ")}${
-            missing.length > 3 ? "…" : ""
-          }`,
+          title: `${missing.length} product${missing.length === 1 ? "" : "s"} not included`,
+          description: `No listed suppliers for: ${missing
+            .map((m) => m.title)
+            .slice(0, 3)
+            .join(", ")}${missing.length > 3 ? "…" : ""}. Quote opened with ${resolved.length} product${
+            resolved.length === 1 ? "" : "s"
+          }.`,
+          variant: "destructive",
         });
       }
       setQuoteService({
@@ -355,6 +381,7 @@ export function B2BServicesHub() {
         catalogProductId: product.id,
         title: product.name,
         priceType: product.unitType,
+        itemType: normalizeB2bQuoteItemType(product.categoryId),
       });
     },
     [addToQuote]
@@ -367,9 +394,10 @@ export function B2BServicesHub() {
         serviceId: item.id,
         title: item.title,
         priceType: item.priceType,
+        itemType: normalizeB2bQuoteItemType(item.subcategory || activeSub),
       });
     },
-    [addToQuote]
+    [activeSub, addToQuote]
   );
 
   const query = search.trim();
@@ -386,6 +414,7 @@ export function B2BServicesHub() {
   const filteredEmpty =
     !loadingItems && !catalogEmpty && (isMaterials ? visibleMaterials.length === 0 : visibleListings.length === 0);
   const resultCount = isMaterials ? visibleMaterials.length : visibleListings.length;
+  const quoteCartItemType = getB2bQuoteCartItemType(quoteCart);
 
   return (
     <div className={`min-h-screen bg-[linear-gradient(180deg,#fff8f5_0%,#ffffff_28%,#f8fafc_100%)] ${quoteCart.length ? "pb-24" : ""}`}>
@@ -405,8 +434,8 @@ export function B2BServicesHub() {
             Source products <span className="text-orange-300">nationwide</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
-            Construction materials, electrical, furniture and hardware. Add several products to
-            your quote list, then get one combined quote from listed suppliers.
+            Construction materials, electrical, furniture and hardware. Add products of the same
+            item type to your quote list, then get one combined quote from listed suppliers.
           </p>
 
           <form
@@ -565,6 +594,7 @@ export function B2BServicesHub() {
                     key={product.id}
                     product={product}
                     hidePrice
+                    detailHref={`/b2b-services/products/${product.id}`}
                     inQuoteList={quoteCart.some((l) => l.key === `catalog:${product.id}`)}
                     onAddToQuote={handleAddMaterials}
                   />
@@ -641,6 +671,7 @@ export function B2BServicesHub() {
               <ShoppingCart className="h-4 w-4 shrink-0 text-slate-500" />
               <span className="font-semibold">
                 {quoteCart.length} product{quoteCart.length === 1 ? "" : "s"} in quote list
+                {quoteCartItemType ? ` · ${quoteCartItemType.replace(/-/g, " ")}` : ""}
               </span>
             </div>
             <button
