@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
 import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
+import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
 
 function formatINR(n: number) {
@@ -384,138 +385,190 @@ export default function QuoteRequestPage() {
     );
   }
 
+  const statusHeadline = isOrdered
+    ? "Order in progress"
+    : data.status === "cancelled"
+      ? "Request cancelled"
+      : windowClosed
+        ? "Quote window closed"
+        : timed
+          ? null
+          : "Open — waiting for quotes";
+
+  const materials =
+    requestItems.length > 0
+      ? requestItems
+      : [{ title: serviceTitle, quantity: data.quantity, priceType: data?.service?.priceType }];
+
+  const cancelRequest = async () => {
+    try {
+      await api.quoteRequests.cancel(id);
+      clearActiveQuoteRequest(id);
+      toast({ title: "Request cancelled" });
+      router.push("/services");
+    } catch (err: any) {
+      toast({
+        title: "Cancel failed",
+        description: err?.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const cancelActions = (data.status === "open" || data.status === "expired") && (
+    <Button
+      variant="ghost"
+      className="w-full text-[#B91C1C] hover:bg-red-50 hover:text-[#991B1B]"
+      onClick={() => void cancelRequest()}
+    >
+      Cancel request
+    </Button>
+  );
+
   return (
-    <main className="min-h-screen bg-[#F6F4F1] px-4 py-8 sm:py-12">
-      <div className="mx-auto max-w-xl">
+    <main className="min-h-screen bg-[#F6F4F1]">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         {liveBanner ? (
-          <div className="mb-4 rounded-2xl bg-stone-900 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg">
+          <div className="mb-5 rounded-xl bg-stone-900 px-4 py-3 text-center text-sm font-semibold text-white">
             {liveBanner}
           </div>
         ) : null}
 
-        <header className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Live quotes</p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-stone-900 sm:text-2xl">
-            {serviceTitle}
-          </h1>
-          {requestItems.length > 1 ? (
-            <ul className="mt-2 space-y-1 text-sm font-medium text-stone-800">
-              {requestItems.map((item, idx) => (
-                <li key={`${item.title}-${idx}`}>
-                  {item.title} · Qty {item.quantity ?? 1}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm font-medium text-stone-800">Qty {data.quantity}</p>
-          )}
-          <p className="mt-1 text-sm text-stone-600">{shortLocation(data)}</p>
-          {data.createdAt ? (
-            <p className="mt-1 text-xs text-stone-500">Requested {formatCreatedAt(data.createdAt)}</p>
-          ) : null}
+        <header className="mb-6 flex flex-col gap-4 border-b border-stone-300/70 pb-5 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+              Live quotes
+            </p>
+            <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+              {serviceTitle}
+            </h1>
+            <p className="mt-2 text-sm text-stone-600">
+              {shortLocation(data)}
+              {data.createdAt ? (
+                <span className="text-stone-400"> · Requested {formatCreatedAt(data.createdAt)}</span>
+              ) : null}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-4 sm:gap-6">
+            <div>
+              {statusHeadline ? (
+                <p className="text-sm font-semibold text-stone-900">{statusHeadline}</p>
+              ) : (
+                <p className="font-mono text-3xl font-extrabold tabular-nums tracking-tight text-[#B91C1C]">
+                  {formatCountdown(secondsLeft)}
+                </p>
+              )}
+              <p className="mt-0.5 text-xs text-stone-500">
+                {isOrdered || data.status === "cancelled" || windowClosed
+                  ? "Status"
+                  : timed
+                    ? "Window open · auto-closes"
+                    : "No time limit"}
+              </p>
+            </div>
+            <div className="h-10 w-px bg-stone-300" aria-hidden />
+            <div className="min-w-[7.5rem]">
+              <p className="text-sm font-semibold tabular-nums text-stone-900">
+                {received} / {notified || "—"}
+              </p>
+              <p className="mt-0.5 text-xs text-stone-500">Quotes received</p>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-stone-200">
+                <div className="h-full rounded-full bg-teal-700" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          </div>
         </header>
 
-        <section className="rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
-          {isOrdered ? (
-            <p className="text-base font-semibold text-stone-900">Order in progress</p>
-          ) : data.status === "cancelled" ? (
-            <p className="text-base font-semibold text-stone-900">Request cancelled</p>
-          ) : windowClosed ? (
-            <p className="text-base font-semibold text-stone-900">Quote window closed</p>
-          ) : timed ? (
-            <>
-              <p className="font-mono text-3xl font-extrabold tabular-nums tracking-tight text-[#B91C1C]">
-                {formatCountdown(secondsLeft)}
+        <div className="grid gap-8 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:items-start lg:gap-10">
+          <aside className="space-y-4 lg:sticky lg:top-6">
+            <section>
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-bold text-stone-900">Your materials</h2>
+                <span className="text-xs tabular-nums text-stone-500">
+                  {materials.length} {materials.length === 1 ? "item" : "items"}
+                </span>
+              </div>
+              <ul className="divide-y divide-stone-200 border-y border-stone-200 bg-white/60">
+                {materials.map((item, idx) => (
+                  <li
+                    key={`${item.title}-${idx}`}
+                    className="flex items-start justify-between gap-4 px-1 py-3"
+                  >
+                    <span className="min-w-0 text-sm font-medium leading-snug text-stone-800">
+                      {item.title}
+                    </span>
+                    <span className="shrink-0 text-right text-xs font-semibold tabular-nums text-stone-500">
+                      {formatQuoteQtyLabel(Number(item.quantity ?? 1), item.priceType)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
+                Supplier details unlock after you confirm through Imagineering India.
               </p>
-              <p className="mt-1 text-xs font-medium text-stone-500">Window open · auto-closes</p>
-            </>
-          ) : (
-            <>
-              <p className="text-base font-semibold text-stone-900">Open — waiting for quotes</p>
-              <p className="mt-1 text-xs font-medium text-stone-500">No time limit</p>
-            </>
-          )}
-          <p className="mt-4 text-sm font-semibold text-stone-900">
-            {received} / {notified || "—"} quotes received
-          </p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200">
-            <div className="h-full rounded-full bg-teal-700" style={{ width: `${progress}%` }} />
-          </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
-            Supplier details unlock after you confirm through Imagineering India.
-          </p>
-        </section>
+            </section>
 
-        <section className="mt-8 space-y-4">
-          <h2 className="text-base font-bold text-stone-900">Offers</h2>
-
-          {offers.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-300 bg-white px-6 py-10 text-center">
-              <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-700" />
-              <p className="mt-3 text-sm font-semibold text-stone-900">
-                Searching listed suppliers…
-              </p>
-              <p className="mt-1 text-sm text-stone-500">
-                {notified} listed suppliers notified.
-                <br />
-                Waiting for responses…
-              </p>
-            </div>
-          ) : (
-            offers.map((offer: any) => {
-              const offerId = String(offer.id);
-              return (
-                <OfferCard
-                  key={offerId}
-                  offer={offer}
-                  expanded={expandedId === offerId || Boolean(offer.isRecommended)}
-                  onToggle={() => setExpandedId((cur) => (cur === offerId ? null : offerId))}
-                  canSelect={
-                    offer.status === "active" && data.status !== "cancelled" && !isOrdered
-                  }
-                  isOrdered={isOrdered}
-                  onSelect={() =>
-                    router.push(
-                      `/quote-requests/${id}/confirm?offerId=${encodeURIComponent(offerId)}`
-                    )
-                  }
-                />
-              );
-            })
-          )}
-        </section>
-
-        <div className="mt-8 space-y-3 pb-8 text-center">
-          <p className="text-xs text-stone-500">
-            Live updates arrive automatically. Refresh if needed.
-          </p>
-          <Button variant="outline" asChild>
-            <Link href="/services">Back to services</Link>
-          </Button>
-          {data.status === "open" || data.status === "expired" ? (
-            <div>
-              <Button
-                variant="ghost"
-                className="text-[#B91C1C] hover:bg-red-50 hover:text-[#991B1B]"
-                onClick={async () => {
-                  try {
-                    await api.quoteRequests.cancel(id);
-                    clearActiveQuoteRequest(id);
-                    toast({ title: "Request cancelled" });
-                    router.push("/services");
-                  } catch (err: any) {
-                    toast({
-                      title: "Cancel failed",
-                      description: err?.message,
-                      variant: "destructive",
-                    });
-                  }
-                }}
-              >
-                Cancel request
+            <div className="hidden space-y-2 lg:block">
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/services">Back to services</Link>
               </Button>
+              {cancelActions}
             </div>
-          ) : null}
+          </aside>
+
+          <section className="min-w-0">
+            <div className="mb-4 flex items-baseline justify-between gap-3">
+              <h2 className="text-base font-bold text-stone-900">Offers</h2>
+              {offers.length > 0 ? (
+                <span className="text-xs tabular-nums text-stone-500">{offers.length} received</span>
+              ) : null}
+            </div>
+
+            {offers.length === 0 ? (
+              <div className="border border-dashed border-stone-300 bg-white/70 px-6 py-14 text-center">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-700" />
+                <p className="mt-3 text-sm font-semibold text-stone-900">Searching listed suppliers…</p>
+                <p className="mt-1 text-sm text-stone-500">
+                  {notified} listed suppliers notified. Waiting for responses…
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {offers.map((offer: any) => {
+                  const offerId = String(offer.id);
+                  return (
+                    <OfferCard
+                      key={offerId}
+                      offer={offer}
+                      expanded={expandedId === offerId || Boolean(offer.isRecommended)}
+                      onToggle={() => setExpandedId((cur) => (cur === offerId ? null : offerId))}
+                      canSelect={
+                        offer.status === "active" && data.status !== "cancelled" && !isOrdered
+                      }
+                      isOrdered={isOrdered}
+                      onSelect={() =>
+                        router.push(
+                          `/quote-requests/${id}/confirm?offerId=${encodeURIComponent(offerId)}`
+                        )
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="mt-6 text-center text-xs text-stone-500 lg:text-left">
+              Live updates arrive automatically. Refresh if needed.
+            </p>
+
+            <div className="mt-4 space-y-2 pb-8 lg:hidden">
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/services">Back to services</Link>
+              </Button>
+              {cancelActions}
+            </div>
+          </section>
         </div>
       </div>
     </main>
