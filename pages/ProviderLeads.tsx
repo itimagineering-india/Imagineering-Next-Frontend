@@ -194,7 +194,7 @@ export default function ProviderLeads() {
       setQuoteRequests((prev) =>
         prev.map((q) => (String(q.id) === qid ? { ...q, ...payload.data } : q))
       );
-      setActiveQuote((cur) => {
+      setActiveQuote((cur: any) => {
         if (!cur || String(cur.id) !== qid) return cur;
         const next = { ...cur, ...payload.data };
         applyProviderQuoteFormFromRow(next, {
