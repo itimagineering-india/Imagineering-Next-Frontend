@@ -458,7 +458,7 @@ export default function QuoteRequestPage() {
       <main className="mx-auto max-w-lg bg-[#F6F4F1] px-4 py-16 text-center">
         <h1 className="text-xl font-semibold text-stone-900">Quote request not found</h1>
         <Button asChild className="mt-4">
-          <Link href="/services">Browse services</Link>
+          <Link href="/buyer/requirements">Browse requirements</Link>
         </Button>
       </main>
     );
@@ -479,7 +479,7 @@ export default function QuoteRequestPage() {
       await api.quoteRequests.cancel(id);
       clearActiveQuoteRequest(id);
       toast({ title: "Request cancelled" });
-      router.push("/services");
+      router.push("/buyer/requirements");
     } catch (err: any) {
       toast({
         title: "Cancel failed",
@@ -641,7 +641,7 @@ export default function QuoteRequestPage() {
 
             <div className="hidden space-y-2 lg:block">
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/services">Back to services</Link>
+                <Link href="/buyer/requirements">Back to requirements</Link>
               </Button>
               {cancelActions}
             </div>
@@ -694,7 +694,7 @@ export default function QuoteRequestPage() {
 
             <div className="mt-4 space-y-2 pb-8 lg:hidden">
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/services">Back to services</Link>
+                <Link href="/buyer/requirements">Back to requirements</Link>
               </Button>
               {cancelActions}
             </div>
