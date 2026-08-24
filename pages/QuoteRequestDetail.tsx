@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Pencil } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -260,6 +261,9 @@ export default function QuoteRequestPage() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [liveBanner, setLiveBanner] = useState<string | null>(null);
+  const [editingQty, setEditingQty] = useState(false);
+  const [draftQty, setDraftQty] = useState<Record<string, string>>({});
+  const [savingQty, setSavingQty] = useState(false);
   const prevOfferCount = useRef(0);
   const prevRecommended = useRef<string | null>(null);
 
@@ -334,6 +338,82 @@ export default function QuoteRequestPage() {
   const serviceTitle = useMemo(() => quoteRequestHeadline(data), [data]);
   const requestItems = useMemo(() => quoteRequestItems(data), [data]);
 
+  const materials = useMemo(() => {
+    if (requestItems.length > 0) return requestItems;
+    const serviceRef = data?.service;
+    const serviceId =
+      typeof serviceRef === "object" && serviceRef
+        ? String((serviceRef as { id?: string; _id?: string }).id || (serviceRef as { _id?: string })._id || "")
+        : String(serviceRef || "");
+    return [
+      {
+        serviceId,
+        title: serviceTitle,
+        quantity: data?.quantity,
+        priceType:
+          typeof serviceRef === "object" && serviceRef
+            ? (serviceRef as { priceType?: string }).priceType
+            : undefined,
+      },
+    ];
+  }, [requestItems, data?.service, data?.quantity, serviceTitle]);
+
+  const isOrdered = data?.status === "ordered" || Boolean(data?.booking);
+  const canEditQty = Boolean(data?.status === "open" && !isOrdered && materials.some((m) => m.serviceId));
+
+  const startEditQty = () => {
+    const next: Record<string, string> = {};
+    for (const item of materials) {
+      const sid = String(item.serviceId || "").trim();
+      if (!sid) continue;
+      next[sid] = String(item.quantity ?? 1);
+    }
+    setDraftQty(next);
+    setEditingQty(true);
+  };
+
+  const saveQuantities = async () => {
+    const items = materials
+      .map((item) => {
+        const serviceId = String(item.serviceId || "").trim();
+        if (!serviceId) return null;
+        const raw = draftQty[serviceId] ?? String(item.quantity ?? 1);
+        const quantity = Number(raw);
+        if (!Number.isFinite(quantity) || quantity <= 0) return null;
+        return { serviceId, quantity };
+      })
+      .filter(Boolean) as Array<{ serviceId: string; quantity: number }>;
+
+    if (items.length !== materials.filter((m) => m.serviceId).length) {
+      toast({
+        title: "Invalid quantity",
+        description: "Enter a valid quantity for each product.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingQty(true);
+    try {
+      const res = await api.quoteRequests.updateQuantities(id, { items });
+      if (!res.success) throw new Error((res as any)?.error?.message || "Update failed");
+      applyRow((res as any).data);
+      setEditingQty(false);
+      toast({
+        title: "Quantities updated",
+        description: "All suppliers see the update; quoted prices refresh automatically.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Could not update",
+        description: err?.message || "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingQty(false);
+    }
+  };
+
   const offers = useMemo(() => (Array.isArray(data?.offers) ? data.offers : []), [data?.offers]);
 
   useEffect(() => {
@@ -364,7 +444,6 @@ export default function QuoteRequestPage() {
   const windowClosed = Boolean(
     data && timed && (!data.windowOpen || data.status === "expired")
   );
-  const isOrdered = data?.status === "ordered" || Boolean(data?.booking);
 
   if (loading || authLoading) {
     return (
@@ -394,11 +473,6 @@ export default function QuoteRequestPage() {
         : timed
           ? null
           : "Open — waiting for quotes";
-
-  const materials =
-    requestItems.length > 0
-      ? requestItems
-      : [{ title: serviceTitle, quantity: data.quantity, priceType: data?.service?.priceType }];
 
   const cancelRequest = async () => {
     try {
@@ -485,28 +559,84 @@ export default function QuoteRequestPage() {
             <section>
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="text-sm font-bold text-stone-900">Your materials</h2>
-                <span className="text-xs tabular-nums text-stone-500">
-                  {materials.length} {materials.length === 1 ? "item" : "items"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {canEditQty && !editingQty ? (
+                    <button
+                      type="button"
+                      onClick={startEditQty}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-teal-800 hover:text-teal-900"
+                    >
+                      <Pencil className="h-3 w-3" aria-hidden />
+                      Edit qty
+                    </button>
+                  ) : null}
+                  <span className="text-xs tabular-nums text-stone-500">
+                    {materials.length} {materials.length === 1 ? "item" : "items"}
+                  </span>
+                </div>
               </div>
               <ul className="divide-y divide-stone-200 border-y border-stone-200 bg-white/60">
-                {materials.map((item, idx) => (
-                  <li
-                    key={`${item.title}-${idx}`}
-                    className="flex items-start justify-between gap-4 px-1 py-3"
-                  >
-                    <span className="min-w-0 text-sm font-medium leading-snug text-stone-800">
-                      {item.title}
-                    </span>
-                    <span className="shrink-0 text-right text-xs font-semibold tabular-nums text-stone-500">
-                      {formatQuoteQtyLabel(Number(item.quantity ?? 1), item.priceType)}
-                    </span>
-                  </li>
-                ))}
+                {materials.map((item, idx) => {
+                  const sid = String(item.serviceId || "").trim();
+                  return (
+                    <li
+                      key={`${sid || item.title}-${idx}`}
+                      className="flex items-start justify-between gap-4 px-1 py-3"
+                    >
+                      <span className="min-w-0 text-sm font-medium leading-snug text-stone-800">
+                        {item.title}
+                      </span>
+                      {editingQty && sid ? (
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          inputMode="decimal"
+                          className="h-8 w-24 shrink-0 text-right text-xs tabular-nums"
+                          value={draftQty[sid] ?? String(item.quantity ?? 1)}
+                          onChange={(e) =>
+                            setDraftQty((prev) => ({ ...prev, [sid]: e.target.value }))
+                          }
+                        />
+                      ) : (
+                        <span className="shrink-0 text-right text-xs font-semibold tabular-nums text-stone-500">
+                          {formatQuoteQtyLabel(Number(item.quantity ?? 1), item.priceType)}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
-              <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
-                Supplier details unlock after you confirm through Imagineering India.
-              </p>
+              {editingQty ? (
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-teal-800 hover:bg-teal-900"
+                    disabled={savingQty}
+                    onClick={() => void saveQuantities()}
+                  >
+                    {savingQty ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save quantities"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={savingQty}
+                    onClick={() => setEditingQty(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : null}
+              {canEditQty && !editingQty ? (
+                <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
+                  Wrong quantity? Edit above — all suppliers see the update and quoted prices refresh
+                  automatically.
+                </p>
+              ) : (
+                <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
+                  Supplier details unlock after you confirm through Imagineering India.
+                </p>
+              )}
             </section>
 
             <div className="hidden space-y-2 lg:block">
