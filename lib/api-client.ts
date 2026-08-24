@@ -2788,10 +2788,19 @@ export const api = {
         body: JSON.stringify(data),
         timeoutMs: 45000,
       }),
-    getMine: () => apiRequest<{ data: any[] }>('/api/quote-requests/mine'),
+    getMine: () =>
+      apiRequest<{ data: any[] }>('/api/quote-requests/mine', { timeoutMs: 30000 }),
     getById: (id: string) => apiRequest<{ data: any }>(`/api/quote-requests/${id}`),
     cancel: (id: string) =>
       apiRequest<{ data: any }>(`/api/quote-requests/${id}/cancel`, { method: 'POST' }),
+    updateQuantities: (
+      id: string,
+      data: { items: Array<{ serviceId: string; quantity: number }> }
+    ) =>
+      apiRequest<{ data: any }>(`/api/quote-requests/${id}/quantities`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     providerInbox: () => apiRequest<{ data: any[] }>('/api/quote-requests/provider/inbox'),
     providerGetById: (id: string) =>
       apiRequest<{ data: any }>(`/api/quote-requests/provider/${id}`),
