@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
 import { ConditionalSiteLayout } from "@/components/layout/ConditionalSiteLayout";
+import { ServiceWorkerCleanup } from "@/components/ServiceWorkerCleanup";
 import { BASE_URL } from "@/lib/constants";
 
 const LOGO_URL = "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png";
@@ -53,6 +54,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${plusJakartaSans.variable} ${plusJakartaSans.className} min-h-screen bg-white text-slate-900 flex flex-col antialiased`}>
         <Providers>
+          <ServiceWorkerCleanup />
           <ConditionalSiteLayout>{children}</ConditionalSiteLayout>
         </Providers>
       </body>
