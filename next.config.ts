@@ -32,6 +32,24 @@ const nextConfig: NextConfig = {
       { source: "/dashboard/imagineering-credit", destination: "/imagineering-credit", permanent: true },
     ];
   },
+  async headers() {
+    return [
+      {
+        // Legacy Vite PWA files — never cache so kill-switch updates immediately
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        source: "/registerSW.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
