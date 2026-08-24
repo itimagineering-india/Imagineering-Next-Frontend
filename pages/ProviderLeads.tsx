@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import api from "@/lib/api-client";
 import { quoteLineKey, quoteOfferItems, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
+import { subscribeToUserQuoteUpdates } from "@/lib/quoteRealtime";
 import { parseQuoteQuantity } from "@/lib/quoteQuantity";
 import { formatQuoteQtyLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
 import {
@@ -47,6 +48,57 @@ function formatCountdown(seconds: number) {
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
+}
+
+function applyProviderQuoteFormFromRow(
+  row: any,
+  setters: {
+    setQuoteLineRates: (v: Record<string, string>) => void;
+    setQuoteAmount: (v: string) => void;
+    setQuoteNotes: (v: string) => void;
+    setQuoteDelivery: (v: string) => void;
+    setQuoteDeliveryOption: (v: "free" | "paid" | "not_available") => void;
+    setQuoteDeliveryCharge: (v: string) => void;
+    setQuoteSampleImages: (v: string[]) => void;
+    setQuoteGstPercent: (v: number | null) => void;
+    setQuoteGstAmount: (v: string) => void;
+    setQuoteGstAmountEdited: (v: boolean) => void;
+    setQuoteSecondsLeft: (v: number) => void;
+  }
+) {
+  setters.setQuoteSecondsLeft(Number(row?.secondsRemaining || 0));
+  const requestLines = quoteRequestItems(row);
+  const offered = quoteOfferItems(row?.myOffer);
+  const rates: Record<string, string> = {};
+  requestLines.forEach((line, idx) => {
+    const key = quoteLineKey(line, idx);
+    const match =
+      offered.find((o) => o.serviceId && o.serviceId === line.serviceId) ||
+      offered.find((o) => o.title && o.title === line.title);
+    rates[key] = match?.unitPrice != null ? String(match.unitPrice) : "";
+  });
+  setters.setQuoteLineRates(rates);
+  setters.setQuoteAmount(row?.myOffer?.amount != null ? String(row.myOffer.amount) : "");
+  setters.setQuoteNotes(row?.myOffer?.notes || "");
+  setters.setQuoteDelivery(row?.myOffer?.estimatedDelivery || "");
+  setters.setQuoteDeliveryOption(
+    row?.myOffer?.deliveryOption === "paid" || row?.myOffer?.deliveryOption === "not_available"
+      ? row.myOffer.deliveryOption
+      : "free"
+  );
+  setters.setQuoteDeliveryCharge(
+    row?.myOffer?.deliveryOption === "paid" && row?.myOffer?.deliveryCharge != null
+      ? String(row.myOffer.deliveryCharge)
+      : ""
+  );
+  setters.setQuoteSampleImages(
+    Array.isArray(row?.myOffer?.sampleImages) ? row.myOffer.sampleImages.filter(Boolean) : []
+  );
+  const savedPercent = parseQuoteGstPercent(row?.myOffer?.gstPercent);
+  setters.setQuoteGstPercent(savedPercent ?? null);
+  const savedGstAmount = parseQuoteGstAmount(row?.myOffer?.gstAmount);
+  setters.setQuoteGstAmount(savedGstAmount != null ? String(savedGstAmount) : "");
+  setters.setQuoteGstAmountEdited(savedGstAmount != null);
 }
 
 export default function ProviderLeads() {
@@ -103,39 +155,19 @@ export default function ProviderLeads() {
           row = (res as any).data;
         }
         setActiveQuote(row);
-        setQuoteSecondsLeft(Number(row?.secondsRemaining || 0));
-        const requestLines = quoteRequestItems(row);
-        const offered = quoteOfferItems(row?.myOffer);
-        const rates: Record<string, string> = {};
-        requestLines.forEach((line, idx) => {
-          const key = quoteLineKey(line, idx);
-          const match =
-            offered.find((o) => o.serviceId && o.serviceId === line.serviceId) ||
-            offered.find((o) => o.title && o.title === line.title);
-          rates[key] = match?.unitPrice != null ? String(match.unitPrice) : "";
+        applyProviderQuoteFormFromRow(row, {
+          setQuoteLineRates,
+          setQuoteAmount,
+          setQuoteNotes,
+          setQuoteDelivery,
+          setQuoteDeliveryOption,
+          setQuoteDeliveryCharge,
+          setQuoteSampleImages,
+          setQuoteGstPercent,
+          setQuoteGstAmount,
+          setQuoteGstAmountEdited,
+          setQuoteSecondsLeft,
         });
-        setQuoteLineRates(rates);
-        setQuoteAmount(row?.myOffer?.amount != null ? String(row.myOffer.amount) : "");
-        setQuoteNotes(row?.myOffer?.notes || "");
-        setQuoteDelivery(row?.myOffer?.estimatedDelivery || "");
-        setQuoteDeliveryOption(
-          row?.myOffer?.deliveryOption === "paid" || row?.myOffer?.deliveryOption === "not_available"
-            ? row.myOffer.deliveryOption
-            : "free"
-        );
-        setQuoteDeliveryCharge(
-          row?.myOffer?.deliveryOption === "paid" && row?.myOffer?.deliveryCharge != null
-            ? String(row.myOffer.deliveryCharge)
-            : ""
-        );
-        setQuoteSampleImages(
-          Array.isArray(row?.myOffer?.sampleImages) ? row.myOffer.sampleImages.filter(Boolean) : []
-        );
-        const savedPercent = parseQuoteGstPercent(row?.myOffer?.gstPercent);
-        setQuoteGstPercent(savedPercent ?? null);
-        const savedGstAmount = parseQuoteGstAmount(row?.myOffer?.gstAmount);
-        setQuoteGstAmount(savedGstAmount != null ? String(savedGstAmount) : "");
-        setQuoteGstAmountEdited(savedGstAmount != null);
         setQuoteSummaryExpanded(false);
         setQuoteDialogOpen(true);
       } catch (err: any) {
@@ -153,6 +185,34 @@ export default function ProviderLeads() {
     fetchManpowerInvites();
     fetchQuoteRequests();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return subscribeToUserQuoteUpdates((payload) => {
+      if (payload.reason !== "quantities_updated" || !payload.data) return;
+      const qid = String(payload.quoteRequestId);
+      setQuoteRequests((prev) =>
+        prev.map((q) => (String(q.id) === qid ? { ...q, ...payload.data } : q))
+      );
+      setActiveQuote((cur) => {
+        if (!cur || String(cur.id) !== qid) return cur;
+        const next = { ...cur, ...payload.data };
+        applyProviderQuoteFormFromRow(next, {
+          setQuoteLineRates,
+          setQuoteAmount,
+          setQuoteNotes,
+          setQuoteDelivery,
+          setQuoteDeliveryOption,
+          setQuoteDeliveryCharge,
+          setQuoteSampleImages,
+          setQuoteGstPercent,
+          setQuoteGstAmount,
+          setQuoteGstAmountEdited,
+          setQuoteSecondsLeft,
+        });
+        return next;
+      });
+    });
   }, []);
 
   // Deep link from notification: /dashboard/provider/leads?quoteRequestId=...
