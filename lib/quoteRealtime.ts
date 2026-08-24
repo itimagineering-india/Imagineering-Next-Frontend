@@ -11,7 +11,7 @@ const API_BASE = (
 
 export type QuoteUpdatePayload = {
   quoteRequestId: string;
-  reason: "offer" | "cancelled" | "ordered" | "expired" | "created";
+  reason: "offer" | "cancelled" | "ordered" | "expired" | "created" | "quantities_updated";
   data?: any;
   at?: string;
 };
@@ -61,5 +61,27 @@ export function subscribeToQuoteRequest(
     s.off("connect", onConnect);
     s.off("quote:update", onEvent);
     s.emit("quote:leave", quoteRequestId);
+  };
+}
+
+/** Provider inbox: server emits to `user:{providerId}` — no quote room join needed. */
+export function subscribeToUserQuoteUpdates(
+  onUpdate: (payload: QuoteUpdatePayload) => void
+): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  let mounted = true;
+  const s = getQuoteSocket();
+  if (!s) return () => {};
+
+  const onEvent = (payload: QuoteUpdatePayload) => {
+    if (!mounted || !payload?.quoteRequestId) return;
+    onUpdate(payload);
+  };
+  s.on("quote:update", onEvent);
+
+  return () => {
+    mounted = false;
+    s.off("quote:update", onEvent);
   };
 }
