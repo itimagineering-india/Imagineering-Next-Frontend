@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
 import { PaymentOptionsSelector, type PaymentOption } from "@/components/payments/PaymentOptionsSelector";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
@@ -48,10 +50,13 @@ export async function getServerSideProps() { return { props: {} }; }
 
 export default function MyRequirements() {
   const { toast } = useToast();
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [list, setList] = useState<RequirementSummary[]>([]);
   const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
   const [tab, setTab] = useState<"quotes" | "admin">("quotes");
   const [isLoading, setIsLoading] = useState(true);
+  const [quotesError, setQuotesError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<RequirementDetail | null>(null);
@@ -60,38 +65,75 @@ export default function MyRequirements() {
   const [rejecting, setRejecting] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("cashfree");
+  const fetchGen = useRef(0);
 
-  const fetchList = async () => {
-    setIsLoading(true);
+  const fetchQuoteRequests = useCallback(async () => {
     try {
-      const [reqRes, quoteRes] = await Promise.all([
-        api.requirements.getAll({
-          status: statusFilter !== "all" ? statusFilter : undefined,
-        }),
-        api.quoteRequests.getMine(),
-      ]);
+      const quoteRes = await api.quoteRequests.getMine();
+      if (quoteRes.success && Array.isArray((quoteRes as any).data)) {
+        setQuoteRequests((quoteRes as any).data);
+        setQuotesError(null);
+        return true;
+      }
+      const message =
+        (quoteRes as any)?.error?.message || "Could not load quote requests. Try again.";
+      setQuotesError(message);
+      // Keep previous rows on soft failure — avoid flashing empty list.
+      return false;
+    } catch (e: any) {
+      setQuotesError(e?.message || "Could not load quote requests. Try again.");
+      return false;
+    }
+  }, []);
+
+  const fetchAdminRequirements = useCallback(async () => {
+    try {
+      const reqRes = await api.requirements.getAll({
+        status: statusFilter !== "all" ? statusFilter : undefined,
+      });
       if (reqRes.success && reqRes.data) {
         setList(Array.isArray(reqRes.data) ? (reqRes.data as RequirementSummary[]) : []);
       }
-      if (quoteRes.success && Array.isArray((quoteRes as any).data)) {
-        setQuoteRequests((quoteRes as any).data);
-      } else {
-        setQuoteRequests([]);
-      }
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: "Failed to load requirements",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    } catch {
+      // Admin tab is secondary; don't wipe quote list if this fails.
     }
-  };
+  }, [statusFilter]);
+
+  const fetchList = useCallback(async () => {
+    const gen = ++fetchGen.current;
+    setIsLoading(true);
+    try {
+      await Promise.all([fetchQuoteRequests(), fetchAdminRequirements()]);
+    } finally {
+      if (gen === fetchGen.current) setIsLoading(false);
+    }
+  }, [fetchQuoteRequests, fetchAdminRequirements]);
 
   useEffect(() => {
-    fetchList();
-  }, [statusFilter]);
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.replace(`/login?redirect=${encodeURIComponent("/buyer/requirements")}`);
+      return;
+    }
+    void fetchList();
+  }, [authLoading, isAuthenticated, statusFilter, router, fetchList]);
+
+  // If the first load raced or timed out empty, retry when the tab is focused again.
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    const onFocus = () => {
+      if (document.visibilityState !== "visible") return;
+      if (quoteRequests.length === 0 || quotesError) {
+        void fetchQuoteRequests();
+      }
+    };
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [isAuthenticated, authLoading, quoteRequests.length, quotesError, fetchQuoteRequests]);
 
   const openDetail = async (id: string) => {
     setDetailId(id);
@@ -286,7 +328,7 @@ export default function MyRequirements() {
           </Button>
         </div>
 
-        {isLoading ? (
+        {isLoading || authLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
@@ -295,10 +337,30 @@ export default function MyRequirements() {
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">No quote requests yet</p>
-                <p className="text-sm mt-1">
-                  Get Best Quote from B2B / product listings stays here. Open anytime to see supplier offers.
-                </p>
+                {quotesError ? (
+                  <>
+                    <p className="font-medium text-foreground">Could not load quote requests</p>
+                    <p className="text-sm mt-1">{quotesError}</p>
+                    <Button
+                      className="mt-4"
+                      variant="outline"
+                      onClick={() => {
+                        setIsLoading(true);
+                        void fetchQuoteRequests().finally(() => setIsLoading(false));
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">No quote requests yet</p>
+                    <p className="text-sm mt-1">
+                      Get Best Quote from B2B / product listings stays here. Open anytime to see
+                      supplier offers.
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
