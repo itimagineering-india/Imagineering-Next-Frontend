@@ -5,14 +5,13 @@ import ConstructionCalculatorsClient from "@/components/construction/Constructio
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Construction Cost Calculators",
+  title: "Construction Cost Calculator",
   description:
-    "Free construction cost calculators for house, villa, warehouse, boundary wall and more. Get material, labour, and timeline estimates by city on Imagineering India.",
+    "Estimate material, labour, and timeline by city for house, villa, warehouse, and more on Imagineering India.",
   alternates: { canonical: `${BASE_URL}/construction-calculator` },
   openGraph: {
-    title: "Construction Cost Calculators | Imagineering India",
-    description:
-      "Rule-driven material, labour, and BOQ estimates for residential and commercial projects.",
+    title: "Construction Cost Calculator | Imagineering India",
+    description: "Quick material and labour estimates for Indian construction projects.",
     url: `${BASE_URL}/construction-calculator`,
   },
 };
