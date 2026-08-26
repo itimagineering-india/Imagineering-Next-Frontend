@@ -6,7 +6,8 @@ import { ConditionalSiteLayout } from "@/components/layout/ConditionalSiteLayout
 import { ServiceWorkerCleanup } from "@/components/ServiceWorkerCleanup";
 import { BASE_URL } from "@/lib/constants";
 
-const LOGO_URL = "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png";
+const LOGO_URL =
+  "https://dwkazjggpovin.cloudfront.net/imagineeringLogoRBG.png";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -17,29 +18,48 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
+
+  // Google Search Console verification
+  verification: {
+    google: "<meta name="google-site-verification" content="FdmMgKsyK1SJ03JYKnv5GamzghfnJC4NL58jFk8JgfE" />",
+  },
+
   manifest: "/manifest.webmanifest",
+
   title: {
     default: "Imagineering India - Find Verified Service Providers Near You",
     template: "%s | Imagineering India",
   },
+
   description:
     "Connect with verified service providers for machines, contractors, logistics, and spaces. Get transparent pricing, location-based matches, and real reviews. Trusted service marketplace in India.",
+
   robots: {
     index: true,
     follow: true,
   },
+
   icons: {
     icon: LOGO_URL,
     shortcut: LOGO_URL,
     apple: LOGO_URL,
   },
+
   openGraph: {
     type: "website",
     locale: "en_IN",
     siteName: "Imagineering India",
     url: BASE_URL,
-    images: [{ url: LOGO_URL, width: 512, height: 512, alt: "Imagineering India" }],
+    images: [
+      {
+        url: LOGO_URL,
+        width: 512,
+        height: 512,
+        alt: "Imagineering India",
+      },
+    ],
   },
+
   twitter: {
     card: "summary_large_image",
   },
@@ -52,10 +72,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${plusJakartaSans.variable} ${plusJakartaSans.className} min-h-screen bg-white text-slate-900 flex flex-col antialiased`}>
+      <body
+        className={`${plusJakartaSans.variable} ${plusJakartaSans.className} min-h-screen bg-white text-slate-900 flex flex-col antialiased`}
+      >
         <Providers>
           <ServiceWorkerCleanup />
-          <ConditionalSiteLayout>{children}</ConditionalSiteLayout>
+          <ConditionalSiteLayout>
+            {children}
+          </ConditionalSiteLayout>
         </Providers>
       </body>
     </html>
