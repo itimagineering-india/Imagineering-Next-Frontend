@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 
   // Google Search Console verification
   verification: {
-    google: "<meta name="google-site-verification" content="FdmMgKsyK1SJ03JYKnv5GamzghfnJC4NL58jFk8JgfE" />",
+    google: "FdmMgKsyK1SJ03JYKnv5GamzghfnJC4NL58jFk8JgfE",
   },
 
   manifest: "/manifest.webmanifest",
