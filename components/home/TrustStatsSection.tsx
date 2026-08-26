@@ -177,7 +177,7 @@ export function TrustStatsSection({
         <div
           ref={ref}
           className={cn(
-            "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-[linear-gradient(90deg,#f8f9fb_0%,#ffffff_45%,#fff1e8_100%)] px-5 py-4 sm:px-6 sm:py-5 md:px-8 transition-all duration-700",
+            "relative overflow-hidden rounded-2xl border border-slate-200/70 bg-[linear-gradient(90deg,#f8f9fb_0%,#ffffff_45%,#fff1e8_100%)] px-4 py-5 sm:px-6 sm:py-5 md:px-8 transition-all duration-700",
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           )}
         >
@@ -189,8 +189,9 @@ export function TrustStatsSection({
             aria-hidden
           />
 
-          <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6 lg:gap-8">
-            <div className="grid grid-cols-3 gap-x-4 gap-y-4 sm:gap-x-6 md:flex md:flex-1 md:items-center md:justify-between md:gap-4 min-w-0">
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-6 lg:gap-8">
+            {/* Mobile: stacked rows · sm+: 3-col · md+: inline flex with dividers */}
+            <div className="flex flex-col gap-4 sm:grid sm:grid-cols-3 sm:gap-x-4 sm:gap-y-4 md:flex md:flex-1 md:items-center md:justify-between md:gap-4 min-w-0">
               {STATS.map((stat, i) => {
                 const Icon = stat.icon;
                 const isRating = stat.icon === Star;
@@ -198,9 +199,10 @@ export function TrustStatsSection({
                   <div
                     key={stat.valueKey}
                     className={cn(
-                      "flex min-w-0 items-center gap-2.5 sm:gap-3 transition-all duration-500",
-                      isVisible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
-                      i > 0 ? "md:border-l md:border-slate-200/80 md:pl-4" : ""
+                      "flex min-w-0 items-center gap-3 transition-all duration-500",
+                      i > 0 && "border-t border-slate-200/80 pt-4 sm:border-t-0 sm:pt-0",
+                      i > 0 && "md:border-l md:border-slate-200/80 md:pl-4",
+                      isVisible ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
                     )}
                     style={{ transitionDelay: `${120 + i * 110}ms` }}
                   >
@@ -217,14 +219,14 @@ export function TrustStatsSection({
                       aria-hidden
                     />
                     <div className="min-w-0">
-                      <p className="text-base sm:text-lg md:text-xl font-bold text-slate-900 leading-none tracking-tight">
+                      <p className="text-lg sm:text-lg md:text-xl font-bold text-slate-900 leading-none tracking-tight">
                         <StatValue
                           raw={t(stat.valueKey)}
                           active={isVisible}
                           delayMs={140 + i * 120}
                         />
                       </p>
-                      <p className="mt-1 text-[11px] sm:text-xs text-slate-500 leading-tight whitespace-nowrap">
+                      <p className="mt-1 text-xs sm:text-xs text-slate-500 leading-snug">
                         {t(stat.labelKey)}
                       </p>
                     </div>
@@ -240,7 +242,7 @@ export function TrustStatsSection({
               )}
               style={{ transitionDelay: "520ms" }}
             >
-              <div className="h-[200px] w-[200px] shrink-0 sm:h-[240px] sm:w-[240px] md:h-[280px] md:w-[280px]">
+              <div className="mx-auto h-[160px] w-[160px] shrink-0 sm:mx-0 sm:h-[220px] sm:w-[220px] md:h-[280px] md:w-[280px]">
                 {isVisible ? (
                   <GlobeAnalytics
                     className="w-full"
@@ -252,8 +254,8 @@ export function TrustStatsSection({
                   />
                 ) : null}
               </div>
-              <div className="flex flex-col items-center justify-center text-center gap-2 min-w-[160px] lg:min-w-[190px]">
-                <p className="text-[11px] sm:text-xs text-slate-600 leading-snug max-w-[200px]">
+              <div className="flex flex-col items-center justify-center text-center gap-2 w-full max-w-[220px] sm:min-w-[160px] lg:min-w-[190px]">
+                <p className="text-xs text-slate-600 leading-snug px-2 sm:px-0">
                   {t("trustStats.trustedBy")}
                 </p>
                 <div className="flex items-center justify-center -space-x-2.5">
