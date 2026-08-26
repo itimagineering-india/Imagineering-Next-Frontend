@@ -34,8 +34,13 @@ import {
   CONFIDENCE_STYLES,
   EstimateFormState,
   EstimateResult,
-  WIZARD_STEPS,
 } from "@/components/construction/estimate-types";
+import {
+  getTypeFieldProfile,
+  getWizardStepsForType,
+  sanitizeFormForType,
+} from "@/components/construction/construction-type-fields";
+import { getStandardGuide } from "@/components/construction/construction-standards";
 
 const DEFAULT_FORM: EstimateFormState = {
   city: "",
@@ -62,7 +67,7 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [cities, setCities] = useState<Array<{ name: string; slug: string }>>([]);
   const [types, setTypes] = useState<Array<{ name: string; slug: string }>>([]);
-  const [standards, setStandards] = useState<Array<{ name: string; slug: string }>>([]);
+  const [standards, setStandards] = useState<Array<{ name: string; slug: string; description?: string }>>([]);
   const [boqTemplates, setBoqTemplates] = useState<BoqTemplateOption[]>([]);
   const [structureTypes, setStructureTypes] = useState<string[]>([]);
   const [soilTypes, setSoilTypes] = useState<string[]>([]);
@@ -92,6 +97,12 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
         next.kitchens = String(cfg.kitchens ?? 0);
         next.balconies = String(cfg.balconies ?? 0);
         next.livingRooms = String(cfg.livingRooms ?? 0);
+      } else {
+        next.bedrooms = "0";
+        next.bathrooms = "0";
+        next.kitchens = "0";
+        next.balconies = "0";
+        next.livingRooms = "0";
       }
       if (tpl.defaultStandardSlug && standardsList?.length) {
         const std =
@@ -99,7 +110,8 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
           standardsList.find((s) => s.slug === "standard");
         if (std) next.standard = std.name;
       }
-      return next;
+      const typeKey = tpl.constructionTypeId?.slug || tpl.constructionTypeId?.name || next.constructionType;
+      return sanitizeFormForType(next, typeKey);
     });
   }, []);
 
@@ -159,7 +171,12 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
             const bhopal = data.cities.find((c) => c.slug === "bhopal");
             next.city = bhopal?.name || data.cities[0].name;
           }
-          return next;
+          const typeKey =
+            data.boqTemplates?.find((t) => t.slug === typeSlug)?.constructionTypeId?.slug ||
+            data.constructionTypes?.find((t) => t.slug === typeSlug)?.slug ||
+            data.constructionTypes?.find((t) => t.name === next.constructionType)?.slug ||
+            next.constructionType;
+          return sanitizeFormForType(next, typeKey);
         });
       } finally {
         if (!cancelled) setOptionsLoading(false);
@@ -176,30 +193,44 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
     }
   }, [optionsLoading, startFromQuery, typeSlug, result]);
 
-  const buildPayload = () => ({
-    city: form.city.trim(),
-    constructionType: form.constructionType,
-    standard: form.standard,
-    builtUpArea: Number(form.builtUpArea),
-    floors: Math.max(1, Number(form.floors) || 1),
-    structureType: form.structureType || null,
-    soilType: form.soilType || null,
-    foundationType: form.foundationType || null,
-    buildingConfiguration: {
-      bedrooms: Number(form.bedrooms) || 0,
-      bathrooms: Number(form.bathrooms) || 0,
-      kitchens: Number(form.kitchens) || 0,
-      balconies: Number(form.balconies) || 0,
-      livingRooms: Number(form.livingRooms) || 0,
-    },
-    boqTemplate: form.boqTemplate || undefined,
-    brandId: form.brandId || null,
-  });
-
   const selectedType = useMemo(
     () => types.find((t) => t.name === form.constructionType),
     [types, form.constructionType]
   );
+
+  const wizardSteps = useMemo(
+    () => getWizardStepsForType(selectedType?.slug || form.constructionType || typeSlug),
+    [selectedType?.slug, form.constructionType, typeSlug]
+  );
+
+  const typeProfile = useMemo(
+    () => getTypeFieldProfile(selectedType?.slug || form.constructionType || typeSlug),
+    [selectedType?.slug, form.constructionType, typeSlug]
+  );
+
+  const buildPayload = () => {
+    const typeKey = selectedType?.slug || form.constructionType;
+    const cleaned = sanitizeFormForType(form, typeKey);
+    return {
+      city: cleaned.city.trim(),
+      constructionType: cleaned.constructionType,
+      standard: cleaned.standard,
+      builtUpArea: Number(cleaned.builtUpArea),
+      floors: Math.max(1, Number(cleaned.floors) || 1),
+      structureType: cleaned.structureType || null,
+      soilType: cleaned.soilType || null,
+      foundationType: cleaned.foundationType || null,
+      buildingConfiguration: {
+        bedrooms: Number(cleaned.bedrooms) || 0,
+        bathrooms: Number(cleaned.bathrooms) || 0,
+        kitchens: Number(cleaned.kitchens) || 0,
+        balconies: Number(cleaned.balconies) || 0,
+        livingRooms: Number(cleaned.livingRooms) || 0,
+      },
+      boqTemplate: cleaned.boqTemplate || undefined,
+      brandId: cleaned.brandId || null,
+    };
+  };
 
   const pageTitle = selectedType
     ? `${selectedType.name} Construction Cost Calculator`
@@ -284,9 +315,10 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
               <h1 className="text-2xl font-bold tracking-tight sm:text-3xl md:text-4xl">
                 {pageTitle}
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Enter project details to get material quantities, labour cost, stage-wise breakdown, and
-                indicative timeline. Final site quotes may differ.
+              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                {typeProfile.roomFields.length > 0
+                  ? "Material, labour, and timeline — based on your city and layout."
+                  : "Material, labour, and timeline — based on your city and area."}
               </p>
             </div>
             {result && (
@@ -301,55 +333,27 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
 
       <div className="container max-w-6xl px-4 py-8 md:py-10">
         {!result && !calculating && (
-          <div className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-5">
-            <Card className="lg:col-span-3">
-              <CardHeader>
-                <CardTitle className="text-lg">Project inputs</CardTitle>
-                <CardDescription>
-                  {WIZARD_STEPS.length} steps — type, city, layout, finish standard, then review.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ol className="space-y-2.5 text-sm text-muted-foreground">
-                  {WIZARD_STEPS.map((s, i) => (
-                    <li key={s.id} className="flex gap-3">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-foreground tabular-nums">
-                        {i + 1}
-                      </span>
-                      <span>
-                        <span className="font-medium text-foreground">{s.title}</span>
-                        <span className="text-muted-foreground"> — {s.hint}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-                <Button className="w-full" onClick={() => setWizardOpen(true)} disabled={optionsLoading}>
-                  {optionsLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Enter project details
-                </Button>
-              </CardContent>
-            </Card>
-            <Card className="lg:col-span-2 border-dashed bg-muted/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">How this estimate is built</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  Your inputs are matched to <span className="font-medium text-foreground">consumption rules</span>{" "}
-                  (cement per sqft, steel per stage, etc.) and multiplied by{" "}
-                  <span className="font-medium text-foreground">city material & labour rates</span>.
-                </p>
-                <p>
-                  The output includes material quantities, trade-wise labour, stage-wise cost, timeline, and
-                  a confidence score based on price data coverage.
-                </p>
-                <Button variant="link" className="h-auto p-0 text-sm" asChild>
-                  <Link href="/construction-calculator#how-it-works">Full explanation on calculator hub</Link>
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="mx-auto max-w-md">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm sm:p-6">
+              <h2 className="text-lg font-semibold">Project details</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {wizardSteps.length} short steps — then your estimate.
+              </p>
+              <ol className="mt-4 space-y-2 text-sm">
+                {wizardSteps.map((s, i) => (
+                  <li key={s.id} className="flex items-center gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold tabular-nums">
+                      {i + 1}
+                    </span>
+                    <span className="font-medium">{s.title}</span>
+                  </li>
+                ))}
+              </ol>
+              <Button className="mt-5 w-full" onClick={() => setWizardOpen(true)} disabled={optionsLoading}>
+                {optionsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Start
+              </Button>
+            </div>
           </div>
         )}
 
@@ -459,7 +463,7 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Materials</CardTitle>
                 </CardHeader>
-                <CardContent className="max-h-72 overflow-y-auto">
+                <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -496,7 +500,7 @@ export default function ConstructionCalculatorClient({ typeSlug }: { typeSlug?: 
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Labour</CardTitle>
                 </CardHeader>
-                <CardContent className="max-h-72 overflow-y-auto">
+                <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
