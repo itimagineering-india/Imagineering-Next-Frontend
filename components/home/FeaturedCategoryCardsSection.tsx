@@ -46,11 +46,11 @@ export function FeaturedCategoryCardsSection() {
   const { t } = useTranslation("home");
 
   return (
-    <section className="relative py-8 smallTablet:py-10 laptop:py-12 pb-4 smallTablet:pb-5 laptop:pb-6">
+    <section className="relative py-8 sm:py-10 lg:py-12 pb-4 sm:pb-5 lg:pb-6">
       <div className="home-shell">
         <div
           ref={ref}
-          className={`grid grid-cols-4 gap-3 smallTablet:gap-4 laptop:gap-5 transition-all duration-700 ${
+          className={`grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           }`}
         >
@@ -58,7 +58,7 @@ export function FeaturedCategoryCardsSection() {
             <Link
               key={card.slug}
               href={card.href}
-              className={`group flex aspect-[3/4] w-full max-w-[280px] mx-auto flex-col items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 smallTablet:p-5 laptop:p-6 shadow-sm transition-all duration-300 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--red-accent))] focus-visible:ring-offset-2 ${
+              className={`group flex aspect-[4/5] sm:aspect-[3/4] w-full max-w-[280px] mx-auto flex-col items-center justify-between gap-2.5 sm:gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 lg:p-6 shadow-sm transition-all duration-300 hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--red-accent))] focus-visible:ring-offset-2 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}
               style={{ transitionDelay: `${100 + i * 60}ms` }}
@@ -68,22 +68,22 @@ export function FeaturedCategoryCardsSection() {
                   src={card.image}
                   alt={t(card.titleKey)}
                   fill
-                  sizes="280px"
+                  sizes="(max-width: 1023px) 45vw, 280px"
                   className="object-contain"
                 />
               </div>
 
-              <div className="w-full flex flex-col items-start gap-2.5 shrink-0">
-                <div>
-                  <h3 className="text-sm smallTablet:text-base laptop:text-lg font-bold text-foreground leading-snug">
+              <div className="w-full flex flex-col items-start gap-2 sm:gap-2.5 shrink-0">
+                <div className="min-w-0 w-full">
+                  <h3 className="text-sm sm:text-base lg:text-lg font-bold text-foreground leading-snug">
                     {t(card.titleKey)}
                   </h3>
-                  <p className="mt-1 text-xs smallTablet:text-sm text-muted-foreground leading-snug line-clamp-2">
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground leading-snug line-clamp-2">
                     {t(card.descKey)}
                   </p>
                 </div>
                 <span
-                  className="inline-flex h-8 w-8 smallTablet:h-9 smallTablet:w-9 items-center justify-center rounded-full bg-[hsl(var(--red-accent))] text-[hsl(var(--red-accent-foreground))] shadow-sm transition group-hover:brightness-110 group-hover:translate-x-0.5"
+                  className="inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[hsl(var(--red-accent))] text-[hsl(var(--red-accent-foreground))] shadow-sm transition group-hover:brightness-110 group-hover:translate-x-0.5"
                   aria-hidden
                 >
                   <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
