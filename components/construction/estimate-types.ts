@@ -97,6 +97,32 @@ export const FOUNDATION_LABELS: Record<string, string> = {
   pile_foundation: "Pile Foundation",
 };
 
+/** Plain-language guide for foundation options in the estimate wizard */
+export const FOUNDATION_SECTION_INTRO =
+  "How the building sits on the ground — mainly changes foundation cement/steel quantities.";
+
+export const FOUNDATION_GUIDE: Record<
+  string,
+  { summary: string; bestFor: string }
+> = {
+  isolated_footing: {
+    summary: "Separate footing pad under each column.",
+    bestFor: "Normal soil, light–medium loads (typical house G+0 / G+1).",
+  },
+  combined_footing: {
+    summary: "Two or more columns share one footing slab.",
+    bestFor: "Columns close together or uneven loads.",
+  },
+  raft_foundation: {
+    summary: "One large slab under the whole building (mat foundation).",
+    bestFor: "Weak / expansive soil, heavier buildings, basements.",
+  },
+  pile_foundation: {
+    summary: "Deep piles transfer load to stronger soil/rock below.",
+    bestFor: "Very weak surface soil, high loads, or waterlogged sites.",
+  },
+};
+
 export const CONFIDENCE_STYLES: Record<string, string> = {
   high: "bg-green-100 text-green-800 border-green-200",
   medium: "bg-amber-100 text-amber-800 border-amber-200",
@@ -105,10 +131,11 @@ export const CONFIDENCE_STYLES: Record<string, string> = {
 
 export const AREA_PRESETS = [800, 1200, 1500, 1800, 2400, 5000];
 
+/** @deprecated Prefer getWizardStepsForType() — layout step is type-dependent */
 export const WIZARD_STEPS = [
   { id: "project", title: "Project", hint: "Select building type or BOQ template" },
   { id: "location", title: "City & area", hint: "Site location and built-up area" },
-  { id: "rooms", title: "Layout", hint: "Floors and room configuration" },
+  { id: "layout", title: "Layout", hint: "Floors and room configuration" },
   { id: "finish", title: "Standard", hint: "Finish quality and site conditions" },
   { id: "review", title: "Review", hint: "Check details before calculating" },
 ] as const;
