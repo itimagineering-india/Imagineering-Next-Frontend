@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,14 +12,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  AREA_PRESETS,
   BoqTemplateOption,
   EstimateFormState,
+  FOUNDATION_GUIDE,
   FOUNDATION_LABELS,
-  WIZARD_STEPS,
+  FOUNDATION_SECTION_INTRO,
 } from "@/components/construction/estimate-types";
+import {
+  ROOM_FIELD_LABELS,
+  getTypeFieldProfile,
+  getWizardStepsForType,
+  sanitizeFormForType,
+  type RoomFieldId,
+  type WizardStepDef,
+} from "@/components/construction/construction-type-fields";
+import {
+  STANDARD_SECTION_INTRO,
+  getStandardGuide,
+} from "@/components/construction/construction-standards";
 import { cn } from "@/lib/utils";
-import { Check, Loader2 } from "lucide-react";
+import { Check, CircleHelp, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ConstructionEstimateWizardProps {
   open: boolean;
@@ -31,7 +44,7 @@ interface ConstructionEstimateWizardProps {
   setForm: React.Dispatch<React.SetStateAction<EstimateFormState>>;
   cities: Array<{ name: string; slug: string }>;
   types: Array<{ name: string; slug: string }>;
-  standards: Array<{ name: string; slug: string }>;
+  standards: Array<{ name: string; slug: string; description?: string }>;
   boqTemplates: BoqTemplateOption[];
   structureTypes: string[];
   soilTypes: string[];
@@ -41,10 +54,10 @@ interface ConstructionEstimateWizardProps {
   onSubmit: () => void;
 }
 
-function StepIndicator({ current }: { current: number }) {
+function StepIndicator({ steps, current }: { steps: WizardStepDef[]; current: number }) {
   return (
     <ol className="flex items-center gap-0" aria-label="Estimate steps">
-      {WIZARD_STEPS.map((s, i) => (
+      {steps.map((s, i) => (
         <li key={s.id} className="flex min-w-0 flex-1 items-center last:flex-none">
           <span
             className={cn(
@@ -57,7 +70,7 @@ function StepIndicator({ current }: { current: number }) {
           >
             {i + 1}
           </span>
-          {i < WIZARD_STEPS.length - 1 && (
+          {i < steps.length - 1 && (
             <span
               className={cn("mx-1.5 h-px min-w-[8px] flex-1", i < current ? "bg-foreground/40" : "bg-border")}
               aria-hidden
@@ -79,7 +92,9 @@ function OptionList({
   return (
     <div className="space-y-1.5">
       <p className="text-sm font-medium text-foreground">{label}</p>
-      <div className="overflow-hidden rounded-md border">{children}</div>
+      <div className="max-h-[280px] overflow-y-auto overflow-x-hidden rounded-md border sm:max-h-[320px]">
+        {children}
+      </div>
     </div>
   );
 }
@@ -182,6 +197,17 @@ function Counter({
   );
 }
 
+const ROOM_COUNTER_MAX: Partial<Record<RoomFieldId, number>> = {
+  kitchens: 3,
+  livingRooms: 3,
+  balconies: 6,
+};
+
+function floorChipLabel(n: number, showGPlus: boolean) {
+  if (!showGPlus) return String(n);
+  return `G+${n - 1}`;
+}
+
 export default function ConstructionEstimateWizard({
   open,
   onOpenChange,
@@ -202,7 +228,19 @@ export default function ConstructionEstimateWizard({
   onSubmit,
 }: ConstructionEstimateWizardProps) {
   const [stepIndex, setStepIndex] = useState(0);
-  const step = WIZARD_STEPS[stepIndex];
+
+  const selectedType = useMemo(
+    () => types.find((t) => t.name === form.constructionType),
+    [types, form.constructionType]
+  );
+  const typeKey = selectedType?.slug || form.constructionType;
+  const profile = useMemo(() => getTypeFieldProfile(typeKey), [typeKey]);
+  const steps = useMemo(() => getWizardStepsForType(typeKey), [typeKey]);
+  const step = steps[Math.min(stepIndex, steps.length - 1)];
+
+  useEffect(() => {
+    setStepIndex((i) => Math.min(i, Math.max(0, steps.length - 1)));
+  }, [steps.length]);
 
   const popularCities = useMemo(() => {
     const preferred = ["Bhopal", "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Pune"];
@@ -210,18 +248,42 @@ export default function ConstructionEstimateWizard({
     return preferred.filter((p) => fromApi.includes(p) || citySuggestions.includes(p)).slice(0, 6);
   }, [cities, citySuggestions]);
 
+  const relevantTemplates = useMemo(() => {
+    if (!form.constructionType && !selectedType) return boqTemplates.slice(0, 8);
+    const slug = selectedType?.slug;
+    const name = form.constructionType;
+    const matched = boqTemplates.filter((tpl) => {
+      const tplSlug = tpl.constructionTypeId?.slug;
+      const tplName = tpl.constructionTypeId?.name;
+      if (slug && tplSlug) return tplSlug === slug;
+      if (name && tplName) return tplName === name;
+      return true;
+    });
+    return (matched.length > 0 ? matched : boqTemplates).slice(0, 8);
+  }, [boqTemplates, form.constructionType, selectedType]);
+
   const setField = <K extends keyof EstimateFormState>(key: K, value: EstimateFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const applyConstructionType = (type: { name: string; slug: string }) => {
+    setForm((prev) =>
+      sanitizeFormForType(
+        { ...prev, constructionType: type.name, boqTemplate: "" },
+        type.slug
+      )
+    );
+  };
+
   const canNext = (): boolean => {
-    switch (step.id) {
+    switch (step?.id) {
       case "project":
         return Boolean(form.constructionType);
       case "location":
         return Boolean(form.city.trim()) && Number(form.builtUpArea) > 0;
-      case "rooms":
-        return Number(form.floors) >= 1;
+      case "layout":
+        if (profile.showFloors) return Number(form.floors) >= 1;
+        return true;
       case "finish":
         return Boolean(form.standard);
       case "review":
@@ -232,11 +294,12 @@ export default function ConstructionEstimateWizard({
   };
 
   const goNext = () => {
-    if (step.id === "review") {
+    if (step?.id === "review") {
+      setForm((prev) => sanitizeFormForType(prev, typeKey));
       onSubmit();
       return;
     }
-    if (stepIndex < WIZARD_STEPS.length - 1) setStepIndex((i) => i + 1);
+    if (stepIndex < steps.length - 1) setStepIndex((i) => i + 1);
   };
 
   const goBack = () => {
@@ -248,19 +311,42 @@ export default function ConstructionEstimateWizard({
     onOpenChange(next);
   };
 
+  const showResidentialFloorLabels =
+    profile.showFloors &&
+    (profile.roomFields.includes("bedrooms") || profile.floorOptions.length > 2);
+
+  const layoutSummary = profile.roomFields
+    .map((id) => {
+      const n = Number(form[id]) || 0;
+      if (n <= 0) return null;
+      const short =
+        id === "bedrooms"
+          ? `${n} BR`
+          : id === "bathrooms"
+            ? `${n} bath`
+            : id === "kitchens"
+              ? `${n} kitchen`
+              : id === "livingRooms"
+                ? `${n} living`
+                : `${n} balcony`;
+      return short;
+    })
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
         <div className="border-b px-5 pb-4 pt-5">
           <DialogHeader className="space-y-2 text-left">
             <p className="text-xs text-muted-foreground">
-              Step {stepIndex + 1} of {WIZARD_STEPS.length} · {step.title}
+              Step {stepIndex + 1} of {steps.length} · {step?.title}
             </p>
-            <DialogTitle className="text-lg font-semibold">{step.hint}</DialogTitle>
-            <DialogDescription className="sr-only">{step.title}</DialogDescription>
+            <DialogTitle className="text-lg font-semibold">{step?.hint}</DialogTitle>
+            <DialogDescription className="sr-only">{step?.title}</DialogDescription>
           </DialogHeader>
           <div className="mt-4">
-            <StepIndicator current={stepIndex} />
+            <StepIndicator steps={steps} current={stepIndex} />
           </div>
         </div>
 
@@ -271,18 +357,20 @@ export default function ConstructionEstimateWizard({
             </div>
           ) : (
             <>
-              {step.id === "project" && (
+              {step?.id === "project" && (
                 <div className="space-y-5">
-                  {boqTemplates.length > 0 && (
-                    <OptionList label="BOQ templates">
-                      {boqTemplates.slice(0, 8).map((tpl) => (
+                  {relevantTemplates.length > 0 && (
+                    <OptionList label="Quick templates">
+                      {relevantTemplates.map((tpl) => (
                         <OptionRow
                           key={tpl.slug}
                           selected={form.boqTemplate === tpl.slug}
                           title={tpl.name}
                           meta={
                             tpl.defaultBuiltUpArea
-                              ? `${tpl.defaultBuiltUpArea.toLocaleString("en-IN")} sqft, ${tpl.defaultFloors} floor(s)`
+                              ? `${tpl.defaultBuiltUpArea.toLocaleString("en-IN")} sqft${
+                                  tpl.defaultFloors ? `, ${tpl.defaultFloors} floor(s)` : ""
+                                }`
                               : undefined
                           }
                           onClick={() => {
@@ -299,17 +387,14 @@ export default function ConstructionEstimateWizard({
                         key={t.slug}
                         selected={form.constructionType === t.name && !form.boqTemplate}
                         title={t.name}
-                        onClick={() => {
-                          setField("constructionType", t.name);
-                          setField("boqTemplate", "");
-                        }}
+                        onClick={() => applyConstructionType(t)}
                       />
                     ))}
                   </OptionList>
                 </div>
               )}
 
-              {step.id === "location" && (
+              {step?.id === "location" && (
                 <div className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="est-wizard-city">City</Label>
@@ -340,7 +425,10 @@ export default function ConstructionEstimateWizard({
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="est-wizard-area">Built-up area (sqft)</Label>
+                    <Label htmlFor="est-wizard-area">{profile.areaLabel}</Label>
+                    {profile.areaHint && (
+                      <p className="text-xs text-muted-foreground">{profile.areaHint}</p>
+                    )}
                     <Input
                       id="est-wizard-area"
                       type="number"
@@ -349,7 +437,7 @@ export default function ConstructionEstimateWizard({
                       onChange={(e) => setField("builtUpArea", e.target.value)}
                     />
                     <div className="flex flex-wrap gap-1.5">
-                      {AREA_PRESETS.map((n) => (
+                      {profile.areaPresets.map((n) => (
                         <ChoiceChip
                           key={n}
                           selected={Number(form.builtUpArea) === n}
@@ -363,74 +451,173 @@ export default function ConstructionEstimateWizard({
                 </div>
               )}
 
-              {step.id === "rooms" && (
+              {step?.id === "layout" && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Floors</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[1, 2, 3, 4].map((n) => (
-                        <ChoiceChip
-                          key={n}
-                          selected={Number(form.floors) === n}
-                          onClick={() => setField("floors", String(n))}
-                        >
-                          G+{n - 1}
-                        </ChoiceChip>
+                  {profile.showFloors && (
+                    <div className="space-y-2">
+                      <Label>{profile.floorsLabel}</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {profile.floorOptions.map((n) => (
+                          <ChoiceChip
+                            key={n}
+                            selected={Number(form.floors) === n}
+                            onClick={() => setField("floors", String(n))}
+                          >
+                            {floorChipLabel(n, showResidentialFloorLabels)}
+                          </ChoiceChip>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {profile.roomFields.length > 0 && (
+                    <div className="rounded-md border px-3">
+                      {profile.roomFields.map((fieldId) => (
+                        <Counter
+                          key={fieldId}
+                          label={ROOM_FIELD_LABELS[fieldId]}
+                          value={Number(form[fieldId]) || 0}
+                          onChange={(n) => setField(fieldId, String(n))}
+                          max={ROOM_COUNTER_MAX[fieldId] ?? 12}
+                        />
                       ))}
                     </div>
-                  </div>
-                  <div className="rounded-md border px-3">
-                    <Counter
-                      label="Bedrooms"
-                      value={Number(form.bedrooms) || 0}
-                      onChange={(n) => setField("bedrooms", String(n))}
-                    />
-                    <Counter
-                      label="Bathrooms"
-                      value={Number(form.bathrooms) || 0}
-                      onChange={(n) => setField("bathrooms", String(n))}
-                    />
-                    <Counter
-                      label="Kitchens"
-                      value={Number(form.kitchens) || 0}
-                      onChange={(n) => setField("kitchens", String(n))}
-                      max={3}
-                    />
-                    <Counter
-                      label="Living rooms"
-                      value={Number(form.livingRooms) || 0}
-                      onChange={(n) => setField("livingRooms", String(n))}
-                      max={3}
-                    />
-                    <Counter
-                      label="Balconies"
-                      value={Number(form.balconies) || 0}
-                      onChange={(n) => setField("balconies", String(n))}
-                      max={6}
-                    />
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    Room counts help estimate plumbing, flooring, and electrical quantities. Leave at 0 if
-                    not relevant.
-                  </p>
+                  )}
+                  {profile.layoutHint ? (
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {profile.layoutHint}
+                    </p>
+                  ) : null}
                 </div>
               )}
 
-              {step.id === "finish" && (
+              {step?.id === "finish" && (
                 <div className="space-y-5">
-                  <OptionList label="Construction standard">
-                    {standards.map((s) => (
-                      <OptionRow
-                        key={s.slug}
-                        selected={form.standard === s.name}
-                        title={s.name}
-                        onClick={() => setField("standard", s.name)}
-                      />
-                    ))}
-                  </OptionList>
-                  {foundationTypes.length > 0 && (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Finish standard</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {STANDARD_SECTION_INTRO}
+                      </p>
+                    </div>
+                    <div className="overflow-hidden rounded-md border">
+                      {standards.map((s) => {
+                        const guide = getStandardGuide(s.slug || s.name, s.description);
+                        const selected = form.standard === s.name;
+                        return (
+                          <div
+                            key={s.slug}
+                            className={cn(
+                              "flex w-full items-start justify-between gap-3 border-b px-3 py-3 last:border-b-0",
+                              "transition-colors hover:bg-muted/40",
+                              selected && "bg-muted/60"
+                            )}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setField("standard", s.name)}
+                              className="min-w-0 flex-1 space-y-1 text-left"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-sm font-semibold">{s.name}</span>
+                              </span>
+                              <span className="block text-xs leading-relaxed text-muted-foreground">
+                                {guide.summary}
+                              </span>
+                            </button>
+                            <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="rounded-full p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                    aria-label={`What ${s.name} affects`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <CircleHelp className="h-4 w-4" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  align="end"
+                                  side="top"
+                                  className="z-[100] w-64 space-y-2 p-3 text-sm"
+                                  onOpenAutoFocus={(e) => e.preventDefault()}
+                                >
+                                  <p className="font-semibold text-foreground">{s.name} — affects</p>
+                                  <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                                    {guide.affects.map((tag) => (
+                                      <li key={tag}>{tag}</li>
+                                    ))}
+                                  </ul>
+                                  {guide.notAffected && (
+                                    <p className="border-t pt-2 text-[11px] leading-relaxed text-muted-foreground">
+                                      Usually unchanged: {guide.notAffected}
+                                    </p>
+                                  )}
+                                </PopoverContent>
+                              </Popover>
+                              {selected && (
+                                <Check className="h-4 w-4 text-foreground" aria-hidden />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Tip: pick <span className="font-medium text-foreground">Standard</span> if you are
+                      unsure — you can refine finish grade with the contractor later.
+                    </p>
+                  </div>
+                  {profile.showFoundation && foundationTypes.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-muted-foreground">Foundation type (optional)</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-muted-foreground">Foundation type (optional)</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="rounded-full p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                              aria-label="What is foundation type"
+                            >
+                              <CircleHelp className="h-3.5 w-3.5" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="start"
+                            side="top"
+                            className="z-[100] w-72 space-y-2.5 p-3 text-sm"
+                            onOpenAutoFocus={(e) => e.preventDefault()}
+                          >
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              {FOUNDATION_SECTION_INTRO}
+                            </p>
+                            <ul className="space-y-2.5">
+                              {foundationTypes.map((f) => {
+                                const guide = FOUNDATION_GUIDE[f];
+                                return (
+                                  <li key={f} className="text-xs">
+                                    <p className="font-semibold text-foreground">
+                                      {FOUNDATION_LABELS[f] || f}
+                                    </p>
+                                    {guide && (
+                                      <>
+                                        <p className="mt-0.5 text-muted-foreground">{guide.summary}</p>
+                                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                          Best for: {guide.bestFor}
+                                        </p>
+                                      </>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                            <p className="border-t pt-2 text-[11px] text-muted-foreground">
+                              Unsure? Leave as Not specified — the estimate still works.
+                            </p>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">{FOUNDATION_SECTION_INTRO}</p>
                       <div className="flex flex-wrap gap-1.5">
                         <ChoiceChip
                           selected={!form.foundationType}
@@ -450,77 +637,103 @@ export default function ConstructionEstimateWizard({
                       </div>
                     </div>
                   )}
-                  <details className="rounded-md border px-3 py-2">
-                    <summary className="cursor-pointer text-sm font-medium">Site details (optional)</summary>
-                    <div className="mt-3 grid gap-3 pb-1 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label htmlFor="est-structure" className="text-xs">
-                          Structure
-                        </Label>
-                        <select
-                          id="est-structure"
-                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                          value={form.structureType}
-                          onChange={(e) => setField("structureType", e.target.value)}
-                        >
-                          <option value="">Not specified</option>
-                          {structureTypes.map((s) => (
-                            <option key={s} value={s}>
-                              {s === "rcc_frame" ? "RCC frame" : s === "load_bearing" ? "Load bearing" : s}
-                            </option>
-                          ))}
-                        </select>
+                  {(profile.showStructure || profile.showSoil) && (
+                    <details className="rounded-md border px-3 py-2">
+                      <summary className="cursor-pointer text-sm font-medium">
+                        Site details (optional)
+                      </summary>
+                      <div className="mt-3 grid gap-3 pb-1 sm:grid-cols-2">
+                        {profile.showStructure && (
+                          <div className="space-y-1">
+                            <Label htmlFor="est-structure" className="text-xs">
+                              Structure
+                            </Label>
+                            <select
+                              id="est-structure"
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={form.structureType}
+                              onChange={(e) => setField("structureType", e.target.value)}
+                            >
+                              <option value="">Not specified</option>
+                              {structureTypes.map((s) => (
+                                <option key={s} value={s}>
+                                  {s === "rcc_frame"
+                                    ? "RCC frame"
+                                    : s === "load_bearing"
+                                      ? "Load bearing"
+                                      : s}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {profile.showSoil && (
+                          <div className="space-y-1">
+                            <Label htmlFor="est-soil" className="text-xs">
+                              Soil
+                            </Label>
+                            <select
+                              id="est-soil"
+                              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={form.soilType}
+                              onChange={(e) => setField("soilType", e.target.value)}
+                            >
+                              <option value="">Not specified</option>
+                              {soilTypes.map((s) => (
+                                <option key={s} value={s}>
+                                  {s === "black_cotton" ? "Black cotton" : s}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="est-soil" className="text-xs">
-                          Soil
-                        </Label>
-                        <select
-                          id="est-soil"
-                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                          value={form.soilType}
-                          onChange={(e) => setField("soilType", e.target.value)}
-                        >
-                          <option value="">Not specified</option>
-                          {soilTypes.map((s) => (
-                            <option key={s} value={s}>
-                              {s === "black_cotton" ? "Black cotton" : s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </details>
+                    </details>
+                  )}
                 </div>
               )}
 
-              {step.id === "review" && (
+              {step?.id === "review" && (
                 <dl className="divide-y rounded-md border text-sm">
                   {[
                     ["Project", form.constructionType || "—"],
                     ["City", form.city || "—"],
                     [
-                      "Built-up area",
-                      `${Number(form.builtUpArea).toLocaleString("en-IN")} sqft · G+${Math.max(0, Number(form.floors) - 1)}`,
+                      profile.areaLabel.replace(/\s*\(.*\)$/, ""),
+                      `${Number(form.builtUpArea).toLocaleString("en-IN")} sqft${
+                        profile.showFloors
+                          ? ` · ${
+                              showResidentialFloorLabels
+                                ? `G+${Math.max(0, Number(form.floors) - 1)}`
+                                : `${form.floors} level(s)`
+                            }`
+                          : ""
+                      }`,
                     ],
                     ["Standard", form.standard || "—"],
-                    ...(form.foundationType
+                    ...(form.foundationType && profile.showFoundation
                       ? [["Foundation", FOUNDATION_LABELS[form.foundationType] || form.foundationType]]
                       : []),
                   ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between gap-4 px-3 py-2.5">
+                    <div key={String(label)} className="flex justify-between gap-4 px-3 py-2.5">
                       <dt className="text-muted-foreground">{label}</dt>
                       <dd className="text-right font-medium">{value}</dd>
                     </div>
                   ))}
-                  {(Number(form.bedrooms) > 0 || Number(form.bathrooms) > 0) && (
-                    <div className="flex justify-between gap-4 px-3 py-2.5">
-                      <dt className="text-muted-foreground">Layout</dt>
-                      <dd className="text-right font-medium">
-                        {form.bedrooms} BR, {form.bathrooms} bath, {form.kitchens} kitchen
-                      </dd>
+                  {form.standard && (
+                    <div className="px-3 py-2.5 text-xs text-muted-foreground">
+                      {getStandardGuide(
+                        standards.find((s) => s.name === form.standard)?.slug || form.standard,
+                        standards.find((s) => s.name === form.standard)?.description
+                      ).summary}
                     </div>
                   )}
+                  {layoutSummary ? (
+                    <div className="flex justify-between gap-4 px-3 py-2.5">
+                      <dt className="text-muted-foreground">Layout</dt>
+                      <dd className="text-right font-medium">{layoutSummary}</dd>
+                    </div>
+                  ) : null}
                 </dl>
               )}
 
@@ -544,7 +757,7 @@ export default function ConstructionEstimateWizard({
             Back
           </Button>
           <div className="flex gap-2">
-            {step.id === "finish" && (
+            {step?.id === "finish" && (
               <Button type="button" variant="ghost" size="sm" onClick={() => setStepIndex((i) => i + 1)}>
                 Skip
               </Button>
@@ -555,7 +768,7 @@ export default function ConstructionEstimateWizard({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Calculating
                 </>
-              ) : step.id === "review" ? (
+              ) : step?.id === "review" ? (
                 "Calculate estimate"
               ) : (
                 "Next"
