@@ -34,7 +34,7 @@ const FEATURED_CARDS = [
   },
   {
     slug: "machine-rental",
-    href: "/services?category=machine-rental",
+    href: "/machine-rental",
     titleKey: "featuredCategories.machines.title",
     descKey: "featuredCategories.machines.description",
     image: machineRentalImg,
