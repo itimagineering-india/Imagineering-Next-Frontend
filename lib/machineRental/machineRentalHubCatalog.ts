@@ -221,7 +221,7 @@ export function groupRentalMachinesByCategory(
 
 export function rentalMachineHref(machine: RentalMachine): string {
   if (machine.serviceId) {
-    return `/service/${machine.slug || machine.serviceId}`;
+    return `/machine-rental/listing/${machine.serviceId}`;
   }
   const sp = new URLSearchParams();
   sp.set("category", "machine-rental");
