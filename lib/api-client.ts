@@ -886,6 +886,18 @@ export const api = {
       const qs = params?.city ? `?city=${encodeURIComponent(params.city)}` : "";
       return apiRequest(`/api/product-catalog/${id}${qs}`);
     },
+    getByCategories: (params?: { limit?: number; categoryLimit?: number }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.limit != null) queryParams.append("limit", String(params.limit));
+      if (params?.categoryLimit != null) {
+        queryParams.append("categoryLimit", String(params.categoryLimit));
+      }
+      const qs = queryParams.toString();
+      return apiRequest<{ success: boolean; data?: { categories?: any[] } }>(
+        `/api/product-catalog/by-categories${qs ? `?${qs}` : ""}`,
+        { timeoutMs: 20000 }
+      );
+    },
   },
 
   // Search
@@ -1619,6 +1631,55 @@ export const api = {
     retryManpowerDispatchSearch: (bookingId: string) =>
       apiRequest(`/api/bookings/manpower-dispatch/${bookingId}/retry-search`, {
         method: "POST",
+      }),
+    previewMachineRental: (payload: {
+      serviceId: string;
+      machineCount: number;
+      duration: number;
+    }) =>
+      apiRequest<{
+        subtotal: number;
+        platformFee: number;
+        platformFeeGst: number;
+        gst: number;
+        total: number;
+        unitPrice: number;
+        priceType: string;
+        machineCount: number;
+        duration: number;
+        durationLabel?: string;
+        lineQuantity: number;
+        productName: string;
+      }>("/api/bookings/machine-rental/preview", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    createMachineRental: (payload: {
+      serviceId: string;
+      machineCount: number;
+      duration: number;
+      startDate?: string;
+      paymentMethod: string;
+      couponUsageId?: string;
+      location: {
+        address: string;
+        city: string;
+        state: string;
+        zipCode?: string;
+        coordinates?: { lat: number; lng: number };
+      };
+      notes?: string;
+    }) =>
+      apiRequest<{
+        bookingId: string;
+        status: string;
+        requiresPayment: boolean;
+        total: number;
+        couponDiscount?: number;
+        couponCode?: string;
+      }>("/api/bookings/machine-rental", {
+        method: "POST",
+        body: JSON.stringify(payload),
       }),
     cancelByBuyer: (id: string, reason?: string) =>
       apiRequest(`/api/bookings/${id}/cancel`, {
