@@ -27,6 +27,7 @@ import {
   type RentalMachineCategory,
 } from "@/lib/machineRental/machineRentalHubCatalog";
 import { fetchRentalHubData, type RentalHubData } from "@/lib/machineRental/machineRentalHubApi";
+import { getMachineRentalCategoryArt } from "@/lib/machineRental/machineRentalCategoryArt";
 import machineRentalHeroImg from "@/assets/services/machine-rental.png";
 
 export const RENTAL_AMBER = "#C2410C";
@@ -35,6 +36,7 @@ const RENTAL_CANVAS = "#FFF7ED";
 const EMPTY: RentalHubData = { categories: [], machines: [], providers: [] };
 
 function CategoryCard({ category }: { category: RentalMachineCategory }) {
+  const art = getMachineRentalCategoryArt(category.id) || getMachineRentalCategoryArt(category.name);
   return (
     <Link
       href={`/machine-rental/${encodeURIComponent(category.id)}`}
@@ -42,10 +44,15 @@ function CategoryCard({ category }: { category: RentalMachineCategory }) {
       className="group flex w-[132px] shrink-0 flex-col items-center gap-2 rounded-2xl border border-orange-200/80 bg-white p-3 shadow-sm transition hover:border-orange-400/50 hover:shadow-md sm:w-[148px]"
     >
       <span
-        className="flex h-14 w-14 items-center justify-center rounded-full text-sm font-bold text-orange-900 transition group-hover:scale-105"
-        style={{ backgroundColor: category.tint }}
+        className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-orange-100 bg-white shadow-sm transition group-hover:scale-105 sm:h-[72px] sm:w-[72px]"
       >
-        {category.mark}
+        <Image
+          src={art}
+          alt={category.name}
+          fill
+          sizes="72px"
+          className="object-contain p-2"
+        />
       </span>
       <p className="line-clamp-2 min-h-[2.5rem] text-center text-xs font-semibold leading-snug text-slate-800">
         {category.name}
