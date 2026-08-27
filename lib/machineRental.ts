@@ -24,6 +24,24 @@ export function isMachineRentalCategorySlug(slug: string | undefined): boolean {
   return (MACHINE_RENTAL_CATEGORY_SLUGS as readonly string[]).includes(s);
 }
 
+export type MachineRentalPriceType =
+  | "daily"
+  | "hourly"
+  | "per_trip"
+  | "fixed"
+  | "monthly";
+
+export const MACHINE_RENTAL_PRICE_TYPES: ReadonlyArray<{
+  value: MachineRentalPriceType;
+  title: string;
+}> = [
+  { value: "daily", title: "Per day" },
+  { value: "hourly", title: "Per hour" },
+  { value: "per_trip", title: "Per trip" },
+  { value: "fixed", title: "Fixed" },
+  { value: "monthly", title: "Per month" },
+];
+
 export type MachineRentalSpecRow = {
   id: string;
   label: string;
@@ -61,7 +79,7 @@ export function buildMachineRentalServicePayload(opts: {
   brandName?: string;
   description: string;
   images: string[];
-  priceType: "daily" | "hourly";
+  priceType: MachineRentalPriceType;
   price: number;
   securityDeposit?: string;
   operatorIncluded: boolean;
