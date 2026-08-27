@@ -111,6 +111,7 @@ export function MachineRentalFormPage() {
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [priceType, setPriceType] = useState<MachineRentalPriceType>("daily");
   const [price, setPrice] = useState("");
+  const [availableMachines, setAvailableMachines] = useState("1");
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
   const [specs, setSpecs] = useState<MachineRentalSpecRow[]>([]);
@@ -189,6 +190,12 @@ export function MachineRentalFormPage() {
     if (!title.trim()) next.title = "Enter a listing title";
     const amount = parseFloat(price);
     if (!Number.isFinite(amount) || amount <= 0) next.price = "Enter a valid rental price";
+    const units = Math.floor(Number(availableMachines));
+    if (!Number.isFinite(units) || units < 1) {
+      next.availableMachines = "Enter how many machines you can rent (at least 1)";
+    } else if (units > 99) {
+      next.availableMachines = "Maximum 99 machines per listing";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -228,6 +235,7 @@ export function MachineRentalFormPage() {
           images: allImages,
           priceType,
           price: parseFloat(price),
+          availableMachines: Math.floor(Number(availableMachines)) || 1,
           securityDeposit,
           operatorIncluded,
           specs,
@@ -449,6 +457,29 @@ export function MachineRentalFormPage() {
               className={errors.price ? "border-destructive" : ""}
             />
             {errors.price ? <p className="text-sm text-destructive">{errors.price}</p> : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rental-available-machines">
+              Number of machines available <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="rental-available-machines"
+              type="number"
+              min={1}
+              max={99}
+              step={1}
+              value={availableMachines}
+              onChange={(e) => {
+                setAvailableMachines(e.target.value);
+                setErrors((prev) => ({ ...prev, availableMachines: "" }));
+              }}
+              placeholder="e.g. 3"
+              className={errors.availableMachines ? "border-destructive" : ""}
+            />
+            {errors.availableMachines ? (
+              <p className="text-sm text-destructive">{errors.availableMachines}</p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
