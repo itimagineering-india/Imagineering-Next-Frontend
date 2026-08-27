@@ -1646,6 +1646,7 @@ export const api = {
         unitPrice: number;
         priceType: string;
         machineCount: number;
+        availableMachines?: number;
         duration: number;
         durationLabel?: string;
         lineQuantity: number;
