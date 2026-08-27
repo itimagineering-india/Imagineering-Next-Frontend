@@ -22,6 +22,10 @@ export type HomeService = {
   priceLabel: string;
   rating: number;
   reviewCount: number;
+  /** Catalog product detail URL (home uses ProductCatalog, not Service listings). */
+  href?: string;
+  /** When true, hide service-favorite heart (catalog products are not favoritable as services). */
+  hideFavorite?: boolean;
 };
 
 export type HomeCategorySection = {
@@ -72,6 +76,8 @@ type ApiService = {
   priceLabel?: string;
   rating?: number | string | null;
   reviewCount?: number | string | null;
+  source?: string;
+  categorySlug?: string;
 };
 
 type ApiCategoryGroup = {
@@ -102,23 +108,60 @@ type ProviderApiItem = {
   };
 };
 
-export function normalizeHomeService(s: ApiService): HomeService {
+export function catalogProductDetailHref(categorySlug: string | undefined, id: string): string {
+  const slug = String(categorySlug || "").trim().toLowerCase();
+  if (slug === "b2b-services" || slug === "b2b") {
+    return `/b2b-services/products/${id}`;
+  }
+  if (slug === "manpower") {
+    return `/manpower`;
+  }
+  if (
+    slug === "machine-rental" ||
+    slug === "rental-services" ||
+    slug === "rental"
+  ) {
+    return `/machine-rental`;
+  }
+  return `/construction-materials/product/${id}`;
+}
+
+export function catalogCategoryBrowseHref(categorySlug: string | undefined, title: string): string {
+  const slug = String(categorySlug || "").trim().toLowerCase();
+  if (slug === "construction-materials" || slug === "construction-material") {
+    return "/construction-materials";
+  }
+  if (slug === "b2b-services" || slug === "b2b") {
+    return "/b2b-services";
+  }
+  if (slug === "manpower") {
+    return "/manpower";
+  }
+  if (
+    slug === "machine-rental" ||
+    slug === "rental-services" ||
+    slug === "rental"
+  ) {
+    return "/machine-rental";
+  }
+  if (slug) return `/services?category=${encodeURIComponent(slug)}`;
+  return `/services?category=${encodeURIComponent(title)}`;
+}
+
+export function normalizeHomeService(s: ApiService, categorySlug?: string): HomeService {
   const id = s?.id ?? s?._id ?? "";
   const name = s?.name ?? s?.title ?? "Service";
   const image =
     (Array.isArray(s?.images) && s.images.length > 0 ? s.images[0] : null) ||
     s?.image ||
     DUMMY_IMAGE;
-  let location = s?.location;
-  if (typeof location === "object" && location !== null) {
-    location = location?.city ?? location?.address ?? "Location not available";
-  }
-  location = typeof location === "string" ? location : "Location not available";
+  const isCatalog = s?.source === "catalog";
+  const resolvedCategorySlug = s?.categorySlug || categorySlug;
   return {
     id: String(id),
     name: String(name),
     image: String(image),
-    location,
+    location: "",
     price: Number(s?.price) || 0,
     priceMode: s?.priceMode,
     priceMin: s?.priceMin != null ? Number(s.priceMin) : undefined,
@@ -128,17 +171,26 @@ export function normalizeHomeService(s: ApiService): HomeService {
     priceLabel: s?.priceLabel ?? "/ project",
     rating: Number(s?.rating) ?? 0,
     reviewCount: Number(s?.reviewCount) ?? 0,
+    ...(isCatalog
+      ? {
+          href: catalogProductDetailHref(resolvedCategorySlug, String(id)),
+          hideFavorite: true,
+        }
+      : {}),
   };
 }
 
 export function normalizeHomeCategorySections(
   rawCategories: ApiCategoryGroup[],
 ): HomeCategorySection[] {
-  return rawCategories.map((cat) => ({
-    title: cat.category?.name ?? "Unknown",
-    categorySlug: cat.category?.slug ?? "",
-    services: (cat.services ?? []).map(normalizeHomeService),
-  }));
+  return rawCategories.map((cat) => {
+    const categorySlug = cat.category?.slug ?? "";
+    return {
+      title: cat.category?.name ?? "Unknown",
+      categorySlug,
+      services: (cat.services ?? []).map((row) => normalizeHomeService(row, categorySlug)),
+    };
+  });
 }
 
 export function normalizeHomeTopProviders(
