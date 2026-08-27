@@ -12,6 +12,13 @@ import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trash2, Plus, Minus } from "lucide-react";
+import { isMachineRentalCategorySlug } from "@/lib/machineRental";
+import {
+  formatDurationQtyLabel,
+  getPriceTypeSuffix,
+  getQuantityUnitFieldLabel,
+  isDurationPriceType,
+} from "@/lib/priceTypeDisplay";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -246,6 +253,25 @@ export default function CartPage() {
                       ? (inputQuantities[sid] ?? qtyInt)
                       : qtyInt;
                   const qtyForTotal = item.quantity;
+                  const categorySlug =
+                    typeof item.service?.category === "object"
+                      ? item.service.category?.slug
+                      : undefined;
+                  const metaSlug = String(
+                    (item.service?.metadata as { categorySlug?: string } | undefined)?.categorySlug || ""
+                  );
+                  const isRentalDuration =
+                    isDurationPriceType(item.priceType) &&
+                    (isMachineRentalCategorySlug(categorySlug) ||
+                      isMachineRentalCategorySlug(metaSlug) ||
+                      // Cart populate may omit category; duration price types are rental billing units
+                      ["daily", "hourly", "per_trip", "monthly"].includes(
+                        String(item.priceType || "").toLowerCase()
+                      ));
+                  const qtyFieldLabel = isRentalDuration
+                    ? getQuantityUnitFieldLabel(item.priceType)
+                    : "Quantity";
+                  const unitSuffix = getPriceTypeSuffix(item.priceType);
                   return (
                     <div 
                       key={sid} 
@@ -254,10 +280,13 @@ export default function CartPage() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm sm:text-base line-clamp-2">{item.service?.title ?? "Service"}</p>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          ₹{item.price?.toLocaleString() || 0} {item.priceType && `/${item.priceType}`}
+                          ₹{item.price?.toLocaleString() || 0}
+                          {unitSuffix ? ` ${unitSuffix}` : item.priceType ? ` /${item.priceType}` : ""}
                         </p>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          Quantity: {displayQty}
+                          {isRentalDuration
+                            ? formatDurationQtyLabel(Number(displayQty) || 0, item.priceType)
+                            : `${qtyFieldLabel}: ${displayQty}`}
                         </p>
                       </div>
                       
@@ -272,8 +301,8 @@ export default function CartPage() {
                               if (q > 1) updateQuantity(serviceId, q - 1);
                             }}
                             disabled={loading || qtyInt <= 1}
-                            aria-label="Decrease quantity"
-                            title="Decrease quantity"
+                            aria-label={`Decrease ${qtyFieldLabel.toLowerCase()}`}
+                            title={`Decrease ${qtyFieldLabel.toLowerCase()}`}
                           >
                             <Minus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
@@ -304,8 +333,8 @@ export default function CartPage() {
                               updateQuantity(serviceId, q + 1);
                             }}
                             disabled={loading}
-                            aria-label="Increase quantity"
-                            title="Increase quantity"
+                            aria-label={`Increase ${qtyFieldLabel.toLowerCase()}`}
+                            title={`Increase ${qtyFieldLabel.toLowerCase()}`}
                           >
                             <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
@@ -461,7 +490,7 @@ export default function CartPage() {
           couponUsageId={couponUsageId}
           onSuccess={() => {
             setOpenCheckout(false);
-            router.push("/dashboard/buyer/orders");
+            router.push("/buyer/orders");
           }}
         />
       )}
