@@ -66,9 +66,9 @@ function MachineCard({ machine }: { machine: RentalMachine }) {
   return (
     <Link
       href={href}
-      className="flex w-[148px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-orange-700/30 hover:shadow-md"
+      className="flex w-[176px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-orange-700/30 hover:shadow-md sm:w-[200px]"
     >
-      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-orange-50">
+      <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-orange-50">
         {machine.imageUri ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -82,12 +82,20 @@ function MachineCard({ machine }: { machine: RentalMachine }) {
           </div>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 p-2.5">
-        <p className="line-clamp-2 min-h-[2.5rem] text-xs font-semibold leading-snug text-slate-900">
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
+        <p
+          className="truncate text-xs font-semibold leading-snug text-slate-900 sm:text-[13px]"
+          title={machine.name}
+        >
           {machine.name}
         </p>
         {machine.priceLabel ? (
-          <p className="mt-auto text-[11px] font-semibold text-orange-800">{machine.priceLabel}</p>
+          <p
+            className="mt-auto truncate text-[11px] font-semibold leading-snug text-orange-800 sm:text-xs"
+            title={machine.priceLabel}
+          >
+            {machine.priceLabel}
+          </p>
         ) : null}
       </div>
     </Link>
