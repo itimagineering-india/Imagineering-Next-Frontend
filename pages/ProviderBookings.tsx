@@ -63,6 +63,7 @@ import {
   getPriceTypeSuffix,
   isMachineRentalBookingMeta,
 } from "@/lib/priceTypeDisplay";
+import { openLocationOnGoogleMaps } from "@/lib/geocodeAddress";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -162,6 +163,7 @@ export default function ProviderBookings() {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [providerServices, setProviderServices] = useState<ProviderService[]>([]);
   const [modificationDialogOpen, setModificationDialogOpen] = useState(false);
+  const [mapOpening, setMapOpening] = useState(false);
   const [modificationItems, setModificationItems] = useState<
     Array<{ service: string; quantity: number; price: number; priceType?: string }>
   >([]);
@@ -1225,46 +1227,54 @@ export default function ProviderBookings() {
                 )}
 
                 {/* Location */}
-                {selectedBooking.location && (() => {
-                  const loc = selectedBooking.location;
-                  const lat = Number(loc.coordinates?.lat);
-                  const lng = Number(loc.coordinates?.lng);
-                  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
-                  const addressQuery = [loc.address, loc.city, loc.state, loc.zipCode]
-                    .map((p) => String(p || "").trim())
-                    .filter(Boolean)
-                    .join(", ");
-                  const mapsUrl = hasCoords
-                    ? `https://www.google.com/maps?q=${lat},${lng}`
-                    : addressQuery
-                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`
-                      : null;
-                  return (
-                    <div>
-                      <h3 className="font-semibold mb-3">Location</h3>
-                      <div className="flex items-start gap-2">
-                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="font-medium">{loc.address}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {loc.city}, {loc.state}
-                          </p>
-                          {mapsUrl && (
-                            <a
-                              href={mapsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                            >
+                {selectedBooking.location && (
+                  <div>
+                    <h3 className="font-semibold mb-3">Location</h3>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="font-medium">{selectedBooking.location.address}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedBooking.location.city}, {selectedBooking.location.state}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={mapOpening}
+                          className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline disabled:opacity-60"
+                          onClick={() => {
+                            void (async () => {
+                              setMapOpening(true);
+                              try {
+                                const ok = await openLocationOnGoogleMaps(selectedBooking.location!);
+                                if (!ok) {
+                                  toast({
+                                    title: "Location unavailable",
+                                    description: "Could not open this address on the map.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              } finally {
+                                setMapOpening(false);
+                              }
+                            })();
+                          }}
+                        >
+                          {mapOpening ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              Opening map…
+                            </>
+                          ) : (
+                            <>
                               View on map
                               <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
+                            </>
                           )}
-                        </div>
+                        </button>
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                )}
               </div>
             )}
           </DialogContent>
