@@ -58,6 +58,11 @@ import {
   BookingStatsCards,
   BookingTable,
 } from "@/components/bookings";
+import {
+  formatMachineRentalBookingQty,
+  getPriceTypeSuffix,
+  isMachineRentalBookingMeta,
+} from "@/lib/priceTypeDisplay";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -97,6 +102,17 @@ interface Booking {
   quotedDeliveryCharge?: number;
   deliveryOption?: string;
   transport?: string;
+  metadata?: {
+    paymentMethod?: string;
+    formVariant?: string;
+    machineCount?: number;
+    duration?: number;
+    rentalPriceType?: string;
+    durationNote?: string;
+    rentalStartDate?: string;
+    rentalStartTime?: string;
+    [key: string]: unknown;
+  };
   location?: {
     address: string;
     city: string;
@@ -204,6 +220,7 @@ export default function ProviderBookings() {
           ),
           deliveryOption: booking.metadata?.quoteDeliveryOption,
           transport: booking.metadata?.transport,
+          metadata: booking.metadata || undefined,
           location: booking.location,
           progress: booking.progress,
           simplifiedBookingFlow: !!booking.simplifiedBookingFlow,
@@ -939,12 +956,23 @@ export default function ProviderBookings() {
                     <div className="border rounded-lg overflow-hidden">
                       <div className="grid grid-cols-3 gap-2 bg-muted px-3 py-2 text-xs font-medium">
                         <span>Service</span>
-                        <span className="text-right">Qty</span>
+                        <span className="text-right">
+                          {isMachineRentalBookingMeta(selectedBooking.metadata)
+                            ? "Machines × duration"
+                            : "Qty"}
+                        </span>
                         <span className="text-right">Price</span>
                       </div>
                       <div className="divide-y">
                         {selectedBooking.services.map((item, idx) => {
                           const serviceId = item.service?._id || (idx === 0 ? selectedBooking.serviceId : '');
+                          const qtyLabel = formatMachineRentalBookingQty(
+                            selectedBooking.metadata,
+                            item.quantity || 1
+                          );
+                          const priceSuffix =
+                            getPriceTypeSuffix(item.priceType) ||
+                            (item.priceType ? `/${item.priceType}` : "");
                           return (
                           <div key={`${serviceId || idx}`} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
                             <div className="min-w-0">
@@ -955,10 +983,10 @@ export default function ProviderBookings() {
                                 </span>
                               ) : null}
                             </div>
-                            <span className="text-right">{item.quantity || 1}</span>
+                            <span className="text-right leading-snug">{qtyLabel}</span>
                             <span className="text-right">
                               ₹{(item.price || 0).toLocaleString()}
-                              {item.priceType ? `/${item.priceType}` : ""}
+                              {priceSuffix}
                             </span>
                           </div>
                           );
