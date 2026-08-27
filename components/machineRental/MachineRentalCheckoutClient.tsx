@@ -548,11 +548,11 @@ export function MachineRentalCheckoutClient() {
                 ₹{preview.platformFee.toLocaleString("en-IN")}
               </span>
             </div>
-            {(preview.platformFeeGst > 0 || preview.gst > 0) && (
+            {(preview.gst > 0 || preview.platformFeeGst > 0) && (
               <div className="flex justify-between gap-3">
                 <span className="text-slate-500">{t("checkoutGst")}</span>
                 <span className="font-medium text-slate-800">
-                  ₹{(preview.platformFeeGst + preview.gst).toLocaleString("en-IN")}
+                  ₹{(preview.gst || preview.platformFeeGst).toLocaleString("en-IN")}
                 </span>
               </div>
             )}
@@ -899,14 +899,28 @@ export function MachineRentalCheckoutClient() {
               />
             </section>
 
-            <div className="xl:hidden">{renderPayButton()}</div>
+            <div className="xl:hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              {renderSummary()}
+            </div>
           </div>
 
-          <aside className="hidden xl:block xl:sticky xl:top-24 xl:self-start">
+          <aside className="hidden xl:sticky xl:top-24 xl:block xl:self-start">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               {renderSummary({ showPay: true })}
             </div>
           </aside>
+        </div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur xl:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-slate-500">{t("checkoutTotal")}</p>
+            <p className="truncate text-lg font-bold text-slate-900">
+              {preview ? `₹${paymentAmount.toLocaleString("en-IN")}` : "—"}
+            </p>
+          </div>
+          <div className="w-[min(100%,220px)] shrink-0">{renderPayButton()}</div>
         </div>
       </div>
 
