@@ -28,6 +28,7 @@ import {
 } from "@/lib/priceTypeDisplay";
 import { resolveMachineRentalMediaUrl } from "@/lib/machineRental/media";
 import { resolveRentalCategoryKey } from "@/lib/machineRental/machineRentalHubCatalog";
+import { resolveAvailableMachinesFromService } from "@/lib/machineRental";
 import { RENTAL_AMBER } from "@/components/machineRental/MachineRentalHub";
 import { CustomFields } from "@/components/service-details/CustomFields";
 import { SimilarServices } from "@/components/service-details/SimilarServices";
@@ -273,9 +274,24 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
     return metadataToCustomFields(service.metadata);
   }, [service]);
 
+  const availableMachines = useMemo(
+    () => resolveAvailableMachinesFromService(service),
+    [service]
+  );
+
+  useEffect(() => {
+    setMachineCount((n) => clampInt(n, 1, availableMachines));
+  }, [availableMachines]);
+
   const detailRows = useMemo(() => {
     const rows: Array<{ label: string; value: string }> = [];
     if (categoryName) rows.push({ label: t("detailCategory"), value: categoryName });
+    if (availableMachines > 0) {
+      rows.push({
+        label: t("detailAvailableMachines"),
+        value: String(availableMachines),
+      });
+    }
     if (priceLabel && priceLabel !== "Contact for pricing") {
       rows.push({ label: t("detailRate"), value: priceLabel });
     }
@@ -290,7 +306,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
       });
     }
     return rows;
-  }, [categoryName, priceLabel, providerName, service, t]);
+  }, [availableMachines, categoryName, priceLabel, providerName, service, t]);
 
   const similarMapped = useMemo(
     () =>
@@ -351,7 +367,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
               variant="outline"
               size="icon"
               className="h-10 w-10 rounded-xl"
-              onClick={() => setMachineCount((n) => clampInt(n - 1, 1, 99))}
+              onClick={() => setMachineCount((n) => clampInt(n - 1, 1, availableMachines))}
               aria-label={t("machinesDecrease")}
             >
               <Minus className="h-4 w-4" />
@@ -359,9 +375,11 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
             <Input
               type="number"
               min={1}
-              max={99}
+              max={availableMachines}
               value={machineCount}
-              onChange={(e) => setMachineCount(clampInt(Number(e.target.value), 1, 99))}
+              onChange={(e) =>
+                setMachineCount(clampInt(Number(e.target.value), 1, availableMachines))
+              }
               className="h-10 w-16 rounded-xl text-center"
             />
             <Button
@@ -369,12 +387,15 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
               variant="outline"
               size="icon"
               className="h-10 w-10 rounded-xl"
-              onClick={() => setMachineCount((n) => clampInt(n + 1, 1, 99))}
+              onClick={() => setMachineCount((n) => clampInt(n + 1, 1, availableMachines))}
               aria-label={t("machinesIncrease")}
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          <p className="mt-1.5 text-xs text-slate-500">
+            {t("machinesAvailableHint", { count: availableMachines })}
+          </p>
         </div>
 
         {needsDuration ? (
@@ -457,16 +478,20 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
           <span className="line-clamp-1 font-medium text-slate-700">{title}</span>
         </nav>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)] xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
           {/* Gallery */}
-          <div className="space-y-3">
+          <div className="mx-auto w-full max-w-md space-y-3 lg:mx-0 lg:max-w-none">
             <div className="overflow-hidden rounded-2xl border border-orange-200/80 bg-white shadow-sm">
-              <div className="relative aspect-[4/3] w-full bg-orange-50 sm:aspect-[16/10]">
+              <div className="relative aspect-[4/3] w-full bg-orange-50">
                 {mainImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mainImage} alt={title} className="h-full w-full object-cover" />
+                  <img
+                    src={mainImage}
+                    alt={title}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-4xl font-bold text-orange-700/50">
+                  <div className="absolute inset-0 flex items-center justify-center text-4xl font-bold text-orange-700/50">
                     {title.slice(0, 2).toUpperCase()}
                   </div>
                 )}
@@ -479,7 +504,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
                     key={`${src}-${i}`}
                     type="button"
                     onClick={() => setActiveImage(i)}
-                    className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 ${
+                    className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border-2 sm:h-16 sm:w-20 ${
                       i === activeImage ? "border-orange-700" : "border-transparent opacity-80"
                     }`}
                   >
