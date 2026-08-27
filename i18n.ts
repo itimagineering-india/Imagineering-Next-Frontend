@@ -15,6 +15,7 @@ import enAuth from "@/locales/en/auth.json";
 import enJoinProvider from "@/locales/en/joinProvider.json";
 import enMaterials from "@/locales/en/materials.json";
 import enManpower from "@/locales/en/manpower.json";
+import enMachineRental from "@/locales/en/machineRental.json";
 import hiCommon from "@/locales/hi/common.json";
 import hiHeader from "@/locales/hi/header.json";
 import hiFooter from "@/locales/hi/footer.json";
@@ -27,6 +28,7 @@ import hiAuth from "@/locales/hi/auth.json";
 import hiJoinProvider from "@/locales/hi/joinProvider.json";
 import hiMaterials from "@/locales/hi/materials.json";
 import hiManpower from "@/locales/hi/manpower.json";
+import hiMachineRental from "@/locales/hi/machineRental.json";
 
 const LANG_STORAGE_KEY = "app_lang";
 
@@ -76,6 +78,7 @@ i18n.use(initReactI18next).init({
     "joinProvider",
     "materials",
     "manpower",
+    "machineRental",
   ],
   defaultNS: "common",
   interpolation: {
@@ -95,6 +98,7 @@ i18n.use(initReactI18next).init({
       joinProvider: enJoinProvider,
       materials: enMaterials,
       manpower: enManpower,
+      machineRental: enMachineRental,
     },
     hi: {
       common: hiCommon,
@@ -109,6 +113,7 @@ i18n.use(initReactI18next).init({
       joinProvider: hiJoinProvider,
       materials: hiMaterials,
       manpower: hiManpower,
+      machineRental: hiMachineRental,
     },
   },
   react: {
