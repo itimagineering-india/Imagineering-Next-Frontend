@@ -141,18 +141,40 @@ export function resolveRentalCategoryKey(raw: string): string {
   const s = String(raw || "")
     .trim()
     .toLowerCase()
-    .replace(/[_-]+/g, " ");
+    .replace(/[_-]+/g, " ")
+    .replace(/&/g, " ");
   if (!s) return "";
+
+  // Hub categories (order matters — more specific first)
+  if (/earthwork|excavation/.test(s) && !/demolition/.test(s)) return "earthwork-excavation";
+  if (/concrete/.test(s) && /construction|mixer|cement/.test(s)) return "concrete-construction";
+  if (/^concrete$/.test(s.trim())) return "concrete-construction";
+  if (/lifting|material\s*handling|crane|hydra|boom\s*lift/.test(s)) return "lifting-material-handling";
+  if (/road\s*construction|asphalt|paving|paver/.test(s)) return "road-construction";
+  if (/demolition|breaker|wrecking/.test(s)) return "demolition";
+  if (/drilling|foundation|pile|auger/.test(s)) return "drilling-foundation";
+  if (/compaction|compactor|roller/.test(s) && !/road\s*construction/.test(s)) return "compaction";
+  if (/power|electrical|generator|dg\s*set/.test(s)) return "power-electrical";
+  if (/welding|fabrication/.test(s)) return "welding-fabrication";
+  if (/clean/.test(s)) return "cleaning-equipment";
+  if (/water/.test(s)) return "water-management";
+  if (/height|scaffold|aerial|scissor\s*lift/.test(s)) return "height-access";
+  if (/survey|total\s*station|theodolite/.test(s)) return "survey-equipment";
+  if (/garden|landscape/.test(s)) return "gardening-landscaping";
+  if (/material\s*transport|dump|tipper|truck/.test(s)) return "material-transport";
+  if (/stone|tile/.test(s)) return "stone-tile-work";
+  if (/wood|carpentry/.test(s)) return "woodworking";
+  if (/paint/.test(s)) return "painting-equipment";
+
+  // Classic machine types
   if (/\bjcb\b|backhoe/.test(s)) return "jcb";
   if (/excavat/.test(s)) return "excavator";
-  if (/crane|hydra|boom/.test(s)) return "crane";
-  if (/dump|tipper/.test(s)) return "dumper";
-  if (/roller|compactor/.test(s)) return "road-roller";
+  if (/crane|hydra/.test(s)) return "crane";
   if (/loader|bobcat/.test(s)) return "loader";
   if (/mixer|transit/.test(s)) return "transit-mixer";
-  if (/generat|dg\s*set/.test(s)) return "generator";
+  if (/generat/.test(s)) return "generator";
   if (/tractor/.test(s)) return "tractor";
-  if (/truck/.test(s)) return "truck";
+
   return slugifyRentalId(s);
 }
 
