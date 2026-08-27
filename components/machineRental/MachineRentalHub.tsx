@@ -230,13 +230,13 @@ export function MachineRentalHub() {
             </div>
 
             <div className="relative mx-auto hidden w-full max-w-[260px] justify-self-end lg:block xl:max-w-[290px]">
-              <div className="relative aspect-square overflow-hidden rounded-t-2xl bg-orange-100/20">
+              <div className="relative aspect-square overflow-hidden">
                 <Image
                   src={machineRentalHeroImg}
                   alt="Construction machines for rent"
                   fill
                   priority
-                  className="object-contain object-center p-4"
+                  className="object-contain object-center"
                   sizes="290px"
                 />
               </div>
