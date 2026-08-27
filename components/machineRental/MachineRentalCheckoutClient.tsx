@@ -631,9 +631,6 @@ export function MachineRentalCheckoutClient() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground xl:text-3xl">
             {t("checkoutTitle")}
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
-            {t("checkoutSubtitle")}
-          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
