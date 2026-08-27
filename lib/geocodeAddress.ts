@@ -78,3 +78,48 @@ export async function geocodeAddressToCoordinates(query: string): Promise<LatLng
   if (mapbox) return mapbox;
   return geocodeWithGoogle(trimmed);
 }
+
+/** Google Maps URL that places a pin at exact lat/lng. */
+export function googleMapsPinUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${lat},${lng}`)}`;
+}
+
+/**
+ * Open Google Maps with a pin. Uses stored coordinates when present;
+ * otherwise geocodes the address so the map shows an exact marker.
+ */
+export async function openLocationOnGoogleMaps(parts: {
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  coordinates?: { lat?: number; lng?: number } | null;
+}): Promise<boolean> {
+  const lat = Number(parts.coordinates?.lat);
+  const lng = Number(parts.coordinates?.lng);
+  if (isValidLatLng({ lat, lng })) {
+    window.open(googleMapsPinUrl(lat, lng), "_blank", "noopener,noreferrer");
+    return true;
+  }
+
+  const query = buildAddressGeocodeQuery(parts)
+    .replace(/[،﹐]/g, ",")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!query) return false;
+
+  // Open synchronously so popup blockers don't block after async geocode.
+  const popup = window.open("about:blank", "_blank");
+
+  const coords = await geocodeAddressToCoordinates(query);
+  const url = coords
+    ? googleMapsPinUrl(coords.lat, coords.lng)
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+
+  if (popup && !popup.closed) {
+    popup.location.href = url;
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+  return true;
+}
