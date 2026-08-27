@@ -1660,6 +1660,7 @@ export const api = {
       machineCount: number;
       duration: number;
       startDate?: string;
+      startTime?: string;
       paymentMethod: string;
       couponUsageId?: string;
       location: {
