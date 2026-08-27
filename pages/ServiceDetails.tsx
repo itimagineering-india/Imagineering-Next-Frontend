@@ -1030,7 +1030,15 @@ export default function ServiceDetails() {
 
                     <div className="hidden space-y-2 lg:block">
                       {canAddToCart ? (
-                        <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-12 w-full text-base font-semibold" />
+                        <AddToCartButton
+                          serviceId={service.id}
+                          providerName={service.provider?.name}
+                          label={t("addToCart", "Add to Cart")}
+                          className="h-12 w-full text-base font-semibold"
+                          priceType={service.priceType}
+                          categorySlug={categorySlug}
+                          unitPrice={typeof service.price === "number" ? service.price : Number(service.price) || null}
+                        />
                       ) : showPricing && isRangePrice ? (
                         <Button onClick={handleGetBestQuotes} className="h-12 w-full text-base font-semibold">
                           Get Best Quotes
@@ -1236,7 +1244,15 @@ export default function ServiceDetails() {
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
           <div>
             {canAddToCart ? (
-              <AddToCartButton serviceId={service.id} providerName={service.provider?.name} label={t("addToCart", "Add to Cart")} className="h-11 w-full text-sm font-semibold" />
+              <AddToCartButton
+                serviceId={service.id}
+                providerName={service.provider?.name}
+                label={t("addToCart", "Add to Cart")}
+                className="h-11 w-full text-sm font-semibold"
+                priceType={service.priceType}
+                categorySlug={categorySlug}
+                unitPrice={typeof service.price === "number" ? service.price : Number(service.price) || null}
+              />
             ) : showPricing && isRangePrice ? (
               <Button onClick={handleGetBestQuotes} className="h-11 w-full text-sm font-semibold">
                 Get Best Quotes
