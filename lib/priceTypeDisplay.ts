@@ -156,6 +156,36 @@ export function formatDurationQtyLabel(quantity: number, priceType?: string | nu
   return `${n} ${shortPlural}`;
 }
 
+/** Provider/buyer booking line qty for machine rental (not raw machines×duration). */
+export function isMachineRentalBookingMeta(
+  metadata?: Record<string, unknown> | null
+): boolean {
+  if (!metadata || typeof metadata !== "object") return false;
+  const form = String(metadata.formVariant || "")
+    .toLowerCase()
+    .trim()
+    .replace(/_/g, "-");
+  // Strict: only dedicated machine-rental bookings (never construction materials / manpower / quotes).
+  return form === "machine-rental" || form === "rental-services";
+}
+
+export function formatMachineRentalBookingQty(
+  metadata?: Record<string, unknown> | null,
+  fallbackQty?: number
+): string {
+  if (!isMachineRentalBookingMeta(metadata)) {
+    return String(fallbackQty ?? 1);
+  }
+  const note = String(metadata?.durationNote || "").trim();
+  if (note) return note;
+  const machines = Math.max(1, Math.floor(Number(metadata?.machineCount) || 1));
+  const duration = Math.max(1, Math.floor(Number(metadata?.duration) || 1));
+  const priceType = String(
+    metadata?.rentalPriceType || metadata?.priceType || "daily"
+  );
+  return `${machines} machine${machines === 1 ? "" : "s"} × ${formatDurationQtyLabel(duration, priceType)}`;
+}
+
 export function formatInr(amount: number): string {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(amount);
 }
