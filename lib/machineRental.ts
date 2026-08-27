@@ -81,6 +81,8 @@ export function buildMachineRentalServicePayload(opts: {
   images: string[];
   priceType: MachineRentalPriceType;
   price: number;
+  /** How many identical units the provider can rent out for this listing. */
+  availableMachines: number;
   securityDeposit?: string;
   operatorIncluded: boolean;
   specs?: MachineRentalSpecRow[];
@@ -93,6 +95,11 @@ export function buildMachineRentalServicePayload(opts: {
       value: row.value.trim(),
       type: "text" as const,
     }));
+
+  const availableMachines = Math.min(
+    99,
+    Math.max(1, Math.floor(Number(opts.availableMachines) || 1))
+  );
 
   const payload: Record<string, unknown> = {
     title: opts.title.trim(),
@@ -110,6 +117,7 @@ export function buildMachineRentalServicePayload(opts: {
       formVariant: "rental_services",
       categorySlug: normalizeCategorySlugLikeApp(opts.categorySlug),
       itemType: "machine",
+      availableMachines: String(availableMachines),
       operatorIncluded: opts.operatorIncluded ? "yes" : "no",
       ...(opts.securityDeposit?.trim()
         ? { securityDeposit: opts.securityDeposit.trim() }
@@ -140,4 +148,36 @@ export function buildMachineRentalServicePayload(opts: {
   }
 
   return payload;
+}
+
+/** Max machines a buyer can book for a listing (from provider metadata). */
+export function resolveAvailableMachinesFromService(
+  service: {
+    metadata?: Record<string, unknown> | null;
+    customFields?: Array<{ label?: string; value?: unknown }> | null;
+  } | null | undefined,
+  fallback = 99
+): number {
+  const meta = service?.metadata;
+  const rawMeta = meta?.availableMachines ?? meta?.machinesAvailable ?? meta?.fleetSize;
+  const fromMeta = Number(rawMeta);
+  if (Number.isFinite(fromMeta) && fromMeta >= 1) {
+    return Math.min(99, Math.floor(fromMeta));
+  }
+  const fields = Array.isArray(service?.customFields) ? service!.customFields! : [];
+  for (const field of fields) {
+    const label = String(field?.label || "").toLowerCase();
+    if (
+      label.includes("available machine") ||
+      label.includes("machines available") ||
+      label.includes("fleet") ||
+      label === "quantity" ||
+      label === "no. of machines" ||
+      label === "number of machines"
+    ) {
+      const n = Number(field?.value);
+      if (Number.isFinite(n) && n >= 1) return Math.min(99, Math.floor(n));
+    }
+  }
+  return Math.min(99, Math.max(1, Math.floor(fallback)));
 }
