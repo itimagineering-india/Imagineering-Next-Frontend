@@ -392,6 +392,9 @@ function ServiceCardComponent({
         <AddToCartButton
          serviceId={id}
          providerName={provider?.name}
+         priceType={priceType}
+         categorySlug={typeof category === "object" ? category?.slug : undefined}
+         unitPrice={price}
         />
        )}
       </div>
@@ -564,6 +567,9 @@ function ServiceCardComponent({
       <AddToCartButton
        serviceId={id}
        providerName={provider?.name}
+       priceType={priceType}
+       categorySlug={typeof category === "object" ? category?.slug : undefined}
+       unitPrice={price}
       />
      )}
     </div>
