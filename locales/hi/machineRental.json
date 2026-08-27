@@ -50,6 +50,8 @@
   "machinesDecrease": "कम मशीनें",
   "machinesIncrease": "अधिक मशीनें",
   "machinesCountBadge": "{{count}} मशीन",
+  "machinesAvailableHint": "इस प्रदाता के पास अधिकतम {{count}} उपलब्ध",
+  "detailAvailableMachines": "उपलब्ध यूनिट",
   "durationLabel": "अवधि ({{unit}})",
   "durationDecrease": "कम अवधि",
   "durationIncrease": "अधिक अवधि",
