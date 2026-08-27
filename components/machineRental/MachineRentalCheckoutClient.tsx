@@ -59,6 +59,7 @@ type Preview = {
   unitPrice?: number;
   priceType?: string;
   machineCount?: number;
+  availableMachines?: number;
   duration?: number;
   durationLabel?: string;
 };
@@ -116,6 +117,14 @@ export function MachineRentalCheckoutClient() {
   const priceType = String(preview?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
   const unitNoun = getQuantityUnitNoun(priceType) || "day";
+  const availableMachines = Math.max(
+    1,
+    Math.min(99, Math.floor(Number(preview?.availableMachines) || 99))
+  );
+
+  useEffect(() => {
+    setMachineCount((n) => clampInt(n, 1, availableMachines));
+  }, [availableMachines]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -166,6 +175,7 @@ export function MachineRentalCheckoutClient() {
             unitPrice: Number(d.unitPrice) || 0,
             priceType: d.priceType,
             machineCount: Number(d.machineCount) || machineCount,
+            availableMachines: Number(d.availableMachines) || 99,
             duration: Number(d.duration) || duration,
             durationLabel: d.durationLabel,
           });
@@ -630,17 +640,17 @@ export function MachineRentalCheckoutClient() {
                       variant="outline"
                       size="icon"
                       className="h-10 w-10 rounded-xl"
-                      onClick={() => setMachineCount((n) => clampInt(n - 1, 1, 99))}
+                      onClick={() => setMachineCount((n) => clampInt(n - 1, 1, availableMachines))}
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
                     <Input
                       type="number"
                       min={1}
-                      max={99}
+                      max={availableMachines}
                       value={machineCount}
                       onChange={(e) =>
-                        setMachineCount(clampInt(Number(e.target.value), 1, 99))
+                        setMachineCount(clampInt(Number(e.target.value), 1, availableMachines))
                       }
                       className="h-10 w-16 rounded-xl text-center"
                     />
@@ -649,11 +659,14 @@ export function MachineRentalCheckoutClient() {
                       variant="outline"
                       size="icon"
                       className="h-10 w-10 rounded-xl"
-                      onClick={() => setMachineCount((n) => clampInt(n + 1, 1, 99))}
+                      onClick={() => setMachineCount((n) => clampInt(n + 1, 1, availableMachines))}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    {t("machinesAvailableHint", { count: availableMachines })}
+                  </p>
                 </div>
 
                 {(needsDuration || !preview) && (
