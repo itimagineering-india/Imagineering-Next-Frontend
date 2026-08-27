@@ -50,6 +50,8 @@
   "machinesDecrease": "Fewer machines",
   "machinesIncrease": "More machines",
   "machinesCountBadge": "{{count}} machine(s)",
+  "machinesAvailableHint": "Up to {{count}} available from this provider",
+  "detailAvailableMachines": "Available units",
   "durationLabel": "Duration ({{unit}})",
   "durationDecrease": "Shorter duration",
   "durationIncrease": "Longer duration",
