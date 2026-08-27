@@ -18,13 +18,16 @@ import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { cn } from "@/lib/utils";
 import {
   MACHINE_RENTAL_FALLBACK_TYPES,
+  MACHINE_RENTAL_PRICE_TYPES,
   MACHINE_RENTAL_SPEC_SUGGESTIONS,
   buildMachineRentalServicePayload,
   createMachineRentalSpecRow,
   isMachineRentalCategorySlug,
   type MachineRentalLocation,
+  type MachineRentalPriceType,
   type MachineRentalSpecRow,
 } from "@/lib/machineRental";
+import { getPriceTypeLabel } from "@/lib/priceTypeDisplay";
 
 interface Category {
   _id: string;
@@ -106,7 +109,7 @@ export function MachineRentalFormPage() {
   const [shortDescription, setShortDescription] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
-  const [priceType, setPriceType] = useState<"daily" | "hourly">("daily");
+  const [priceType, setPriceType] = useState<MachineRentalPriceType>("daily");
   const [price, setPrice] = useState("");
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
@@ -257,6 +260,11 @@ export function MachineRentalFormPage() {
       setSubmitting(false);
     }
   };
+
+  const pricePlaceholder = useMemo(() => {
+    const label = getPriceTypeLabel(priceType);
+    return label ? `Price (${label}) in ₹` : "Rental price in ₹";
+  }, [priceType]);
 
   const progress = step === 1 ? 50 : 100;
 
@@ -410,11 +418,8 @@ export function MachineRentalFormPage() {
             <Label>
               Rental rate <span className="text-destructive">*</span>
             </Label>
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { value: "daily" as const, title: "Per day" },
-                { value: "hourly" as const, title: "Per hour" },
-              ]).map((option) => (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+              {MACHINE_RENTAL_PRICE_TYPES.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -426,7 +431,7 @@ export function MachineRentalFormPage() {
                       : "border-border bg-background",
                   )}
                 >
-                  <span className="block font-medium">{option.title}</span>
+                  <span className="block text-sm font-medium">{option.title}</span>
                 </button>
               ))}
             </div>
@@ -440,7 +445,7 @@ export function MachineRentalFormPage() {
                 setPrice(e.target.value);
                 setErrors((prev) => ({ ...prev, price: "" }));
               }}
-              placeholder={priceType === "hourly" ? "Price per hour (₹)" : "Price per day (₹)"}
+              placeholder={pricePlaceholder}
               className={errors.price ? "border-destructive" : ""}
             />
             {errors.price ? <p className="text-sm text-destructive">{errors.price}</p> : null}
