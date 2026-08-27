@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,14 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProviderMismatchDialog } from "@/components/cart/ProviderMismatchDialog";
 import { useToast } from "@/hooks/use-toast";
+import { isMachineRentalCategorySlug } from "@/lib/machineRental";
+import { formatServicePrice } from "@/lib/formatServicePrice";
+import {
+  formatDurationQtyLabel,
+  getPriceTypeLabel,
+  getQuantityUnitFieldLabel,
+  isDurationPriceType,
+} from "@/lib/priceTypeDisplay";
 
 const OPEN_CART_PARAM = "openAddToCart";
 
@@ -32,6 +40,12 @@ type AddToCartButtonProps = {
   showQuantity?: boolean;
   /** Max quantity allowed in selector */
   maxQuantity?: number;
+  /** Service price type — used for rental duration labels (daily/hourly/per_trip). */
+  priceType?: string | null;
+  /** Category slug — enables rental duration UX when machine-rental. */
+  categorySlug?: string | null;
+  /** Unit selling price for live total preview in the modal. */
+  unitPrice?: number | null;
 };
 
 export const AddToCartButton = ({
@@ -42,6 +56,9 @@ export const AddToCartButton = ({
   label = "Add to Cart",
   onAdded,
   maxQuantity,
+  priceType,
+  categorySlug,
+  unitPrice,
 }: AddToCartButtonProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -52,7 +69,19 @@ export const AddToCartButton = ({
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   const [showMismatch, setShowMismatch] = useState(false);
   const [pendingAdd, setPendingAdd] = useState(false);
-  const minQty = 0.1;
+
+  const isRentalDuration =
+    isMachineRentalCategorySlug(categorySlug || undefined) && isDurationPriceType(priceType);
+
+  const minQty = isRentalDuration ? 1 : 0.1;
+  const qtyStep = isRentalDuration ? (String(priceType).toLowerCase() === "hourly" ? 0.5 : 1) : 0.1;
+  const fieldLabel = isRentalDuration ? getQuantityUnitFieldLabel(priceType) : "Quantity";
+  const unitPriceLabel = formatServicePrice({
+    price: unitPrice,
+    priceMode: "exact",
+    priceType: priceType || "fixed",
+  });
+
   const [quantity, setQuantity] = useState(() => {
     const next = Math.max(minQty, Number(initialQuantity) || minQty);
     return typeof maxQuantity === "number" ? Math.min(next, maxQuantity) : next;
@@ -60,11 +89,21 @@ export const AddToCartButton = ({
 
   const clamp = useCallback(
     (q: number) => {
-      const next = Math.max(minQty, q);
+      let next = Math.max(minQty, q);
+      if (isRentalDuration && String(priceType).toLowerCase() !== "hourly") {
+        next = Math.max(minQty, Math.round(next));
+      }
       return typeof maxQuantity === "number" ? Math.min(next, maxQuantity) : next;
     },
-    [maxQuantity]
+    [maxQuantity, minQty, isRentalDuration, priceType]
   );
+
+  const estimatedTotal = useMemo(() => {
+    const price = Number(unitPrice);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    const qty = clamp(quantity);
+    return Math.round(price * qty * 100) / 100;
+  }, [unitPrice, quantity, clamp]);
 
   const buildCurrentPath = useCallback(() => {
     const qs = searchParams?.toString();
@@ -90,7 +129,7 @@ export const AddToCartButton = ({
     params.delete(OPEN_CART_PARAM);
     const next = params.toString();
     router.replace(`${pathname || "/"}${next ? `?${next}` : ""}`);
-  }, [isAuthenticated, isAuthLoading, searchParams, serviceId, pathname, router, clamp, initialQuantity]);
+  }, [isAuthenticated, isAuthLoading, searchParams, serviceId, pathname, router, clamp, initialQuantity, minQty]);
 
   const handleOpenAdd = () => {
     if (isAuthLoading) return;
@@ -106,7 +145,12 @@ export const AddToCartButton = ({
     setPendingAdd(true);
     try {
       await addToCart(serviceId, qty, { silent: true });
-      toast({ title: "Added to cart" });
+      toast({
+        title: "Added to cart",
+        description: isRentalDuration
+          ? formatDurationQtyLabel(qty, priceType)
+          : undefined,
+      });
       setShowQuantityModal(false);
       onAdded?.();
     } catch (error: unknown) {
@@ -156,6 +200,10 @@ export const AddToCartButton = ({
     if (!Number.isNaN(v)) setQuantity(clamp(v));
   };
 
+  const dialogDescription = isRentalDuration
+    ? `How many ${fieldLabel.toLowerCase()} do you need? Rate is ${unitPriceLabel}.`
+    : "Enter the quantity you need for this item.";
+
   return (
     <>
       <Button
@@ -178,22 +226,42 @@ export const AddToCartButton = ({
         <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Add to Cart</DialogTitle>
-            <DialogDescription>Enter the quantity you need for this item.</DialogDescription>
+            <DialogDescription>{dialogDescription}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor={`cart-qty-${serviceId}`}>Quantity</Label>
-            <Input
-              id={`cart-qty-${serviceId}`}
-              type="number"
-              min={minQty}
-              max={maxQuantity}
-              step={0.1}
-              value={quantity}
-              onChange={handleQuantityChange}
-              onBlur={() => setQuantity((q) => clamp(q))}
-              disabled={pendingAdd}
-              autoFocus
-            />
+          <div className="space-y-3 py-2">
+            <div className="space-y-2">
+              <Label htmlFor={`cart-qty-${serviceId}`}>{fieldLabel}</Label>
+              <Input
+                id={`cart-qty-${serviceId}`}
+                type="number"
+                min={minQty}
+                max={maxQuantity}
+                step={qtyStep}
+                value={quantity}
+                onChange={handleQuantityChange}
+                onBlur={() => setQuantity((q) => clamp(q))}
+                disabled={pendingAdd}
+                autoFocus
+              />
+              {isRentalDuration && getPriceTypeLabel(priceType) ? (
+                <p className="text-xs text-muted-foreground">
+                  Billed {getPriceTypeLabel(priceType).toLowerCase()}
+                </p>
+              ) : null}
+            </div>
+            {estimatedTotal != null ? (
+              <div className="rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">Estimated total</span>
+                  <span className="font-semibold text-foreground">
+                    ₹{estimatedTotal.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {unitPriceLabel} × {formatDurationQtyLabel(clamp(quantity), priceType)}
+                </p>
+              </div>
+            ) : null}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
