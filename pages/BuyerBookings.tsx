@@ -37,6 +37,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
+import {
+  formatMachineRentalBookingQty,
+  getPriceTypeSuffix,
+  isMachineRentalBookingMeta,
+} from "@/lib/priceTypeDisplay";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -1547,18 +1552,29 @@ export default function BuyerBookings() {
                         <div className="mt-2 border rounded-lg overflow-hidden">
                           <div className="grid grid-cols-12 gap-2 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
                             <div className="col-span-6">Service</div>
-                            <div className="col-span-2 text-right">Qty</div>
+                            <div className="col-span-2 text-right">
+                              {isMachineRentalBookingMeta(selectedBooking.metadata as Record<string, unknown>)
+                                ? "Machines × duration"
+                                : "Qty"}
+                            </div>
                             <div className="col-span-4 text-right">Price</div>
                           </div>
                           <div className="divide-y">
                             {getServiceItems(selectedBooking).map((item, index) => (
                               <div key={`${item._id || index}`} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm">
                                 <div className="col-span-6">{item.title || "Service"}</div>
-                                <div className="col-span-2 text-right">
-                                  {item.quantity}
-                                  {item.priceType ? ` ${item.priceType}` : ""}
+                                <div className="col-span-2 text-right leading-snug">
+                                  {formatMachineRentalBookingQty(
+                                    selectedBooking.metadata as Record<string, unknown>,
+                                    item.quantity
+                                  )}
                                 </div>
-                                <div className="col-span-4 text-right">₹{(item.price || 0).toLocaleString()}</div>
+                                <div className="col-span-4 text-right">
+                                  ₹{Number(item.price || 0).toLocaleString("en-IN")}
+                                  {item.priceType
+                                    ? getPriceTypeSuffix(item.priceType) || `/${item.priceType}`
+                                    : ""}
+                                </div>
                               </div>
                             ))}
                           </div>
