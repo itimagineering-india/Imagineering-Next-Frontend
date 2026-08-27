@@ -89,9 +89,71 @@ export function getQuantityUnitNoun(priceType: string | null | undefined): strin
   return key.replace(/_/g, " ").replace(/^per\s+/i, "").trim();
 }
 
+/** Plural field label for cart qty (e.g. "Days", "Hours", "Trips"). */
+export function getQuantityUnitFieldLabel(priceType: string | null | undefined): string {
+  const noun = getQuantityUnitNoun(priceType);
+  if (!noun) return "Quantity";
+  const plural: Record<string, string> = {
+    day: "Days",
+    hour: "Hours",
+    trip: "Trips",
+    month: "Months",
+    min: "Minutes",
+    bag: "Bags",
+    kg: "Kilograms",
+    litre: "Litres",
+    load: "Loads",
+    unit: "Units",
+    article: "Articles",
+    "sq ft": "Sq ft",
+    "sq m": "Sq m",
+    "cu ft": "Cu ft",
+    "cu m": "Cu m",
+    metre: "Metres",
+    MT: "Metric tons",
+  };
+  return plural[noun] || `${noun.charAt(0).toUpperCase()}${noun.slice(1)}s`;
+}
+
+/** Whether this price type is billed as a duration unit (rental-style). */
+export function isDurationPriceType(priceType: string | null | undefined): boolean {
+  const key = String(priceType || "")
+    .trim()
+    .toLowerCase();
+  return key === "daily" || key === "hourly" || key === "per_trip" || key === "monthly";
+}
+
 export function formatQuoteQtyLabel(quantity: number, priceType?: string | null): string {
   const unit = getQuantityUnitNoun(priceType);
   return unit ? `Qty ${quantity} ${unit}` : `Qty ${quantity}`;
+}
+
+/** e.g. "3 days", "2 hours" */
+export function formatDurationQtyLabel(quantity: number, priceType?: string | null): string {
+  const unit = getQuantityUnitNoun(priceType);
+  if (!unit) return `Qty ${quantity}`;
+  const n = Number(quantity);
+  const shortPlural =
+    unit === "day"
+      ? n === 1
+        ? "day"
+        : "days"
+      : unit === "hour"
+        ? n === 1
+          ? "hour"
+          : "hours"
+        : unit === "trip"
+          ? n === 1
+            ? "trip"
+            : "trips"
+          : unit === "month"
+            ? n === 1
+              ? "month"
+              : "months"
+            : n === 1
+              ? unit
+              : `${unit}s`;
+  return `${n} ${shortPlural}`;
 }
 
 export function formatInr(amount: number): string {
