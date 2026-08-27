@@ -29,6 +29,10 @@ import {
   loadSavedAddresses,
   type SavedAddress,
 } from "@/lib/savedAddresses";
+import {
+  buildAddressGeocodeQuery,
+  geocodeAddressToCoordinates,
+} from "@/lib/geocodeAddress";
 import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
 import { CartOffersModal } from "@/components/cart/CartOffersModal";
 import {
@@ -357,6 +361,19 @@ export function MachineRentalCheckoutClient() {
         : local.toISOString();
     }
 
+    let coordinates = selectedAddress.coordinates;
+    const lat = Number(coordinates?.lat);
+    const lng = Number(coordinates?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      const query = buildAddressGeocodeQuery({
+        address: formatSavedAddressLine(selectedAddress),
+        city: selectedAddress.city,
+        state: selectedAddress.state,
+        zipCode: selectedAddress.zipCode,
+      });
+      coordinates = (await geocodeAddressToCoordinates(query)) || undefined;
+    }
+
     const res = await api.bookings.createMachineRental({
       serviceId,
       machineCount,
@@ -371,7 +388,7 @@ export function MachineRentalCheckoutClient() {
         city: selectedAddress.city,
         state: selectedAddress.state,
         zipCode: selectedAddress.zipCode,
-        coordinates: selectedAddress.coordinates,
+        coordinates,
       },
     });
     if (!res.success || !(res.data as { bookingId?: string })?.bookingId) {
