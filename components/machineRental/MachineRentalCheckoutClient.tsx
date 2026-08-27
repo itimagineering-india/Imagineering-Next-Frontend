@@ -95,6 +95,7 @@ export function MachineRentalCheckoutClient() {
     clampInt(Number(sp.get("duration") || 1), 1, 365)
   );
   const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [notes, setNotes] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -340,12 +341,28 @@ export function MachineRentalCheckoutClient() {
       });
       return null;
     }
+    if ((startDate && !startTime) || (!startDate && startTime)) {
+      toast({
+        title: t("startDateTimeRequired"),
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    let startDatePayload: string | undefined;
+    if (startDate && startTime) {
+      const local = new Date(`${startDate}T${startTime}`);
+      startDatePayload = Number.isNaN(local.getTime())
+        ? `${startDate}T${startTime}`
+        : local.toISOString();
+    }
 
     const res = await api.bookings.createMachineRental({
       serviceId,
       machineCount,
       duration: needsDuration ? duration : 1,
-      startDate: startDate || undefined,
+      startDate: startDatePayload,
+      startTime: startTime || undefined,
       paymentMethod,
       couponUsageId: appliedCoupon?.usageId,
       notes: notes.trim() || undefined,
@@ -375,6 +392,7 @@ export function MachineRentalCheckoutClient() {
     selectedAddress,
     serviceId,
     startDate,
+    startTime,
     t,
     toast,
   ]);
@@ -708,19 +726,33 @@ export function MachineRentalCheckoutClient() {
                 )}
               </div>
 
-              <div className="mt-5">
-                <Label htmlFor="rental-start" className="text-sm font-semibold text-slate-800">
-                  {t("startDateLabel")}
-                </Label>
-                <Input
-                  id="rental-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="mt-2 h-11 max-w-xs rounded-xl"
-                />
-                <p className="mt-1.5 text-xs text-slate-500">{t("startDateHint")}</p>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="rental-start" className="text-sm font-semibold text-slate-800">
+                    {t("startDateLabel")}
+                  </Label>
+                  <Input
+                    id="rental-start"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="mt-2 h-11 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rental-start-time" className="text-sm font-semibold text-slate-800">
+                    {t("startTimeLabel")}
+                  </Label>
+                  <Input
+                    id="rental-start-time"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="mt-2 h-11 rounded-xl"
+                  />
+                </div>
               </div>
+              <p className="mt-1.5 text-xs text-slate-500">{t("startDateHint")}</p>
             </section>
 
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
