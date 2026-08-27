@@ -117,6 +117,11 @@ interface Booking {
     address: string;
     city: string;
     state: string;
+    zipCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
   };
   progress?: number;
   milestones?: Array<{
@@ -199,8 +204,12 @@ export default function ProviderBookings() {
           serviceName: booking.serviceName,
           services: booking.services || [],
           bookingDate: booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          startDate: booking.startDate ? new Date(booking.startDate).toISOString().split('T')[0] : undefined,
-          endDate: booking.endDate ? new Date(booking.endDate).toISOString().split('T')[0] : undefined,
+          startDate: booking.startDate
+            ? new Date(booking.startDate).toISOString()
+            : booking.metadata?.rentalStartDate
+              ? String(booking.metadata.rentalStartDate)
+              : undefined,
+          endDate: booking.endDate ? new Date(booking.endDate).toISOString() : undefined,
           status: booking.status,
           paymentStatus: booking.paymentStatus,
           amount: booking.amount ?? booking.totalAmount ?? 0,
@@ -907,41 +916,75 @@ export default function ProviderBookings() {
                   )}
                 </div>
 
-                {/* Job Info */}
+                {/* Schedule / status */}
                 <div>
-                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Job Information</h3>
+                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Schedule</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Booking ID</p>
-                      <p className="font-medium font-mono text-sm md:text-base">
-                        {bookingDisplayId(selectedBooking)}
-                      </p>
-                      {selectedBooking.id &&
-                      bookingDisplayId(selectedBooking) !== selectedBooking.id ? (
-                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5 break-all">
-                          Ref {selectedBooking.id}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Job Title</p>
-                      <p className="font-medium text-sm md:text-base">{selectedBooking.jobTitle}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Service</p>
-                      <p className="font-medium text-sm md:text-base">{selectedBooking.serviceName}</p>
-                      {selectedBooking.serviceId ? (
-                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5 break-all">
-                          Service ID {selectedBooking.serviceId}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Booking Date</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">Placed on</p>
                       <p className="font-medium text-sm md:text-base">
-                        {new Date(selectedBooking.bookingDate).toLocaleDateString()}
+                        {new Date(selectedBooking.bookingDate).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
                       </p>
                     </div>
+                    {(() => {
+                      const meta = selectedBooking.metadata || {};
+                      const startRaw =
+                        selectedBooking.startDate ||
+                        (typeof meta.rentalStartDate === "string" ? meta.rentalStartDate : "");
+                      if (!startRaw) return null;
+                      const start = new Date(startRaw);
+                      if (Number.isNaN(start.getTime())) return null;
+                      const timeFromMeta =
+                        typeof meta.rentalStartTime === "string" &&
+                        /^\d{1,2}:\d{2}/.test(meta.rentalStartTime)
+                          ? meta.rentalStartTime.slice(0, 5)
+                          : "";
+                      const timeLabel =
+                        timeFromMeta ||
+                        start.toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        });
+                      const hasMeaningfulTime =
+                        Boolean(timeFromMeta) ||
+                        start.getUTCHours() !== 0 ||
+                        start.getUTCMinutes() !== 0 ||
+                        start.getHours() !== 0 ||
+                        start.getMinutes() !== 0;
+                      return (
+                        <>
+                          <div>
+                            <p className="text-xs md:text-sm text-muted-foreground">
+                              {isMachineRentalBookingMeta(selectedBooking.metadata)
+                                ? "Preferred start date"
+                                : "Scheduled date"}
+                            </p>
+                            <p className="font-medium text-sm md:text-base">
+                              {start.toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                          {hasMeaningfulTime ? (
+                            <div>
+                              <p className="text-xs md:text-sm text-muted-foreground">
+                                {isMachineRentalBookingMeta(selectedBooking.metadata)
+                                  ? "Preferred start time"
+                                  : "Scheduled time"}
+                              </p>
+                              <p className="font-medium text-sm md:text-base">{timeLabel}</p>
+                            </div>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                     <div>
                       <p className="text-xs md:text-sm text-muted-foreground">Status</p>
                       {getStatusBadge(selectedBooking.status)}
@@ -1182,20 +1225,46 @@ export default function ProviderBookings() {
                 )}
 
                 {/* Location */}
-                {selectedBooking.location && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Location</h3>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{selectedBooking.location.address}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedBooking.location.city}, {selectedBooking.location.state}
-                        </p>
+                {selectedBooking.location && (() => {
+                  const loc = selectedBooking.location;
+                  const lat = Number(loc.coordinates?.lat);
+                  const lng = Number(loc.coordinates?.lng);
+                  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+                  const addressQuery = [loc.address, loc.city, loc.state, loc.zipCode]
+                    .map((p) => String(p || "").trim())
+                    .filter(Boolean)
+                    .join(", ");
+                  const mapsUrl = hasCoords
+                    ? `https://www.google.com/maps?q=${lat},${lng}`
+                    : addressQuery
+                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`
+                      : null;
+                  return (
+                    <div>
+                      <h3 className="font-semibold mb-3">Location</h3>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="font-medium">{loc.address}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {loc.city}, {loc.state}
+                          </p>
+                          {mapsUrl && (
+                            <a
+                              href={mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                            >
+                              View on map
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </DialogContent>
