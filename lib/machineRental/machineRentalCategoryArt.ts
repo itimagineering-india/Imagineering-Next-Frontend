@@ -1,36 +1,35 @@
 /**
- * Machine Rental category art — exact category → related equipment image.
+ * Machine Rental category art — transparent equipment icons (icons/).
  */
 
 import type { StaticImageData } from "next/image";
 import { resolveRentalCategoryKey } from "@/lib/machineRental/machineRentalHubCatalog";
-import earthwork from "@/assets/services/machineRental/earthwork.png";
-import concrete from "@/assets/services/machineRental/concrete.png";
-import lifting from "@/assets/services/machineRental/lifting.png";
-import road from "@/assets/services/machineRental/road.png";
-import demolition from "@/assets/services/machineRental/demolition.png";
-import drilling from "@/assets/services/machineRental/drilling.png";
-import compaction from "@/assets/services/machineRental/compaction.png";
-import power from "@/assets/services/machineRental/power.png";
-import welding from "@/assets/services/machineRental/welding.png";
-import cleaning from "@/assets/services/machineRental/cleaning.png";
-import water from "@/assets/services/machineRental/water.png";
-import height from "@/assets/services/machineRental/height.png";
-import survey from "@/assets/services/machineRental/survey.png";
-import garden from "@/assets/services/machineRental/garden.png";
-import transport from "@/assets/services/machineRental/transport.png";
-import stone from "@/assets/services/machineRental/stone.png";
-import wood from "@/assets/services/machineRental/wood.png";
-import paint from "@/assets/services/machineRental/paint.png";
-import excavator from "@/assets/services/machineRental/excavator.png";
-import jcb from "@/assets/services/machineRental/jcb.png";
-import crane from "@/assets/services/machineRental/crane.png";
-import roller from "@/assets/services/machineRental/roller.png";
-import mixer from "@/assets/services/machineRental/mixer.png";
-import generator from "@/assets/services/machineRental/generator.png";
-import tractor from "@/assets/services/machineRental/tractor.png";
-import fallback from "@/assets/services/machineRental/fallback.png";
-import machineRentalFallback from "@/assets/services/machine-rental.png";
+import earthwork from "@/assets/services/machineRental/icons/earthwork.png";
+import concrete from "@/assets/services/machineRental/icons/concrete.png";
+import lifting from "@/assets/services/machineRental/icons/lifting.png";
+import road from "@/assets/services/machineRental/icons/road.png";
+import demolition from "@/assets/services/machineRental/icons/demolition.png";
+import drilling from "@/assets/services/machineRental/icons/drilling.png";
+import compaction from "@/assets/services/machineRental/icons/compaction.png";
+import power from "@/assets/services/machineRental/icons/power.png";
+import welding from "@/assets/services/machineRental/icons/welding.png";
+import cleaning from "@/assets/services/machineRental/icons/cleaning.png";
+import water from "@/assets/services/machineRental/icons/water.png";
+import height from "@/assets/services/machineRental/icons/height.png";
+import survey from "@/assets/services/machineRental/icons/survey.png";
+import garden from "@/assets/services/machineRental/icons/garden.png";
+import transport from "@/assets/services/machineRental/icons/transport.png";
+import stone from "@/assets/services/machineRental/icons/stone.png";
+import wood from "@/assets/services/machineRental/icons/wood.png";
+import paint from "@/assets/services/machineRental/icons/paint.png";
+import excavator from "@/assets/services/machineRental/icons/excavator.png";
+import jcb from "@/assets/services/machineRental/icons/jcb.png";
+import crane from "@/assets/services/machineRental/icons/crane.png";
+import roller from "@/assets/services/machineRental/icons/roller.png";
+import mixer from "@/assets/services/machineRental/icons/mixer.png";
+import generator from "@/assets/services/machineRental/icons/generator.png";
+import tractor from "@/assets/services/machineRental/icons/tractor.png";
+import fallback from "@/assets/services/machineRental/icons/fallback.png";
 
 /** Exact slug / alias → art. Prefer exact match; avoid fuzzy cross-matches. */
 const CATEGORY_ART: Record<string, StaticImageData> = {
@@ -118,7 +117,7 @@ export function getMachineRentalCategoryArt(
   categoryIdOrName: string
 ): StaticImageData {
   const raw = String(categoryIdOrName || "").trim();
-  if (!raw) return machineRentalFallback || fallback;
+  if (!raw) return fallback;
 
   const resolved = resolveRentalCategoryKey(raw);
   if (resolved && CATEGORY_ART[resolved]) return CATEGORY_ART[resolved];
