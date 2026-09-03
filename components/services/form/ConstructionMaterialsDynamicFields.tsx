@@ -8,6 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  SANITARY_PRODUCT_TREE,
+  getSanitaryProductSubcategories,
   resolveConstructionMaterialTypeKeyFromSubcategory,
   resolveConstructionMaterialTypeKeySlugOnly,
 } from "@/lib/constructionMaterials";
@@ -112,6 +114,8 @@ export function ConstructionMaterialsDynamicFields({
   const tileCat = val("tileFloorCategoryType");
   const tileOnly = ["ceramic", "vitrified", "porcelain", "digital_tiles"];
   const flooringOnly = ["marble", "granite", "wooden", "vinyl", "stone"];
+  const sanitaryProductCategory = val("sanitaryProductCategory");
+  const sanitarySubcategoryOptions = getSanitaryProductSubcategories(sanitaryProductCategory);
 
   return (
     <div className="space-y-4 rounded-lg border p-4 bg-muted/20">
@@ -286,6 +290,21 @@ export function ConstructionMaterialsDynamicFields({
             onCustomChange={(v) => set({ steelCustomSize: v })}
           />
           <SelectWithCustom
+            label="Grade"
+            value={val("steelGrade")}
+            customValue={val("steelGradeCustom")}
+            placeholder="Select grade"
+            customPlaceholder="Enter grade"
+            options={[
+              { v: "E250A", label: "E250A" },
+              { v: "E250BR", label: "E250BR" },
+              { v: "E350BR", label: "E350BR" },
+              { v: "E410BR", label: "E410BR" },
+            ]}
+            onSelect={(v) => set({ steelGrade: v })}
+            onCustomChange={(v) => set({ steelGradeCustom: v })}
+          />
+          <SelectWithCustom
             label="Brand"
             optional
             value={val("steelBrand")}
@@ -453,6 +472,43 @@ export function ConstructionMaterialsDynamicFields({
             onSelect={(v) => set({ tileDesignPattern: v })}
             onCustomChange={(v) => set({ tileDesignPatternCustom: v })}
           />
+        </div>
+      )}
+
+      {materialTypeKey === "sanitary" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Product category</Label>
+            <Select
+              value={sanitaryProductCategory}
+              onValueChange={(v) => {
+                set({ sanitaryProductCategory: v, sanitaryProductSubcategory: "" });
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select product category" />
+              </SelectTrigger>
+              <SelectContent>
+                {SANITARY_PRODUCT_TREE.map((cat) => optLabel(cat.value, cat.label))}
+              </SelectContent>
+            </Select>
+          </div>
+          {sanitarySubcategoryOptions.length > 0 && (
+            <div className="space-y-2">
+              <Label>Product subcategory</Label>
+              <Select
+                value={val("sanitaryProductSubcategory")}
+                onValueChange={(v) => set({ sanitaryProductSubcategory: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select product subcategory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sanitarySubcategoryOptions.map((sub) => optLabel(sub.value, sub.label))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       )}
 
