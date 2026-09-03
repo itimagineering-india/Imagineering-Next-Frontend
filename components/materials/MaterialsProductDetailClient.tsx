@@ -40,13 +40,14 @@ function toReadableText(raw: unknown): string {
   if (raw == null) return "—";
   const text = String(raw).trim();
   if (!text) return "—";
-  if (text.includes("-") || text.includes("_")) {
-    return text
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-  return text;
+  return text
+    // camelCase → "camel Case"
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    // underscores/hyphens → space
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function similarToServiceCard(product: MaterialsProduct) {
