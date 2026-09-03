@@ -182,6 +182,53 @@ export function ConstructionMaterialsDynamicFields({
             onSelect={(v) => set({ bagSize: v })}
             onCustomChange={(v) => set({ bagSizeCustom: v })}
           />
+          <SelectWithCustom
+            label="Grade"
+            optional
+            value={val("cementGrade")}
+            customValue={val("cementGradeCustom")}
+            placeholder="Select grade"
+            customPlaceholder="Enter grade"
+            options={[
+              { v: "33", label: "33 Grade" },
+              { v: "43", label: "43 Grade" },
+              { v: "53", label: "53 Grade" },
+            ]}
+            onSelect={(v) => set({ cementGrade: v })}
+            onCustomChange={(v) => set({ cementGradeCustom: v })}
+          />
+        </div>
+      )}
+
+      {materialTypeKey === "concrete" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SelectWithCustom
+            label="Grade"
+            value={val("concreteGrade")}
+            customValue={val("concreteGradeCustom")}
+            placeholder="Select grade"
+            customPlaceholder="Enter grade (e.g., M70)"
+            options={[
+              "M15","M20","M25","M30","M35","M40","M45","M50","M55","M60","M65",
+            ].map((v) => ({ v, label: v }))}
+            onSelect={(v) => set({ concreteGrade: v })}
+            onCustomChange={(v) => set({ concreteGradeCustom: v })}
+          />
+          <SelectWithCustom
+            label="Brand"
+            optional
+            value={val("steelBrand")}
+            customValue={val("steelBrandCustom")}
+            placeholder="Select brand"
+            customPlaceholder="Enter brand name"
+            options={[
+              { v: "ultratech", label: "Ultratech" },
+              { v: "acc", label: "ACC" },
+              { v: "ambuja", label: "Ambuja" },
+            ]}
+            onSelect={(v) => set({ steelBrand: v })}
+            onCustomChange={(v) => set({ steelBrandCustom: v })}
+          />
         </div>
       )}
 
