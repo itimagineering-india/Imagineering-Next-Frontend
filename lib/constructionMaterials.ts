@@ -163,6 +163,8 @@ export const CONSTRUCTION_MATERIAL_FORM_KEYS: readonly string[] = [
   "steelTypeCustom",
   "steelSize",
   "steelCustomSize",
+  "steelGrade",
+  "steelGradeCustom",
   "steelBrand",
   "steelBrandCustom",
   "aggregateType",
@@ -182,6 +184,8 @@ export const CONSTRUCTION_MATERIAL_FORM_KEYS: readonly string[] = [
   "tileFinishCustom",
   "tileDesignPattern",
   "tileDesignPatternCustom",
+  "sanitaryProductCategory",
+  "sanitaryProductSubcategory",
   "quantityAvailable",
   "deliveryOption",
   "materialAvailability",
@@ -203,6 +207,7 @@ export const CONSTRUCTION_SELECT_TO_CUSTOM: Record<string, string> = {
   sandTruckSize: "sandTruckSizeCustom",
   steelType: "steelTypeCustom",
   steelSize: "steelCustomSize",
+  steelGrade: "steelGradeCustom",
   steelBrand: "steelBrandCustom",
   aggregateType: "aggregateTypeCustom",
   aggregateSize: "aggregateSizeCustom",
@@ -229,8 +234,13 @@ export function resolveConstructionMaterialTypeKeySlugOnly(raw: string): string 
   if (n.includes("aggreg")) return "aggregate";
   if (n.includes("brick") || n.includes("block")) return "bricks";
   if (n.includes("tile") || n.includes("flooring") || n === "tiles_flooring") return "tiles_flooring";
+  if (n.includes("sanitary") || n === "sanitary_bathroom") return "sanitary";
   if (n === "other") return "other";
-  if (["cement", "sand", "steel", "aggregate", "bricks", "tiles_flooring", "other"].includes(n)) return n;
+  if (
+    ["cement", "sand", "steel", "aggregate", "bricks", "tiles_flooring", "sanitary", "other"].includes(n)
+  ) {
+    return n;
+  }
   return n;
 }
 
@@ -243,12 +253,90 @@ export function resolveConstructionMaterialTypeKeyFromSubcategory(raw: string): 
     [/steel\s*&\s*iron/i, "steel"],
     [/bricks?\s*&\s*blocks?/i, "bricks"],
     [/tiles?\s*&\s*flooring/i, "tiles_flooring"],
+    [/sanitary/i, "sanitary"],
     [/paint\s*&\s*finishes?/i, "other"],
   ];
   for (const [re, key] of displayPairs) {
     if (re.test(s)) return key;
   }
   return resolveConstructionMaterialTypeKeySlugOnly(s);
+}
+
+/** Sanitary & Bathroom — Product category → Product subcategory tree */
+export const SANITARY_PRODUCT_TREE: readonly {
+  value: string;
+  label: string;
+  subcategories: readonly { value: string; label: string }[];
+}[] = [
+  {
+    value: "sanitaryware",
+    label: "Sanitaryware",
+    subcategories: [
+      { value: "western_toilet_ewc", label: "Western Toilet / EWC" },
+      { value: "one_piece_ewc", label: "One Piece EWC" },
+      { value: "two_piece_ewc", label: "Two Piece EWC" },
+      { value: "wall_hung_ewc", label: "Wall Hung EWC" },
+      { value: "squatting_pan", label: "Squatting Pan" },
+      { value: "urinals", label: "Urinals" },
+      { value: "cisterns", label: "Cisterns" },
+    ],
+  },
+  {
+    value: "basins",
+    label: "Basins",
+    subcategories: [
+      { value: "table_top_basin", label: "Table Top Basin" },
+      { value: "wall_hung_basin", label: "Wall Hung Basin" },
+      { value: "counter_basin", label: "Counter Basin" },
+      { value: "under_counter_basin", label: "Under Counter Basin" },
+      { value: "pedestal_basin", label: "Pedestal Basin" },
+    ],
+  },
+  {
+    value: "faucets_taps",
+    label: "Faucets & Taps",
+    subcategories: [
+      { value: "pillar_cock", label: "Pillar Cock" },
+      { value: "basin_mixer", label: "Basin Mixer" },
+      { value: "wall_mixer", label: "Wall Mixer" },
+      { value: "sink_mixer", label: "Sink Mixer" },
+      { value: "shower_mixer", label: "Shower Mixer" },
+      { value: "diverter", label: "Diverter" },
+      { value: "health_faucet", label: "Health Faucet" },
+    ],
+  },
+  {
+    value: "showers",
+    label: "Showers",
+    subcategories: [
+      { value: "hand_shower", label: "Hand Shower" },
+      { value: "overhead_shower", label: "Overhead Shower" },
+      { value: "rain_shower", label: "Rain Shower" },
+      { value: "shower_arm", label: "Shower Arm" },
+    ],
+  },
+  {
+    value: "flushing_systems",
+    label: "Flushing Systems",
+    subcategories: [
+      { value: "flush_valve", label: "Flush Valve" },
+      { value: "flush_cock", label: "Flush Cock" },
+      { value: "concealed_cistern", label: "Concealed Cistern" },
+      { value: "flush_accessories", label: "Flush Accessories" },
+    ],
+  },
+  { value: "bathroom_accessories", label: "Bathroom Accessories", subcategories: [] },
+  { value: "kitchen_sinks", label: "Kitchen Sinks", subcategories: [] },
+  { value: "vanity_furniture", label: "Vanity & Furniture", subcategories: [] },
+  { value: "mirrors", label: "Mirrors", subcategories: [] },
+  { value: "shower_enclosures", label: "Shower Enclosures", subcategories: [] },
+] as const;
+
+export function getSanitaryProductSubcategories(
+  productCategory: string,
+): readonly { value: string; label: string }[] {
+  const found = SANITARY_PRODUCT_TREE.find((c) => c.value === productCategory);
+  return found?.subcategories ?? [];
 }
 
 export function buildConstructionMetadataPayload(
@@ -330,10 +418,13 @@ export function validateConstructionMaterials(
     if (err) return err;
   }
   if (materialTypeKey === "steel") {
-    if (!meta.steelType?.trim() || !meta.steelSize?.trim()) return "Please select steel type and size.";
+    if (!meta.steelType?.trim() || !meta.steelSize?.trim() || !meta.steelGrade?.trim()) {
+      return "Please select steel type, size, and grade.";
+    }
     const err =
       checkCustom(meta, "steelType", "steelTypeCustom", "steel type") ||
       checkCustom(meta, "steelSize", "steelCustomSize", "steel size") ||
+      checkCustom(meta, "steelGrade", "steelGradeCustom", "steel grade") ||
       checkCustom(meta, "steelBrand", "steelBrandCustom", "steel brand");
     if (err) return err;
   }
@@ -365,6 +456,15 @@ export function validateConstructionMaterials(
       checkCustom(meta, "tileFinish", "tileFinishCustom", "finish") ||
       checkCustom(meta, "tileDesignPattern", "tileDesignPatternCustom", "design / pattern");
     if (err) return err;
+  }
+  if (materialTypeKey === "sanitary") {
+    if (!meta.sanitaryProductCategory?.trim()) {
+      return "Please select product category.";
+    }
+    const subs = getSanitaryProductSubcategories(meta.sanitaryProductCategory);
+    if (subs.length > 0 && !meta.sanitaryProductSubcategory?.trim()) {
+      return "Please select product subcategory.";
+    }
   }
   if (meta.deliveryOption === "delivery_available") {
     if (!meta.deliveryCharges?.trim() || !meta.materialDeliveryTime?.trim() || !meta.loadingUnloading?.trim()) {
