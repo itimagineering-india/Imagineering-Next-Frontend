@@ -12,15 +12,13 @@ import {
   ChevronRight,
   Loader2,
   Star,
-  TrendingDown,
-  TrendingUp,
-  Minus,
   Truck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { MaterialsProductRail } from "@/components/materials/MaterialsProductRail";
 import { MaterialsHowToBook } from "@/components/materials/MaterialsHowToBook";
 import { MaterialsHero } from "@/components/materials/MaterialsHero";
+import { MaterialsProductCard } from "@/components/materials/MaterialsProductCard";
 import { GetBestQuotesModal } from "@/components/service-details/GetBestQuotesModal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import {
   MATERIALS_TRENDING_BRANDS,
+  filterMaterialsProducts,
   getMaterialsCategoryProductSections,
   type MaterialsProduct,
 } from "@/lib/materials/constructionMaterialsCatalog";
@@ -57,6 +56,11 @@ export function ConstructionMaterialsHub() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<MaterialsHubData>(EMPTY_HUB);
   const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState<{
+    q: string;
+    categoryKey?: string;
+    locationText?: string;
+  } | null>(null);
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteService, setQuoteService] = useState<{
@@ -111,21 +115,58 @@ export function ConstructionMaterialsHub() {
     (opts?: { q?: string; locationText?: string; categoryKey?: string }) => {
       const q = (opts?.q ?? search).trim();
       const categoryKey = opts?.categoryKey;
+      const locationText = opts?.locationText?.trim() || undefined;
 
-      if (!q && categoryKey) {
-        router.push(`/construction-materials/${encodeURIComponent(categoryKey)}`);
+      if (!q && !categoryKey && !locationText) {
+        setAppliedSearch(null);
+        document.getElementById("materials-browse")?.scrollIntoView({ behavior: "smooth" });
         return;
       }
 
-      const sp = new URLSearchParams();
-      sp.set("category", "construction-materials");
-      if (q) sp.set("q", q);
-      else if (categoryKey) sp.set("q", categoryKey);
-      if (opts?.locationText) sp.set("locationText", opts.locationText);
-      router.push(`/services?${sp.toString()}`);
+      setAppliedSearch({ q, categoryKey, locationText });
+      window.requestAnimationFrame(() => {
+        document.getElementById("materials-search-results")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
     },
-    [router, search]
+    [search]
   );
+
+  const searchProducts = useMemo(() => {
+    if (!appliedSearch) return [];
+    if (!appliedSearch.q && !appliedSearch.categoryKey) return [];
+    return filterMaterialsProducts(data.products, {
+      query: appliedSearch.q,
+      categoryId: appliedSearch.categoryKey || null,
+    });
+  }, [appliedSearch, data.products]);
+
+  const searchProviders = useMemo(() => {
+    if (!appliedSearch) return [];
+    const loc = (appliedSearch.locationText || "").toLowerCase();
+    const q = appliedSearch.q.toLowerCase();
+    if (!loc && !q) return [];
+    return data.providers.filter((p) => {
+      if (loc) {
+        const city = p.city.toLowerCase();
+        const locHit =
+          city.includes(loc) ||
+          loc.includes(city) ||
+          (loc.includes("delhi") && /delhi|noida|gurgaon|gurugram|faridabad|ncr/i.test(p.city));
+        if (!locHit) return false;
+      }
+      if (!q) return true;
+      return (
+        p.name.toLowerCase().includes(q) ||
+        p.specialty.toLowerCase().includes(q) ||
+        p.city.toLowerCase().includes(q)
+      );
+    });
+  }, [appliedSearch, data.providers]);
+
+  const isSearching = Boolean(appliedSearch);
 
   const handleProductCta = useCallback(
     async (product: MaterialsProduct) => {
@@ -192,53 +233,85 @@ export function ConstructionMaterialsHub() {
           </div>
         ) : (
           <>
-            {/* Commodity-board ticker — dense, utilitarian */}
-            {data.marketPrices.length > 0 ? (
-              <section className="-mx-4 border-y border-slate-200 bg-white sm:mx-0 sm:rounded-none">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5 sm:px-0">
-                  <div className="flex items-center gap-2.5">
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                      {t("marketPrices")}
+            {isSearching ? (
+              <section id="materials-search-results" className="scroll-mt-24">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 md:text-2xl">
+                      {t("hubSearchResults")}
                     </h2>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                      {t("marketLive")}
-                    </span>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {searchProducts.length + searchProviders.length > 0
+                        ? t("hubSearchResultsSub", {
+                            count: searchProducts.length,
+                          })
+                        : t("emptyProducts")}
+                    </p>
                   </div>
-                  <span className="text-[10px] font-medium text-slate-400">{t("marketUpdated")}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-full"
+                    onClick={() => setAppliedSearch(null)}
+                  >
+                    {t("hubClearSearch")}
+                  </Button>
                 </div>
-                <div className="flex divide-x divide-slate-100 overflow-x-auto scrollbar-hide">
-                  {data.marketPrices.map((row) => {
-                    const TrendIcon =
-                      row.trend === "up" ? TrendingUp : row.trend === "down" ? TrendingDown : Minus;
-                    const trendTone =
-                      row.trend === "up"
-                        ? "text-red-600"
-                        : row.trend === "down"
-                          ? "text-emerald-600"
-                          : "text-slate-400";
-                    return (
-                      <div
-                        key={row.id}
-                        className="min-w-[130px] shrink-0 px-4 py-3 first:pl-4 sm:first:pl-0 last:pr-4 sm:last:pr-0"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <p className="truncate text-[11px] font-medium text-slate-500">{row.name}</p>
-                          <TrendIcon className={`h-3 w-3 shrink-0 ${trendTone}`} strokeWidth={2.5} />
-                        </div>
-                        <p className="mt-1 font-mono text-[15px] font-bold tabular-nums tracking-tight text-slate-900">
-                          {row.priceLabel}
-                        </p>
-                        {row.unitHint ? (
-                          <p className="mt-0.5 truncate text-[10px] text-slate-400">{row.unitHint}</p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+
+                {searchProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {searchProducts.map((product) => (
+                      <MaterialsProductCard
+                        key={product.id}
+                        product={product}
+                        onCta={handleProductCta}
+                        ctaLoading={ctaLoadingId === product.id}
+                      />
+                    ))}
+                  </div>
+                ) : searchProviders.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-slate-500">
+                    {t("emptyProducts")}
+                  </div>
+                ) : null}
+
+                {searchProviders.length > 0 ? (
+                  <div className="mt-8">
+                    <h3 className="mb-4 text-lg font-bold text-slate-900">{t("topProviders")}</h3>
+                    <ul className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-1">
+                      {searchProviders.map((provider) => (
+                        <li key={provider.id} className="w-[138px] shrink-0 sm:w-[148px]">
+                          <Link
+                            href={`/provider/${provider.id}`}
+                            className="group relative flex h-full flex-col items-center overflow-hidden rounded-2xl border border-slate-200/90 bg-white px-3 pb-3.5 pt-4 text-center shadow-[0_6px_18px_-12px_rgba(15,23,42,0.35)] transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_14px_28px_-16px_rgba(234,88,12,0.35)]"
+                          >
+                            <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-100">
+                              <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                              {provider.rating.toFixed(1)}
+                            </span>
+                            <span
+                              className="relative z-[1] flex h-14 w-14 items-center justify-center rounded-full text-sm font-extrabold text-slate-800 shadow-sm ring-2 ring-white"
+                              style={{ backgroundColor: provider.tint }}
+                            >
+                              {provider.mark}
+                              {provider.verified ? (
+                                <BadgeCheck className="absolute -bottom-0.5 -right-0.5 h-[18px] w-[18px] rounded-full bg-white text-emerald-500" />
+                              ) : null}
+                            </span>
+                            <p className="relative z-[1] mt-3 w-full truncate text-[13px] font-bold text-slate-900 group-hover:text-[hsl(var(--red-accent))]">
+                              {provider.name}
+                            </p>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
+            {!isSearching ? (
+            <>
             {/* Category shop — circular tiles like major marketplaces */}
             <section id="materials-browse">
               <div className="mb-5 flex items-end justify-between gap-3">
@@ -480,6 +553,8 @@ export function ConstructionMaterialsHub() {
                 </Link>
               </div>
             </section>
+            </>
+            ) : null}
           </>
         )}
       </div>
