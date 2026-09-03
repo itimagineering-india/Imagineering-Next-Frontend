@@ -64,6 +64,19 @@ export function isB2bCategorySlug(slug: string | undefined): boolean {
   return false;
 }
 
+/** Hub / B2B Traders browse — all B2B purchase categories, not a single slug. */
+export function isB2bServicesHubSlug(slug: string | undefined): boolean {
+  const s = String(slug || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/_/g, "-");
+  if (!s) return false;
+  if (s === "b2b" || s === "b2b-services") return true;
+  if (s === "traders" || s === "vendors" || s === "vendor") return true;
+  return s.includes("trader");
+}
+
 export function usesB2bCatalogOrManualListing(
   cat: { slug?: string; name?: string; interactionType?: string } | null | undefined
 ): boolean {
