@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import {
-  Grid3X3,
-  MapPin,
-  Search,
-} from "lucide-react";
+import { Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,28 +23,8 @@ const POPULAR_SEARCHES = [
   "Aggregate",
 ] as const;
 
-const LOCATION_OPTIONS = [
-  { value: "", labelKey: "heroLocationAll" as const },
-  { value: "Delhi NCR", labelKey: "heroLocationDelhi" as const },
-  { value: "Mumbai", labelKey: "heroLocationMumbai" as const },
-  { value: "Bengaluru", labelKey: "heroLocationBengaluru" as const },
-  { value: "Hyderabad", labelKey: "heroLocationHyderabad" as const },
-  { value: "Pune", labelKey: "heroLocationPune" as const },
-] as const;
-
-const CATEGORY_OPTIONS = [
-  { value: "all", labelKey: "heroCategoryAll" as const },
-  { value: "cement", labelKey: "heroCategoryCement" as const },
-  { value: "steel", labelKey: "heroCategorySteel" as const },
-  { value: "bricks", labelKey: "heroCategoryBricks" as const },
-  { value: "sand", labelKey: "heroCategorySand" as const },
-  { value: "aggregate", labelKey: "heroCategoryAggregate" as const },
-] as const;
-
 type SearchSubmitOpts = {
   q?: string;
-  locationText?: string;
-  categoryKey?: string;
 };
 
 type Props = {
@@ -60,8 +36,6 @@ type Props = {
 export function MaterialsHero({ search, onSearchChange, onSearchSubmit }: Props) {
   const { t } = useTranslation("materials");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [category, setCategory] = useState("all");
-  const [location, setLocation] = useState("");
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -73,21 +47,17 @@ export function MaterialsHero({ search, onSearchChange, onSearchSubmit }: Props)
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
       e?.preventDefault();
-      onSearchSubmit({
-        q: search.trim(),
-        locationText: location || undefined,
-        categoryKey: category !== "all" ? category : undefined,
-      });
+      onSearchSubmit({ q: search.trim() });
     },
-    [category, location, onSearchSubmit, search]
+    [onSearchSubmit, search]
   );
 
   const runPopular = useCallback(
     (term: string) => {
       onSearchChange(term);
-      onSearchSubmit({ q: term, locationText: location || undefined });
+      onSearchSubmit({ q: term });
     },
-    [location, onSearchChange, onSearchSubmit]
+    [onSearchChange, onSearchSubmit]
   );
 
   return (
@@ -142,7 +112,7 @@ export function MaterialsHero({ search, onSearchChange, onSearchSubmit }: Props)
               role="search"
               aria-label={t("heroSearchAria")}
             >
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-1.5">
                 <div className="relative min-w-0 flex-1">
                   <Search
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -156,48 +126,13 @@ export function MaterialsHero({ search, onSearchChange, onSearchSubmit }: Props)
                     aria-label={t("heroSearchAria")}
                   />
                 </div>
-
-                <div className="flex gap-1.5 sm:contents">
-                  <label className="flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 ring-1 ring-slate-200/80 sm:h-12 sm:w-[8.5rem] sm:flex-none">
-                    <Grid3X3 className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                    <span className="sr-only">{t("heroCategoryLabel")}</span>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full cursor-pointer appearance-none bg-transparent text-xs font-medium text-slate-700 outline-none sm:text-sm"
-                    >
-                      {CATEGORY_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {t(opt.labelKey)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 ring-1 ring-slate-200/80 sm:h-12 sm:w-[9rem] sm:flex-none">
-                    <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                    <span className="sr-only">{t("heroLocationLabel")}</span>
-                    <select
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      className="w-full cursor-pointer appearance-none bg-transparent text-xs font-medium text-slate-700 outline-none sm:text-sm"
-                    >
-                      {LOCATION_OPTIONS.map((opt) => (
-                        <option key={opt.value || "all"} value={opt.value}>
-                          {t(opt.labelKey)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <Button
-                    type="submit"
-                    className="h-11 shrink-0 rounded-xl bg-[hsl(var(--red-accent))] px-4 text-sm font-semibold text-white shadow-md shadow-red-900/25 transition hover:brightness-110 sm:h-12 sm:px-5"
-                  >
-                    <Search className="mr-1.5 h-4 w-4 sm:mr-2" aria-hidden />
-                    {t("heroSearchCta")}
-                  </Button>
-                </div>
+                <Button
+                  type="submit"
+                  className="h-11 shrink-0 rounded-xl bg-[hsl(var(--red-accent))] px-4 text-sm font-semibold text-white shadow-md shadow-red-900/25 transition hover:brightness-110 sm:h-12 sm:px-5"
+                >
+                  <Search className="mr-1.5 h-4 w-4 sm:mr-2" aria-hidden />
+                  {t("heroSearchCta")}
+                </Button>
               </div>
             </form>
 
