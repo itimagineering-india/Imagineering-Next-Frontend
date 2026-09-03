@@ -183,26 +183,126 @@ export function materialsMarkFromName(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+const GENERIC_STOPWORDS = new Set(['a', 'an', 'and', 'for', 'of', 'the', 'to', 'with', 'in', 'on']);
+
+function normalizeSearchText(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[_/,.-]+/g, ' ')
+    .replace(/([a-z])([0-9])/g, '$1 $2')
+    .replace(/([0-9])([a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenizeSearchQuery(query: string): string[] {
+  return normalizeSearchText(query)
+    .split(' ')
+    .filter((w) => w && !GENERIC_STOPWORDS.has(w));
+}
+
+function fieldHasToken(field: string, token: string): boolean {
+  if (!field || !token) return false;
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(field);
+}
+
+type SearchFields = {
+  name: string;
+  brand: string;
+  grade: string;
+  category: string;
+  description: string;
+};
+
+function productSearchFields(p: MaterialsProduct): SearchFields {
+  return {
+    name: normalizeSearchText(p.name),
+    brand: normalizeSearchText(p.brand),
+    grade: normalizeSearchText(p.grade || ''),
+    category: normalizeSearchText(p.categoryId.replace(/_/g, ' ')),
+    description: normalizeSearchText(p.shortDescription),
+  };
+}
+
+/**
+ * Field-weighted lexical search (same idea as storefronts: title/brand beat
+ * description, multi-word queries need high token coverage, then rank by score).
+ */
+function scoreMaterialsProduct(fields: SearchFields, tokens: string[], rawQuery: string): number {
+  const phrase = normalizeSearchText(rawQuery);
+  let score = 0;
+
+  if (phrase && fields.name.includes(phrase)) score += 50;
+  else if (phrase && `${fields.brand} ${fields.name}`.includes(phrase)) score += 35;
+
+  for (const token of tokens) {
+    if (fieldHasToken(fields.name, token)) score += 8;
+    else if (fieldHasToken(fields.brand, token)) score += 6;
+    else if (fieldHasToken(fields.grade, token)) score += 4;
+    else if (fieldHasToken(fields.category, token)) score += 3;
+    else if (fieldHasToken(fields.description, token)) score += 0.25;
+  }
+  return score;
+}
+
+function primaryTokenCoverage(fields: SearchFields, tokens: string[]): number {
+  if (tokens.length === 0) return 0;
+  let hits = 0;
+  for (const token of tokens) {
+    if (
+      fieldHasToken(fields.name, token) ||
+      fieldHasToken(fields.brand, token) ||
+      fieldHasToken(fields.grade, token) ||
+      fieldHasToken(fields.category, token)
+    ) {
+      hits += 1;
+    }
+  }
+  return hits / tokens.length;
+}
+
+function minCoverageForQuery(tokenCount: number): number {
+  if (tokenCount <= 2) return 1;
+  return (tokenCount - 1) / tokenCount;
+}
+
+function hasTitleMatch(fields: SearchFields, tokens: string[]): boolean {
+  return tokens.some((token) => fieldHasToken(fields.name, token) || fieldHasToken(fields.brand, token));
+}
+
 export function filterMaterialsProducts(
   products: readonly MaterialsProduct[],
   opts: { query?: string; categoryId?: MaterialsCategoryId | null }
 ): MaterialsProduct[] {
-  const q = (opts.query || '').trim().toLowerCase();
-  return products.filter((p) => {
-    if (opts.categoryId) {
-      const want = resolveMaterialsMaterialTypeKey(opts.categoryId);
-      const have = resolveMaterialsMaterialTypeKey(p.categoryId);
-      if (have !== want && p.categoryId !== opts.categoryId) return false;
-    }
-    if (!q) return true;
-    return (
-      p.name.toLowerCase().includes(q) ||
-      p.brand.toLowerCase().includes(q) ||
-      p.shortDescription.toLowerCase().includes(q) ||
-      (p.grade || '').toLowerCase().includes(q) ||
-      p.categoryId.includes(q)
-    );
-  });
+  const rawQuery = (opts.query || '').trim();
+  const tokens = rawQuery ? tokenizeSearchQuery(rawQuery) : [];
+
+  const scoped = opts.categoryId
+    ? products.filter((p) => {
+        const want = resolveMaterialsMaterialTypeKey(opts.categoryId as string);
+        const have = resolveMaterialsMaterialTypeKey(p.categoryId);
+        return have === want || p.categoryId === opts.categoryId;
+      })
+    : products;
+
+  if (!rawQuery || tokens.length === 0) return [...scoped];
+
+  const minCoverage = minCoverageForQuery(tokens.length);
+  const ranked: { product: MaterialsProduct; score: number }[] = [];
+
+  for (const product of scoped) {
+    const fields = productSearchFields(product);
+    const coverage = primaryTokenCoverage(fields, tokens);
+    if (coverage < minCoverage) continue;
+    if (!hasTitleMatch(fields, tokens) && coverage < 1) continue;
+    const score = scoreMaterialsProduct(fields, tokens, rawQuery);
+    if (score <= 0) continue;
+    ranked.push({ product, score });
+  }
+
+  ranked.sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name));
+  return ranked.map((row) => row.product);
 }
 
 export type MaterialsProductSort =
