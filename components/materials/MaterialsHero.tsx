@@ -95,10 +95,10 @@ export function MaterialsHero({ search, onSearchChange, onSearchSubmit }: Props)
 
             <h1
               id="materials-hero-heading"
-              className="mt-4 max-w-[16ch] text-[1.85rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[2.35rem] md:text-[2.65rem]"
+              className="mt-4 max-w-xl text-[1.85rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[2.35rem] md:text-[2.65rem]"
             >
               {t("heroHeadlineLine1")}{" "}
-              <span className="text-orange-300">{t("heroHeadlineLine2")}</span>
+              <span className="whitespace-nowrap text-orange-300">{t("heroHeadlineLine2")}</span>
             </h1>
 
             <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-[15px]">
