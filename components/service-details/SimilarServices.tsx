@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
+import { formatServicePrice } from "@/lib/formatServicePrice";
 import {
   Carousel,
   CarouselContent,
@@ -25,7 +25,7 @@ interface SimilarService {
   priceMode?: "exact" | "range";
   priceMin?: number;
   priceMax?: number;
-  priceType: "hourly" | "daily" | "fixed" | "monthly" | "per_minute" | "per_article" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip";
+  priceType?: string;
   location?: string;
 }
 
@@ -80,6 +80,11 @@ export function SimilarServices({
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/35 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+                      <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                      <span>{service.rating}</span>
+                      <span className="text-white/80">({service.reviewCount})</span>
+                    </div>
                   </div>
                   <CardContent className="space-y-3 p-3">
                     <div className="flex items-start justify-between gap-2">
@@ -90,21 +95,10 @@ export function SimilarServices({
                         <p className="text-sm font-bold text-primary lg:text-base">
                           {formatServicePrice(service)}
                         </p>
-                        {isRangePricedService(service) && (
-                          <Badge variant="outline" className="mt-1 text-[10px]">Enquiry</Badge>
-                        )}
                       </div>
                     </div>
 
-                    <h3 className="line-clamp-2 min-h-[40px] text-sm font-semibold leading-tight lg:text-[15px]">{service.title}</h3>
-
-                    <div className="flex items-center gap-1 text-xs lg:text-sm">
-                      <Star className="h-2 w-2 fill-warning text-warning" />
-                      <span className="font-medium">{service.rating}</span>
-                      <span className="text-muted-foreground">
-                        ({service.reviewCount})
-                      </span>
-                    </div>
+                    <h3 className="line-clamp-1 text-sm font-semibold leading-tight lg:text-[15px]">{service.title}</h3>
 
                     {service.location ? (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground lg:text-sm">
@@ -113,9 +107,6 @@ export function SimilarServices({
                       </div>
                     ) : null}
 
-                    <p className="line-clamp-1 text-xs text-muted-foreground lg:text-sm">
-                      by {service.providerName}
-                    </p>
                     <div className="flex h-8 w-full items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-xs font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-white lg:text-sm">
                       Quick View
                     </div>
