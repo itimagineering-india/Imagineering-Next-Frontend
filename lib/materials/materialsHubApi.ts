@@ -182,21 +182,60 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
   };
 }
 
+const CATALOG_PAGE_SIZE = 250;
+const CATALOG_MAX_PAGES = 20;
+
+export async function listAllCatalogProducts(params: {
+  categorySlug: string;
+  materialTypeKey?: string;
+  subcategory?: string;
+}): Promise<Record<string, unknown>[]> {
+  const categorySlug = String(params.categorySlug || "").trim();
+  if (!categorySlug) return [];
+  const collected: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+  try {
+    for (let page = 1; page <= CATALOG_MAX_PAGES; page++) {
+      const res = await api.productCatalog.list({
+        categorySlug,
+        ...(params.materialTypeKey ? { materialTypeKey: params.materialTypeKey } : {}),
+        ...(params.subcategory ? { subcategory: params.subcategory } : {}),
+        limit: CATALOG_PAGE_SIZE,
+        page,
+      });
+      if (!res.success) break;
+      const data = res.data as
+        | { products?: unknown[]; pagination?: { pages?: number } }
+        | undefined;
+      const rawProducts = Array.isArray(data?.products) ? data.products : [];
+      for (const row of rawProducts) {
+        const rec = row as Record<string, unknown>;
+        const id = String(rec._id || rec.id || "").trim();
+        if (id) {
+          if (seen.has(id)) continue;
+          seen.add(id);
+        }
+        collected.push(rec);
+      }
+      const pages = Number(data?.pagination?.pages || (res as { pagination?: { pages?: number } }).pagination?.pages) || 1;
+      if (page >= pages || rawProducts.length < CATALOG_PAGE_SIZE) break;
+    }
+  } catch {
+    return collected;
+  }
+  return collected;
+}
+
 export async function fetchCatalogProductsByCategory(categoryId: string): Promise<MaterialsProduct[]> {
   const key = resolveMaterialsMaterialTypeKey(categoryId) || String(categoryId || "").trim();
   if (!key) return [];
   try {
-    const res = await api.productCatalog.list({
+    const rawProducts = await listAllCatalogProducts({
       categorySlug: MATERIALS_CATEGORY_SLUG,
       materialTypeKey: key,
-      limit: 100,
-      page: 1,
     });
-    if (!res.success) return [];
-    const rawProducts = (res.data as { products?: unknown[] } | undefined)?.products;
-    if (!Array.isArray(rawProducts)) return [];
     const mapped = rawProducts
-      .map((row) => mapCatalogProduct(row as Record<string, unknown>, key))
+      .map((row) => mapCatalogProduct(row, key))
       .filter(Boolean) as MaterialsProduct[];
     const filtered = mapped.filter((p) => p.categoryId === key);
     return filtered.length > 0 ? filtered : mapped;
@@ -280,13 +319,9 @@ export async function fetchMaterialsHubData(opts?: {
   const lat = opts?.lat;
   const lng = opts?.lng;
 
-  const [subRes, catalogRes, providersRes] = await Promise.allSettled([
+  const [subRes, catalogRows, providersRes] = await Promise.allSettled([
     api.categories.getSubcategories(MATERIALS_CATEGORY_SLUG),
-    api.productCatalog.list({
-      categorySlug: MATERIALS_CATEGORY_SLUG,
-      limit: 100,
-      page: 1,
-    }),
+    listAllCatalogProducts({ categorySlug: MATERIALS_CATEGORY_SLUG }),
     api.providers.getAll({
       categorySlug: MATERIALS_CATEGORY_SLUG,
       limit: 12,
@@ -306,13 +341,10 @@ export async function fetchMaterialsHubData(opts?: {
   }
 
   let products: MaterialsProduct[] = [];
-  if (catalogRes.status === "fulfilled" && catalogRes.value?.success) {
-    const rawProducts = (catalogRes.value.data as { products?: unknown[] } | undefined)?.products;
-    if (Array.isArray(rawProducts)) {
-      products = rawProducts
-        .map((row) => mapCatalogProduct(row as Record<string, unknown>, categories[0]?.id || "general"))
-        .filter(Boolean) as MaterialsProduct[];
-    }
+  if (catalogRows.status === "fulfilled") {
+    products = catalogRows.value
+      .map((row) => mapCatalogProduct(row, categories[0]?.id || "general"))
+      .filter(Boolean) as MaterialsProduct[];
   }
 
   if (categories.length > 0) {
