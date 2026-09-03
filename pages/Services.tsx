@@ -24,6 +24,7 @@ import {
   slimCategoriesForCache,
   toSubcategorySlug,
 } from "@/lib/categorySubcategories";
+import { isB2bServicesHubSlug } from "@/lib/b2b/b2bCategories";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,8 @@ const toSlug = toSubcategorySlug;
 const CATEGORY_SLUG_ALIASES: Record<string, string[]> = {
   "machine-rental": ["machine-rental", "rental-services"],
   "rental-services": ["rental-services", "machine-rental"],
+  manpower: ["manpower", "technical-manpower"],
+  "technical-manpower": ["technical-manpower", "manpower"],
 };
 
 function resolveBrowseCategorySlug(
@@ -533,6 +536,7 @@ export default function Services(props: ServicesProps = {}) {
       const shouldUseProviderGeo = hasSearchGeoIntent || !queryParam.trim();
       const hasLocation =
         shouldUseProviderGeo && Number.isFinite(locationLat) && Number.isFinite(locationLng);
+      const skipGeoForB2bHub = isB2bServicesHubSlug(categorySlug);
 
       const resp = await api.providers.getAll({
         categorySlug,
@@ -543,7 +547,9 @@ export default function Services(props: ServicesProps = {}) {
         q: queryParam || undefined,
         page,
         limit: BROWSE_PAGE_SIZE,
-        ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm } : {}),
+        ...(hasLocation && !skipGeoForB2bHub
+          ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm }
+          : {}),
       });
 
       if (resp.success && resp.data) {
@@ -623,6 +629,7 @@ export default function Services(props: ServicesProps = {}) {
         const hasLocation =
           shouldUseProviderGeo && Number.isFinite(locationLat) && Number.isFinite(locationLng);
         const isMap = viewMode === "map";
+        const skipGeoForB2bHub = isB2bServicesHubSlug(categorySlug);
 
         const resp = await api.providers.getAll({
           categorySlug,
@@ -632,8 +639,10 @@ export default function Services(props: ServicesProps = {}) {
             undefined,
           q: queryParam || undefined,
           ...(!isMap ? { page: 1, limit: BROWSE_PAGE_SIZE } : {}),
-          ...(hasLocation ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm } : {}),
-          ...(isMap && hasLocation ? { mapMarkers: 1 as const } : {}),
+          ...(hasLocation && !skipGeoForB2bHub
+            ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm }
+            : {}),
+          ...(isMap ? { mapMarkers: 1 as const } : {}),
         });
 
         if (isCancelled) return;
