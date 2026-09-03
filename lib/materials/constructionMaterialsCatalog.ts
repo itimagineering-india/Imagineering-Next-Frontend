@@ -161,11 +161,12 @@ export function resolveMaterialsMaterialTypeKey(raw: string): string {
   if (n.includes('aggreg')) return 'aggregate';
   if (n.includes('brick') || n.includes('block')) return 'bricks';
   if (n.includes('tile') || n.includes('flooring') || n === 'tiles_flooring') return 'tiles_flooring';
+  if (n.includes('sanitary') || n === 'sanitary_bathroom') return 'sanitary';
   if (n.includes('paint')) return 'paint';
   if (n === 'sand' || n.includes('sand')) return 'sand';
   if (n === 'other') return 'other';
   if (
-    ['cement', 'sand', 'steel', 'aggregate', 'bricks', 'tiles_flooring', 'paint', 'other'].includes(n)
+    ['cement', 'sand', 'steel', 'aggregate', 'bricks', 'tiles_flooring', 'sanitary', 'paint', 'other'].includes(n)
   ) {
     return n;
   }
@@ -188,7 +189,11 @@ export function filterMaterialsProducts(
 ): MaterialsProduct[] {
   const q = (opts.query || '').trim().toLowerCase();
   return products.filter((p) => {
-    if (opts.categoryId && p.categoryId !== opts.categoryId) return false;
+    if (opts.categoryId) {
+      const want = resolveMaterialsMaterialTypeKey(opts.categoryId);
+      const have = resolveMaterialsMaterialTypeKey(p.categoryId);
+      if (have !== want && p.categoryId !== opts.categoryId) return false;
+    }
     if (!q) return true;
     return (
       p.name.toLowerCase().includes(q) ||
