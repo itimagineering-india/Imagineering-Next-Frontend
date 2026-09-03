@@ -56,11 +56,7 @@ export function ConstructionMaterialsHub() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<MaterialsHubData>(EMPTY_HUB);
   const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState<{
-    q: string;
-    categoryKey?: string;
-    locationText?: string;
-  } | null>(null);
+  const [appliedSearch, setAppliedSearch] = useState<string | null>(null);
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteService, setQuoteService] = useState<{
@@ -112,18 +108,16 @@ export function ConstructionMaterialsHub() {
   }, [data.products]);
 
   const submitSearch = useCallback(
-    (opts?: { q?: string; locationText?: string; categoryKey?: string }) => {
+    (opts?: { q?: string }) => {
       const q = (opts?.q ?? search).trim();
-      const categoryKey = opts?.categoryKey;
-      const locationText = opts?.locationText?.trim() || undefined;
 
-      if (!q && !categoryKey && !locationText) {
+      if (!q) {
         setAppliedSearch(null);
         document.getElementById("materials-browse")?.scrollIntoView({ behavior: "smooth" });
         return;
       }
 
-      setAppliedSearch({ q, categoryKey, locationText });
+      setAppliedSearch(q);
       window.requestAnimationFrame(() => {
         document.getElementById("materials-search-results")?.scrollIntoView({
           behavior: "smooth",
@@ -136,34 +130,18 @@ export function ConstructionMaterialsHub() {
 
   const searchProducts = useMemo(() => {
     if (!appliedSearch) return [];
-    if (!appliedSearch.q && !appliedSearch.categoryKey) return [];
-    return filterMaterialsProducts(data.products, {
-      query: appliedSearch.q,
-      categoryId: appliedSearch.categoryKey || null,
-    });
+    return filterMaterialsProducts(data.products, { query: appliedSearch });
   }, [appliedSearch, data.products]);
 
   const searchProviders = useMemo(() => {
     if (!appliedSearch) return [];
-    const loc = (appliedSearch.locationText || "").toLowerCase();
-    const q = appliedSearch.q.toLowerCase();
-    if (!loc && !q) return [];
-    return data.providers.filter((p) => {
-      if (loc) {
-        const city = p.city.toLowerCase();
-        const locHit =
-          city.includes(loc) ||
-          loc.includes(city) ||
-          (loc.includes("delhi") && /delhi|noida|gurgaon|gurugram|faridabad|ncr/i.test(p.city));
-        if (!locHit) return false;
-      }
-      if (!q) return true;
-      return (
+    const q = appliedSearch.toLowerCase();
+    return data.providers.filter(
+      (p) =>
         p.name.toLowerCase().includes(q) ||
         p.specialty.toLowerCase().includes(q) ||
         p.city.toLowerCase().includes(q)
-      );
-    });
+    );
   }, [appliedSearch, data.providers]);
 
   const isSearching = Boolean(appliedSearch);
