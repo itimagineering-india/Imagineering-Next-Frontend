@@ -66,7 +66,7 @@ function similarToServiceCard(product: MaterialsProduct) {
     priceMode: isRange ? ("range" as const) : ("exact" as const),
     priceMin: min,
     priceMax: max,
-    priceType: "fixed" as const,
+    priceType: product.unitType || "fixed",
     _id: product.id,
   };
 }
