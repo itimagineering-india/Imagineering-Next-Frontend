@@ -670,7 +670,7 @@ export function B2BServicesHub() {
                     key={item.id}
                     className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                   >
-                    <Link href={`/service/${item.id}`} className="block">
+                    <Link href={`/service/${item.id}`} className="block" target="_blank" rel="noopener noreferrer">
                       {item.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
