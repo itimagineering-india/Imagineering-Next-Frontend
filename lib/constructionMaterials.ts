@@ -151,6 +151,10 @@ export const CONSTRUCTION_MATERIAL_FORM_KEYS: readonly string[] = [
   "cementTypeCustom",
   "bagSize",
   "bagSizeCustom",
+  "cementGrade",
+  "cementGradeCustom",
+  "concreteGrade",
+  "concreteGradeCustom",
   "brickBlockType",
   "brickBlockTypeCustom",
   "brickBlockSize",
@@ -203,6 +207,8 @@ export const CONSTRUCTION_SELECT_TO_CUSTOM: Record<string, string> = {
   brand: "brandCustom",
   cementType: "cementTypeCustom",
   bagSize: "bagSizeCustom",
+  cementGrade: "cementGradeCustom",
+  concreteGrade: "concreteGradeCustom",
   sandType: "sandTypeCustom",
   sandTruckSize: "sandTruckSizeCustom",
   steelType: "steelTypeCustom",
@@ -229,6 +235,7 @@ export function resolveConstructionMaterialTypeKeySlugOnly(raw: string): string 
     .replace(/-/g, "_");
 
   if (n === "cement") return "cement";
+  if (n === "concrete") return "concrete";
   if (n === "sand") return "sand";
   if (n === "steel") return "steel";
   if (n.includes("aggreg")) return "aggregate";
