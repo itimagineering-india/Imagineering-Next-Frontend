@@ -17,11 +17,22 @@ export interface CatalogProductItem {
   description?: string;
   metadata?: Record<string, string>;
   brand?: string;
+  productCode?: string;
   images?: string[];
   customFields?: Array<{ label: string; value: string; type?: string }>;
   suggestedPriceType?: string;
   suggestedPriceMin?: number;
   suggestedPriceMax?: number;
+  hasVariants?: boolean;
+  variantAxes?: Array<{ key: string; label: string; options: string[]; allowCustom?: boolean }>;
+  variants?: Array<{
+    id: string;
+    attributes: Record<string, string>;
+    productCode?: string;
+    suggestedPriceMin?: number;
+    suggestedPriceMax?: number;
+    isActive?: boolean;
+  }>;
 }
 
 export type CatalogListingFormPatch = {
