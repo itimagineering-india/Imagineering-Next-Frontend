@@ -3,6 +3,12 @@
  * Product rails use admin product catalog (templates), not provider services.
  */
 
+import {
+  catalogVariantLabel,
+  catalogVariantPriceBounds,
+  catalogVariantSummary,
+  readCatalogVariants,
+} from "@/lib/catalogVariants";
 import api from "@/lib/api-client";
 import { resolveMaterialsMediaUrl } from "@/lib/materials/media";
 import {
@@ -130,7 +136,12 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
     "general";
   const brand = String(raw?.brand || "").trim() || "Brand";
   const images = Array.isArray(raw?.images) ? (raw.images as string[]) : [];
-  const imageUri = resolveMaterialsMediaUrl(images[0]);
+  const { hasVariants, variantAxes, variants } = readCatalogVariants(raw);
+  const firstVariantImage =
+    hasVariants
+      ? variants.find((v) => v.isActive !== false && Array.isArray(v.images) && v.images.length)?.images?.[0]
+      : undefined;
+  const imageUri = resolveMaterialsMediaUrl(images[0] || firstVariantImage);
   const grade = String(meta.grade || meta.Grade || raw?.grade || "").trim() || undefined;
   const delivery = Number(meta.avgDeliveryDays || meta.deliveryDays || 3);
   const ratingObj = raw?.rating as { average?: number; count?: number } | number | undefined;
@@ -147,9 +158,9 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
   const rating = Number.isFinite(ratingRaw) && ratingRaw > 0 ? ratingRaw : undefined;
   const reviewCount =
     Number.isFinite(reviewCountRaw) && reviewCountRaw > 0 ? Math.floor(reviewCountRaw) : undefined;
-
-  const priceMinRaw = Number(raw?.suggestedPriceMin);
-  const priceMaxRaw = Number(raw?.suggestedPriceMax);
+  const variantBounds = hasVariants ? catalogVariantPriceBounds(variants) : {};
+  const priceMinRaw = Number(hasVariants && variantBounds.min != null ? variantBounds.min : raw?.suggestedPriceMin);
+  const priceMaxRaw = Number(hasVariants && variantBounds.max != null ? variantBounds.max : raw?.suggestedPriceMax);
   const priceMin = Number.isFinite(priceMinRaw) && priceMinRaw > 0 ? priceMinRaw : undefined;
   const priceMax = Number.isFinite(priceMaxRaw) && priceMaxRaw > 0 ? priceMaxRaw : undefined;
   const unitType = String(raw?.suggestedPriceType || "").trim() || undefined;
@@ -162,23 +173,25 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
     grade,
     shortDescription: String(raw?.description || raw?.shortDescription || "").trim(),
     available: raw?.isActive !== false,
-    priceRange: formatMaterialsPriceRange(
-      raw?.suggestedPriceMin as number,
-      raw?.suggestedPriceMax as number,
-      unitType
-    ),
+    priceRange: formatMaterialsPriceRange(priceMin, priceMax, unitType),
     priceMin,
     priceMax,
-    isPriceRange: isMaterialsCatalogPriceRange(
-      raw?.suggestedPriceMin as number,
-      raw?.suggestedPriceMax as number
-    ),
+    isPriceRange: isMaterialsCatalogPriceRange(priceMin, priceMax),
     unitType,
     avgDeliveryDays: Number.isFinite(delivery) && delivery > 0 ? Math.round(delivery) : 3,
     avgQuoteResponseMin: 30,
     imageUri,
     rating,
     reviewCount,
+    hasVariants,
+    variantSummary: hasVariants ? catalogVariantSummary(variantAxes, variants) : undefined,
+    variantCount: hasVariants ? variants.filter((v) => v.isActive !== false).length : undefined,
+    defaultVariantId: hasVariants
+      ? variants.find((v) => v.isActive !== false)?.id
+      : undefined,
+    defaultVariantLabel: hasVariants
+      ? catalogVariantLabel(variants.find((v) => v.isActive !== false) || variants[0], variantAxes)
+      : undefined,
   };
 }
 
