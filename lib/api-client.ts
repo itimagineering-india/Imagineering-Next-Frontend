@@ -2924,6 +2924,13 @@ export const api = {
         paymentOption?: string;
         couponUsageId?: string;
         creditsToApply?: number;
+        billingSameAsShipping?: boolean;
+        billingAddress?: {
+          address: string;
+          city: string;
+          state: string;
+          zipCode?: string;
+        };
       }
     ) =>
       apiRequest<{
