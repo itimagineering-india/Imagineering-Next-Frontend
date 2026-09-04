@@ -64,6 +64,51 @@ export function catalogVariantPriceBounds(variants: CatalogVariant[]): { min?: n
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
+export function catalogAxisOptionValues(
+  axis: CatalogVariantAxis,
+  variants: CatalogVariant[],
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (raw: string | undefined) => {
+    const v = String(raw || "").trim();
+    if (!v || seen.has(v)) return;
+    seen.add(v);
+    out.push(v);
+  };
+  for (const opt of axis.options || []) push(opt);
+  for (const variant of activeCatalogVariants(variants)) {
+    push(variant.attributes?.[axis.key]);
+  }
+  return out;
+}
+
+/** After changing one axis, keep a valid combination (sync other axes if needed). */
+export function selectionAfterAxisChange(
+  axes: CatalogVariantAxis[],
+  variants: CatalogVariant[],
+  current: Record<string, string>,
+  axisKey: string,
+  value: string,
+): Record<string, string> {
+  const next = { ...current, [axisKey]: value };
+  const exact = findCatalogVariant(variants, next, axes);
+  if (exact) {
+    const synced: Record<string, string> = {};
+    for (const axis of axes) synced[axis.key] = exact.attributes?.[axis.key] || "";
+    return synced;
+  }
+  const fallback = activeCatalogVariants(variants).find(
+    (v) => v.attributes?.[axisKey] === value,
+  );
+  if (fallback) {
+    const synced: Record<string, string> = {};
+    for (const axis of axes) synced[axis.key] = fallback.attributes?.[axis.key] || "";
+    return synced;
+  }
+  return next;
+}
+
 export function findCatalogVariant(
   variants: CatalogVariant[],
   selected: Record<string, string>,
