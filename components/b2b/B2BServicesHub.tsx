@@ -430,13 +430,10 @@ export function B2BServicesHub() {
 
   const handleAddMaterials = useCallback(
     (product: MaterialsProduct) => {
+      if (product.hasVariants) return;
       addToQuote({
-        key: product.defaultVariantId
-          ? `catalog:${product.id}:${product.defaultVariantId}`
-          : `catalog:${product.id}`,
+        key: `catalog:${product.id}`,
         catalogProductId: product.id,
-        catalogVariantId: product.defaultVariantId,
-        variantLabel: product.defaultVariantLabel,
         title: product.name,
         priceType: product.unitType,
         itemType: normalizeB2bQuoteItemType(product.categoryId),
@@ -662,7 +659,7 @@ export function B2BServicesHub() {
                         l.key === `catalog:${product.id}` ||
                         l.key.startsWith(`catalog:${product.id}:`)
                     )}
-                    onAddToQuote={handleAddMaterials}
+                    onAddToQuote={product.hasVariants ? undefined : handleAddMaterials}
                   />
                 ))}
               </div>
