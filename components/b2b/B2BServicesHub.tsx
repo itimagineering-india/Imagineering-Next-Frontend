@@ -659,7 +659,7 @@ export function B2BServicesHub() {
                         l.key === `catalog:${product.id}` ||
                         l.key.startsWith(`catalog:${product.id}:`)
                     )}
-                    onAddToQuote={product.hasVariants ? undefined : handleAddMaterials}
+                    onAddToQuote={handleAddMaterials}
                   />
                 ))}
               </div>
