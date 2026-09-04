@@ -24,6 +24,30 @@ export function quoteOfferItems(offer: { items?: QuoteOfferItemLike[] | null } |
   return offer.items.filter((row) => row && String(row.title || "").trim());
 }
 
+/** Sum of line quantities on an offer (falls back to single `quantity` when no lines). */
+export function quoteOfferTotalQuantity(
+  offer: { items?: QuoteOfferItemLike[] | null; quantity?: number } | null | undefined,
+): number {
+  const items = quoteOfferItems(offer);
+  if (items.length > 0) {
+    return items.reduce((sum, row) => {
+      const q = Number(row.quantity);
+      return sum + (Number.isFinite(q) && q > 0 ? q : 0);
+    }, 0);
+  }
+  const fallback = Number(offer?.quantity);
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+}
+
+export function formatOfferTotalQtyLabel(totalQty: number): string {
+  if (!(totalQty > 0)) return "";
+  const rounded =
+    Math.abs(totalQty - Math.round(totalQty)) < 1e-9
+      ? String(Math.round(totalQty))
+      : String(Math.round(totalQty * 100) / 100);
+  return `Total qty ${rounded}`;
+}
+
 export function quoteLineKey(row: { serviceId?: string; title?: string }, index = 0) {
   return String(row.serviceId || row.title || index);
 }
