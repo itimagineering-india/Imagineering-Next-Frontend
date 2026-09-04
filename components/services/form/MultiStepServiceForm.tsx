@@ -22,6 +22,10 @@ import { ToolsServiceFields } from "./ToolsServiceFields";
 import { CommonFields } from "./CommonFields";
 import { DynamicFieldsRenderer } from "./DynamicFieldsRenderer";
 import { ProductCatalogPicker } from "./ProductCatalogPicker";
+import {
+ ProviderVariantPicker,
+ type ProviderVariantRow,
+} from "./ProviderVariantPicker";
 import { PricingSection } from "./PricingSection";
 import { SubmitReview } from "./SubmitReview";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -248,9 +252,7 @@ export function MultiStepServiceForm({
  const [toolsFields, setToolsFields] = useState<ToolsServiceFieldsValue>(EMPTY_TOOLS_FIELDS);
  const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string | null>(null);
  const [selectedCatalogProduct, setSelectedCatalogProduct] = useState<CatalogProductItem | null>(null);
- const [providerVariantRows, setProviderVariantRows] = useState<
-  Array<{ id: string; enabled: boolean; priceMin: string; priceMax: string }>
- >([]);
+ const [providerVariantRows, setProviderVariantRows] = useState<ProviderVariantRow[]>([]);
  const [catalogCustomFields, setCatalogCustomFields] = useState<
   Array<{ label: string; value: string; type: "text" }>
  >([]);
@@ -877,6 +879,14 @@ export function MultiStepServiceForm({
     ) {
       newErrors.itemType = "Please select item type";
     }
+    if (
+      showCatalogProductPicker &&
+      selectedCatalogProduct?.hasVariants &&
+      providerVariantRows.length > 0 &&
+      !providerVariantRows.some((r) => r.enabled)
+    ) {
+      newErrors.providerVariants = "Enable at least one variant you sell.";
+    }
     break;
 
    case 2:
@@ -1013,6 +1023,10 @@ export function MultiStepServiceForm({
  };
 
  const handleSubmit = async () => {
+  if (visibleStepIds.includes(1) && !validateStep(1)) {
+   setCurrentStep(1);
+   return;
+  }
   if (visibleStepIds.includes(4) && !validateStep(4)) {
    setCurrentStep(4);
    return;
@@ -1380,50 +1394,15 @@ export function MultiStepServiceForm({
          />
         )}
         {showCatalogProductPicker && selectedCatalogProduct?.hasVariants && providerVariantRows.length > 0 && (
-         <div className="space-y-2 rounded-lg border p-3">
-          <Label>Variants you sell</Label>
-          {providerVariantRows.map((row, i) => {
-           const variant = selectedCatalogProduct.variants?.find((v) => v.id === row.id);
-           const label = selectedCatalogProduct.variantAxes
-            ?.map((axis) => variant?.attributes?.[axis.key])
-            .filter(Boolean)
-            .join(" · ") || row.id;
-           return (
-            <div key={row.id} className="grid grid-cols-1 gap-2 sm:grid-cols-4 items-center text-sm">
-             <label className="flex items-center gap-2 sm:col-span-2">
-              <input
-               type="checkbox"
-               checked={row.enabled}
-               onChange={(e) =>
-                setProviderVariantRows((prev) =>
-                 prev.map((r, idx) => (idx === i ? { ...r, enabled: e.target.checked } : r)),
-                )
-               }
-              />
-              {label}
-             </label>
-             <Input
-              placeholder="Min ₹"
-              value={row.priceMin}
-              onChange={(e) =>
-               setProviderVariantRows((prev) =>
-                prev.map((r, idx) => (idx === i ? { ...r, priceMin: e.target.value } : r)),
-               )
-              }
-             />
-             <Input
-              placeholder="Max ₹"
-              value={row.priceMax}
-              onChange={(e) =>
-               setProviderVariantRows((prev) =>
-                prev.map((r, idx) => (idx === i ? { ...r, priceMax: e.target.value } : r)),
-               )
-              }
-             />
-            </div>
-           );
-          })}
-         </div>
+         <ProviderVariantPicker
+          product={selectedCatalogProduct}
+          rows={providerVariantRows}
+          onChange={(next) => {
+           setProviderVariantRows(next);
+           setErrors((prev) => ({ ...prev, providerVariants: undefined }));
+          }}
+          error={errors.providerVariants}
+         />
         )}
         {showItemTypeSelector && (
          <div className="space-y-2">
