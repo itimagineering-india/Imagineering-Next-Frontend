@@ -31,12 +31,16 @@ function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
 }
 
-const QUOTE_PARTIAL_MIN_RATIO = 0.1;
+type PartialAdvanceMethod = "razorpay" | "cashfree" | "sbicollect";
 
-function quotePartialMinimum(total: number): number {
-  const t = Math.max(0, Math.round(Number(total || 0) * 100) / 100);
-  return Math.round(t * QUOTE_PARTIAL_MIN_RATIO * 100) / 100;
-}
+type PartialPreview = {
+  orderTotal: number;
+  minPercent: number;
+  minPartialAmount: number;
+  partialAmount: number;
+  balanceDue: number;
+  allowedAdvanceMethods: PartialAdvanceMethod[];
+};
 
 function normalizeGstNumber(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -80,6 +84,35 @@ function loadRazorpayScript(): Promise<void> {
     script.onerror = () => reject(new Error("Failed to load payment"));
     document.body.appendChild(script);
   });
+}
+
+async function loadCashfreeSdk(): Promise<any> {
+  if (typeof window === "undefined") return null;
+  const mode =
+    (process.env.NEXT_PUBLIC_CASHFREE_MODE as "sandbox" | "production") || "sandbox";
+  const existingFn = window.Cashfree;
+  if (existingFn && typeof existingFn === "function") {
+    return existingFn({ mode });
+  }
+  await new Promise<void>((resolve, reject) => {
+    const scriptId = "cashfree-js-sdk";
+    const existingScript = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve());
+      existingScript.addEventListener("error", () => reject(new Error("Failed to load Cashfree")));
+      if (window.Cashfree) resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Cashfree"));
+    document.body.appendChild(script);
+  });
+  const cf = window.Cashfree;
+  if (!cf || typeof cf !== "function") throw new Error("Cashfree SDK unavailable");
+  return cf({ mode });
 }
 
 type Transport = "supplier" | "self_pickup";
@@ -180,6 +213,9 @@ export default function QuoteRequestConfirmPage() {
   const [loadingNeftDetails, setLoadingNeftDetails] = useState(false);
   const [neftReceiptFile, setNeftReceiptFile] = useState<File | null>(null);
   const [partialAmountInput, setPartialAmountInput] = useState("");
+  const [partialPreview, setPartialPreview] = useState<PartialPreview | null>(null);
+  const [partialPreviewLoading, setPartialPreviewLoading] = useState(false);
+  const [partialAdvanceMethod, setPartialAdvanceMethod] = useState<PartialAdvanceMethod>("razorpay");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [billingAddress, setBillingAddress] = useState({
@@ -266,7 +302,12 @@ export default function QuoteRequestConfirmPage() {
   }, [offer?.id, deliveryUnavailable]);
 
   useEffect(() => {
-    if (paymentOption !== "sbicollect") return;
+    if (
+      paymentOption !== "sbicollect" &&
+      !(paymentOption === "partial" && partialAdvanceMethod === "sbicollect")
+    ) {
+      return;
+    }
     setLoadingSbiCollect(true);
     api.settings
       .getSbiCollectDetails()
@@ -278,7 +319,7 @@ export default function QuoteRequestConfirmPage() {
         setSbiCollectDetails({ instructions: "Contact support for SBI Collect payment details." })
       )
       .finally(() => setLoadingSbiCollect(false));
-  }, [paymentOption]);
+  }, [paymentOption, partialAdvanceMethod]);
 
   useEffect(() => {
     if (paymentOption !== "neft") return;
@@ -401,29 +442,25 @@ export default function QuoteRequestConfirmPage() {
   const displayTotal = Math.max(0, previewBase - (couponDiscount || 0));
   const paymentAmount = Math.max(0, displayTotal - creditsDiscount);
   const payableTotal = bookingId ? Math.max(0, payAmount - creditsDiscount) : paymentAmount;
-  const partialMin = quotePartialMinimum(payableTotal);
-  const parsedPartialAmount = Math.round(Number(partialAmountInput || 0) * 100) / 100;
-  const partialAmount =
-    paymentOption === "partial"
-      ? Number.isFinite(parsedPartialAmount) && parsedPartialAmount > 0
-        ? parsedPartialAmount
-        : partialMin
-      : 0;
-  const partialBalanceDue =
-    paymentOption === "partial" ? Math.max(0, Math.round((payableTotal - partialAmount) * 100) / 100) : 0;
+  const partialMin = partialPreview?.minPartialAmount ?? 0;
+  const partialAmount = partialPreview?.partialAmount ?? 0;
+  const partialBalanceDue = partialPreview?.balanceDue ?? 0;
   const isOfflineCheckout =
     paymentOption === "cod" ||
     paymentOption === "neft" ||
     paymentOption === "sbicollect" ||
-    paymentOption === "imagineering_credit";
+    paymentOption === "imagineering_credit" ||
+    (paymentOption === "partial" && partialAdvanceMethod === "sbicollect");
   const checkoutCta =
     paymentOption === "sbicollect" && !sbiCollectReceiptFile
       ? `Pay via SBI Collect — ${formatINR(payableTotal)}`
-      : paymentOption === "partial"
-        ? `Pay ${formatINR(partialAmount)} now`
-        : isOfflineCheckout
-          ? "Place order"
-          : `Pay ${formatINR(payableTotal)}`;
+      : paymentOption === "partial" && partialAdvanceMethod === "sbicollect" && !sbiCollectReceiptFile
+        ? `Pay via SBI Collect — ${formatINR(partialAmount)}`
+        : paymentOption === "partial"
+          ? `Pay ${formatINR(partialAmount)} now`
+          : isOfflineCheckout
+            ? "Place order"
+            : `Pay ${formatINR(payableTotal)}`;
   const shownProduct = preview?.productAmount ?? productAmount;
   const shownSupplierGst = preview?.supplierGst ?? supplierGst;
   const shownDelivery = preview?.deliveryCharge ?? effectiveDelivery;
@@ -437,16 +474,59 @@ export default function QuoteRequestConfirmPage() {
   }, []);
 
   useEffect(() => {
-    if (paymentOption !== "partial") return;
-    setPartialAmountInput((prev) => {
-      const n = Number(prev);
-      if (!prev.trim() || !Number.isFinite(n) || n + 0.001 < partialMin) {
-        return String(partialMin || "");
-      }
-      if (n - 0.001 > payableTotal) return String(payableTotal || "");
-      return prev;
-    });
-  }, [paymentOption, partialMin, payableTotal]);
+    if (paymentOption !== "partial" || !id || !offerId) {
+      setPartialPreview(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setPartialPreviewLoading(true);
+      const requested = Number(partialAmountInput);
+      void api.quoteRequests
+        .previewPartialOffer(id, offerId, {
+          transport,
+          couponUsageId: couponUsageId || undefined,
+          creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
+          partialAmount:
+            Number.isFinite(requested) && requested > 0 ? requested : undefined,
+        })
+        .then((res) => {
+          if (cancelled) return;
+          const row = (res as any)?.data as PartialPreview | undefined;
+          if (!res.success || !row) {
+            setPartialPreview(null);
+            return;
+          }
+          setPartialPreview(row);
+          const typed = Number(partialAmountInput);
+          if (!Number.isFinite(typed) || Math.abs(typed - row.partialAmount) > 0.011) {
+            setPartialAmountInput(String(row.partialAmount));
+          }
+          const methods = row.allowedAdvanceMethods || [];
+          setPartialAdvanceMethod((prev) =>
+            methods.includes(prev) ? prev : methods[0] || "razorpay"
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setPartialPreview(null);
+        })
+        .finally(() => {
+          if (!cancelled) setPartialPreviewLoading(false);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    paymentOption,
+    id,
+    offerId,
+    transport,
+    couponUsageId,
+    creditsToApply,
+    partialAmountInput,
+  ]);
 
   // Transport changes the payable base — clear applied offer so user re-applies on the new total
   useEffect(() => {
@@ -520,6 +600,10 @@ export default function QuoteRequestConfirmPage() {
       handleSbiCollectOpenLink();
       return;
     }
+    if (paymentOption === "partial" && partialAdvanceMethod === "sbicollect" && !sbiCollectReceiptFile) {
+      handleSbiCollectOpenLink();
+      return;
+    }
     if (paymentOption === "neft" && !neftReceiptFile) {
       toast({
         title: "Receipt required",
@@ -529,18 +613,26 @@ export default function QuoteRequestConfirmPage() {
       return;
     }
     if (paymentOption === "partial") {
-      if (!(partialAmount >= partialMin - 0.001)) {
+      if (!partialPreview) {
         toast({
-          title: "Partial payment too low",
-          description: `Pay at least 10% now (${formatINR(partialMin)}).`,
+          title: "Calculating…",
+          description: "Partial payment amount is still loading. Please wait a moment.",
           variant: "destructive",
         });
         return;
       }
-      if (partialAmount - 0.001 > payableTotal) {
+      if (!(partialAmount >= partialMin - 0.001)) {
         toast({
-          title: "Invalid amount",
-          description: "Partial payment cannot exceed order total.",
+          title: "Partial payment too low",
+          description: `Pay at least ${partialPreview.minPercent}% now (${formatINR(partialMin)}).`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!partialPreview.allowedAdvanceMethods.includes(partialAdvanceMethod)) {
+        toast({
+          title: "Payment method unavailable",
+          description: "Choose another way to pay the advance amount.",
           variant: "destructive",
         });
         return;
@@ -551,7 +643,8 @@ export default function QuoteRequestConfirmPage() {
     try {
       let receiptUrl: string | undefined;
       const receiptFile =
-        paymentOption === "sbicollect"
+        paymentOption === "sbicollect" ||
+        (paymentOption === "partial" && partialAdvanceMethod === "sbicollect")
           ? sbiCollectReceiptFile
           : paymentOption === "neft"
             ? neftReceiptFile
@@ -571,7 +664,9 @@ export default function QuoteRequestConfirmPage() {
         couponUsageId: couponUsageId || undefined,
         creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
         receiptUrl,
-        ...(paymentOption === "partial" ? { partialAmount } : {}),
+        ...(paymentOption === "partial"
+          ? { partialAmount, partialPaymentMethod: partialAdvanceMethod }
+          : {}),
         billingSameAsShipping,
         ...(billingSameAsShipping
           ? {}
@@ -606,7 +701,8 @@ export default function QuoteRequestConfirmPage() {
         paymentOption === "cod" ||
         paymentOption === "neft" ||
         paymentOption === "sbicollect" ||
-        paymentOption === "imagineering_credit";
+        paymentOption === "imagineering_credit" ||
+        (paymentOption === "partial" && partialAdvanceMethod === "sbicollect");
 
       if (offlinePay) {
         if (!payload?.bookingId) {
@@ -620,16 +716,19 @@ export default function QuoteRequestConfirmPage() {
               ? "Pay on delivery selected. The supplier will confirm your order."
               : paymentOption === "imagineering_credit"
                 ? `Paid with ${IMAGINEERING_CREDIT.name}. Your order is placed.`
-                : paymentOption === "sbicollect" || paymentOption === "neft"
-                  ? "Admin will verify your receipt and confirm the payment."
-                  : "Order placed. Complete payment as selected.",
+                : paymentOption === "partial"
+                  ? "Advance receipt uploaded. Remaining balance is due on delivery."
+                  : paymentOption === "sbicollect" || paymentOption === "neft"
+                    ? "Admin will verify your receipt and confirm the payment."
+                    : "Order placed. Complete payment as selected.",
         });
         router.push("/buyer/orders");
         return;
       }
 
       if (
-        (paymentOption === "razorpay" || paymentOption === "partial") &&
+        (paymentOption === "razorpay" ||
+          (paymentOption === "partial" && partialAdvanceMethod === "razorpay")) &&
         payload?.orderId &&
         payload?.paymentId &&
         payload?.key
@@ -690,12 +789,46 @@ export default function QuoteRequestConfirmPage() {
         return;
       }
 
+      if (
+        (paymentOption === "cashfree" ||
+          (paymentOption === "partial" && partialAdvanceMethod === "cashfree")) &&
+        payload?.orderId &&
+        payload?.paymentId &&
+        payload?.paymentSessionId
+      ) {
+        const cashfree = await loadCashfreeSdk();
+        const result = await cashfree.checkout({
+          paymentSessionId: payload.paymentSessionId,
+          redirectTarget: "_modal",
+        });
+        if (result?.error) {
+          throw new Error(result.error?.message || "Payment cancelled or failed");
+        }
+        const verifyRes = await api.payments.verifyCashfreeQuoteRequest({
+          orderId: String(payload.orderId),
+          paymentId: String(payload.paymentId),
+        });
+        if (!verifyRes.success) {
+          throw new Error((verifyRes as any)?.error?.message || "Payment verification failed");
+        }
+        clearActiveQuoteRequest(id);
+        toast({
+          title: paymentOption === "partial" ? "Partial payment successful" : "Payment successful",
+          description:
+            paymentOption === "partial"
+              ? "Advance paid. Remaining balance is due on delivery."
+              : "Your order is placed.",
+        });
+        router.push("/buyer/orders");
+        return;
+      }
+
       if (!payload?.bookingId) {
         throw new Error((res as any)?.error?.message || "Failed to place order");
       }
       clearActiveQuoteRequest(id);
       setBookingId(String(payload.bookingId));
-      setPayAmount(Number(payload.amount || payload.amountRupees || displayTotal));
+      setPayAmount(Number(payload.amountRupees || payload.amount || displayTotal));
     } catch (err: any) {
       toast({
         title: "Could not continue",
@@ -943,9 +1076,13 @@ export default function QuoteRequestConfirmPage() {
                     setCreditsDiscount(0);
                   }
                   if (v !== "neft") setNeftReceiptFile(null);
+                  if (v !== "sbicollect" && !(v === "partial" && partialAdvanceMethod === "sbicollect")) {
+                    // keep receipt when switching into partial+sbi later
+                  }
                   if (v !== "sbicollect") setSbiCollectReceiptFile(null);
                   if (v === "partial") {
-                    setPartialAmountInput(String(quotePartialMinimum(payableTotal) || ""));
+                    setPartialAmountInput("");
+                    setPartialPreview(null);
                   }
                 }}
                 amount={paymentOption === "imagineering_credit" ? displayTotal : paymentAmount}
@@ -959,17 +1096,23 @@ export default function QuoteRequestConfirmPage() {
               />
               {paymentOption === "partial" && !bookingId ? (
                 <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-                  <Label className="text-sm font-semibold">Pay now (min 10%)</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Pay at least {formatINR(partialMin)} online to place the order. Remaining{" "}
-                    {formatINR(partialBalanceDue)} is due on delivery.
-                  </p>
+                  <Label className="text-sm font-semibold">
+                    Pay now (min {partialPreview?.minPercent ?? 5}%)
+                  </Label>
+                  {partialPreviewLoading && !partialPreview ? (
+                    <p className="text-sm text-muted-foreground animate-pulse">Calculating…</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Pay at least {formatINR(partialMin)} online to place the order. Remaining{" "}
+                      {formatINR(partialBalanceDue)} is due on delivery.
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">₹</span>
                     <Input
                       type="number"
-                      min={partialMin}
-                      max={payableTotal}
+                      min={partialMin || undefined}
+                      max={partialPreview?.orderTotal || undefined}
                       step="1"
                       value={partialAmountInput}
                       onChange={(e) => setPartialAmountInput(e.target.value)}
@@ -986,6 +1129,81 @@ export default function QuoteRequestConfirmPage() {
                       <span className="tabular-nums">{formatINR(partialBalanceDue)}</span>
                     </div>
                   </div>
+                  <div className="space-y-2 border-t pt-3">
+                    <Label className="text-xs font-medium">Pay advance with</Label>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      {(partialPreview?.allowedAdvanceMethods || ["razorpay", "cashfree", "sbicollect"]).map(
+                        (method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            onClick={() => {
+                              setPartialAdvanceMethod(method);
+                              if (method !== "sbicollect") setSbiCollectReceiptFile(null);
+                            }}
+                            className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                              partialAdvanceMethod === method
+                                ? "border-primary bg-primary/5 font-medium"
+                                : "border-border"
+                            }`}
+                          >
+                            {method === "razorpay"
+                              ? "Razorpay"
+                              : method === "cashfree"
+                                ? "Cashfree"
+                                : "SBI Collect"}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                  {partialAdvanceMethod === "sbicollect" ? (
+                    <div className="space-y-3 border-t pt-3">
+                      <p className="text-xs text-muted-foreground">
+                        Open SBI Collect, pay {formatINR(partialAmount)}, then upload your receipt.
+                      </p>
+                      {loadingSbiCollect ? (
+                        <p className="text-sm text-muted-foreground animate-pulse">
+                          Loading SBI Collect details…
+                        </p>
+                      ) : sbiCollectDetails?.paymentLink ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 w-full"
+                          onClick={handleSbiCollectOpenLink}
+                        >
+                          Open SBI Collect — {formatINR(partialAmount)}
+                        </Button>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          {sbiCollectDetails?.instructions ||
+                            "Contact support for SBI Collect payment details."}
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium">Upload payment receipt *</Label>
+                        <label
+                          htmlFor="quote-partial-sbicollect-receipt"
+                          className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm hover:bg-muted/50"
+                        >
+                          <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate">
+                            {sbiCollectReceiptFile
+                              ? sbiCollectReceiptFile.name
+                              : "Choose file (image or PDF)"}
+                          </span>
+                        </label>
+                        <input
+                          id="quote-partial-sbicollect-receipt"
+                          type="file"
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={(e) => setSbiCollectReceiptFile(e.target.files?.[0] || null)}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {paymentOption === "sbicollect" && !bookingId ? (
