@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, ArrowLeft, CreditCard, Package, Tag, Truck, MapPin } from "lucide-react";
+import { Loader2, ArrowLeft, CreditCard, Package, Tag, Truck, MapPin, Building2, Upload } from "lucide-react";
 import api from "@/lib/api-client";
 import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,13 @@ import { parseQuoteQuantity } from "@/lib/quoteQuantity";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
+}
+
+const QUOTE_PARTIAL_MIN_RATIO = 0.1;
+
+function quotePartialMinimum(total: number): number {
+  const t = Math.max(0, Math.round(Number(total || 0) * 100) / 100);
+  return Math.round(t * QUOTE_PARTIAL_MIN_RATIO * 100) / 100;
 }
 
 function normalizeGstNumber(value: unknown): string {
@@ -158,6 +165,21 @@ export default function QuoteRequestConfirmPage() {
   const [creditsToApply, setCreditsToApply] = useState(0);
   const [creditsDiscount, setCreditsDiscount] = useState(0);
   const [preview, setPreview] = useState<QuoteCheckoutPreview | null>(null);
+  const [sbiCollectDetails, setSbiCollectDetails] = useState<{
+    paymentLink?: string;
+    instructions?: string;
+  } | null>(null);
+  const [loadingSbiCollect, setLoadingSbiCollect] = useState(false);
+  const [sbiCollectReceiptFile, setSbiCollectReceiptFile] = useState<File | null>(null);
+  const [neftBankDetails, setNeftBankDetails] = useState<{
+    accountName?: string;
+    accountNo?: string;
+    ifsc?: string;
+    upi?: string;
+  } | null>(null);
+  const [loadingNeftDetails, setLoadingNeftDetails] = useState(false);
+  const [neftReceiptFile, setNeftReceiptFile] = useState<File | null>(null);
+  const [partialAmountInput, setPartialAmountInput] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [billingAddress, setBillingAddress] = useState({
@@ -243,6 +265,49 @@ export default function QuoteRequestConfirmPage() {
     else setTransport("supplier");
   }, [offer?.id, deliveryUnavailable]);
 
+  useEffect(() => {
+    if (paymentOption !== "sbicollect") return;
+    setLoadingSbiCollect(true);
+    api.settings
+      .getSbiCollectDetails()
+      .then((res) => {
+        if (res.success && (res as any).data) setSbiCollectDetails((res as any).data);
+        else setSbiCollectDetails({ instructions: "Contact support for SBI Collect payment details." });
+      })
+      .catch(() =>
+        setSbiCollectDetails({ instructions: "Contact support for SBI Collect payment details." })
+      )
+      .finally(() => setLoadingSbiCollect(false));
+  }, [paymentOption]);
+
+  useEffect(() => {
+    if (paymentOption !== "neft") return;
+    setLoadingNeftDetails(true);
+    api.settings
+      .getNeftBankDetails()
+      .then((res) => {
+        if (res.success && (res as any).data) setNeftBankDetails((res as any).data);
+        else setNeftBankDetails(null);
+      })
+      .catch(() => setNeftBankDetails(null))
+      .finally(() => setLoadingNeftDetails(false));
+  }, [paymentOption]);
+
+  const handleSbiCollectOpenLink = () => {
+    if (sbiCollectDetails?.paymentLink) {
+      window.open(sbiCollectDetails.paymentLink, "_blank", "noopener,noreferrer");
+      toast({
+        title: "Opened SBI Collect",
+        description: "Complete payment there, then come back and upload your receipt.",
+      });
+      return;
+    }
+    toast({
+      title: "Link not available",
+      description: "SBI Collect payment link is not configured. Contact support.",
+      variant: "destructive",
+    });
+  };
   useEffect(() => {
     if (!id || !offerId || !offer) return;
     let cancelled = false;
@@ -336,12 +401,29 @@ export default function QuoteRequestConfirmPage() {
   const displayTotal = Math.max(0, previewBase - (couponDiscount || 0));
   const paymentAmount = Math.max(0, displayTotal - creditsDiscount);
   const payableTotal = bookingId ? Math.max(0, payAmount - creditsDiscount) : paymentAmount;
+  const partialMin = quotePartialMinimum(payableTotal);
+  const parsedPartialAmount = Math.round(Number(partialAmountInput || 0) * 100) / 100;
+  const partialAmount =
+    paymentOption === "partial"
+      ? Number.isFinite(parsedPartialAmount) && parsedPartialAmount > 0
+        ? parsedPartialAmount
+        : partialMin
+      : 0;
+  const partialBalanceDue =
+    paymentOption === "partial" ? Math.max(0, Math.round((payableTotal - partialAmount) * 100) / 100) : 0;
   const isOfflineCheckout =
     paymentOption === "cod" ||
     paymentOption === "neft" ||
     paymentOption === "sbicollect" ||
     paymentOption === "imagineering_credit";
-  const checkoutCta = isOfflineCheckout ? "Place order" : `Pay ${formatINR(payableTotal)}`;
+  const checkoutCta =
+    paymentOption === "sbicollect" && !sbiCollectReceiptFile
+      ? `Pay via SBI Collect — ${formatINR(payableTotal)}`
+      : paymentOption === "partial"
+        ? `Pay ${formatINR(partialAmount)} now`
+        : isOfflineCheckout
+          ? "Place order"
+          : `Pay ${formatINR(payableTotal)}`;
   const shownProduct = preview?.productAmount ?? productAmount;
   const shownSupplierGst = preview?.supplierGst ?? supplierGst;
   const shownDelivery = preview?.deliveryCharge ?? effectiveDelivery;
@@ -353,6 +435,18 @@ export default function QuoteRequestConfirmPage() {
     setCreditsToApply(credits);
     setCreditsDiscount(discount);
   }, []);
+
+  useEffect(() => {
+    if (paymentOption !== "partial") return;
+    setPartialAmountInput((prev) => {
+      const n = Number(prev);
+      if (!prev.trim() || !Number.isFinite(n) || n + 0.001 < partialMin) {
+        return String(partialMin || "");
+      }
+      if (n - 0.001 > payableTotal) return String(payableTotal || "");
+      return prev;
+    });
+  }, [paymentOption, partialMin, payableTotal]);
 
   // Transport changes the payable base — clear applied offer so user re-applies on the new total
   useEffect(() => {
@@ -422,14 +516,62 @@ export default function QuoteRequestConfirmPage() {
       }
     }
 
+    if (paymentOption === "sbicollect" && !sbiCollectReceiptFile) {
+      handleSbiCollectOpenLink();
+      return;
+    }
+    if (paymentOption === "neft" && !neftReceiptFile) {
+      toast({
+        title: "Receipt required",
+        description: "Transfer the amount using the bank details above, then upload your payment receipt.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (paymentOption === "partial") {
+      if (!(partialAmount >= partialMin - 0.001)) {
+        toast({
+          title: "Partial payment too low",
+          description: `Pay at least 10% now (${formatINR(partialMin)}).`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (partialAmount - 0.001 > payableTotal) {
+        toast({
+          title: "Invalid amount",
+          description: "Partial payment cannot exceed order total.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
+      let receiptUrl: string | undefined;
+      const receiptFile =
+        paymentOption === "sbicollect"
+          ? sbiCollectReceiptFile
+          : paymentOption === "neft"
+            ? neftReceiptFile
+            : null;
+      if (receiptFile) {
+        const uploadRes = await api.bookings.uploadNeftReceipt(receiptFile);
+        if (!uploadRes.success || !(uploadRes as any).data?.receiptUrl) {
+          throw new Error((uploadRes as any).error?.message || "Failed to upload receipt");
+        }
+        receiptUrl = String((uploadRes as any).data.receiptUrl);
+      }
+
       const res = await api.quoteRequests.payOffer(id, offerId, {
         gstNumber: gstNumber.trim() || undefined,
         transport,
         paymentOption,
         couponUsageId: couponUsageId || undefined,
         creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
+        receiptUrl,
+        ...(paymentOption === "partial" ? { partialAmount } : {}),
         billingSameAsShipping,
         ...(billingSameAsShipping
           ? {}
@@ -478,13 +620,20 @@ export default function QuoteRequestConfirmPage() {
               ? "Pay on delivery selected. The supplier will confirm your order."
               : paymentOption === "imagineering_credit"
                 ? `Paid with ${IMAGINEERING_CREDIT.name}. Your order is placed.`
-                : "Order placed. Complete payment as selected.",
+                : paymentOption === "sbicollect" || paymentOption === "neft"
+                  ? "Admin will verify your receipt and confirm the payment."
+                  : "Order placed. Complete payment as selected.",
         });
         router.push("/buyer/orders");
         return;
       }
 
-      if (paymentOption === "razorpay" && payload?.orderId && payload?.paymentId && payload?.key) {
+      if (
+        (paymentOption === "razorpay" || paymentOption === "partial") &&
+        payload?.orderId &&
+        payload?.paymentId &&
+        payload?.key
+      ) {
         await loadRazorpayScript();
         if (!window.Razorpay) throw new Error("Payment window could not be opened");
         await new Promise<void>((resolve, reject) => {
@@ -493,7 +642,10 @@ export default function QuoteRequestConfirmPage() {
             amount: payload.amount,
             currency: payload.currency || "INR",
             name: "Imagineering India",
-            description: `Quote for ${serviceTitle}`,
+            description:
+              paymentOption === "partial"
+                ? `Partial payment for ${serviceTitle}`
+                : `Quote for ${serviceTitle}`,
             order_id: payload.orderId,
             prefill: {
               name: user?.name || "",
@@ -527,7 +679,13 @@ export default function QuoteRequestConfirmPage() {
           razorpay.open();
         });
         clearActiveQuoteRequest(id);
-        toast({ title: "Payment successful", description: "Your order is placed." });
+        toast({
+          title: paymentOption === "partial" ? "Partial payment successful" : "Payment successful",
+          description:
+            paymentOption === "partial"
+              ? "Advance paid. Remaining balance is due on delivery."
+              : "Your order is placed.",
+        });
         router.push("/buyer/orders");
         return;
       }
@@ -784,15 +942,191 @@ export default function QuoteRequestConfirmPage() {
                     setCreditsToApply(0);
                     setCreditsDiscount(0);
                   }
+                  if (v !== "neft") setNeftReceiptFile(null);
+                  if (v !== "sbicollect") setSbiCollectReceiptFile(null);
+                  if (v === "partial") {
+                    setPartialAmountInput(String(quotePartialMinimum(payableTotal) || ""));
+                  }
                 }}
                 amount={paymentOption === "imagineering_credit" ? displayTotal : paymentAmount}
                 showImagineeringCredit={canUseImagineeringCredit}
+                showPartialPayment
                 className={bookingId ? "pointer-events-none opacity-60" : undefined}
               />
               <ImagineeringCreditCheckoutPanel
                 orderTotal={displayTotal}
                 selected={paymentOption === "imagineering_credit"}
               />
+              {paymentOption === "partial" && !bookingId ? (
+                <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+                  <Label className="text-sm font-semibold">Pay now (min 10%)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Pay at least {formatINR(partialMin)} online to place the order. Remaining{" "}
+                    {formatINR(partialBalanceDue)} is due on delivery.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">₹</span>
+                    <Input
+                      type="number"
+                      min={partialMin}
+                      max={payableTotal}
+                      step="1"
+                      value={partialAmountInput}
+                      onChange={(e) => setPartialAmountInput(e.target.value)}
+                      disabled={Boolean(bookingId)}
+                    />
+                  </div>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Pay now</span>
+                      <span className="tabular-nums font-medium">{formatINR(partialAmount)}</span>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Balance on delivery</span>
+                      <span className="tabular-nums">{formatINR(partialBalanceDue)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {paymentOption === "sbicollect" && !bookingId ? (
+                <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-background">
+                      <Building2 className="h-4 w-4 text-blue-600" />
+                    </span>
+                    <Label className="text-sm font-semibold">SBI Collect</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Step 1: Open SBI Collect and pay. Step 2: Upload your receipt. Step 3: Place order.
+                  </p>
+                  {loadingSbiCollect ? (
+                    <p className="text-sm text-muted-foreground animate-pulse">Loading SBI Collect details…</p>
+                  ) : sbiCollectDetails ? (
+                    <div className="space-y-3 text-sm">
+                      {sbiCollectDetails.paymentLink ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11 w-full"
+                          onClick={handleSbiCollectOpenLink}
+                        >
+                          Open SBI Collect — {formatINR(payableTotal)}
+                        </Button>
+                      ) : null}
+                      {sbiCollectDetails.instructions ? (
+                        <p className="whitespace-pre-wrap rounded-lg border bg-background p-3 text-xs text-muted-foreground">
+                          {sbiCollectDetails.instructions}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Contact support for SBI Collect payment details.</p>
+                  )}
+                  <div className="space-y-2 border-t pt-3">
+                    <Label className="text-xs font-medium">Upload payment receipt *</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <label
+                        htmlFor="quote-sbicollect-receipt"
+                        className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm hover:bg-muted/50"
+                      >
+                        <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">
+                          {sbiCollectReceiptFile ? sbiCollectReceiptFile.name : "Choose file (image or PDF)"}
+                        </span>
+                      </label>
+                      <input
+                        id="quote-sbicollect-receipt"
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => setSbiCollectReceiptFile(e.target.files?.[0] || null)}
+                      />
+                      {sbiCollectReceiptFile ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSbiCollectReceiptFile(null)}
+                        >
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      We’ll verify your receipt before confirming the order.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+              {paymentOption === "neft" && !bookingId ? (
+                <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-background">
+                      <Building2 className="h-4 w-4 text-blue-600" />
+                    </span>
+                    <Label className="text-sm font-semibold">NEFT / IMPS transfer</Label>
+                  </div>
+                  {loadingNeftDetails ? (
+                    <p className="text-sm text-muted-foreground animate-pulse">Loading bank details…</p>
+                  ) : neftBankDetails ? (
+                    <div className="space-y-2 rounded-lg border bg-background p-3 text-sm">
+                      <p>
+                        <span className="text-muted-foreground">Account name</span>
+                        <br />
+                        <span className="font-medium">{neftBankDetails.accountName || "—"}</span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Account no.</span>
+                        <br />
+                        <span className="font-mono text-sm font-medium">{neftBankDetails.accountNo || "—"}</span>
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">IFSC</span>
+                        <br />
+                        <span className="font-mono text-sm font-medium">{neftBankDetails.ifsc || "—"}</span>
+                      </p>
+                      {neftBankDetails.upi ? (
+                        <p>
+                          <span className="text-muted-foreground">UPI</span>
+                          <br />
+                          <span className="font-medium">{neftBankDetails.upi}</span>
+                        </p>
+                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        Transfer {formatINR(payableTotal)} and upload your receipt below.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Contact support for NEFT bank details.</p>
+                  )}
+                  <div className="space-y-2 border-t pt-3">
+                    <Label className="text-xs font-medium">Upload payment receipt *</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <label
+                        htmlFor="quote-neft-receipt"
+                        className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm hover:bg-muted/50"
+                      >
+                        <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">
+                          {neftReceiptFile ? neftReceiptFile.name : "Choose file (image or PDF)"}
+                        </span>
+                      </label>
+                      <input
+                        id="quote-neft-receipt"
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => setNeftReceiptFile(e.target.files?.[0] || null)}
+                      />
+                      {neftReceiptFile ? (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setNeftReceiptFile(null)}>
+                          Remove
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </CheckoutSection>
 
