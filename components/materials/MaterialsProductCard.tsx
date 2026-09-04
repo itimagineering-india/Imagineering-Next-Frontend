@@ -28,6 +28,9 @@ export function MaterialsProductCard({
   const href = detailHref || `/construction-materials/product/${product.id}`;
   const label =
     ctaLabel || (product.isPriceRange ? "Get Best Quote" : "Add to Cart");
+  // Variants need selection on the detail page before quote/cart.
+  const quickAddToQuote = product.hasVariants ? undefined : onAddToQuote;
+  const quickCta = product.hasVariants ? undefined : onCta;
 
   return (
     <article className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md">
@@ -61,10 +64,10 @@ export function MaterialsProductCard({
         </div>
       </Link>
       <div className="space-y-1 px-2 pb-2">
-        {onAddToQuote ? (
+        {quickAddToQuote ? (
           <button
             type="button"
-            onClick={() => onAddToQuote(product)}
+            onClick={() => quickAddToQuote(product)}
             className={`inline-flex h-7 w-full items-center justify-center rounded-lg px-2 text-[10px] font-semibold transition ${
               inQuoteList
                 ? "border border-emerald-300 bg-emerald-50 text-emerald-800"
@@ -74,16 +77,16 @@ export function MaterialsProductCard({
             {inQuoteList ? "Added to quote" : "Add to quote"}
           </button>
         ) : null}
-        {onCta ? (
+        {quickCta ? (
           <button
             type="button"
             disabled={ctaLoading}
-            onClick={() => onCta(product)}
+            onClick={() => quickCta(product)}
             className="inline-flex h-7 w-full items-center justify-center rounded-lg bg-[hsl(var(--red-accent))] px-2 text-[10px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
           >
             {ctaLoading ? "…" : label}
           </button>
-        ) : onAddToQuote ? null : (
+        ) : quickAddToQuote ? null : (
           <Link
             href={href}
             className="inline-flex h-7 w-full items-center justify-center rounded-lg bg-[hsl(var(--red-accent))] px-2 text-[10px] font-semibold text-white transition hover:brightness-110"
