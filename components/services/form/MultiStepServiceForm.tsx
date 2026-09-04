@@ -62,6 +62,7 @@ import {
  mapCatalogProductToListingForm,
  type CatalogProductItem,
 } from "@/lib/productCatalog";
+import { parseProviderVariants } from "@/lib/catalogVariants";
 
 interface Category {
  _id: string;
@@ -246,6 +247,10 @@ export function MultiStepServiceForm({
  const [errors, setErrors] = useState<Record<string, any>>({});
  const [toolsFields, setToolsFields] = useState<ToolsServiceFieldsValue>(EMPTY_TOOLS_FIELDS);
  const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string | null>(null);
+ const [selectedCatalogProduct, setSelectedCatalogProduct] = useState<CatalogProductItem | null>(null);
+ const [providerVariantRows, setProviderVariantRows] = useState<
+  Array<{ id: string; enabled: boolean; priceMin: string; priceMax: string }>
+ >([]);
  const [catalogCustomFields, setCatalogCustomFields] = useState<
   Array<{ label: string; value: string; type: "text" }>
  >([]);
@@ -261,6 +266,8 @@ export function MultiStepServiceForm({
    setProviderBusinessAddress(undefined);
    setToolsFields(EMPTY_TOOLS_FIELDS);
    setSelectedCatalogProductId(null);
+   setSelectedCatalogProduct(null);
+   setProviderVariantRows([]);
    setCatalogCustomFields([]);
    setFormData({
     category: "",
@@ -332,9 +339,62 @@ export function MultiStepServiceForm({
    setManpowerCustomDraft("");
    setToolsFields(initialData.toolsFields ?? EMPTY_TOOLS_FIELDS);
    setSelectedCatalogProductId(initialData.catalogProductId ?? null);
+   setSelectedCatalogProduct(null);
+   setProviderVariantRows(parseProviderVariants(initialData.dynamicData).map((row) => ({
+    id: row.id,
+    enabled: row.enabled,
+    priceMin: row.priceMin != null ? String(row.priceMin) : "",
+    priceMax: row.priceMax != null ? String(row.priceMax) : "",
+   })));
    setCatalogCustomFields(initialData.catalogCustomFields ?? []);
   }
  }, [open, initialData]);
+
+ useEffect(() => {
+  if (!open || !selectedCatalogProductId) return;
+  let cancelled = false;
+  api.productCatalog
+   .getById(selectedCatalogProductId)
+   .then((res) => {
+    if (cancelled || !res.success) return;
+    const product = ((res.data as { product?: CatalogProductItem })?.product ||
+     res.data) as CatalogProductItem;
+    if (!product?._id) return;
+    setSelectedCatalogProduct(product);
+    if (product.hasVariants && product.variants?.length) {
+     setProviderVariantRows((prev) => {
+      if (prev.length) {
+       const byId = new Map(prev.map((r) => [r.id, r]));
+       return product.variants!
+        .filter((v) => v.isActive !== false)
+        .map((v) => {
+         const existing = byId.get(v.id);
+         return (
+          existing || {
+           id: v.id,
+           enabled: true,
+           priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
+           priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
+          }
+         );
+        });
+      }
+      return product.variants
+       .filter((v) => v.isActive !== false)
+       .map((v) => ({
+        id: v.id,
+        enabled: true,
+        priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
+        priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
+       }));
+     });
+    }
+   })
+   .catch(() => undefined);
+  return () => {
+   cancelled = true;
+  };
+ }, [open, selectedCatalogProductId]);
 
  useEffect(() => {
   if (!open || adminMode || !providerPrimaryCategoryId || editMode) return;
@@ -438,6 +498,8 @@ export function MultiStepServiceForm({
   (product: CatalogProductItem | null) => {
    if (!product) {
     setSelectedCatalogProductId(null);
+    setSelectedCatalogProduct(null);
+    setProviderVariantRows([]);
     setCatalogCustomFields([]);
     setFormData((prev) => ({
      ...prev,
@@ -463,6 +525,17 @@ export function MultiStepServiceForm({
     formData.itemType,
    );
    setSelectedCatalogProductId(product._id);
+   setSelectedCatalogProduct(product);
+   setProviderVariantRows(
+    (product.variants || [])
+     .filter((v) => v.isActive !== false)
+     .map((v) => ({
+      id: v.id,
+      enabled: true,
+      priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
+      priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
+     })),
+   );
    setCatalogCustomFields(patch.catalogCustomFields);
    setFormData((prev) => ({
     ...prev,
@@ -1063,6 +1136,16 @@ export function MultiStepServiceForm({
      formData.itemType || "",
     );
     const meta = extractConstructionStrings(formData.dynamicData);
+    if (providerVariantRows.length) {
+     meta.providerVariants = JSON.stringify(
+      providerVariantRows.map((row) => ({
+       id: row.id,
+       enabled: row.enabled,
+       ...(row.priceMin ? { priceMin: Number(row.priceMin) } : {}),
+       ...(row.priceMax ? { priceMax: Number(row.priceMax) } : {}),
+      })),
+     );
+    }
     servicePayload.metadata = buildConstructionMetadataPayload(mt, meta);
    }
 
@@ -1294,6 +1377,52 @@ export function MultiStepServiceForm({
           selectedProductId={selectedCatalogProductId}
           onSelect={handleCatalogProductSelect}
          />
+        )}
+        {showCatalogProductPicker && selectedCatalogProduct?.hasVariants && providerVariantRows.length > 0 && (
+         <div className="space-y-2 rounded-lg border p-3">
+          <Label>Variants you sell</Label>
+          {providerVariantRows.map((row, i) => {
+           const variant = selectedCatalogProduct.variants?.find((v) => v.id === row.id);
+           const label = selectedCatalogProduct.variantAxes
+            ?.map((axis) => variant?.attributes?.[axis.key])
+            .filter(Boolean)
+            .join(" · ") || row.id;
+           return (
+            <div key={row.id} className="grid grid-cols-1 gap-2 sm:grid-cols-4 items-center text-sm">
+             <label className="flex items-center gap-2 sm:col-span-2">
+              <input
+               type="checkbox"
+               checked={row.enabled}
+               onChange={(e) =>
+                setProviderVariantRows((prev) =>
+                 prev.map((r, idx) => (idx === i ? { ...r, enabled: e.target.checked } : r)),
+                )
+               }
+              />
+              {label}
+             </label>
+             <Input
+              placeholder="Min ₹"
+              value={row.priceMin}
+              onChange={(e) =>
+               setProviderVariantRows((prev) =>
+                prev.map((r, idx) => (idx === i ? { ...r, priceMin: e.target.value } : r)),
+               )
+              }
+             />
+             <Input
+              placeholder="Max ₹"
+              value={row.priceMax}
+              onChange={(e) =>
+               setProviderVariantRows((prev) =>
+                prev.map((r, idx) => (idx === i ? { ...r, priceMax: e.target.value } : r)),
+               )
+              }
+             />
+            </div>
+           );
+          })}
+         </div>
         )}
         {showItemTypeSelector && (
          <div className="space-y-2">
