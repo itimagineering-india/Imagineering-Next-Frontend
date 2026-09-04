@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
+import { formatOfferTotalQtyLabel, quoteOfferItems, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +86,8 @@ function OfferCard({
   const score = Number(offer.offerScore || 0);
   const recommended = Boolean(offer.isRecommended);
   const lineItems = quoteOfferItems(offer);
+  const totalQty = quoteOfferTotalQuantity(offer);
+  const totalQtyLabel = formatOfferTotalQtyLabel(totalQty);
 
   return (
     <article
@@ -112,6 +114,7 @@ function OfferCard({
         </p>
         <p className="mt-1 text-xs text-stone-500">
           {Number(offer.gstAmount) > 0 ? "Total · material + GST + delivery" : "Total · material + delivery"}
+          {totalQtyLabel ? ` · ${totalQtyLabel}` : ""}
         </p>
         {score > 0 ? <ScoreMeter score={score} /> : null}
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -180,7 +183,20 @@ function OfferCard({
                   </span>
                 </li>
               ))}
+              {totalQty > 0 ? (
+                <li className="flex justify-between gap-3 border-t border-stone-100 pt-2">
+                  <span className="text-stone-500">Total quantity</span>
+                  <span className="shrink-0 font-semibold tabular-nums text-stone-900">{totalQtyLabel.replace(/^Total qty /, "")}</span>
+                </li>
+              ) : null}
             </ul>
+          ) : totalQty > 0 ? (
+            <div className="flex justify-between gap-3 pb-2">
+              <span className="text-stone-500">Total quantity</span>
+              <span className="font-semibold tabular-nums text-stone-900">
+                {totalQtyLabel.replace(/^Total qty /, "")}
+              </span>
+            </div>
           ) : null}
           <div className="flex justify-between gap-3">
             <span className="text-stone-500">Material</span>
