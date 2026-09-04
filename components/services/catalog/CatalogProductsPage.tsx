@@ -27,11 +27,14 @@ import {
 } from "@/lib/productCatalog";
 import { ProductCatalogPicker } from "@/components/services/form/ProductCatalogPicker";
 import {
-  defaultProviderVariantRows,
+  defaultProviderAxisSelection,
+  isProviderAxisSelectionComplete,
   ProviderVariantPicker,
-  type ProviderVariantRow,
 } from "@/components/services/form/ProviderVariantPicker";
-import { parseProviderVariants } from "@/lib/catalogVariants";
+import {
+  resolveProviderAxisSelection,
+  type ProviderAxisSelection,
+} from "@/lib/catalogVariants";
 import type { ProviderBusinessAddressSnapshot } from "@/components/services/ServiceLocationInput";
 
 interface Category {
@@ -102,7 +105,7 @@ export function CatalogProductsPage({
   const [materialType, setMaterialType] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<CatalogProductItem[]>([]);
   const [variantConfigByProduct, setVariantConfigByProduct] = useState<
-    Record<string, ProviderVariantRow[]>
+    Record<string, ProviderAxisSelection>
   >({});
   const [variantError, setVariantError] = useState<string | null>(null);
   const [variantErrorProductId, setVariantErrorProductId] = useState<string | null>(null);
@@ -215,31 +218,9 @@ export function CatalogProductsPage({
         service && typeof service === "object"
           ? (service as { metadata?: unknown }).metadata
           : null;
-      const saved = parseProviderVariants(meta);
-      if (item.hasVariants && (item.variants || []).length) {
-        const byId = new Map(saved.map((r) => [r.id, r]));
+      if (item.hasVariants && (item.variantAxes || []).length) {
         setVariantConfigByProduct({
-          [item._id]: (item.variants || [])
-            .filter((v) => v.isActive !== false && v.id)
-            .map((v) => {
-              const existing = byId.get(v.id);
-              return {
-                id: v.id,
-                enabled: existing ? existing.enabled : true,
-                priceMin:
-                  existing?.priceMin != null
-                    ? String(existing.priceMin)
-                    : v.suggestedPriceMin != null
-                      ? String(v.suggestedPriceMin)
-                      : "",
-                priceMax:
-                  existing?.priceMax != null
-                    ? String(existing.priceMax)
-                    : v.suggestedPriceMax != null
-                      ? String(v.suggestedPriceMax)
-                      : "",
-              };
-            }),
+          [item._id]: resolveProviderAxisSelection(item, meta),
         });
       }
     })();
@@ -258,7 +239,7 @@ export function CatalogProductsPage({
   const productsWithVariants = useMemo(
     () =>
       selectedProducts.filter(
-        (p) => Boolean(p.hasVariants) && Array.isArray(p.variants) && p.variants.length > 0,
+        (p) => Boolean(p.hasVariants) && (p.variantAxes || []).length > 0,
       ),
     [selectedProducts],
   );
@@ -279,12 +260,12 @@ export function CatalogProductsPage({
         }
 
         const hasVariantSetup =
-          Boolean(product.hasVariants) && (product.variants || []).length > 0;
+          Boolean(product.hasVariants) && (product.variantAxes || []).length > 0;
 
         if (isEdit) {
           setVariantConfigByProduct(
             hasVariantSetup
-              ? { [product._id]: defaultProviderVariantRows(product) }
+              ? { [product._id]: defaultProviderAxisSelection(product) }
               : {},
           );
           if (hasVariantSetup) {
@@ -300,7 +281,7 @@ export function CatalogProductsPage({
         if (hasVariantSetup) {
           setVariantConfigByProduct((cfg) => ({
             ...cfg,
-            [product._id]: cfg[product._id] || defaultProviderVariantRows(product),
+            [product._id]: cfg[product._id] || defaultProviderAxisSelection(product),
           }));
           requestAnimationFrame(() => {
             document
@@ -339,9 +320,10 @@ export function CatalogProductsPage({
     }
 
     for (const product of productsWithVariants) {
-      const rows = variantConfigByProduct[product._id] || defaultProviderVariantRows(product);
-      if (!rows.some((r) => r.enabled)) {
-        setVariantError(`Enable at least one variant for “${product.name}”.`);
+      const selection =
+        variantConfigByProduct[product._id] || defaultProviderAxisSelection(product);
+      if (!isProviderAxisSelectionComplete(product, selection)) {
+        setVariantError(`Select at least one option for each field on “${product.name}”.`);
         setVariantErrorProductId(product._id);
         document
           .getElementById(`provider-variants-${product._id}`)
@@ -362,9 +344,9 @@ export function CatalogProductsPage({
           subcategory,
           itemType: materialType,
           location,
-          providerVariants:
-            product.hasVariants && (product.variants || []).length
-              ? variantConfigByProduct[product._id] || defaultProviderVariantRows(product)
+          providerVariantAxes:
+            product.hasVariants && (product.variantAxes || []).length
+              ? variantConfigByProduct[product._id] || defaultProviderAxisSelection(product)
               : undefined,
         });
         const response = await api.services.update(serviceId, payload);
@@ -390,9 +372,9 @@ export function CatalogProductsPage({
               subcategory,
               itemType: materialType,
               location,
-              providerVariants:
-                product.hasVariants && (product.variants || []).length
-                  ? variantConfigByProduct[product._id] || defaultProviderVariantRows(product)
+              providerVariantAxes:
+                product.hasVariants && (product.variantAxes || []).length
+                  ? variantConfigByProduct[product._id] || defaultProviderAxisSelection(product)
                   : undefined,
             }),
           ),
@@ -665,9 +647,9 @@ export function CatalogProductsPage({
           {productsWithVariants.length > 0 ? (
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium">Variants you sell</h3>
+                <p className="text-sm font-medium">What you sell</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  For each selected product with sizes/grades, enable only what you offer.
+                  Select the grades, sizes, and other options you offer — not every combination.
                 </p>
               </div>
               {productsWithVariants.map((product) => (
@@ -679,16 +661,16 @@ export function CatalogProductsPage({
                   <p className="text-sm font-medium">{product.name}</p>
                   <ProviderVariantPicker
                     product={product}
-                    rows={
+                    selection={
                       variantConfigByProduct[product._id] ||
-                      defaultProviderVariantRows(product)
+                      defaultProviderAxisSelection(product)
                     }
-                    onChange={(rows) => {
+                    onChange={(selection) => {
                       setVariantError(null);
                       setVariantErrorProductId(null);
                       setVariantConfigByProduct((cfg) => ({
                         ...cfg,
-                        [product._id]: rows,
+                        [product._id]: selection,
                       }));
                     }}
                     error={
