@@ -362,10 +362,11 @@ export function MultiStepServiceForm({
     if (!product?._id) return;
     setSelectedCatalogProduct(product);
     if (product.hasVariants && product.variants?.length) {
+     const catalogVariants = product.variants;
      setProviderVariantRows((prev) => {
       if (prev.length) {
        const byId = new Map(prev.map((r) => [r.id, r]));
-       return product.variants!
+       return catalogVariants
         .filter((v) => v.isActive !== false)
         .map((v) => {
          const existing = byId.get(v.id);
@@ -379,7 +380,7 @@ export function MultiStepServiceForm({
          );
         });
       }
-      return product.variants
+      return catalogVariants
        .filter((v) => v.isActive !== false)
        .map((v) => ({
         id: v.id,
