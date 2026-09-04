@@ -148,6 +148,7 @@ export function ConstructionMaterialsHub() {
 
   const handleProductCta = useCallback(
     async (product: MaterialsProduct) => {
+      if (product.hasVariants) return;
       setCtaLoadingId(product.id);
       try {
         const linked = await findServiceIdForCatalogProduct(product.id, {
