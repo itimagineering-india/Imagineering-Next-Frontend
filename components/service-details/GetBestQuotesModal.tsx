@@ -28,6 +28,8 @@ export type QuoteModalLine = {
   quantity?: number;
   priceType?: string | null;
   catalogProductId?: string;
+  catalogVariantId?: string;
+  variantLabel?: string;
 };
 
 function pad2(n: number) {
@@ -156,6 +158,8 @@ export function GetBestQuotesModal({
         ),
         priceType: line.priceType || undefined,
         catalogProductId: line.catalogProductId,
+        catalogVariantId: line.catalogVariantId,
+        variantLabel: line.variantLabel,
       })) || undefined;
     const firstQty = payloadItems?.[0]?.quantity || quantity;
     if (!payloadItems && (!quantity || quantity < QUOTE_QTY_MIN)) {
