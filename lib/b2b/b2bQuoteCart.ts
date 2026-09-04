@@ -7,6 +7,8 @@ export type B2bQuoteCartLine = {
   key: string;
   serviceId?: string;
   catalogProductId?: string;
+  catalogVariantId?: string;
+  variantLabel?: string;
   title: string;
   quantity: number;
   priceType?: string;
@@ -55,6 +57,10 @@ function safeParse(raw: string | null): B2bQuoteCartLine[] {
         if (serviceId) line.serviceId = serviceId;
         const catalogProductId = String(row?.catalogProductId || "").trim();
         if (catalogProductId) line.catalogProductId = catalogProductId;
+        const catalogVariantId = String(row?.catalogVariantId || "").trim();
+        if (catalogVariantId) line.catalogVariantId = catalogVariantId;
+        const variantLabel = String(row?.variantLabel || "").trim();
+        if (variantLabel) line.variantLabel = variantLabel;
         const priceType = String(row?.priceType || "").trim();
         if (priceType) line.priceType = priceType;
         const itemType = normalizeB2bQuoteItemType(row?.itemType);
@@ -103,6 +109,8 @@ export function upsertB2bQuoteCartLine(
     existing.quantity = parseQuoteQuantity(existing.quantity + parseQuoteQuantity(incoming.quantity));
     if (incoming.serviceId) existing.serviceId = incoming.serviceId;
     if (incoming.catalogProductId) existing.catalogProductId = incoming.catalogProductId;
+    if (incoming.catalogVariantId) existing.catalogVariantId = incoming.catalogVariantId;
+    if (incoming.variantLabel) existing.variantLabel = incoming.variantLabel;
     if (incoming.priceType) existing.priceType = incoming.priceType;
     if (incomingType) existing.itemType = incomingType;
     existing.title = incoming.title || existing.title;
@@ -127,6 +135,8 @@ export function upsertB2bQuoteCartLine(
   };
   if (incoming.serviceId) next.serviceId = incoming.serviceId;
   if (incoming.catalogProductId) next.catalogProductId = incoming.catalogProductId;
+  if (incoming.catalogVariantId) next.catalogVariantId = incoming.catalogVariantId;
+  if (incoming.variantLabel) next.variantLabel = incoming.variantLabel;
   if (incoming.priceType) next.priceType = incoming.priceType;
   if (incomingType) next.itemType = incomingType;
   return {
