@@ -26,6 +26,8 @@ interface ProductCatalogPickerProps {
   catalogOnlyMode?: boolean;
   /** list = compact rows (modal), grid = card grid (full page) */
   layout?: "list" | "grid";
+  /** Selected products that currently show a variant setup panel below */
+  setupOpenProductIds?: string[];
 }
 
 function formatPrice(product: CatalogProductItem): string | null {
@@ -49,6 +51,7 @@ export function ProductCatalogPicker({
   onToggleProduct,
   catalogOnlyMode = false,
   layout = "list",
+  setupOpenProductIds = [],
 }: ProductCatalogPickerProps) {
   const [products, setProducts] = useState<CatalogProductItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -138,6 +141,10 @@ export function ProductCatalogPicker({
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
             {products.map((product) => {
               const selected = isProductSelected(product._id);
+              const setupOpen = selected && setupOpenProductIds.includes(product._id);
+              const variantCount = (product.variants || []).filter(
+                (v) => v.isActive !== false,
+              ).length;
               const imageUrl =
                 product.images?.[0] ||
                 getSubcategoryImageUrl(categorySlug, subcategory);
@@ -168,6 +175,11 @@ export function ProductCatalogPicker({
                     {product.brand && (
                       <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{product.brand}</p>
                     )}
+                    {product.hasVariants && variantCount > 0 ? (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {setupOpen ? "Setup open" : `${variantCount} variants`}
+                      </p>
+                    ) : null}
                   </div>
                   {selected && (
                     <div className="absolute top-1 right-1 rounded-full bg-primary p-px text-primary-foreground">
