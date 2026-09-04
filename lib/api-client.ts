@@ -2844,6 +2844,8 @@ export const api = {
         quantity: number;
         priceType?: string;
         catalogProductId?: string;
+        catalogVariantId?: string;
+        variantLabel?: string;
       }>;
     }) =>
       apiRequest<{ data: any }>('/api/quote-requests', {
