@@ -22,6 +22,12 @@ import {
   findServiceIdForCatalogProduct,
   mapCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
+import {
+  catalogVariantLabel,
+  defaultVariantSelection,
+  findCatalogVariant,
+  readCatalogVariants,
+} from "@/lib/catalogVariants";
 import { resolveMaterialsMediaUrl } from "@/lib/materials/media";
 import {
   B2B_QUOTE_CART_MAX,
@@ -93,11 +99,38 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [inQuoteList, setInQuoteList] = useState(false);
+  const [variantSel, setVariantSel] = useState<Record<string, string>>({});
+
+  const catalogVariants = useMemo(() => readCatalogVariants(raw || undefined), [raw]);
+  const selectedVariant = useMemo(() => {
+    if (!catalogVariants.hasVariants) return undefined;
+    return findCatalogVariant(
+      catalogVariants.variants,
+      variantSel,
+      catalogVariants.variantAxes,
+    );
+  }, [catalogVariants, variantSel]);
+
+  useEffect(() => {
+    if (!raw) return;
+    const parsed = readCatalogVariants(raw);
+    if (parsed.hasVariants) {
+      setVariantSel(defaultVariantSelection(parsed.variantAxes, parsed.variants));
+    } else {
+      setVariantSel({});
+    }
+  }, [raw]);
 
   useEffect(() => {
     if (!isB2b) return;
-    setInQuoteList(loadB2bQuoteCart().some((l) => l.key === `catalog:${productId}`));
-  }, [isB2b, productId]);
+    const variantId = selectedVariant?.id;
+    setInQuoteList(
+      loadB2bQuoteCart().some(
+        (l) =>
+          l.key === (variantId ? `catalog:${productId}:${variantId}` : `catalog:${productId}`)
+      )
+    );
+  }, [isB2b, productId, selectedVariant?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,26 +191,46 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   }, [raw]);
 
   const images = useMemo(() => {
-    const list = Array.isArray(raw?.images) ? (raw!.images as string[]) : [];
+    const variantList = Array.isArray(selectedVariant?.images) ? selectedVariant.images : [];
+    const list = variantList.length
+      ? variantList
+      : Array.isArray(raw?.images)
+        ? (raw!.images as string[])
+        : [];
     const resolved = list.map((u) => resolveMaterialsMediaUrl(u)).filter(Boolean) as string[];
     if (resolved.length > 0) return resolved;
     if (mapped?.imageUri) return [mapped.imageUri];
     return [];
-  }, [mapped, raw]);
+  }, [mapped, raw, selectedVariant]);
 
   const specs = useMemo(() => {
     const rows: { label: string; value: string }[] = [];
     if (mapped?.brand) rows.push({ label: "Brand", value: mapped.brand });
-    if (mapped?.grade) rows.push({ label: "Grade / Spec", value: mapped.grade });
+    if (mapped?.grade && !catalogVariants.hasVariants) {
+      rows.push({ label: "Grade / Spec", value: mapped.grade });
+    }
     if (mapped?.avgDeliveryDays) {
       rows.push({ label: "Avg delivery", value: `${mapped.avgDeliveryDays} days` });
+    }
+    if (selectedVariant) {
+      catalogVariants.variantAxes.forEach((axis) => {
+        const val = selectedVariant.attributes?.[axis.key];
+        if (val) rows.push({ label: axis.label, value: val });
+      });
     }
     const meta =
       raw?.metadata && typeof raw.metadata === "object"
         ? (raw.metadata as Record<string, unknown>)
         : {};
+    const skipMeta = new Set([
+      "formVariant",
+      ...(catalogVariants.hasVariants
+        ? ["steelGrade", "steelSize", "steelCustomSize", "steelGradeCustom"]
+        : []),
+    ]);
     Object.entries(meta).forEach(([k, v]) => {
       if (v == null || v === "") return;
+      if (skipMeta.has(k)) return;
       rows.push({ label: toReadableText(k), value: toReadableText(v) });
     });
     const custom = Array.isArray(raw?.customFields)
@@ -191,24 +244,29 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
       });
     });
     return rows;
-  }, [mapped, raw]);
+  }, [catalogVariants, mapped, raw, selectedVariant]);
 
   const priceLabel = useMemo(() => {
     if (!raw) return "Get quotes";
+    const min =
+      selectedVariant?.suggestedPriceMin ?? (raw.suggestedPriceMin as number);
+    const max =
+      selectedVariant?.suggestedPriceMax ?? (raw.suggestedPriceMax as number);
     return formatMaterialsPriceRange(
-      raw.suggestedPriceMin as number,
-      raw.suggestedPriceMax as number,
-      raw.suggestedPriceType as string
+      min,
+      max,
+      (selectedVariant?.suggestedPriceType || raw.suggestedPriceType) as string
     );
-  }, [raw]);
+  }, [raw, selectedVariant]);
 
   const isRange = useMemo(() => {
     if (!raw) return true;
-    return isMaterialsCatalogPriceRange(
-      raw.suggestedPriceMin as number,
-      raw.suggestedPriceMax as number
-    );
-  }, [raw]);
+    const min =
+      selectedVariant?.suggestedPriceMin ?? (raw.suggestedPriceMin as number);
+    const max =
+      selectedVariant?.suggestedPriceMax ?? (raw.suggestedPriceMax as number);
+    return isMaterialsCatalogPriceRange(min, max);
+  }, [raw, selectedVariant]);
 
   const typeKey = resolveMaterialsMaterialTypeKey(
     String(raw?.materialTypeKey || raw?.subcategory || "")
@@ -235,11 +293,21 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
 
   const handleAddToQuote = useCallback(() => {
     if (!mapped) return;
+    const variantId = selectedVariant?.id;
+    const variantLabel = selectedVariant
+      ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
+      : undefined;
     const result = upsertB2bQuoteCartLine(loadB2bQuoteCart(), {
-      key: `catalog:${mapped.id}`,
+      key: variantId ? `catalog:${mapped.id}:${variantId}` : `catalog:${mapped.id}`,
       catalogProductId: mapped.id,
+      catalogVariantId: variantId,
+      variantLabel,
       title: mapped.name,
-      priceType: mapped.unitType || String(raw?.suggestedPriceType || "").trim() || undefined,
+      priceType:
+        selectedVariant?.suggestedPriceType ||
+        mapped.unitType ||
+        String(raw?.suggestedPriceType || "").trim() ||
+        undefined,
       itemType: normalizeB2bQuoteItemType(mapped.categoryId),
     });
     if (result.error === "full") {
@@ -262,9 +330,9 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     setInQuoteList(true);
     toast({
       title: result.added ? "Added to quote list" : "Quantity updated",
-      description: mapped.name,
+      description: variantLabel ? `${mapped.name} · ${variantLabel}` : mapped.name,
     });
-  }, [mapped, raw?.suggestedPriceType, toast]);
+  }, [catalogVariants.variantAxes, mapped, raw?.suggestedPriceType, selectedVariant, toast]);
 
   const handleShare = useCallback(async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -317,8 +385,10 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     );
   }
 
-  const priceMin = Number(raw.suggestedPriceMin) || 0;
-  const priceMax = Number(raw.suggestedPriceMax) || priceMin;
+  const priceMin =
+    Number(selectedVariant?.suggestedPriceMin ?? raw.suggestedPriceMin) || 0;
+  const priceMax =
+    Number(selectedVariant?.suggestedPriceMax ?? raw.suggestedPriceMax) || priceMin;
   const b2bCategoryHref = typeKey
     ? `/b2b-services?category=${encodeURIComponent(MATERIALS_CATEGORY_SLUG)}&subcategory=${encodeURIComponent(typeKey)}`
     : hubHref;
@@ -369,6 +439,48 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           onShare={handleShare}
           onFavorite={handleFavorite}
           isSaved={isSaved}
+          variantPicker={
+            catalogVariants.hasVariants ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {catalogVariants.variantAxes.map((axis) => {
+                  const values = Array.from(
+                    new Set(
+                      catalogVariants.variants
+                        .filter((v) => {
+                          if (v.isActive === false) return false;
+                          return catalogVariants.variantAxes.every(
+                            (other) =>
+                              other.key === axis.key ||
+                              !variantSel[other.key] ||
+                              v.attributes?.[other.key] === variantSel[other.key]
+                          );
+                        })
+                        .map((v) => v.attributes?.[axis.key])
+                        .filter(Boolean)
+                    )
+                  );
+                  return (
+                    <label key={axis.key} className="space-y-1 text-sm">
+                      <span className="font-medium text-foreground">{axis.label}</span>
+                      <select
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={variantSel[axis.key] || ""}
+                        onChange={(e) =>
+                          setVariantSel((prev) => ({ ...prev, [axis.key]: e.target.value }))
+                        }
+                      >
+                        {values.map((val) => (
+                          <option key={val} value={val}>
+                            {val}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null
+          }
         />
       </div>
 
@@ -377,8 +489,31 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           open={quoteOpen}
           onOpenChange={setQuoteOpen}
           serviceId={linkedServiceId}
-          serviceTitle={linkedServiceTitle || mapped.name}
-          priceType={(raw?.suggestedPriceType as string) || mapped.unitType}
+          serviceTitle={
+            selectedVariant
+              ? `${mapped.name} · ${catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)}`
+              : linkedServiceTitle || mapped.name
+          }
+          priceType={
+            selectedVariant?.suggestedPriceType ||
+            (raw?.suggestedPriceType as string) ||
+            mapped.unitType
+          }
+          items={[
+            {
+              serviceId: linkedServiceId,
+              title: mapped.name,
+              catalogProductId: mapped.id,
+              catalogVariantId: selectedVariant?.id,
+              variantLabel: selectedVariant
+                ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
+                : undefined,
+              priceType:
+                selectedVariant?.suggestedPriceType ||
+                (raw?.suggestedPriceType as string) ||
+                mapped.unitType,
+            },
+          ]}
           noCountdown
         />
       ) : null}
