@@ -384,10 +384,12 @@ export function B2BServicesHub() {
         }
         resolved.push({
           serviceId,
-          title,
+          title: line.variantLabel ? `${line.title} · ${line.variantLabel}` : title,
           quantity: line.quantity,
           priceType,
           catalogProductId: line.catalogProductId,
+          catalogVariantId: line.catalogVariantId,
+          variantLabel: line.variantLabel,
         });
       }
       if (!resolved.length) {
@@ -429,8 +431,12 @@ export function B2BServicesHub() {
   const handleAddMaterials = useCallback(
     (product: MaterialsProduct) => {
       addToQuote({
-        key: `catalog:${product.id}`,
+        key: product.defaultVariantId
+          ? `catalog:${product.id}:${product.defaultVariantId}`
+          : `catalog:${product.id}`,
         catalogProductId: product.id,
+        catalogVariantId: product.defaultVariantId,
+        variantLabel: product.defaultVariantLabel,
         title: product.name,
         priceType: product.unitType,
         itemType: normalizeB2bQuoteItemType(product.categoryId),
@@ -651,7 +657,11 @@ export function B2BServicesHub() {
                     product={product}
                     hidePrice
                     detailHref={`/b2b-services/products/${product.id}`}
-                    inQuoteList={quoteCart.some((l) => l.key === `catalog:${product.id}`)}
+                    inQuoteList={quoteCart.some(
+                      (l) =>
+                        l.key === `catalog:${product.id}` ||
+                        l.key.startsWith(`catalog:${product.id}:`)
+                    )}
                     onAddToQuote={handleAddMaterials}
                   />
                 ))}
