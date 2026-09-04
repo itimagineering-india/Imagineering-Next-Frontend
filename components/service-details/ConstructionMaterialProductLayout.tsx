@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   BadgeCheck,
@@ -77,6 +77,7 @@ export interface ConstructionMaterialProductLayoutProps {
   inQuoteList?: boolean;
   /** When true, always show quote CTAs (no add-to-cart). */
   forceQuoteCtas?: boolean;
+  variantPicker?: ReactNode;
 }
 
 const WHY_BUY_POINTS = [
@@ -128,6 +129,7 @@ export function ConstructionMaterialProductLayout({
   onAddToQuote,
   inQuoteList = false,
   forceQuoteCtas = false,
+  variantPicker,
 }: ConstructionMaterialProductLayoutProps) {
   const [overviewExpanded, setOverviewExpanded] = useState(false);
   const canAddToCart = !forceQuoteCtas && showPricing && !isRangePrice && Boolean(service.id);
@@ -209,6 +211,8 @@ export function ConstructionMaterialProductLayout({
                   </Badge>
                 </div>
               </div>
+
+              {variantPicker}
 
               <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-800/80">
