@@ -5,6 +5,8 @@ import {
   pickConstructionMetadataFields,
   resolveMaterialTypeKeyForServiceForm,
 } from "@/lib/constructionMaterials";
+import type { ProviderAxisSelection } from "@/lib/catalogVariants";
+import { serializeProviderVariantAxes } from "@/lib/catalogVariants";
 import { fitListingShortDescription } from "@/lib/serviceListingAiContext";
 
 export interface CatalogProductItem {
@@ -119,12 +121,7 @@ export function buildServicePayloadFromCatalogProduct(
     subcategory: string;
     itemType?: string;
     location?: CatalogServiceLocation | null;
-    providerVariants?: Array<{
-      id: string;
-      enabled: boolean;
-      priceMin?: string;
-      priceMax?: string;
-    }>;
+    providerVariantAxes?: ProviderAxisSelection;
   },
 ): Record<string, unknown> {
   const patch = mapCatalogProductToListingForm(
@@ -155,15 +152,9 @@ export function buildServicePayloadFromCatalogProduct(
     extractConstructionStrings(patch.dynamicData),
   );
 
-  if (opts.providerVariants?.length) {
-    meta.providerVariants = JSON.stringify(
-      opts.providerVariants.map((row) => ({
-        id: row.id,
-        enabled: row.enabled,
-        ...(row.priceMin ? { priceMin: Number(row.priceMin) } : {}),
-        ...(row.priceMax ? { priceMax: Number(row.priceMax) } : {}),
-      })),
-    );
+  if (opts.providerVariantAxes && Object.keys(opts.providerVariantAxes).length) {
+    delete meta.providerVariants;
+    meta.providerVariantAxes = serializeProviderVariantAxes(opts.providerVariantAxes);
   }
 
   const payload: Record<string, unknown> = {
