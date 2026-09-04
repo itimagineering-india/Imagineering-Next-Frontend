@@ -102,6 +102,11 @@ function OfferCard({
             Recommended
           </span>
         ) : null}
+        {(offer.providerName || offer.provider?.name || offer.provider?.businessName) ? (
+          <p className="mb-1.5 text-sm font-semibold text-stone-800">
+            {offer.providerName || offer.provider?.businessName || offer.provider?.name}
+          </p>
+        ) : null}
         <p className="text-[32px] font-extrabold leading-none tracking-tight text-stone-900 tabular-nums sm:text-4xl">
           {formatINR(total)}
         </p>
