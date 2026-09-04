@@ -23,10 +23,12 @@ import {
   mapCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
 import {
+  catalogAxisOptionValues,
   catalogVariantLabel,
   defaultVariantSelection,
   findCatalogVariant,
   readCatalogVariants,
+  selectionAfterAxisChange,
 } from "@/lib/catalogVariants";
 import { resolveMaterialsMediaUrl } from "@/lib/materials/media";
 import {
@@ -447,22 +449,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
             catalogVariants.hasVariants ? (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {catalogVariants.variantAxes.map((axis) => {
-                  const values = Array.from(
-                    new Set(
-                      catalogVariants.variants
-                        .filter((v) => {
-                          if (v.isActive === false) return false;
-                          return catalogVariants.variantAxes.every(
-                            (other) =>
-                              other.key === axis.key ||
-                              !variantSel[other.key] ||
-                              v.attributes?.[other.key] === variantSel[other.key]
-                          );
-                        })
-                        .map((v) => v.attributes?.[axis.key])
-                        .filter(Boolean)
-                    )
-                  );
+                  const values = catalogAxisOptionValues(axis, catalogVariants.variants);
                   return (
                     <label key={axis.key} className="space-y-1 text-sm">
                       <span className="font-medium text-foreground">{axis.label}</span>
@@ -470,7 +457,15 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
                         className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                         value={variantSel[axis.key] || ""}
                         onChange={(e) =>
-                          setVariantSel((prev) => ({ ...prev, [axis.key]: e.target.value }))
+                          setVariantSel((prev) =>
+                            selectionAfterAxisChange(
+                              catalogVariants.variantAxes,
+                              catalogVariants.variants,
+                              prev,
+                              axis.key,
+                              e.target.value,
+                            ),
+                          )
                         }
                       >
                         {values.map((val) => (
