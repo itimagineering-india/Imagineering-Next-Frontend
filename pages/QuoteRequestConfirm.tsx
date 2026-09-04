@@ -548,7 +548,17 @@ export default function QuoteRequestConfirmPage() {
         <h1 className="text-2xl font-bold tracking-tight">Checkout</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Confirm GST, payment, and delivery for{" "}
-          <span className="font-medium text-foreground">{serviceTitle}</span>.
+          <span className="font-medium text-foreground">{serviceTitle}</span>
+          {(offer?.providerName || offer?.provider?.businessName || offer?.provider?.name) ? (
+            <>
+              {" "}
+              from{" "}
+              <span className="font-medium text-foreground">
+                {offer.providerName || offer.provider?.businessName || offer.provider?.name}
+              </span>
+            </>
+          ) : null}
+          .
         </p>
       </div>
 
