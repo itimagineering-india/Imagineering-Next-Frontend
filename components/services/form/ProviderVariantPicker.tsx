@@ -13,6 +13,17 @@ export type ProviderVariantRow = {
   priceMax: string;
 };
 
+export function defaultProviderVariantRows(product: CatalogProductItem): ProviderVariantRow[] {
+  return (product.variants || [])
+    .filter((v) => v.isActive !== false && v.id)
+    .map((v) => ({
+      id: v.id,
+      enabled: true,
+      priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
+      priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
+    }));
+}
+
 type Props = {
   product: CatalogProductItem;
   rows: ProviderVariantRow[];
