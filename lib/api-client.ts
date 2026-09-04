@@ -2193,6 +2193,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+    verifyCashfreeQuoteRequest: (payload: { orderId: string; paymentId: string }) =>
+      apiRequest<{
+        bookingId: string;
+        amount: number;
+        alreadyVerified?: boolean;
+        payment?: { id: string; status: string; amount: number; paidAt?: Date };
+      }>('/api/payments/cashfree/verify-quote-request', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
   },
 
   // Chat (block / report)
@@ -2915,6 +2925,27 @@ export const api = {
         total: number;
         quantity: number;
       }>(`/api/quote-requests/${id}/offers/${offerId}/preview?transport=${encodeURIComponent(transport)}`),
+    previewPartialOffer: (
+      id: string,
+      offerId: string,
+      data?: {
+        transport?: 'supplier' | 'self_pickup';
+        couponUsageId?: string;
+        creditsToApply?: number;
+        partialAmount?: number;
+      }
+    ) =>
+      apiRequest<{
+        orderTotal: number;
+        minPercent: number;
+        minPartialAmount: number;
+        partialAmount: number;
+        balanceDue: number;
+        allowedAdvanceMethods: Array<'razorpay' | 'cashfree' | 'sbicollect'>;
+      }>(`/api/quote-requests/${id}/offers/${offerId}/partial-preview`, {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      }),
     payOffer: (
       id: string,
       offerId: string,
@@ -2926,6 +2957,7 @@ export const api = {
         creditsToApply?: number;
         receiptUrl?: string;
         partialAmount?: number;
+        partialPaymentMethod?: 'razorpay' | 'cashfree' | 'sbicollect';
         billingSameAsShipping?: boolean;
         billingAddress?: {
           address: string;
@@ -2948,6 +2980,16 @@ export const api = {
           couponDiscount?: number;
           couponCode?: string;
           couponUsageId?: string;
+          gateway?: 'razorpay' | 'cashfree';
+          orderId?: string;
+          paymentId?: string;
+          key?: string;
+          paymentSessionId?: string;
+          cashfreeEnvironment?: 'SANDBOX' | 'PRODUCTION';
+          currency?: string;
+          amountRupees?: number;
+          partialAmount?: number;
+          balanceDue?: number;
         };
       }>(`/api/quote-requests/${id}/offers/${offerId}/pay`, {
         method: 'POST',
