@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MaterialsCategoryProductsClient } from "@/components/materials/MaterialsCategoryProductsClient";
+import MaterialsCategoryProductsClient from "@/components/materials/MaterialsCategoryProductsClient";
 import { BASE_URL } from "@/lib/constants";
 import { resolveMaterialsMaterialTypeKey } from "@/lib/materials/constructionMaterialsCatalog";
 
