@@ -24,7 +24,8 @@ import { DynamicFieldsRenderer } from "./DynamicFieldsRenderer";
 import { ProductCatalogPicker } from "./ProductCatalogPicker";
 import {
  ProviderVariantPicker,
- type ProviderVariantRow,
+ defaultProviderAxisSelection,
+ isProviderAxisSelectionComplete,
 } from "./ProviderVariantPicker";
 import { PricingSection } from "./PricingSection";
 import { SubmitReview } from "./SubmitReview";
@@ -66,7 +67,11 @@ import {
  mapCatalogProductToListingForm,
  type CatalogProductItem,
 } from "@/lib/productCatalog";
-import { parseProviderVariants } from "@/lib/catalogVariants";
+import {
+ resolveProviderAxisSelection,
+ serializeProviderVariantAxes,
+ type ProviderAxisSelection,
+} from "@/lib/catalogVariants";
 
 interface Category {
  _id: string;
@@ -252,7 +257,7 @@ export function MultiStepServiceForm({
  const [toolsFields, setToolsFields] = useState<ToolsServiceFieldsValue>(EMPTY_TOOLS_FIELDS);
  const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string | null>(null);
  const [selectedCatalogProduct, setSelectedCatalogProduct] = useState<CatalogProductItem | null>(null);
- const [providerVariantRows, setProviderVariantRows] = useState<ProviderVariantRow[]>([]);
+ const [providerVariantAxes, setProviderVariantAxes] = useState<ProviderAxisSelection>({});
  const [catalogCustomFields, setCatalogCustomFields] = useState<
   Array<{ label: string; value: string; type: "text" }>
  >([]);
@@ -269,7 +274,7 @@ export function MultiStepServiceForm({
    setToolsFields(EMPTY_TOOLS_FIELDS);
    setSelectedCatalogProductId(null);
    setSelectedCatalogProduct(null);
-   setProviderVariantRows([]);
+   setProviderVariantAxes({});
    setCatalogCustomFields([]);
    setFormData({
     category: "",
@@ -342,12 +347,7 @@ export function MultiStepServiceForm({
    setToolsFields(initialData.toolsFields ?? EMPTY_TOOLS_FIELDS);
    setSelectedCatalogProductId(initialData.catalogProductId ?? null);
    setSelectedCatalogProduct(null);
-   setProviderVariantRows(parseProviderVariants(initialData.dynamicData).map((row) => ({
-    id: row.id,
-    enabled: row.enabled,
-    priceMin: row.priceMin != null ? String(row.priceMin) : "",
-    priceMax: row.priceMax != null ? String(row.priceMax) : "",
-   })));
+   setProviderVariantAxes({});
    setCatalogCustomFields(initialData.catalogCustomFields ?? []);
   }
  }, [open, initialData]);
@@ -363,41 +363,24 @@ export function MultiStepServiceForm({
      res.data) as CatalogProductItem;
     if (!product?._id) return;
     setSelectedCatalogProduct(product);
-    if (product.hasVariants && product.variants?.length) {
-     const catalogVariants = product.variants;
-     setProviderVariantRows((prev) => {
-      if (prev.length) {
-       const byId = new Map(prev.map((r) => [r.id, r]));
-       return catalogVariants
-        .filter((v) => v.isActive !== false)
-        .map((v) => {
-         const existing = byId.get(v.id);
-         return (
-          existing || {
-           id: v.id,
-           enabled: true,
-           priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
-           priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
-          }
-         );
-        });
+    if (product.hasVariants && (product.variantAxes || []).length) {
+     setProviderVariantAxes((prev) => {
+      if (Object.keys(prev).length) {
+       return resolveProviderAxisSelection(product, {
+        providerVariantAxes: JSON.stringify(prev),
+       });
       }
-      return catalogVariants
-       .filter((v) => v.isActive !== false)
-       .map((v) => ({
-        id: v.id,
-        enabled: true,
-        priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
-        priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
-       }));
+      return resolveProviderAxisSelection(product, initialData?.dynamicData || null);
      });
+    } else {
+     setProviderVariantAxes({});
     }
    })
    .catch(() => undefined);
   return () => {
    cancelled = true;
   };
- }, [open, selectedCatalogProductId]);
+ }, [open, selectedCatalogProductId, initialData?.dynamicData]);
 
  useEffect(() => {
   if (!open || adminMode || !providerPrimaryCategoryId || editMode) return;
@@ -502,7 +485,7 @@ export function MultiStepServiceForm({
    if (!product) {
     setSelectedCatalogProductId(null);
     setSelectedCatalogProduct(null);
-    setProviderVariantRows([]);
+    setProviderVariantAxes({});
     setCatalogCustomFields([]);
     setFormData((prev) => ({
      ...prev,
@@ -529,15 +512,10 @@ export function MultiStepServiceForm({
    );
    setSelectedCatalogProductId(product._id);
    setSelectedCatalogProduct(product);
-   setProviderVariantRows(
-    (product.variants || [])
-     .filter((v) => v.isActive !== false)
-     .map((v) => ({
-      id: v.id,
-      enabled: true,
-      priceMin: v.suggestedPriceMin != null ? String(v.suggestedPriceMin) : "",
-      priceMax: v.suggestedPriceMax != null ? String(v.suggestedPriceMax) : "",
-     })),
+   setProviderVariantAxes(
+    product.hasVariants && (product.variantAxes || []).length
+     ? defaultProviderAxisSelection(product)
+     : {},
    );
    setCatalogCustomFields(patch.catalogCustomFields);
    setFormData((prev) => ({
@@ -882,10 +860,10 @@ export function MultiStepServiceForm({
     if (
       showCatalogProductPicker &&
       selectedCatalogProduct?.hasVariants &&
-      providerVariantRows.length > 0 &&
-      !providerVariantRows.some((r) => r.enabled)
+      (selectedCatalogProduct.variantAxes || []).length > 0 &&
+      !isProviderAxisSelectionComplete(selectedCatalogProduct, providerVariantAxes)
     ) {
-      newErrors.providerVariants = "Enable at least one variant you sell.";
+      newErrors.providerVariants = "Select at least one option for each variant field.";
     }
     break;
 
@@ -1151,15 +1129,13 @@ export function MultiStepServiceForm({
      formData.itemType || "",
     );
     const meta = extractConstructionStrings(formData.dynamicData);
-    if (providerVariantRows.length) {
-     meta.providerVariants = JSON.stringify(
-      providerVariantRows.map((row) => ({
-       id: row.id,
-       enabled: row.enabled,
-       ...(row.priceMin ? { priceMin: Number(row.priceMin) } : {}),
-       ...(row.priceMax ? { priceMax: Number(row.priceMax) } : {}),
-      })),
-     );
+    if (
+     selectedCatalogProduct?.hasVariants &&
+     (selectedCatalogProduct.variantAxes || []).length &&
+     Object.keys(providerVariantAxes).length
+    ) {
+     delete meta.providerVariants;
+     meta.providerVariantAxes = serializeProviderVariantAxes(providerVariantAxes);
     }
     servicePayload.metadata = buildConstructionMetadataPayload(mt, meta);
    }
@@ -1393,12 +1369,14 @@ export function MultiStepServiceForm({
           onSelect={handleCatalogProductSelect}
          />
         )}
-        {showCatalogProductPicker && selectedCatalogProduct?.hasVariants && providerVariantRows.length > 0 && (
+        {showCatalogProductPicker &&
+         selectedCatalogProduct?.hasVariants &&
+         (selectedCatalogProduct.variantAxes || []).length > 0 && (
          <ProviderVariantPicker
           product={selectedCatalogProduct}
-          rows={providerVariantRows}
+          selection={providerVariantAxes}
           onChange={(next) => {
-           setProviderVariantRows(next);
+           setProviderVariantAxes(next);
            setErrors((prev) => ({ ...prev, providerVariants: undefined }));
           }}
           error={errors.providerVariants}
