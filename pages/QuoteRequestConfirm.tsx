@@ -23,9 +23,15 @@ import {
 } from "@/components/imagineering-credit/ImagineeringCreditCheckoutPanel";
 import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 import { CartOffersModal } from "@/components/cart/CartOffersModal";
+import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
 import { quoteOfferItems, quoteRequestHeadline, quoteRequestItems } from "@/lib/b2b/quoteRequestDisplay";
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { parseQuoteQuantity } from "@/lib/quoteQuantity";
+import {
+  formatSavedAddressLine,
+  loadSavedAddresses,
+  type SavedAddress,
+} from "@/lib/savedAddresses";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -224,6 +230,9 @@ export default function QuoteRequestConfirmPage() {
     state: "",
     zipCode: "",
   });
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [billingAddressPickerOpen, setBillingAddressPickerOpen] = useState(false);
+  const [selectedBillingAddressId, setSelectedBillingAddressId] = useState<string | null>(null);
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -467,6 +476,33 @@ export default function QuoteRequestConfirmPage() {
   const platformFee = preview?.platformFee ?? 0;
   const platformFeeGst = preview?.platformFeeGst || preview?.gst || 0;
   const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(displayTotal);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadSavedAddresses().then((rows) => {
+      if (!cancelled) setSavedAddresses(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const applyBillingFromSaved = useCallback((row: SavedAddress) => {
+    setSelectedBillingAddressId(row.id);
+    setBillingAddress({
+      address: formatSavedAddressLine(row) || row.address || "",
+      city: row.city || "",
+      state: row.state || "",
+      zipCode: row.zipCode || "",
+    });
+    setBillingSameAsShipping(false);
+    setBillingAddressPickerOpen(false);
+  }, []);
+
+  const selectedBillingSaved = useMemo(
+    () => savedAddresses.find((s) => s.id === selectedBillingAddressId) ?? null,
+    [savedAddresses, selectedBillingAddressId]
+  );
 
   const handleCreditsChange = useCallback((credits: number, discount: number) => {
     setCreditsToApply(credits);
@@ -928,6 +964,7 @@ export default function QuoteRequestConfirmPage() {
                     setBillingSameAsShipping(checked);
                     if (checked) {
                       setBillingAddress({ address: "", city: "", state: "", zipCode: "" });
+                      setSelectedBillingAddressId(null);
                     }
                   }}
                   disabled={Boolean(bookingId)}
@@ -939,15 +976,33 @@ export default function QuoteRequestConfirmPage() {
               </div>
 
               {!billingSameAsShipping ? (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={Boolean(bookingId)}
+                      onClick={() => setBillingAddressPickerOpen(true)}
+                    >
+                      Select saved address
+                    </Button>
+                    {selectedBillingSaved ? (
+                      <p className="text-xs text-muted-foreground">
+                        Selected: {selectedBillingSaved.label}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
                   <div className="sm:col-span-2 space-y-1.5">
                     <Label htmlFor="billing-street">Billing street / area</Label>
                     <Input
                       id="billing-street"
                       value={billingAddress.address}
-                      onChange={(e) =>
-                        setBillingAddress((prev) => ({ ...prev, address: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        setSelectedBillingAddressId(null);
+                        setBillingAddress((prev) => ({ ...prev, address: e.target.value }));
+                      }}
                       placeholder="Building, street, landmark"
                       disabled={Boolean(bookingId)}
                     />
@@ -957,9 +1012,10 @@ export default function QuoteRequestConfirmPage() {
                     <Input
                       id="billing-city"
                       value={billingAddress.city}
-                      onChange={(e) =>
-                        setBillingAddress((prev) => ({ ...prev, city: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        setSelectedBillingAddressId(null);
+                        setBillingAddress((prev) => ({ ...prev, city: e.target.value }));
+                      }}
                       placeholder="City"
                       disabled={Boolean(bookingId)}
                     />
@@ -969,9 +1025,10 @@ export default function QuoteRequestConfirmPage() {
                     <Input
                       id="billing-state"
                       value={billingAddress.state}
-                      onChange={(e) =>
-                        setBillingAddress((prev) => ({ ...prev, state: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        setSelectedBillingAddressId(null);
+                        setBillingAddress((prev) => ({ ...prev, state: e.target.value }));
+                      }}
                       placeholder="State"
                       disabled={Boolean(bookingId)}
                     />
@@ -981,12 +1038,14 @@ export default function QuoteRequestConfirmPage() {
                     <Input
                       id="billing-zip"
                       value={billingAddress.zipCode}
-                      onChange={(e) =>
-                        setBillingAddress((prev) => ({ ...prev, zipCode: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        setSelectedBillingAddressId(null);
+                        setBillingAddress((prev) => ({ ...prev, zipCode: e.target.value }));
+                      }}
                       placeholder="PIN code"
                       disabled={Boolean(bookingId)}
                     />
+                  </div>
                   </div>
                 </div>
               ) : null}
@@ -1537,6 +1596,14 @@ export default function QuoteRequestConfirmPage() {
             setCouponDiscount(0);
           }
         }}
+      />
+      <CheckoutAddressPickerModal
+        open={billingAddressPickerOpen}
+        onOpenChange={setBillingAddressPickerOpen}
+        addresses={savedAddresses}
+        selectedId={selectedBillingAddressId}
+        onAddressesChange={setSavedAddresses}
+        onSelect={applyBillingFromSaved}
       />
     </main>
   );
