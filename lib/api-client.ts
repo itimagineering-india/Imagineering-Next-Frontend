@@ -2924,6 +2924,8 @@ export const api = {
         paymentOption?: string;
         couponUsageId?: string;
         creditsToApply?: number;
+        receiptUrl?: string;
+        partialAmount?: number;
         billingSameAsShipping?: boolean;
         billingAddress?: {
           address: string;
