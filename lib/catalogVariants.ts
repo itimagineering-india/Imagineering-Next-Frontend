@@ -83,7 +83,7 @@ export function catalogAxisOptionValues(
   return out;
 }
 
-/** After changing one axis, keep a valid combination (sync other axes if needed). */
+/** After changing one axis, keep a valid combination without wiping earlier picks. */
 export function selectionAfterAxisChange(
   axes: CatalogVariantAxis[],
   variants: CatalogVariant[],
@@ -92,20 +92,50 @@ export function selectionAfterAxisChange(
   value: string,
 ): Record<string, string> {
   const next = { ...current, [axisKey]: value };
-  const exact = findCatalogVariant(variants, next, axes);
-  if (exact) {
+  const active = activeCatalogVariants(variants);
+
+  const toSelection = (variant: CatalogVariant): Record<string, string> => {
     const synced: Record<string, string> = {};
-    for (const axis of axes) synced[axis.key] = exact.attributes?.[axis.key] || "";
+    for (const axis of axes) synced[axis.key] = variant.attributes?.[axis.key] || "";
     return synced;
-  }
-  const fallback = activeCatalogVariants(variants).find(
-    (v) => v.attributes?.[axisKey] === value,
+  };
+
+  const exact = active.find((v) =>
+    axes.every((axis) => (v.attributes?.[axis.key] || "") === (next[axis.key] || "")),
   );
-  if (fallback) {
-    const synced: Record<string, string> = {};
-    for (const axis of axes) synced[axis.key] = fallback.attributes?.[axis.key] || "";
-    return synced;
+  if (exact) return toSelection(exact);
+
+  const candidates = active.filter((v) => v.attributes?.[axisKey] === value);
+  if (!candidates.length) return next;
+
+  // Prefer candidates that keep the user's other selections (earlier axes weigh more).
+  let best: CatalogVariant | null = null;
+  let bestScore = -1;
+  for (const variant of candidates) {
+    let score = 0;
+    axes.forEach((axis, i) => {
+      if (axis.key === axisKey) return;
+      const want = current[axis.key];
+      if (want && variant.attributes?.[axis.key] === want) {
+        score += 1 << (axes.length - 1 - i);
+      }
+    });
+    if (score > bestScore) {
+      bestScore = score;
+      best = variant;
+    }
   }
+
+  if (best && bestScore > 0) return toSelection(best);
+
+  // No overlap with prior picks — still try to keep the first axis (e.g. Grade) if possible.
+  const primaryKey = axes[0]?.key;
+  if (primaryKey && primaryKey !== axisKey && current[primaryKey]) {
+    const keepPrimary = candidates.find((v) => v.attributes?.[primaryKey] === current[primaryKey]);
+    if (keepPrimary) return toSelection(keepPrimary);
+  }
+
+  // Keep the user's explicit selection as-is instead of jumping to an unrelated default combo.
   return next;
 }
 
