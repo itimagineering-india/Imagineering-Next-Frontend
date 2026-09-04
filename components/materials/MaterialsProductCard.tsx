@@ -52,6 +52,9 @@ export function MaterialsProductCard({
           <p className="truncate text-xs font-bold leading-[1.25] text-slate-900">
             {product.name}
           </p>
+          {product.variantSummary ? (
+            <p className="truncate text-[10px] text-slate-500">{product.variantSummary} available</p>
+          ) : null}
           {hidePrice ? null : (
             <p className="truncate text-xs font-semibold text-slate-900">{product.priceRange}</p>
           )}
