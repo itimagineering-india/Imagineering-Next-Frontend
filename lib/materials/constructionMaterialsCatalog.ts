@@ -47,6 +47,11 @@ export type MaterialsProduct = {
   badge?: MaterialsTrustBadge;
   rating?: number;
   reviewCount?: number;
+  hasVariants?: boolean;
+  variantSummary?: string;
+  variantCount?: number;
+  defaultVariantId?: string;
+  defaultVariantLabel?: string;
 };
 
 export type MaterialsBrand = {
