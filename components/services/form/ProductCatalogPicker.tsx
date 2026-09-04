@@ -142,9 +142,7 @@ export function ProductCatalogPicker({
             {products.map((product) => {
               const selected = isProductSelected(product._id);
               const setupOpen = selected && setupOpenProductIds.includes(product._id);
-              const variantCount = (product.variants || []).filter(
-                (v) => v.isActive !== false,
-              ).length;
+              const fieldCount = (product.variantAxes || []).length;
               const imageUrl =
                 product.images?.[0] ||
                 getSubcategoryImageUrl(categorySlug, subcategory);
@@ -175,9 +173,9 @@ export function ProductCatalogPicker({
                     {product.brand && (
                       <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{product.brand}</p>
                     )}
-                    {product.hasVariants && variantCount > 0 ? (
+                    {product.hasVariants && fieldCount > 0 ? (
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {setupOpen ? "Setup open" : `${variantCount} variants`}
+                        {setupOpen ? "Setup open" : `${fieldCount} fields`}
                       </p>
                     ) : null}
                   </div>
@@ -231,7 +229,7 @@ export function ProductCatalogPicker({
                     <p className="text-sm font-medium leading-snug truncate">{product.name}</p>
                     {product.hasVariants ? (
                       <p className="text-[11px] text-muted-foreground">
-                        {(product.variants || []).filter((v) => v.isActive !== false).length} variants
+                        {(product.variantAxes || []).length} fields
                       </p>
                     ) : product.brand ? (
                       <p className="text-xs text-muted-foreground truncate">{product.brand}</p>
