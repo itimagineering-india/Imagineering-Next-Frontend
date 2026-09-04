@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, CreditCard, Lock } from "lucide-react";
+import { Banknote, CreditCard, Lock, Percent } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -68,6 +68,14 @@ function ImagineeringCreditLogo() {
   );
 }
 
+function PartialLogo() {
+  return (
+    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-600">
+      <Percent className="h-4 w-4" strokeWidth={1.75} />
+    </div>
+  );
+}
+
 const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
   {
     value: "razorpay",
@@ -90,6 +98,13 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
     description: "Pay in cash or UPI when your order is delivered",
     tags: ["Cash", "UPI on delivery"],
     icon: <CodLogo />,
+  },
+  {
+    value: "partial",
+    label: "Partial payment",
+    description: "Pay at least 10% now online; remaining on delivery",
+    tags: ["Advance", "Balance COD"],
+    icon: <PartialLogo />,
   },
   {
     value: "imagineering_credit",
@@ -115,6 +130,8 @@ type PaymentOptionsSelectorProps = {
   className?: string;
   /** When true, shows Imagineering Credit if order is within available limit */
   showImagineeringCredit?: boolean;
+  /** B2B quote checkout: show partial (min 10%) + balance COD */
+  showPartialPayment?: boolean;
 };
 
 function RadioIndicator({ selected }: { selected: boolean }) {
@@ -137,6 +154,7 @@ export function PaymentOptionsSelector({
   amount,
   className,
   showImagineeringCredit = false,
+  showPartialPayment = false,
 }: PaymentOptionsSelectorProps) {
   const amountNum = typeof amount === "number" && isFinite(amount) ? amount : 0;
   const [rules, setRules] = useState<PaymentMethodsMap>(FALLBACK_PAYMENT_METHODS);
@@ -149,7 +167,8 @@ export function PaymentOptionsSelector({
         if (cancelled || !res.success || !res.data?.methods) return;
         const next = { ...FALLBACK_PAYMENT_METHODS };
         for (const key of Object.keys(next) as PaymentOption[]) {
-          const raw = res.data.methods[key];
+          if (key === "partial") continue;
+          const raw = (res.data.methods as Record<string, PaymentMethodRuleLike>)[key];
           if (!raw) continue;
           next[key] = {
             enabled: raw.enabled !== false,
@@ -171,17 +190,19 @@ export function PaymentOptionsSelector({
     () =>
       PAYMENT_OPTIONS.filter((opt) => {
         if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
+        if (opt.value === "partial") return showPartialPayment && amountNum > 0;
         return isPaymentMethodAvailable(opt.value, amountNum, rules);
       }),
-    [amountNum, rules, showImagineeringCredit]
+    [amountNum, rules, showImagineeringCredit, showPartialPayment]
   );
 
   useEffect(() => {
     if (!value) return;
+    if (value === "partial" && showPartialPayment && amountNum > 0) return;
     if (isPaymentMethodAvailable(value, amountNum, rules)) return;
     const fallback = pickFallbackPaymentMethod(amountNum, rules, value);
     if (fallback !== value) onChange(fallback);
-  }, [amountNum, onChange, rules, value]);
+  }, [amountNum, onChange, rules, showPartialPayment, value]);
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -244,5 +265,11 @@ export function PaymentOptionsSelector({
     </div>
   );
 }
+
+type PaymentMethodRuleLike = {
+  enabled?: boolean;
+  maxAmount?: number;
+  message?: string;
+};
 
 export { PAYMENT_OPTIONS };
