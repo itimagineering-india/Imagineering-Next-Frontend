@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, ArrowLeft, CreditCard, Package, Tag, Truck } from "lucide-react";
+import { Loader2, ArrowLeft, CreditCard, Package, Tag, Truck, MapPin } from "lucide-react";
 import api from "@/lib/api-client";
 import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import { useToast } from "@/hooks/use-toast";
@@ -157,6 +159,13 @@ export default function QuoteRequestConfirmPage() {
   const [creditsDiscount, setCreditsDiscount] = useState(0);
   const [preview, setPreview] = useState<QuoteCheckoutPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const [billingAddress, setBillingAddress] = useState({
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+  });
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -210,6 +219,23 @@ export default function QuoteRequestConfirmPage() {
   const offerIndex = offers.findIndex((o: any) => String(o.id) === String(offerId));
   const offer = offerIndex >= 0 ? offers[offerIndex] : null;
   const deliveryUnavailable = offer?.deliveryOption === "not_available";
+
+  const shippingAddress = useMemo(() => {
+    const addr = data?.address || {};
+    return {
+      address: String(addr.address || "").trim(),
+      city: String(addr.city || "").trim(),
+      state: String(addr.state || "").trim(),
+      zipCode: String(addr.zipCode || "").trim(),
+    };
+  }, [data?.address]);
+
+  const shippingLabel = useMemo(() => {
+    if (data?.addressLabel) return String(data.addressLabel);
+    return [shippingAddress.address, shippingAddress.city, shippingAddress.state, shippingAddress.zipCode]
+      .filter(Boolean)
+      .join(", ");
+  }, [data?.addressLabel, shippingAddress]);
 
   useEffect(() => {
     if (!offer) return;
@@ -385,6 +411,16 @@ export default function QuoteRequestConfirmPage() {
       });
       return;
     }
+    if (!billingSameAsShipping) {
+      if (!billingAddress.address.trim() || !billingAddress.city.trim() || !billingAddress.state.trim()) {
+        toast({
+          title: "Billing address required",
+          description: "Enter address, city, and state — or use same as shipping.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -394,6 +430,19 @@ export default function QuoteRequestConfirmPage() {
         paymentOption,
         couponUsageId: couponUsageId || undefined,
         creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
+        billingSameAsShipping,
+        ...(billingSameAsShipping
+          ? {}
+          : {
+              billingAddress: {
+                address: billingAddress.address.trim(),
+                city: billingAddress.city.trim(),
+                state: billingAddress.state.trim(),
+                ...(billingAddress.zipCode.trim()
+                  ? { zipCode: billingAddress.zipCode.trim() }
+                  : {}),
+              },
+            }),
       });
       const payload = (res as any).data;
       if (!res.success) {
@@ -564,6 +613,95 @@ export default function QuoteRequestConfirmPage() {
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
         <div className="space-y-4 lg:order-1">
+          <CheckoutSection
+            title="Addresses"
+            description="Shipping is from your quote request. Billing can match it or be different for the invoice."
+          >
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Shipping address
+                </div>
+                <p className="mt-1.5 text-sm font-medium text-foreground">
+                  {shippingLabel || "No shipping address on this request"}
+                </p>
+              </div>
+
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="billing-same-as-shipping"
+                  checked={billingSameAsShipping}
+                  onCheckedChange={(v) => {
+                    const checked = v === true;
+                    setBillingSameAsShipping(checked);
+                    if (checked) {
+                      setBillingAddress({ address: "", city: "", state: "", zipCode: "" });
+                    }
+                  }}
+                  disabled={Boolean(bookingId)}
+                  className="mt-0.5"
+                />
+                <Label htmlFor="billing-same-as-shipping" className="text-sm font-medium leading-snug">
+                  Billing address same as shipping address
+                </Label>
+              </div>
+
+              {!billingSameAsShipping ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label htmlFor="billing-street">Billing street / area</Label>
+                    <Input
+                      id="billing-street"
+                      value={billingAddress.address}
+                      onChange={(e) =>
+                        setBillingAddress((prev) => ({ ...prev, address: e.target.value }))
+                      }
+                      placeholder="Building, street, landmark"
+                      disabled={Boolean(bookingId)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="billing-city">City</Label>
+                    <Input
+                      id="billing-city"
+                      value={billingAddress.city}
+                      onChange={(e) =>
+                        setBillingAddress((prev) => ({ ...prev, city: e.target.value }))
+                      }
+                      placeholder="City"
+                      disabled={Boolean(bookingId)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="billing-state">State</Label>
+                    <Input
+                      id="billing-state"
+                      value={billingAddress.state}
+                      onChange={(e) =>
+                        setBillingAddress((prev) => ({ ...prev, state: e.target.value }))
+                      }
+                      placeholder="State"
+                      disabled={Boolean(bookingId)}
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="billing-zip">PIN code (optional)</Label>
+                    <Input
+                      id="billing-zip"
+                      value={billingAddress.zipCode}
+                      onChange={(e) =>
+                        setBillingAddress((prev) => ({ ...prev, zipCode: e.target.value }))
+                      }
+                      placeholder="PIN code"
+                      disabled={Boolean(bookingId)}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </CheckoutSection>
+
           <CheckoutSection
             title="GST number"
             description="Optional — used on the invoice. Editable for this order."
