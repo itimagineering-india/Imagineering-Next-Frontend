@@ -677,13 +677,29 @@ export default function QuoteRequestPage() {
             </div>
 
             {offers.length === 0 ? (
-              <div className="border border-dashed border-stone-300 bg-white/70 px-6 py-14 text-center">
-                <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-700" />
-                <p className="mt-3 text-sm font-semibold text-stone-900">Searching listed suppliers…</p>
-                <p className="mt-1 text-sm text-stone-500">
-                  {notified} listed suppliers notified. Waiting for responses…
-                </p>
-              </div>
+              data.status === "cancelled" ? (
+                <div className="border border-dashed border-stone-300 bg-white/70 px-6 py-14 text-center">
+                  <p className="text-sm font-semibold text-stone-900">No offers</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    This request was cancelled before any quotes arrived.
+                  </p>
+                </div>
+              ) : windowClosed || data.status === "expired" ? (
+                <div className="border border-dashed border-stone-300 bg-white/70 px-6 py-14 text-center">
+                  <p className="text-sm font-semibold text-stone-900">No offers received</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    The quote window closed without supplier responses.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-dashed border-stone-300 bg-white/70 px-6 py-14 text-center">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin text-teal-700" />
+                  <p className="mt-3 text-sm font-semibold text-stone-900">Searching listed suppliers…</p>
+                  <p className="mt-1 text-sm text-stone-500">
+                    {notified} listed suppliers notified. Waiting for responses…
+                  </p>
+                </div>
+              )
             ) : (
               <div className="space-y-4">
                 {offers.map((offer: any) => {
@@ -709,9 +725,11 @@ export default function QuoteRequestPage() {
               </div>
             )}
 
-            <p className="mt-6 text-center text-xs text-stone-500 lg:text-left">
-              Live updates arrive automatically. Refresh if needed.
-            </p>
+            {data.status !== "cancelled" && !windowClosed ? (
+              <p className="mt-6 text-center text-xs text-stone-500 lg:text-left">
+                Live updates arrive automatically. Refresh if needed.
+              </p>
+            ) : null}
 
             <div className="mt-4 space-y-2 pb-8 lg:hidden">
               <Button variant="outline" className="w-full" asChild>
