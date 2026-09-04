@@ -102,7 +102,7 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
   {
     value: "partial",
     label: "Partial payment",
-    description: "Pay at least 10% now online; remaining on delivery",
+    description: "Pay at least 5% now online; remaining on delivery",
     tags: ["Advance", "Balance COD"],
     icon: <PartialLogo />,
   },
@@ -130,7 +130,7 @@ type PaymentOptionsSelectorProps = {
   className?: string;
   /** When true, shows Imagineering Credit if order is within available limit */
   showImagineeringCredit?: boolean;
-  /** B2B quote checkout: show partial (min 10%) + balance COD */
+  /** B2B quote checkout: show partial (min 5%) + balance COD */
   showPartialPayment?: boolean;
 };
 
