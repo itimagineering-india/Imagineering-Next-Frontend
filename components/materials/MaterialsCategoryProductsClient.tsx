@@ -3,170 +3,71 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Filter, Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ConstructionMaterialProductLayout } from "@/components/service-details/ConstructionMaterialProductLayout";
+import { MaterialsProductCard } from "@/components/materials/MaterialsProductCard";
 import { GetBestQuotesModal } from "@/components/service-details/GetBestQuotesModal";
-import { ServiceDetailSkeleton } from "@/components/service-details/ServiceDetailSkeleton";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 import {
-  formatMaterialsPriceRange,
-  isMaterialsCatalogPriceRange,
-  MATERIALS_CATEGORY_SLUG,
+  applyMaterialsProductFilters,
+  filterMaterialsProducts,
   resolveMaterialsMaterialTypeKey,
+  sortMaterialsProducts,
   type MaterialsProduct,
+  type MaterialsProductFilters,
+  type MaterialsProductSort,
 } from "@/lib/materials/constructionMaterialsCatalog";
 import {
-  fetchCatalogProductById,
   fetchCatalogProductsByCategory,
   findServiceIdForCatalogProduct,
-  mapCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
-import {
-  catalogVariantLabel,
-  defaultVariantSelection,
-  findCatalogVariant,
-  readCatalogVariants,
-} from "@/lib/catalogVariants";
-import { resolveMaterialsMediaUrl } from "@/lib/materials/media";
-import {
-  B2B_QUOTE_CART_MAX,
-  loadB2bQuoteCart,
-  normalizeB2bQuoteItemType,
-  upsertB2bQuoteCartLine,
-} from "@/lib/b2b/b2bQuoteCart";
 
 type Props = {
-  productId: string;
-  /** materials = /construction-materials/… ; b2b = /b2b-services/products/… */
-  surface?: "materials" | "b2b";
+  materialTypeKey: string;
 };
 
-function toReadableText(raw: unknown): string {
-  if (raw == null) return "—";
-  const text = String(raw).trim();
-  if (!text) return "—";
-  return text
-    // camelCase → "camel Case"
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    // underscores/hyphens → space
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function similarToServiceCard(product: MaterialsProduct) {
-  const min = product.priceMin ?? 0;
-  const max = product.priceMax ?? min;
-  const isRange = product.isPriceRange;
-  return {
-    id: product.id,
-    slug: product.id,
-    title: product.name,
-    image: product.imageUri || "/placeholder.svg",
-    category: product.brand || "Materials",
-    providerName: product.brand || "Supplier",
-    rating: product.rating ?? 4.5,
-    reviewCount: product.reviewCount ?? 0,
-    price: min,
-    priceMode: isRange ? ("range" as const) : ("exact" as const),
-    priceMin: min,
-    priceMax: max,
-    priceType: product.unitType || "fixed",
-    _id: product.id,
-  };
-}
-
-export function MaterialsProductDetailClient({ productId, surface = "materials" }: Props) {
+export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
   const { t } = useTranslation("materials");
   const router = useRouter();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
-  const isB2b = surface === "b2b";
-  const productPath = isB2b
-    ? `/b2b-services/products/${productId}`
-    : `/construction-materials/product/${productId}`;
-  const hubHref = isB2b ? "/b2b-services" : "/construction-materials";
-  const hubLabel = isB2b ? "B2B Services" : "Construction Materials";
-  const productHrefBase = isB2b ? "/b2b-services/products" : "/construction-materials/product";
+  const { addToCart } = useCart();
+
+  const key = resolveMaterialsMaterialTypeKey(materialTypeKey) || materialTypeKey;
+  const title = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   const [loading, setLoading] = useState(true);
-  const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
-  const [similar, setSimilar] = useState<MaterialsProduct[]>([]);
-  const [linkedServiceId, setLinkedServiceId] = useState<string | null>(null);
-  const [linkedServiceTitle, setLinkedServiceTitle] = useState<string | null>(null);
+  const [products, setProducts] = useState<MaterialsProduct[]>([]);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<MaterialsProductSort>("relevance");
+  const [filters, setFilters] = useState<MaterialsProductFilters>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [inQuoteList, setInQuoteList] = useState(false);
-  const [variantSel, setVariantSel] = useState<Record<string, string>>({});
-
-  const catalogVariants = useMemo(() => readCatalogVariants(raw || undefined), [raw]);
-  const selectedVariant = useMemo(() => {
-    if (!catalogVariants.hasVariants) return undefined;
-    return findCatalogVariant(
-      catalogVariants.variants,
-      variantSel,
-      catalogVariants.variantAxes,
-    );
-  }, [catalogVariants, variantSel]);
-
-  useEffect(() => {
-    if (!raw) return;
-    const parsed = readCatalogVariants(raw);
-    if (parsed.hasVariants) {
-      setVariantSel(defaultVariantSelection(parsed.variantAxes, parsed.variants));
-    } else {
-      setVariantSel({});
-    }
-  }, [raw]);
-
-  useEffect(() => {
-    if (!isB2b) return;
-    const variantId = selectedVariant?.id;
-    setInQuoteList(
-      loadB2bQuoteCart().some(
-        (l) =>
-          l.key === (variantId ? `catalog:${productId}:${variantId}` : `catalog:${productId}`)
-      )
-    );
-  }, [isB2b, productId, selectedVariant?.id]);
+  const [quoteService, setQuoteService] = useState<{
+    id: string;
+    title: string;
+    priceType?: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        const product = await fetchCatalogProductById(productId);
-        if (cancelled || !product) return;
-        setRaw(product);
-
-        const mappedProduct = mapCatalogProduct(product, "general");
-        if (!mappedProduct) {
-          if (!cancelled) setRaw(null);
-          return;
-        }
-        const exclude =
-          (user as { _id?: string; id?: string } | null)?._id ||
-          (user as { id?: string } | null)?.id ||
-          null;
-        const linked = await findServiceIdForCatalogProduct(mappedProduct.id, {
-          excludeProviderUserId: exclude,
-        });
-        if (!cancelled) {
-          setLinkedServiceId(linked?.serviceId || null);
-          setLinkedServiceTitle(linked?.title || mappedProduct.name);
-        }
-
-        const typeKey = resolveMaterialsMaterialTypeKey(
-          String(product?.materialTypeKey || product?.subcategory || "")
-        );
-        if (typeKey) {
-          const list = await fetchCatalogProductsByCategory(typeKey);
-          if (!cancelled) {
-            setSimilar(list.filter((p) => p.id !== productId).slice(0, 10));
-          }
-        }
+        const list = await fetchCatalogProductsByCategory(key);
+        if (!cancelled) setProducts(list);
       } catch {
         if (!cancelled) {
           toast({
@@ -174,7 +75,6 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
             description: t("loadErrorBody"),
             variant: "destructive",
           });
-          setRaw(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -183,340 +83,264 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     return () => {
       cancelled = true;
     };
-  }, [productId, t, toast, user]);
+  }, [key, t, toast]);
 
-  const mapped = useMemo(() => {
-    if (!raw) return null;
-    return mapCatalogProduct(raw, "general");
-  }, [raw]);
+  const brands = useMemo(() => {
+    const set = new Set(products.map((p) => p.brand).filter(Boolean));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [products]);
 
-  const images = useMemo(() => {
-    const variantList = Array.isArray(selectedVariant?.images) ? selectedVariant.images : [];
-    const list = variantList.length
-      ? variantList
-      : Array.isArray(raw?.images)
-        ? (raw!.images as string[])
-        : [];
-    const resolved = list.map((u) => resolveMaterialsMediaUrl(u)).filter(Boolean) as string[];
-    if (resolved.length > 0) return resolved;
-    if (mapped?.imageUri) return [mapped.imageUri];
-    return [];
-  }, [mapped, raw, selectedVariant]);
+  const visible = useMemo(() => {
+    const searched = filterMaterialsProducts(products, { query, categoryId: null });
+    const filtered = applyMaterialsProductFilters(searched, filters);
+    return sortMaterialsProducts(filtered, sort);
+  }, [filters, products, query, sort]);
 
-  const specs = useMemo(() => {
-    const rows: { label: string; value: string }[] = [];
-    if (mapped?.brand) rows.push({ label: "Brand", value: mapped.brand });
-    if (mapped?.grade && !catalogVariants.hasVariants) {
-      rows.push({ label: "Grade / Spec", value: mapped.grade });
-    }
-    if (mapped?.avgDeliveryDays) {
-      rows.push({ label: "Avg delivery", value: `${mapped.avgDeliveryDays} days` });
-    }
-    if (selectedVariant) {
-      catalogVariants.variantAxes.forEach((axis) => {
-        const val = selectedVariant.attributes?.[axis.key];
-        if (val) rows.push({ label: axis.label, value: val });
-      });
-    }
-    const meta =
-      raw?.metadata && typeof raw.metadata === "object"
-        ? (raw.metadata as Record<string, unknown>)
-        : {};
-    const skipMeta = new Set([
-      "formVariant",
-      ...(catalogVariants.hasVariants
-        ? ["steelGrade", "steelSize", "steelCustomSize", "steelGradeCustom"]
-        : []),
-    ]);
-    Object.entries(meta).forEach(([k, v]) => {
-      if (v == null || v === "") return;
-      if (skipMeta.has(k)) return;
-      rows.push({ label: toReadableText(k), value: toReadableText(v) });
-    });
-    const custom = Array.isArray(raw?.customFields)
-      ? (raw!.customFields as Array<{ label?: string; value?: string }>)
-      : [];
-    custom.forEach((field) => {
-      if (!field?.label && !field?.value) return;
-      rows.push({
-        label: String(field.label || "Spec").trim(),
-        value: String(field.value || "—").trim(),
-      });
-    });
-    return rows;
-  }, [catalogVariants, mapped, raw, selectedVariant]);
-
-  const priceLabel = useMemo(() => {
-    if (!raw) return "Get quotes";
-    const min =
-      selectedVariant?.suggestedPriceMin ?? (raw.suggestedPriceMin as number);
-    const max =
-      selectedVariant?.suggestedPriceMax ?? (raw.suggestedPriceMax as number);
-    return formatMaterialsPriceRange(
-      min,
-      max,
-      (selectedVariant?.suggestedPriceType || raw.suggestedPriceType) as string
-    );
-  }, [raw, selectedVariant]);
-
-  const isRange = useMemo(() => {
-    if (!raw) return true;
-    const min =
-      selectedVariant?.suggestedPriceMin ?? (raw.suggestedPriceMin as number);
-    const max =
-      selectedVariant?.suggestedPriceMax ?? (raw.suggestedPriceMax as number);
-    return isMaterialsCatalogPriceRange(min, max);
-  }, [raw, selectedVariant]);
-
-  const typeKey = resolveMaterialsMaterialTypeKey(
-    String(raw?.materialTypeKey || raw?.subcategory || "")
-  );
-  const subcategoryLabel = typeKey
-    ? typeKey.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-    : undefined;
-
-  const handleGetQuotes = useCallback(() => {
-    if (!linkedServiceId) {
-      toast({
-        title: t("noListingTitle"),
-        description: t("noListingBody"),
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(productPath)}`);
-      return;
-    }
-    setQuoteOpen(true);
-  }, [isAuthenticated, linkedServiceId, productPath, router, t, toast]);
-
-  const handleAddToQuote = useCallback(() => {
-    if (!mapped) return;
-    const variantId = selectedVariant?.id;
-    const variantLabel = selectedVariant
-      ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
-      : undefined;
-    const result = upsertB2bQuoteCartLine(loadB2bQuoteCart(), {
-      key: variantId ? `catalog:${mapped.id}:${variantId}` : `catalog:${mapped.id}`,
-      catalogProductId: mapped.id,
-      catalogVariantId: variantId,
-      variantLabel,
-      title: mapped.name,
-      priceType:
-        selectedVariant?.suggestedPriceType ||
-        mapped.unitType ||
-        String(raw?.suggestedPriceType || "").trim() ||
-        undefined,
-      itemType: normalizeB2bQuoteItemType(mapped.categoryId),
-    });
-    if (result.error === "full") {
-      toast({
-        title: "Quote list is full",
-        description: `You can add up to ${B2B_QUOTE_CART_MAX} products in one request.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    if (result.error === "mixed_item_type") {
-      toast({
-        title: "Different item type",
-        description:
-          "This quote list is for one item type only. Clear the list on B2B Services to add a different type.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setInQuoteList(true);
-    toast({
-      title: result.added ? "Added to quote list" : "Quantity updated",
-      description: variantLabel ? `${mapped.name} · ${variantLabel}` : mapped.name,
-    });
-  }, [catalogVariants.variantAxes, mapped, raw?.suggestedPriceType, selectedVariant, toast]);
-
-  const handleShare = useCallback(async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const title = mapped?.name || (isB2b ? "B2B product" : "Construction material");
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, url });
-        return;
+  const handleProductCta = useCallback(
+    async (product: MaterialsProduct) => {
+      if (product.hasVariants) return;
+      setCtaLoadingId(product.id);
+      try {
+        const exclude =
+          (user as { _id?: string; id?: string } | null)?._id ||
+          (user as { id?: string } | null)?.id ||
+          null;
+        const linked = await findServiceIdForCatalogProduct(product.id, {
+          excludeProviderUserId: exclude,
+        });
+        if (!linked?.serviceId) {
+          toast({
+            title: t("noListingTitle"),
+            description: t("noListingBody"),
+            variant: "destructive",
+          });
+          return;
+        }
+        if (product.isPriceRange) {
+          if (!isAuthenticated) {
+            router.push(
+              `/login?redirect=${encodeURIComponent(`/construction-materials/product/${product.id}`)}`
+            );
+            return;
+          }
+          setQuoteService({
+            id: linked.serviceId,
+            title: linked.title || product.name,
+            priceType: product.unitType,
+          });
+          setQuoteOpen(true);
+          return;
+        }
+        if (!isAuthenticated) {
+          router.push(`/login?redirect=${encodeURIComponent("/cart")}`);
+          return;
+        }
+        await addToCart(linked.serviceId, 1);
+        toast({ title: t("addedToCart"), description: product.name });
+      } catch (err) {
+        toast({
+          title: t("ctaErrorTitle"),
+          description: err instanceof Error ? err.message : t("ctaErrorBody"),
+          variant: "destructive",
+        });
+      } finally {
+        setCtaLoadingId(null);
       }
-      await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied", description: title });
-    } catch {
-      /* user cancelled share */
-    }
-  }, [isB2b, mapped?.name, toast]);
-
-  const handleFavorite = useCallback(() => {
-    if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(productPath)}`);
-      return;
-    }
-    setIsSaved((v) => !v);
-    toast({
-      title: isSaved ? "Removed from saved" : "Saved",
-      description: mapped?.name,
-    });
-  }, [isAuthenticated, isSaved, mapped?.name, productPath, router, toast]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
-        <div className="layout-shell py-8">
-          <ServiceDetailSkeleton />
-        </div>
-      </div>
-    );
-  }
-
-  if (!raw || !mapped) {
-    return (
-      <div className="home-shell py-16 text-center">
-        <p className="text-slate-600">{t("productNotFound")}</p>
-        <Link
-          href={hubHref}
-          className="mt-4 inline-block font-semibold text-[hsl(var(--red-accent))]"
-        >
-          {isB2b ? "Back to B2B Services" : t("backToHub")}
-        </Link>
-      </div>
-    );
-  }
-
-  const priceMin =
-    Number(selectedVariant?.suggestedPriceMin ?? raw.suggestedPriceMin) || 0;
-  const priceMax =
-    Number(selectedVariant?.suggestedPriceMax ?? raw.suggestedPriceMax) || priceMin;
-  const b2bCategoryHref = typeKey
-    ? `/b2b-services?category=${encodeURIComponent(MATERIALS_CATEGORY_SLUG)}&subcategory=${encodeURIComponent(typeKey)}`
-    : hubHref;
-  const variantLabel = selectedVariant
-    ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
-    : "";
-  const displayTitle = variantLabel ? `${mapped.name} | ${variantLabel}` : mapped.name;
+    },
+    [addToCart, isAuthenticated, router, t, toast, user]
+  );
 
   return (
-    <div className="min-h-screen max-w-full overflow-x-clip bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
-      <div className="layout-shell overflow-x-clip pb-28 pt-4 sm:pt-6 md:pt-8">
-        <ConstructionMaterialProductLayout
-          responsive
-          forceQuoteCtas={isB2b}
-          similarHrefBase={productHrefBase}
-          viewAllHref={hubHref}
-          categoryHref={
-            isB2b
-              ? b2bCategoryHref
-              : typeKey
-                ? `/construction-materials/${encodeURIComponent(typeKey)}`
-                : hubHref
-          }
-          service={{
-            id: linkedServiceId || "",
-            title: displayTitle,
-            description:
-              mapped.shortDescription ||
-              String(raw.description || raw.longDescription || "") ||
-              `${mapped.name} from verified suppliers on Imagineering India.`,
-            images,
-            price: priceMin,
-            priceMin,
-            priceMax,
-            priceMode: isRange ? "range" : "exact",
-            rating: mapped.rating ?? 4.5,
-            reviewCount: mapped.reviewCount ?? 0,
-            subcategory: subcategoryLabel,
-            provider: { name: mapped.brand, businessName: mapped.brand },
-          }}
-          categoryName={hubLabel}
-          categorySlug={isB2b ? "b2b-services" : "construction-materials"}
-          formattedPrice={priceLabel}
-          isRangePrice={isB2b ? true : isRange}
-          showPricing
-          specFields={specs}
-          similarServices={similar.map(similarToServiceCard)}
-          cityLabel="your city"
-          onGetQuotes={handleGetQuotes}
-          onAddToQuote={isB2b ? handleAddToQuote : undefined}
-          inQuoteList={inQuoteList}
-          onShare={handleShare}
-          onFavorite={handleFavorite}
-          isSaved={isSaved}
-          variantPicker={
-            catalogVariants.hasVariants ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {catalogVariants.variantAxes.map((axis) => {
-                  const values = Array.from(
-                    new Set(
-                      catalogVariants.variants
-                        .filter((v) => {
-                          if (v.isActive === false) return false;
-                          return catalogVariants.variantAxes.every(
-                            (other) =>
-                              other.key === axis.key ||
-                              !variantSel[other.key] ||
-                              v.attributes?.[other.key] === variantSel[other.key]
-                          );
-                        })
-                        .map((v) => v.attributes?.[axis.key])
-                        .filter(Boolean)
-                    )
-                  );
-                  return (
-                    <label key={axis.key} className="space-y-1 text-sm">
-                      <span className="font-medium text-foreground">{axis.label}</span>
-                      <select
-                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        value={variantSel[axis.key] || ""}
-                        onChange={(e) =>
-                          setVariantSel((prev) => ({ ...prev, [axis.key]: e.target.value }))
-                        }
-                      >
-                        {values.map((val) => (
-                          <option key={val} value={val}>
-                            {val}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                })}
+    <div className="min-h-screen bg-slate-50">
+      <div className="border-b border-slate-200/90 bg-white">
+        <div className="home-shell py-3 md:py-3.5">
+          <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:gap-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Link
+                href="/construction-materials"
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                aria-label={t("backToHub")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 md:text-xl">
+                    {title}
+                  </h1>
+                  <span className="text-xs font-medium text-slate-400">
+                    {loading ? t("loading") : t("productsCount", { count: visible.length })}
+                  </span>
+                </div>
               </div>
-            ) : null
-          }
-        />
+            </div>
+
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+              <div className="relative w-full max-w-[280px] sm:max-w-[320px] lg:max-w-[340px]">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("searchProducts")}
+                  className="h-8 rounded-full border-slate-200/90 bg-slate-50 pl-8 pr-3 text-xs shadow-none placeholder:text-slate-400 focus-visible:border-slate-300 focus-visible:bg-white focus-visible:ring-1 focus-visible:ring-slate-200 md:text-sm"
+                />
+              </div>
+              <Select value={sort} onValueChange={(v) => setSort(v as MaterialsProductSort)}>
+                <SelectTrigger className="h-8 w-auto min-w-[7rem] shrink-0 rounded-full border-slate-200/90 px-2.5 text-xs sm:min-w-[8.5rem]">
+                  <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <SelectValue placeholder={t("sort")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relevance">{t("sortRelevance")}</SelectItem>
+                  <SelectItem value="price_asc">{t("sortPriceAsc")}</SelectItem>
+                  <SelectItem value="price_desc">{t("sortPriceDesc")}</SelectItem>
+                  <SelectItem value="rating">{t("sortRating")}</SelectItem>
+                  <SelectItem value="delivery">{t("sortDelivery")}</SelectItem>
+                  <SelectItem value="name">{t("sortName")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={`h-8 shrink-0 rounded-full px-2.5 sm:px-3 ${
+                  filtersOpen ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200/90"
+                }`}
+                onClick={() => setFiltersOpen((v) => !v)}
+              >
+                <Filter className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline text-xs">{t("filters")}</span>
+              </Button>
+            </div>
+          </div>
+
+          {filtersOpen ? (
+            <div className="mt-3 grid gap-2.5 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {t("filterBrand")}
+                </p>
+                <Select
+                  value={filters.brands?.[0] || "__all__"}
+                  onValueChange={(v) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      brands: v === "__all__" ? [] : [v],
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-9 rounded-lg bg-white text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">{t("allBrands")}</SelectItem>
+                    {brands.map((b) => (
+                      <SelectItem key={b} value={b}>
+                        {b}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {t("filterPriceMode")}
+                </p>
+                <Select
+                  value={filters.priceMode || "__all__"}
+                  onValueChange={(v) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      priceMode: v === "__all__" ? null : (v as "fixed" | "quote"),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-9 rounded-lg bg-white text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">{t("allModes")}</SelectItem>
+                    <SelectItem value="fixed">{t("fixedPrice")}</SelectItem>
+                    <SelectItem value="quote">{t("quotePrice")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {t("filterMinRating")}
+                </p>
+                <Select
+                  value={filters.minRating != null ? String(filters.minRating) : "__all__"}
+                  onValueChange={(v) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      minRating: v === "__all__" ? null : Number(v),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="h-9 rounded-lg bg-white text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">{t("anyRating")}</SelectItem>
+                    <SelectItem value="3">3+</SelectItem>
+                    <SelectItem value="4">4+</SelectItem>
+                    <SelectItem value="4.5">4.5+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-full rounded-lg"
+                  onClick={() => setFilters({})}
+                >
+                  {t("clearFilters")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      {linkedServiceId ? (
+      <div className="home-shell py-4 md:py-6">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            {t("loading")}
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-slate-500">
+            {t("emptyProducts")}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {visible.map((product) => (
+              <MaterialsProductCard
+                key={product.id}
+                product={product}
+                onCta={handleProductCta}
+                ctaLoading={ctaLoadingId === product.id}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {quoteService ? (
         <GetBestQuotesModal
           open={quoteOpen}
           onOpenChange={setQuoteOpen}
-          serviceId={linkedServiceId}
-          serviceTitle={displayTitle || linkedServiceTitle || mapped.name}
-          priceType={
-            selectedVariant?.suggestedPriceType ||
-            (raw?.suggestedPriceType as string) ||
-            mapped.unitType
-          }
-          items={[
-            {
-              serviceId: linkedServiceId,
-              title: mapped.name,
-              catalogProductId: mapped.id,
-              catalogVariantId: selectedVariant?.id,
-              variantLabel: selectedVariant
-                ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
-                : undefined,
-              priceType:
-                selectedVariant?.suggestedPriceType ||
-                (raw?.suggestedPriceType as string) ||
-                mapped.unitType,
-            },
-          ]}
+          serviceId={quoteService.id}
+          serviceTitle={quoteService.title}
+          priceType={quoteService.priceType}
           noCountdown
         />
       ) : null}
     </div>
   );
 }
+
+export default MaterialsCategoryProductsClient;
