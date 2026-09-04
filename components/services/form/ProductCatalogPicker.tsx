@@ -217,9 +217,13 @@ export function ProductCatalogPicker({
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium leading-snug truncate">{product.name}</p>
-                    {product.brand && (
+                    {product.hasVariants ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        {(product.variants || []).filter((v) => v.isActive !== false).length} variants
+                      </p>
+                    ) : product.brand ? (
                       <p className="text-xs text-muted-foreground truncate">{product.brand}</p>
-                    )}
+                    ) : null}
                   </div>
                 </button>
               );
