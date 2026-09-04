@@ -26,6 +26,12 @@ import {
   type CatalogProductItem,
 } from "@/lib/productCatalog";
 import { ProductCatalogPicker } from "@/components/services/form/ProductCatalogPicker";
+import {
+  defaultProviderVariantRows,
+  ProviderVariantPicker,
+  type ProviderVariantRow,
+} from "@/components/services/form/ProviderVariantPicker";
+import { parseProviderVariants } from "@/lib/catalogVariants";
 import type { ProviderBusinessAddressSnapshot } from "@/components/services/ServiceLocationInput";
 
 interface Category {
@@ -95,6 +101,11 @@ export function CatalogProductsPage({
   const [subcategory, setSubcategory] = useState(initialSubcategory);
   const [materialType, setMaterialType] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<CatalogProductItem[]>([]);
+  const [variantConfigByProduct, setVariantConfigByProduct] = useState<
+    Record<string, ProviderVariantRow[]>
+  >({});
+  const [variantError, setVariantError] = useState<string | null>(null);
+  const [variantErrorProductId, setVariantErrorProductId] = useState<string | null>(null);
   const [businessAddress, setBusinessAddress] = useState<ProviderBusinessAddressSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -179,23 +190,63 @@ export function CatalogProductsPage({
   useEffect(() => {
     if (!isEdit || !initialCatalogProductId) return;
     let cancelled = false;
-    api.productCatalog.getById(initialCatalogProductId).then((res) => {
-      if (cancelled || !res.success) return;
+    (async () => {
+      const [catalogRes, serviceRes] = await Promise.all([
+        api.productCatalog.getById(initialCatalogProductId),
+        serviceId ? api.services.getById(serviceId) : Promise.resolve(null),
+      ]);
+      if (cancelled || !catalogRes.success) return;
       const product =
-        (res.data as { product?: CatalogProductItem })?.product ?? res.data;
-      if (product && typeof product === "object" && "_id" in product) {
-        const item = product as CatalogProductItem;
-        setSelectedProducts([item]);
-        const fromProduct = String(item.subcategory || "").trim();
-        if (fromProduct && !isB2bMaterialSuppliersSubcategory(fromProduct)) {
-          setMaterialType(fromProduct);
-        }
+        (catalogRes.data as { product?: CatalogProductItem })?.product ?? catalogRes.data;
+      if (!(product && typeof product === "object" && "_id" in product)) return;
+      const item = product as CatalogProductItem;
+      setSelectedProducts([item]);
+      const fromProduct = String(item.subcategory || "").trim();
+      if (fromProduct && !isB2bMaterialSuppliersSubcategory(fromProduct)) {
+        setMaterialType(fromProduct);
       }
-    });
+
+      const service =
+        serviceRes && serviceRes.success
+          ? ((serviceRes.data as { service?: Record<string, unknown> })?.service ??
+            serviceRes.data)
+          : null;
+      const meta =
+        service && typeof service === "object"
+          ? (service as { metadata?: unknown }).metadata
+          : null;
+      const saved = parseProviderVariants(meta);
+      if (item.hasVariants && (item.variants || []).length) {
+        const byId = new Map(saved.map((r) => [r.id, r]));
+        setVariantConfigByProduct({
+          [item._id]: (item.variants || [])
+            .filter((v) => v.isActive !== false && v.id)
+            .map((v) => {
+              const existing = byId.get(v.id);
+              return {
+                id: v.id,
+                enabled: existing ? existing.enabled : true,
+                priceMin:
+                  existing?.priceMin != null
+                    ? String(existing.priceMin)
+                    : v.suggestedPriceMin != null
+                      ? String(v.suggestedPriceMin)
+                      : "",
+                priceMax:
+                  existing?.priceMax != null
+                    ? String(existing.priceMax)
+                    : v.suggestedPriceMax != null
+                      ? String(v.suggestedPriceMax)
+                      : "",
+              };
+            }),
+        });
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [isEdit, initialCatalogProductId]);
+  }, [isEdit, initialCatalogProductId, serviceId]);
 
   const subcategories = useMemo(() => {
     if (!category) return [];
@@ -204,12 +255,59 @@ export function CatalogProductsPage({
     });
   }, [category, profileSubcategories, isEdit, initialSubcategory]);
 
+  const productsWithVariants = useMemo(
+    () =>
+      selectedProducts.filter(
+        (p) => Boolean(p.hasVariants) && Array.isArray(p.variants) && p.variants.length > 0,
+      ),
+    [selectedProducts],
+  );
+
   const handleToggleProduct = useCallback(
     (product: CatalogProductItem) => {
+      setVariantError(null);
+      setVariantErrorProductId(null);
       setSelectedProducts((prev) => {
         const exists = prev.some((p) => p._id === product._id);
-        if (exists) return prev.filter((p) => p._id !== product._id);
-        if (isEdit) return [product];
+        if (exists) {
+          setVariantConfigByProduct((cfg) => {
+            const next = { ...cfg };
+            delete next[product._id];
+            return next;
+          });
+          return prev.filter((p) => p._id !== product._id);
+        }
+
+        const hasVariantSetup =
+          Boolean(product.hasVariants) && (product.variants || []).length > 0;
+
+        if (isEdit) {
+          setVariantConfigByProduct(
+            hasVariantSetup
+              ? { [product._id]: defaultProviderVariantRows(product) }
+              : {},
+          );
+          if (hasVariantSetup) {
+            requestAnimationFrame(() => {
+              document
+                .getElementById(`provider-variants-${product._id}`)
+                ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            });
+          }
+          return [product];
+        }
+
+        if (hasVariantSetup) {
+          setVariantConfigByProduct((cfg) => ({
+            ...cfg,
+            [product._id]: cfg[product._id] || defaultProviderVariantRows(product),
+          }));
+          requestAnimationFrame(() => {
+            document
+              .getElementById(`provider-variants-${product._id}`)
+              ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        }
         return [...prev, product];
       });
       setErrors((e) => ({ ...e, products: undefined }));
@@ -224,6 +322,9 @@ export function CatalogProductsPage({
     }
     setErrors({});
     setSelectedProducts([]);
+    setVariantConfigByProduct({});
+    setVariantError(null);
+    setVariantErrorProductId(null);
     if (!usesSharedConstructionMaterialsCatalog(category?.slug, subcategory)) {
       setMaterialType("");
     }
@@ -235,6 +336,18 @@ export function CatalogProductsPage({
     if (selectedProducts.length === 0) {
       setErrors({ products: "Select at least one product" });
       return;
+    }
+
+    for (const product of productsWithVariants) {
+      const rows = variantConfigByProduct[product._id] || defaultProviderVariantRows(product);
+      if (!rows.some((r) => r.enabled)) {
+        setVariantError(`Enable at least one variant for “${product.name}”.`);
+        setVariantErrorProductId(product._id);
+        document
+          .getElementById(`provider-variants-${product._id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -249,6 +362,10 @@ export function CatalogProductsPage({
           subcategory,
           itemType: materialType,
           location,
+          providerVariants:
+            product.hasVariants && (product.variants || []).length
+              ? variantConfigByProduct[product._id] || defaultProviderVariantRows(product)
+              : undefined,
         });
         const response = await api.services.update(serviceId, payload);
         if (response.success) {
@@ -273,6 +390,10 @@ export function CatalogProductsPage({
               subcategory,
               itemType: materialType,
               location,
+              providerVariants:
+                product.hasVariants && (product.variants || []).length
+                  ? variantConfigByProduct[product._id] || defaultProviderVariantRows(product)
+                  : undefined,
             }),
           ),
         ),
@@ -477,6 +598,9 @@ export function CatalogProductsPage({
                   if (needsCmTypePicker && materialType) {
                     setMaterialType("");
                     setSelectedProducts([]);
+                    setVariantConfigByProduct({});
+                    setVariantError(null);
+                    setVariantErrorProductId(null);
                     return;
                   }
                   setStep(1);
@@ -501,6 +625,9 @@ export function CatalogProductsPage({
                     onClick={() => {
                       setMaterialType(type);
                       setSelectedProducts([]);
+                      setVariantConfigByProduct({});
+                      setVariantError(null);
+                      setVariantErrorProductId(null);
                       setErrors((e) => ({ ...e, products: undefined }));
                     }}
                     className="group relative overflow-hidden rounded-lg border border-border text-left transition-all hover:border-primary/40"
@@ -531,8 +658,47 @@ export function CatalogProductsPage({
               onToggleProduct={handleToggleProduct}
               catalogOnlyMode
               layout="grid"
+              setupOpenProductIds={productsWithVariants.map((p) => p._id)}
             />
           )}
+
+          {productsWithVariants.length > 0 ? (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium">Variants you sell</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  For each selected product with sizes/grades, enable only what you offer.
+                </p>
+              </div>
+              {productsWithVariants.map((product) => (
+                <div
+                  key={product._id}
+                  id={`provider-variants-${product._id}`}
+                  className="rounded-lg border border-border p-3 sm:p-4 space-y-2"
+                >
+                  <p className="text-sm font-medium">{product.name}</p>
+                  <ProviderVariantPicker
+                    product={product}
+                    rows={
+                      variantConfigByProduct[product._id] ||
+                      defaultProviderVariantRows(product)
+                    }
+                    onChange={(rows) => {
+                      setVariantError(null);
+                      setVariantErrorProductId(null);
+                      setVariantConfigByProduct((cfg) => ({
+                        ...cfg,
+                        [product._id]: rows,
+                      }));
+                    }}
+                    error={
+                      variantErrorProductId === product._id ? variantError || undefined : undefined
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {errors.products && (
             <p className="text-sm text-destructive">{errors.products}</p>
@@ -549,6 +715,9 @@ export function CatalogProductsPage({
                     if (needsCmTypePicker && materialType) {
                       setMaterialType("");
                       setSelectedProducts([]);
+                      setVariantConfigByProduct({});
+                      setVariantError(null);
+                      setVariantErrorProductId(null);
                       return;
                     }
                     setStep(1);
