@@ -119,6 +119,12 @@ export function buildServicePayloadFromCatalogProduct(
     subcategory: string;
     itemType?: string;
     location?: CatalogServiceLocation | null;
+    providerVariants?: Array<{
+      id: string;
+      enabled: boolean;
+      priceMin?: string;
+      priceMax?: string;
+    }>;
   },
 ): Record<string, unknown> {
   const patch = mapCatalogProductToListingForm(
@@ -148,6 +154,17 @@ export function buildServicePayloadFromCatalogProduct(
     mt,
     extractConstructionStrings(patch.dynamicData),
   );
+
+  if (opts.providerVariants?.length) {
+    meta.providerVariants = JSON.stringify(
+      opts.providerVariants.map((row) => ({
+        id: row.id,
+        enabled: row.enabled,
+        ...(row.priceMin ? { priceMin: Number(row.priceMin) } : {}),
+        ...(row.priceMax ? { priceMax: Number(row.priceMax) } : {}),
+      })),
+    );
+  }
 
   const payload: Record<string, unknown> = {
     title: patch.title,
