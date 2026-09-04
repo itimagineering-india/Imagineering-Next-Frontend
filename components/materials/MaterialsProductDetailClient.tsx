@@ -392,6 +392,10 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const b2bCategoryHref = typeKey
     ? `/b2b-services?category=${encodeURIComponent(MATERIALS_CATEGORY_SLUG)}&subcategory=${encodeURIComponent(typeKey)}`
     : hubHref;
+  const variantLabel = selectedVariant
+    ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
+    : "";
+  const displayTitle = variantLabel ? `${mapped.name} | ${variantLabel}` : mapped.name;
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
@@ -410,7 +414,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           }
           service={{
             id: linkedServiceId || "",
-            title: mapped.name,
+            title: displayTitle,
             description:
               mapped.shortDescription ||
               String(raw.description || raw.longDescription || "") ||
@@ -489,11 +493,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           open={quoteOpen}
           onOpenChange={setQuoteOpen}
           serviceId={linkedServiceId}
-          serviceTitle={
-            selectedVariant
-              ? `${mapped.name} · ${catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)}`
-              : linkedServiceTitle || mapped.name
-          }
+          serviceTitle={displayTitle || linkedServiceTitle || mapped.name}
           priceType={
             selectedVariant?.suggestedPriceType ||
             (raw?.suggestedPriceType as string) ||
