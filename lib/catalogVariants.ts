@@ -95,19 +95,21 @@ export function parseProviderVariants(meta: unknown): Array<{
   if (!meta || typeof meta !== "object") return [];
   const raw = (meta as Record<string, unknown>).providerVariants;
   if (Array.isArray(raw)) {
-    return raw
-      .map((row) => {
-        const r = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
-        const id = String(r.id || "").trim();
-        if (!id) return null;
-        return {
+    return raw.flatMap((row) => {
+      const r = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+      const id = String(r.id || "").trim();
+      if (!id) return [];
+      const priceMin = Number(r.priceMin);
+      const priceMax = Number(r.priceMax);
+      return [
+        {
           id,
           enabled: r.enabled !== false,
-          priceMin: Number.isFinite(Number(r.priceMin)) ? Number(r.priceMin) : undefined,
-          priceMax: Number.isFinite(Number(r.priceMax)) ? Number(r.priceMax) : undefined,
-        };
-      })
-      .filter((x): x is { id: string; enabled: boolean; priceMin?: number; priceMax?: number } => Boolean(x));
+          ...(Number.isFinite(priceMin) ? { priceMin } : {}),
+          ...(Number.isFinite(priceMax) ? { priceMax } : {}),
+        },
+      ];
+    });
   }
   if (typeof raw === "string") {
     try {
