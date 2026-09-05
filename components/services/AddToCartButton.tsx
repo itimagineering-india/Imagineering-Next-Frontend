@@ -46,6 +46,8 @@ type AddToCartButtonProps = {
   categorySlug?: string | null;
   /** Unit selling price for live total preview in the modal. */
   unitPrice?: number | null;
+  /** When set, cart uses this catalog variant's price override (hybrid pricing). */
+  catalogVariantId?: string | null;
 };
 
 export const AddToCartButton = ({
@@ -59,6 +61,7 @@ export const AddToCartButton = ({
   priceType,
   categorySlug,
   unitPrice,
+  catalogVariantId,
 }: AddToCartButtonProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -144,7 +147,10 @@ export const AddToCartButton = ({
   const performAdd = async (qty: number) => {
     setPendingAdd(true);
     try {
-      await addToCart(serviceId, qty, { silent: true });
+      await addToCart(serviceId, qty, {
+        silent: true,
+        catalogVariantId: catalogVariantId || undefined,
+      });
       toast({
         title: "Added to cart",
         description: isRentalDuration
@@ -177,7 +183,9 @@ export const AddToCartButton = ({
     const qty = clamp(quantity);
     try {
       await clearCart();
-      await addToCart(serviceId, qty);
+      await addToCart(serviceId, qty, {
+        catalogVariantId: catalogVariantId || undefined,
+      });
       setShowQuantityModal(false);
       onAdded?.();
       setShowMismatch(false);
