@@ -22,7 +22,7 @@ export const FALLBACK_PAYMENT_METHODS: PaymentMethodsMap = {
   sbicollect: { enabled: true, maxAmount: 0, message: "" },
   neft: { enabled: true, maxAmount: 0, message: "" },
   imagineering_credit: { enabled: true, maxAmount: 0, message: "" },
-  /** B2B quote checkout only — advance online, balance on delivery */
+  /** Available on quote / cart / machine-rental checkout — advance online, balance on delivery */
   partial: { enabled: true, maxAmount: 0, message: "" },
 };
 
