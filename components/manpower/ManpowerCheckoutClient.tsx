@@ -33,6 +33,8 @@ import {
   PaymentOptionsSelector,
   type PaymentOption,
 } from "@/components/payments/PaymentOptionsSelector";
+import { SbiCollectPaymentPanel } from "@/components/payments/SbiCollectPaymentPanel";
+import { useSbiCollectPayment } from "@/components/payments/useSbiCollectPayment";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 import {
@@ -103,6 +105,8 @@ export function ManpowerCheckoutClient() {
   const [creditsDiscount, setCreditsDiscount] = useState(0);
   const appliedCouponRef = useRef<AppliedCoupon | null>(null);
   appliedCouponRef.current = appliedCoupon;
+
+  const sbi = useSbiCollectPayment({ enabled: paymentMethod === "sbicollect" });
 
   useEffect(() => {
     if (authLoading) return;
@@ -292,7 +296,7 @@ export function ManpowerCheckoutClient() {
     [router]
   );
 
-  const createDispatch = useCallback(async () => {
+  const createDispatch = useCallback(async (receiptUrl?: string) => {
     if (!selectedAddress) {
       toast({
         title: t("checkoutAddressRequired"),
@@ -321,6 +325,7 @@ export function ManpowerCheckoutClient() {
       hireMode,
       hours: needsHours ? hours : undefined,
       paymentMethod,
+      receiptUrl: receiptUrl || undefined,
       couponUsageId: appliedCoupon?.usageId,
       notes: notes.trim() || undefined,
       location: {
@@ -353,21 +358,37 @@ export function ManpowerCheckoutClient() {
   ]);
 
   const onConfirmCod = async () => {
+    if (paymentMethod === "sbicollect" && !sbi.hasReceipt) {
+      sbi.openLink();
+      return;
+    }
     setSubmitting(true);
     try {
-      const created = await createDispatch();
+      let receiptUrl: string | undefined;
+      if (paymentMethod === "sbicollect") {
+        receiptUrl = await sbi.uploadReceipt();
+      }
+      const created = await createDispatch(receiptUrl);
       if (!created) return;
       if (created.requiresPayment && (paymentMethod === "razorpay" || paymentMethod === "cashfree")) {
         setPendingPayBookingId(created.bookingId);
         return;
       }
-      toast({
-        title: paymentMethod === "imagineering_credit" ? "Payment successful" : t("checkoutSuccessTitle"),
-        description:
-          paymentMethod === "imagineering_credit"
-            ? `Paid using ${IMAGINEERING_CREDIT.name} · ₹${payableTotal.toLocaleString("en-IN")}`
-            : undefined,
-      });
+      if (paymentMethod === "sbicollect") {
+        sbi.clearReceipt();
+        toast({
+          title: "Order placed",
+          description: "Admin will verify your receipt and confirm the payment.",
+        });
+      } else {
+        toast({
+          title: paymentMethod === "imagineering_credit" ? "Payment successful" : t("checkoutSuccessTitle"),
+          description:
+            paymentMethod === "imagineering_credit"
+              ? `Paid using ${IMAGINEERING_CREDIT.name} · ₹${payableTotal.toLocaleString("en-IN")}`
+              : undefined,
+        });
+      }
       goWaiting(created.bookingId);
     } catch (err) {
       toast({
@@ -396,9 +417,13 @@ export function ManpowerCheckoutClient() {
   const confirmLabel =
     paymentMethod === "cod"
       ? t("checkoutConfirmCod")
-      : paymentMethod === "imagineering_credit"
-        ? `Confirm · ${IMAGINEERING_CREDIT.name}`
-        : t("checkoutPay");
+      : paymentMethod === "sbicollect"
+        ? sbi.hasReceipt
+          ? "Place order (SBI Collect)"
+          : "Pay via SBI Collect"
+        : paymentMethod === "imagineering_credit"
+          ? `Confirm · ${IMAGINEERING_CREDIT.name}`
+          : t("checkoutPay");
 
   const renderPayButton = () => {
     if (showOnlinePay && paymentMethod === "razorpay" && pendingPayBookingId) {
@@ -773,10 +798,24 @@ export function ManpowerCheckoutClient() {
                     setCreditsToApply(0);
                     setCreditsDiscount(0);
                   }
+                  if (v !== "sbicollect") sbi.clearReceipt();
                 }}
                 amount={paymentMethod === "imagineering_credit" ? payableTotal : paymentAmount}
                 showImagineeringCredit={canUseImagineeringCredit}
               />
+              {paymentMethod === "sbicollect" ? (
+                <div className="mt-4">
+                  <SbiCollectPaymentPanel
+                    amount={paymentAmount}
+                    details={sbi.details}
+                    loading={sbi.loading}
+                    receiptFile={sbi.receiptFile}
+                    onReceiptFileChange={sbi.setReceiptFile}
+                    onOpenLink={() => sbi.openLink()}
+                    inputId="manpower-sbicollect-receipt-upload"
+                  />
+                </div>
+              ) : null}
               <ImagineeringCreditCheckoutPanel
                 orderTotal={payableTotal}
                 selected={paymentMethod === "imagineering_credit"}
