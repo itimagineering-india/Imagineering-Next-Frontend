@@ -1,5 +1,6 @@
 export type QuoteRequestItemLike = {
   serviceId?: string;
+  catalogVariantId?: string;
   title?: string;
   quantity?: number;
   /** Product listing unit (Service.priceType). */
@@ -8,6 +9,7 @@ export type QuoteRequestItemLike = {
 
 export type QuoteOfferItemLike = {
   serviceId?: string;
+  catalogVariantId?: string;
   title?: string;
   quantity?: number;
   unitPrice?: number;
@@ -48,8 +50,15 @@ export function formatOfferTotalQtyLabel(totalQty: number): string {
   return `Total qty ${rounded}`;
 }
 
-export function quoteLineKey(row: { serviceId?: string; title?: string }, index = 0) {
-  return String(row.serviceId || row.title || index);
+export function quoteLineKey(
+  row: { serviceId?: string; catalogVariantId?: string; title?: string },
+  index = 0
+) {
+  const sid = String(row.serviceId || "").trim();
+  const vid = String(row.catalogVariantId || "").trim();
+  if (sid && vid) return `${sid}:${vid}`;
+  if (sid) return sid;
+  return String(row.title || index);
 }
 
 export function quoteRequestHeadline(data: {
