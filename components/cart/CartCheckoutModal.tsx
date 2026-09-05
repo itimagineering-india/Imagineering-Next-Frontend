@@ -10,6 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 import { PaymentOptionsSelector, type PaymentOption } from "@/components/payments/PaymentOptionsSelector";
+import { SbiCollectPaymentPanel } from "@/components/payments/SbiCollectPaymentPanel";
+import { useSbiCollectPayment } from "@/components/payments/useSbiCollectPayment";
+import { PartialPaymentPanel } from "@/components/payments/PartialPaymentPanel";
+import {
+  computePartialBreakdown,
+  type PartialAdvanceMethod,
+} from "@/lib/partialPayment";
 import api from "@/lib/api-client";
 import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import {
@@ -134,6 +141,9 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const [paymentMethod, setPaymentMethod] = useState<PaymentOption>("razorpay");
   const [creditsToApply, setCreditsToApply] = useState(0);
   const [creditsDiscount, setCreditsDiscount] = useState(0);
+  const [partialAmountInput, setPartialAmountInput] = useState("");
+  const [partialAdvanceMethod, setPartialAdvanceMethod] =
+    useState<PartialAdvanceMethod>("razorpay");
 
   const handleCreditsChange = useCallback((credits: number, discount: number) => {
     setCreditsToApply(credits);
@@ -147,13 +157,15 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const [neftReceiptFile, setNeftReceiptFile] = useState<File | null>(null);
   const [neftBankDetails, setNeftBankDetails] = useState<{ accountName: string; accountNo: string; ifsc: string; upi: string } | null>(null);
   const [loadingNeftDetails, setLoadingNeftDetails] = useState(false);
-  const [sbiCollectDetails, setSbiCollectDetails] = useState<{ paymentLink?: string; instructions?: string } | null>(null);
-  const [loadingSbiCollect, setLoadingSbiCollect] = useState(false);
-  const [sbiCollectReceiptFile, setSbiCollectReceiptFile] = useState<File | null>(null);
   const [detailsStep, setDetailsStep] = useState<DetailsStep>(1);
   const [bookingSummaryOpen, setBookingSummaryOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  const sbiEnabled =
+    paymentMethod === "sbicollect" ||
+    (paymentMethod === "partial" && partialAdvanceMethod === "sbicollect");
+  const sbi = useSbiCollectPayment({ enabled: sbiEnabled });
 
   const buyerGST = useMemo(() => {
     const v = user?.gstNumber;
@@ -235,21 +247,6 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     }).catch(() => {
       setNeftBankDetails({ accountName: "—", accountNo: "—", ifsc: "—", upi: "—" });
     }).finally(() => setLoadingNeftDetails(false));
-  }, [paymentMethod]);
-
-  // Fetch SBI Collect details when SBI Collect is selected
-  useEffect(() => {
-    if (paymentMethod !== "sbicollect") return;
-    setLoadingSbiCollect(true);
-    api.settings.getSbiCollectDetails().then((res) => {
-      if (res.success && res.data) {
-        setSbiCollectDetails(res.data);
-      } else {
-        setSbiCollectDetails({ instructions: "Contact support for SBI Collect payment details." });
-      }
-    }).catch(() => {
-      setSbiCollectDetails({ instructions: "Contact support for SBI Collect payment details." });
-    }).finally(() => setLoadingSbiCollect(false));
   }, [paymentMethod]);
 
   const parseAddress = (formatted: string) => {
@@ -444,24 +441,12 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
 
   // Open SBI Collect in new tab (user pays first, then comes back to upload receipt)
   const handleSbiCollectOpenLink = () => {
-    if (sbiCollectDetails?.paymentLink) {
-      window.open(sbiCollectDetails.paymentLink, "_blank", "noopener,noreferrer");
-      toast({
-        title: "Opened SBI Collect",
-        description: "Complete payment there, then come back and upload your receipt.",
-      });
-    } else {
-      toast({
-        title: "Link not available",
-        description: "SBI Collect payment link is not configured. Contact support.",
-        variant: "destructive",
-      });
-    }
+    sbi.openLink();
   };
 
   // Place order with SBI Collect receipt (after user has paid and uploaded receipt)
   const handleSbiCollectCheckout = async () => {
-    if (!sbiCollectReceiptFile) {
+    if (!sbi.hasReceipt) {
       toast({
         title: "Receipt required",
         description: "Please pay via SBI Collect first, then upload your payment receipt.",
@@ -471,11 +456,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     }
     setIsPlacingOrder(true);
     try {
-      const uploadRes = await api.bookings.uploadNeftReceipt(sbiCollectReceiptFile);
-      if (!uploadRes.success || !(uploadRes as any).data?.receiptUrl) {
-        throw new Error((uploadRes as any).error?.message || "Failed to upload receipt");
-      }
-      const receiptUrl = (uploadRes as any).data.receiptUrl;
+      const receiptUrl = await sbi.uploadReceipt();
       const response = await api.bookings.createFromCart({
         date,
         time,
@@ -495,7 +476,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         title: "Order placed",
         description: "Admin will verify your receipt and confirm the payment.",
       });
-      setSbiCollectReceiptFile(null);
+      sbi.clearReceipt();
       onSuccess();
     } catch (error: any) {
       toast({
@@ -509,9 +490,75 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   };
 
   const paymentAmount = Math.max(0, amount - creditsDiscount);
+  const partialBreakdown = useMemo(
+    () => computePartialBreakdown(paymentAmount, partialAmountInput),
+    [paymentAmount, partialAmountInput]
+  );
+  const partialAmount = partialBreakdown.partialAmount;
   const imagineeringCreditOrderTotal =
     paymentMethod === "imagineering_credit" ? amount : paymentAmount;
   const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
+
+  useEffect(() => {
+    if (paymentMethod !== "partial") return;
+    if (!partialAmountInput.trim()) {
+      setPartialAmountInput(String(computePartialBreakdown(paymentAmount).partialAmount));
+    }
+  }, [paymentMethod, paymentAmount, partialAmountInput]);
+
+  const handlePartialSbiCheckout = async () => {
+    if (!sbi.hasReceipt) {
+      toast({
+        title: "Receipt required",
+        description: "Please pay via SBI Collect first, then upload your payment receipt.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!(partialAmount >= partialBreakdown.minPartialAmount - 0.001)) {
+      toast({
+        title: "Invalid advance amount",
+        description: `Pay at least ₹${partialBreakdown.minPartialAmount.toLocaleString("en-IN")} (5% of order total).`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsPlacingOrder(true);
+    try {
+      const receiptUrl = await sbi.uploadReceipt();
+      const response = await api.bookings.createFromCart({
+        date,
+        time,
+        location,
+        requirementNote: notes,
+        notes,
+        buyerGST: buyerGST,
+        buyerPAN: buyerPAN,
+        paymentMethod: "partial",
+        partialAmount,
+        partialPaymentMethod: "sbicollect",
+        receiptUrl,
+        ...cartDiscountPayload,
+      });
+      if (!response.success) {
+        throw new Error((response as any).error?.message || "Failed to place order");
+      }
+      toast({
+        title: "Order placed",
+        description: "Advance receipt uploaded. Remaining balance is due on delivery.",
+      });
+      sbi.clearReceipt();
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: "Checkout failed",
+        description: error.message || "Failed to place order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
 
   const canProceedToPayment = date.trim() !== "" && time.trim() !== "" && address.trim() !== "";
 
@@ -1031,86 +1078,62 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                           setCreditsDiscount(0);
                         }
                         if (v !== "neft") setNeftReceiptFile(null);
-                        if (v !== "sbicollect") setSbiCollectReceiptFile(null);
+                        if (v !== "sbicollect" && !(v === "partial" && partialAdvanceMethod === "sbicollect")) {
+                          sbi.clearReceipt();
+                        }
+                        if (v === "partial") {
+                          setPartialAmountInput(
+                            String(computePartialBreakdown(paymentAmount).partialAmount)
+                          );
+                        }
                       }}
                       amount={paymentMethod === "imagineering_credit" ? amount : paymentAmount}
                       showImagineeringCredit={canUseImagineeringCredit}
+                      showPartialPayment
                     />
                     <ImagineeringCreditCheckoutPanel
                       orderTotal={amount}
                       selected={paymentMethod === "imagineering_credit"}
                     />
+                    {paymentMethod === "partial" ? (
+                      <PartialPaymentPanel
+                        orderTotal={paymentAmount}
+                        amountInput={partialAmountInput}
+                        onAmountInputChange={setPartialAmountInput}
+                        advanceMethod={partialAdvanceMethod}
+                        onAdvanceMethodChange={(m) => {
+                          setPartialAdvanceMethod(m);
+                          if (m !== "sbicollect") sbi.clearReceipt();
+                        }}
+                      >
+                        {partialAdvanceMethod === "sbicollect" ? (
+                          <div className="space-y-3 border-t pt-3">
+                            <SbiCollectPaymentPanel
+                              amount={partialAmount}
+                              details={sbi.details}
+                              loading={sbi.loading}
+                              receiptFile={sbi.receiptFile}
+                              onReceiptFileChange={sbi.setReceiptFile}
+                              onOpenLink={() => sbi.openLink()}
+                              inputId="cart-partial-sbicollect-receipt-upload"
+                            />
+                          </div>
+                        ) : null}
+                      </PartialPaymentPanel>
+                    ) : null}
                   </div>
                 </div>
 
                 {paymentMethod === "sbicollect" && (
-                  <div className="space-y-3 rounded-[14px] border border-slate-200/90 bg-[#f9fafb] p-4 shadow-sm dark:border-slate-800 dark:bg-muted/40 sm:p-6">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-700">
-                        <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      </span>
-                      <Label className="text-sm font-semibold text-slate-900 dark:text-slate-100">SBI Collect</Label>
-                    </div>
-                    <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                      Pay on SBI Collect in a new tab, then upload your receipt here to place the order.
-                    </p>
-                    {loadingSbiCollect ? (
-                      <p className="text-sm text-muted-foreground animate-pulse">Loading SBI Collect details…</p>
-                    ) : sbiCollectDetails ? (
-                      <div className="space-y-3 text-sm">
-                        {sbiCollectDetails.paymentLink ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-11 w-full rounded-xl border-slate-200 font-medium transition-all hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800/80"
-                            onClick={handleSbiCollectOpenLink}
-                          >
-                            Open SBI Collect — ₹{amount.toLocaleString("en-IN")}
-                          </Button>
-                        ) : null}
-                        {sbiCollectDetails.instructions ? (
-                          <p className="whitespace-pre-wrap rounded-lg bg-white/80 p-3 text-xs text-slate-600 ring-1 ring-slate-200/80 dark:bg-slate-900/50 dark:text-slate-300 dark:ring-slate-700">
-                            {sbiCollectDetails.instructions}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Contact support for SBI Collect payment details.</p>
-                    )}
-                    <div className="space-y-2 border-t border-slate-200/90 pt-3 dark:border-slate-700">
-                      <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">Upload payment receipt *</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <label
-                          htmlFor="sbicollect-receipt-upload"
-                          className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm transition-colors hover:border-blue-400/60 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60 dark:hover:border-blue-500/40 dark:hover:bg-slate-800/80"
-                        >
-                          <Upload className="h-4 w-4 shrink-0 text-slate-500" />
-                          <span className="truncate break-all text-slate-700 dark:text-slate-200">
-                            {sbiCollectReceiptFile ? sbiCollectReceiptFile.name : "Choose file (image or PDF)"}
-                          </span>
-                        </label>
-                        <input
-                          id="sbicollect-receipt-upload"
-                          type="file"
-                          accept="image/*,.pdf"
-                          className="hidden"
-                          onChange={(e) => setSbiCollectReceiptFile(e.target.files?.[0] || null)}
-                        />
-                        {sbiCollectReceiptFile ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="shrink-0 text-slate-600"
-                            onClick={() => setSbiCollectReceiptFile(null)}
-                          >
-                            Remove
-                          </Button>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">We’ll verify your receipt before confirming the booking.</p>
-                    </div>
-                  </div>
+                  <SbiCollectPaymentPanel
+                    amount={amount}
+                    details={sbi.details}
+                    loading={sbi.loading}
+                    receiptFile={sbi.receiptFile}
+                    onReceiptFileChange={sbi.setReceiptFile}
+                    onOpenLink={() => sbi.openLink()}
+                    inputId="cart-sbicollect-receipt-upload"
+                  />
                 )}
 
                 {paymentMethod === "neft" && (
@@ -1254,7 +1277,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                 </Button>
               ) : paymentMethod === "sbicollect" ? (
                 <Button
-                  onClick={sbiCollectReceiptFile ? handleSbiCollectCheckout : handleSbiCollectOpenLink}
+                  onClick={sbi.hasReceipt ? handleSbiCollectCheckout : handleSbiCollectOpenLink}
                   disabled={isPlacingOrder}
                   className="h-12 w-full flex-1 rounded-xl bg-[#2563eb] text-base font-semibold text-white shadow-md transition-all hover:bg-[#1d4ed8] disabled:opacity-50 sm:min-w-[12rem]"
                 >
@@ -1263,12 +1286,77 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Submitting…
                     </>
-                  ) : sbiCollectReceiptFile ? (
+                  ) : sbi.hasReceipt ? (
                     "Place order (SBI Collect)"
                   ) : (
                     "Pay via SBI Collect"
                   )}
                 </Button>
+              ) : paymentMethod === "partial" && partialAdvanceMethod === "sbicollect" ? (
+                <Button
+                  onClick={sbi.hasReceipt ? handlePartialSbiCheckout : handleSbiCollectOpenLink}
+                  disabled={isPlacingOrder}
+                  className="h-12 w-full flex-1 rounded-xl bg-[#2563eb] text-base font-semibold text-white shadow-md transition-all hover:bg-[#1d4ed8] disabled:opacity-50 sm:min-w-[12rem]"
+                >
+                  {isPlacingOrder ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting…
+                    </>
+                  ) : sbi.hasReceipt ? (
+                    "Place order (partial · SBI Collect)"
+                  ) : (
+                    `Pay via SBI Collect · ₹${partialAmount.toLocaleString("en-IN")}`
+                  )}
+                </Button>
+              ) : paymentMethod === "partial" && partialAdvanceMethod === "razorpay" ? (
+                <RazorpayCheckout
+                  cartId={cartId}
+                  amount={partialAmount}
+                  couponUsageId={couponUsageId || undefined}
+                  creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+                  bookingDescription="Cart Checkout · Partial"
+                  bookingPayload={{
+                    date,
+                    time,
+                    location,
+                    requirementNote: notes,
+                    notes,
+                    buyerGST: buyerGST,
+                    buyerPAN: buyerPAN,
+                    paymentMethod: "partial",
+                    partialAmount,
+                    partialPaymentMethod: "razorpay",
+                  }}
+                  onSuccess={onSuccess}
+                  className="h-12 w-full flex-1 rounded-xl bg-[#2563eb] px-4 text-base font-semibold text-white shadow-md hover:bg-[#1d4ed8] sm:min-w-[12rem]"
+                >
+                  Pay ₹{partialAmount.toLocaleString("en-IN")} now · Razorpay
+                </RazorpayCheckout>
+              ) : paymentMethod === "partial" && partialAdvanceMethod === "cashfree" ? (
+                <CashfreeCheckout
+                  cartId={cartId}
+                  amount={partialAmount}
+                  couponUsageId={couponUsageId || undefined}
+                  creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+                  bookingDescription="Cart Checkout · Partial"
+                  bookingPayload={{
+                    date,
+                    time,
+                    location,
+                    requirementNote: notes,
+                    notes,
+                    buyerGST: buyerGST,
+                    buyerPAN: buyerPAN,
+                    paymentMethod: "partial",
+                    partialAmount,
+                    partialPaymentMethod: "cashfree",
+                  }}
+                  onSuccess={onSuccess}
+                  className="h-12 w-full flex-1 rounded-xl bg-[#2563eb] px-4 text-base font-semibold text-white shadow-md hover:bg-[#1d4ed8] sm:min-w-[12rem]"
+                >
+                  Pay ₹{partialAmount.toLocaleString("en-IN")} now · Cashfree
+                </CashfreeCheckout>
               ) : (
                 <div className="flex w-full flex-col gap-2 sm:flex-1 sm:flex-row">
                   {paymentMethod === "razorpay" && (
