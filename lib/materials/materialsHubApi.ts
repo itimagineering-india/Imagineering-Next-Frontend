@@ -134,7 +134,38 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
     slugifyMaterialsId(String(raw?.subcategory || fallbackCategoryId || "")) ||
     fallbackCategoryId ||
     "general";
-  const brand = String(raw?.brand || "").trim() || "Brand";
+  const pickBrand = (...candidates: unknown[]) => {
+    for (const c of candidates) {
+      const s = String(c ?? "").trim();
+      if (!s) continue;
+      const n = s.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+      if (
+        n === "brand" ||
+        n === "not specified" ||
+        n === "n/a" ||
+        n === "na" ||
+        n === "custom" ||
+        n === "select" ||
+        n === "none"
+      ) {
+        continue;
+      }
+      return s;
+    }
+    return "";
+  };
+  const resolveSelect = (key: string, customKey: string) => {
+    const v = String(meta[key] ?? "").trim();
+    const custom = String(meta[customKey] ?? "").trim();
+    if (v.toLowerCase() === "custom" && custom) return custom;
+    return v;
+  };
+  const brand = pickBrand(
+    raw?.brand,
+    resolveSelect("steelBrand", "steelBrandCustom"),
+    resolveSelect("tileBrand", "tileBrandCustom"),
+    resolveSelect("brand", "brandCustom"),
+  );
   const images = Array.isArray(raw?.images) ? (raw.images as string[]) : [];
   const { hasVariants, variantAxes, variants } = readCatalogVariants(raw);
   const firstVariantImage =
