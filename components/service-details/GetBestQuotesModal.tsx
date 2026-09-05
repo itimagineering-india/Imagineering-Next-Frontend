@@ -270,100 +270,124 @@ export function GetBestQuotesModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90vh,720px)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-5 text-left sm:px-6">
             <DialogTitle>Get Best Quotes</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm leading-snug">
               {isMulti ? (
                 <>
-                  Share quantities, schedule, and delivery address for these{" "}
-                  <span className="font-medium text-foreground">{quoteLines!.length} products</span>.
-                  {noCountdown
-                    ? " Listed suppliers will send a combined quote."
-                    : " Listed suppliers will send a combined quote within 30 minutes."}
+                  Enter quantity for each product, then pick schedule and delivery address.
+                  {noCountdown ? "" : " Suppliers reply within 30 minutes."}
                 </>
               ) : (
                 <>
                   Share quantity, schedule, and delivery address for{" "}
-                  <span className="font-medium text-foreground">{serviceTitle}</span>.{" "}
+                  <span className="font-medium text-foreground">{serviceTitle}</span>.
                   {noCountdown
-                    ? "Listed suppliers will send prices."
-                    : "Nearby verified suppliers will send prices within 30 minutes."}
+                    ? " Listed suppliers will send prices."
+                    : " Nearby verified suppliers will send prices within 30 minutes."}
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
             {isMulti ? (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <Package className="h-4 w-4" /> Products
+                  <Package className="h-4 w-4" /> Products · quantities
                 </Label>
-                <ul className="divide-y divide-border overflow-hidden rounded-lg border">
+                <ul className="divide-y divide-border rounded-lg border">
                   {quoteLines!.map((line, idx) => {
                     const unit = getQuantityUnitNoun(line.priceType);
+                    const name = line.variantLabel
+                      ? line.title.includes(" · ")
+                        ? line.title.split(" · ")[0]
+                        : line.title
+                      : line.title;
+                    const variant =
+                      line.variantLabel ||
+                      (line.title.includes(" · ")
+                        ? line.title.split(" · ").slice(1).join(" · ")
+                        : "");
                     return (
-                    <li key={line.serviceId + idx} className="flex items-center gap-2 px-3 py-2">
-                      <p className="min-w-0 flex-1 truncate text-sm font-medium">{line.title}</p>
-                      <Input
-                        type="number"
-                        min={QUOTE_QTY_MIN}
-                        step="0.01"
-                        aria-label={`Quantity for ${line.title}`}
-                        className="h-9 w-20 shrink-0"
-                        value={lineQuantities[idx] ?? line.quantity ?? 1}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          setLineQuantities((prev) => {
-                            const copy = [...prev];
-                            copy[idx] = Number.isFinite(n) && n > 0 ? n : QUOTE_QTY_MIN;
-                            return copy;
-                          });
-                        }}
-                      />
-                      {unit ? (
-                        <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">
-                          {unit}
-                        </span>
-                      ) : null}
-                    </li>
+                      <li
+                        key={`${line.serviceId}-${line.catalogVariantId || idx}`}
+                        className="space-y-2 px-3 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold leading-snug text-foreground">
+                            {name}
+                          </p>
+                          {variant ? (
+                            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                              {variant}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                            Qty
+                          </span>
+                          <Input
+                            type="number"
+                            min={QUOTE_QTY_MIN}
+                            step="0.01"
+                            aria-label={`Quantity for ${line.title}`}
+                            className="h-9 max-w-[8rem] flex-1"
+                            value={lineQuantities[idx] ?? line.quantity ?? 1}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              setLineQuantities((prev) => {
+                                const copy = [...prev];
+                                copy[idx] = Number.isFinite(n) && n > 0 ? n : QUOTE_QTY_MIN;
+                                return copy;
+                              });
+                            }}
+                          />
+                          {unit ? (
+                            <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                              {unit}
+                            </span>
+                          ) : null}
+                        </div>
+                      </li>
                     );
                   })}
                 </ul>
               </div>
             ) : (
-            <div className="space-y-2">
-              <Label htmlFor="rfq-qty" className="flex items-center gap-2">
-                <Package className="h-4 w-4" /> Quantity
-                {quantityUnitLabel ? (
-                  <span className="font-normal text-muted-foreground">· {quantityUnitLabel}</span>
-                ) : null}
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="rfq-qty"
-                  type="number"
-                  min={QUOTE_QTY_MIN}
-                  step="0.01"
-                  value={quantity}
-                  onChange={(e) => {
-                    const n = Number(e.target.value);
-                    setQuantity(Number.isFinite(n) && n > 0 ? n : QUOTE_QTY_MIN);
-                  }}
-                  className="flex-1"
-                  aria-describedby={quantityUnit ? "rfq-qty-unit" : undefined}
-                />
-                {quantityUnit ? (
-                  <span
-                    id="rfq-qty-unit"
-                    className="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center rounded-md border border-input bg-muted/60 px-3 text-sm font-medium text-muted-foreground"
-                  >
-                    {quantityUnit}
-                  </span>
-                ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="rfq-qty" className="flex items-center gap-2">
+                  <Package className="h-4 w-4" /> Quantity
+                  {quantityUnitLabel ? (
+                    <span className="font-normal text-muted-foreground">· {quantityUnitLabel}</span>
+                  ) : null}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="rfq-qty"
+                    type="number"
+                    min={QUOTE_QTY_MIN}
+                    step="0.01"
+                    value={quantity}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      setQuantity(Number.isFinite(n) && n > 0 ? n : QUOTE_QTY_MIN);
+                    }}
+                    className="flex-1"
+                    aria-describedby={quantityUnit ? "rfq-qty-unit" : undefined}
+                  />
+                  {quantityUnit ? (
+                    <span
+                      id="rfq-qty-unit"
+                      className="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center rounded-md border border-input bg-muted/60 px-3 text-sm font-medium text-muted-foreground"
+                    >
+                      {quantityUnit}
+                    </span>
+                  ) : null}
+                </div>
               </div>
-            </div>
             )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -474,7 +498,7 @@ export function GetBestQuotesModal({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
