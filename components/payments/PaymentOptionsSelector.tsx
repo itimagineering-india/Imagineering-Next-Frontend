@@ -130,7 +130,7 @@ type PaymentOptionsSelectorProps = {
   className?: string;
   /** When true, shows Imagineering Credit if order is within available limit */
   showImagineeringCredit?: boolean;
-  /** B2B quote checkout: show partial (min 5%) + balance COD */
+  /** Show partial (min 5%) + balance on delivery — cart, machine rental, B2B quotes */
   showPartialPayment?: boolean;
 };
 
