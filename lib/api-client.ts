@@ -1492,6 +1492,8 @@ export const api = {
       receiptUrl?: string;
       couponUsageId?: string;
       creditsToApply?: number;
+      partialAmount?: number;
+      partialPaymentMethod?: string;
     }) =>
       apiRequest('/api/bookings/cart', {
         method: 'POST',
@@ -1603,6 +1605,7 @@ export const api = {
       hireMode: string;
       hours?: number;
       paymentMethod: string;
+      receiptUrl?: string;
       couponUsageId?: string;
       location: {
         address: string;
@@ -1664,7 +1667,11 @@ export const api = {
       startDate?: string;
       startTime?: string;
       paymentMethod: string;
+      receiptUrl?: string;
       couponUsageId?: string;
+      creditsToApply?: number;
+      partialAmount?: number;
+      partialPaymentMethod?: string;
       location: {
         address: string;
         city: string;
@@ -1679,6 +1686,8 @@ export const api = {
         status: string;
         requiresPayment: boolean;
         total: number;
+        partialAmount?: number;
+        balanceDue?: number;
         couponDiscount?: number;
         couponCode?: string;
       }>("/api/bookings/machine-rental", {
