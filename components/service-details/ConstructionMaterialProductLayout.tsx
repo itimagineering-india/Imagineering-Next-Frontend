@@ -77,6 +77,8 @@ export interface ConstructionMaterialProductLayoutProps {
   inQuoteList?: boolean;
   /** When true, always show quote CTAs (no add-to-cart). */
   forceQuoteCtas?: boolean;
+  /** When set, overrides range/exact for cart vs quote CTAs (per selected variant). */
+  allowAddToCart?: boolean;
   variantPicker?: ReactNode;
   /** Resolved unit price for selected variant (hybrid exact pricing). */
   unitPrice?: number | null;
@@ -132,13 +134,21 @@ export function ConstructionMaterialProductLayout({
   onAddToQuote,
   inQuoteList = false,
   forceQuoteCtas = false,
+  allowAddToCart: allowAddToCartProp,
   variantPicker,
   unitPrice,
   catalogVariantId,
 }: ConstructionMaterialProductLayoutProps) {
   const [overviewExpanded, setOverviewExpanded] = useState(false);
-  const canAddToCart = !forceQuoteCtas && showPricing && !isRangePrice && Boolean(service.id);
-  const showGetBestQuotes = forceQuoteCtas || isRangePrice;
+  const canAddToCart =
+    !forceQuoteCtas &&
+    showPricing &&
+    Boolean(service.id) &&
+    (allowAddToCartProp !== undefined ? allowAddToCartProp : !isRangePrice);
+  const showGetBestQuotes = !canAddToCart && (forceQuoteCtas || showPricing);
+  const sellerName =
+    String(service.provider?.businessName || "").trim() ||
+    String(service.provider?.name || "").trim();
   const categoryLink = categoryHref || `/services?category=${categorySlug}`;
   const relatedViewAll =
     viewAllHref ||
@@ -205,6 +215,12 @@ export function ConstructionMaterialProductLayout({
                 <h1 className="text-2xl font-bold leading-tight tracking-tight text-foreground xl:text-3xl">
                   {service.title}
                 </h1>
+                {sellerName ? (
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    Sold by{" "}
+                    <span className="font-semibold text-foreground">{sellerName}</span>
+                  </p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1 font-semibold text-foreground">
                     <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
@@ -268,7 +284,7 @@ export function ConstructionMaterialProductLayout({
               ) : canAddToCart ? (
                 <AddToCartButton
                   serviceId={service.id}
-                  providerName={service.provider?.name || service.provider?.businessName}
+                  providerName={sellerName || undefined}
                   label="Add to Cart"
                   className="h-12 w-full text-base font-semibold"
                   unitPrice={unitPrice ?? (typeof service.price === "number" ? service.price : null)}
@@ -397,7 +413,7 @@ export function ConstructionMaterialProductLayout({
                   {canAddToCart ? (
                     <AddToCartButton
                       serviceId={service.id}
-                      providerName={service.provider?.name || service.provider?.businessName}
+                      providerName={sellerName || undefined}
                       label="Add to Cart"
                       className="h-11 w-full font-semibold"
                       unitPrice={unitPrice ?? (typeof service.price === "number" ? service.price : null)}
@@ -490,6 +506,9 @@ export function ConstructionMaterialProductLayout({
           )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold leading-snug">{service.title}</p>
+            {sellerName ? (
+              <p className="truncate text-xs text-muted-foreground">Sold by {sellerName}</p>
+            ) : null}
             <p className="text-sm font-bold tabular-nums text-primary">
               {showPricing ? formattedPrice : "Get quote"}
             </p>
@@ -501,7 +520,7 @@ export function ConstructionMaterialProductLayout({
           {canAddToCart ? (
             <AddToCartButton
               serviceId={service.id}
-              providerName={service.provider?.name || service.provider?.businessName}
+              providerName={sellerName || undefined}
               label="Add to Cart"
               className="h-10 w-auto min-w-[120px] max-w-[180px] shrink-0 px-4 text-sm font-semibold sm:min-w-[140px] sm:px-5"
               unitPrice={unitPrice ?? (typeof service.price === "number" ? service.price : null)}
