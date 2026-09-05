@@ -39,6 +39,13 @@ import {
   PaymentOptionsSelector,
   type PaymentOption,
 } from "@/components/payments/PaymentOptionsSelector";
+import { SbiCollectPaymentPanel } from "@/components/payments/SbiCollectPaymentPanel";
+import { useSbiCollectPayment } from "@/components/payments/useSbiCollectPayment";
+import { PartialPaymentPanel } from "@/components/payments/PartialPaymentPanel";
+import {
+  computePartialBreakdown,
+  type PartialAdvanceMethod,
+} from "@/lib/partialPayment";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
 import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 import {
@@ -120,8 +127,17 @@ export function MachineRentalCheckoutClient() {
   const [offersOpen, setOffersOpen] = useState(false);
   const [creditsToApply, setCreditsToApply] = useState(0);
   const [creditsDiscount, setCreditsDiscount] = useState(0);
+  const [partialAmountInput, setPartialAmountInput] = useState("");
+  const [partialAdvanceMethod, setPartialAdvanceMethod] =
+    useState<PartialAdvanceMethod>("razorpay");
+  const [pendingPartialCharge, setPendingPartialCharge] = useState<number | null>(null);
   const appliedCouponRef = useRef<AppliedCoupon | null>(null);
   appliedCouponRef.current = appliedCoupon;
+
+  const sbiEnabled =
+    paymentMethod === "sbicollect" ||
+    (paymentMethod === "partial" && partialAdvanceMethod === "sbicollect");
+  const sbi = useSbiCollectPayment({ enabled: sbiEnabled });
 
   const priceType = String(selectedPriceType || preview?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
@@ -241,6 +257,18 @@ export function MachineRentalCheckoutClient() {
   }, [appliedCoupon, preview?.total]);
 
   const paymentAmount = Math.max(0, payableTotal - creditsDiscount);
+  const partialBreakdown = useMemo(
+    () => computePartialBreakdown(paymentAmount, partialAmountInput),
+    [paymentAmount, partialAmountInput]
+  );
+  const partialAmount = partialBreakdown.partialAmount;
+
+  useEffect(() => {
+    if (paymentMethod !== "partial") return;
+    if (!partialAmountInput.trim()) {
+      setPartialAmountInput(String(computePartialBreakdown(paymentAmount).partialAmount));
+    }
+  }, [paymentMethod, paymentAmount, partialAmountInput]);
 
   const handleCreditsChange = useCallback((credits: number, discount: number) => {
     setCreditsToApply(credits);
@@ -336,7 +364,7 @@ export function MachineRentalCheckoutClient() {
     [router]
   );
 
-  const createBooking = useCallback(async () => {
+  const createBooking = useCallback(async (receiptUrl?: string) => {
     if (!selectedAddress) {
       toast({ title: t("checkoutAddressRequired"), variant: "destructive" });
       return null;
@@ -390,8 +418,16 @@ export function MachineRentalCheckoutClient() {
       startDate: startDatePayload,
       startTime: startTime || undefined,
       paymentMethod,
+      receiptUrl: receiptUrl || undefined,
       couponUsageId: appliedCoupon?.usageId,
+      creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
       notes: notes.trim() || undefined,
+      ...(paymentMethod === "partial"
+        ? {
+            partialAmount,
+            partialPaymentMethod: partialAdvanceMethod,
+          }
+        : {}),
       location: {
         address: formatSavedAddressLine(selectedAddress),
         city: selectedAddress.city,
@@ -407,13 +443,17 @@ export function MachineRentalCheckoutClient() {
       bookingId: string;
       requiresPayment?: boolean;
       total?: number;
+      partialAmount?: number;
     };
   }, [
     appliedCoupon?.usageId,
+    creditsToApply,
     duration,
     machineCount,
     needsDuration,
     notes,
+    partialAdvanceMethod,
+    partialAmount,
     paymentMethod,
     priceType,
     selectedAddress,
@@ -425,24 +465,70 @@ export function MachineRentalCheckoutClient() {
   ]);
 
   const onConfirm = async () => {
+    if (
+      (paymentMethod === "sbicollect" ||
+        (paymentMethod === "partial" && partialAdvanceMethod === "sbicollect")) &&
+      !sbi.hasReceipt
+    ) {
+      sbi.openLink();
+      return;
+    }
+    if (paymentMethod === "partial") {
+      if (!(partialAmount >= partialBreakdown.minPartialAmount - 0.001)) {
+        toast({
+          title: "Invalid advance amount",
+          description: `Pay at least ₹${partialBreakdown.minPartialAmount.toLocaleString("en-IN")} (5% of order total).`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     setSubmitting(true);
     try {
-      const created = await createBooking();
+      let receiptUrl: string | undefined;
+      if (
+        paymentMethod === "sbicollect" ||
+        (paymentMethod === "partial" && partialAdvanceMethod === "sbicollect")
+      ) {
+        receiptUrl = await sbi.uploadReceipt();
+      }
+      const created = await createBooking(receiptUrl);
       if (!created) return;
-      if (created.requiresPayment && (paymentMethod === "razorpay" || paymentMethod === "cashfree")) {
+      const onlineAdvance =
+        paymentMethod === "razorpay" ||
+        paymentMethod === "cashfree" ||
+        (paymentMethod === "partial" &&
+          (partialAdvanceMethod === "razorpay" || partialAdvanceMethod === "cashfree"));
+      if (created.requiresPayment && onlineAdvance) {
+        setPendingPartialCharge(
+          paymentMethod === "partial"
+            ? Number(created.partialAmount ?? partialAmount)
+            : null
+        );
         setPendingPayBookingId(created.bookingId);
         return;
       }
-      toast({
-        title:
-          paymentMethod === "imagineering_credit"
-            ? "Payment successful"
-            : t("checkoutSuccessTitle"),
-        description:
-          paymentMethod === "imagineering_credit"
-            ? `Paid using ${IMAGINEERING_CREDIT.name} · ₹${payableTotal.toLocaleString("en-IN")}`
-            : t("checkoutSuccessBody"),
-      });
+      if (paymentMethod === "sbicollect" || (paymentMethod === "partial" && partialAdvanceMethod === "sbicollect")) {
+        sbi.clearReceipt();
+        toast({
+          title: "Order placed",
+          description:
+            paymentMethod === "partial"
+              ? "Advance receipt uploaded. Remaining balance is due on delivery."
+              : "Admin will verify your receipt and confirm the payment.",
+        });
+      } else {
+        toast({
+          title:
+            paymentMethod === "imagineering_credit"
+              ? "Payment successful"
+              : t("checkoutSuccessTitle"),
+          description:
+            paymentMethod === "imagineering_credit"
+              ? `Paid using ${IMAGINEERING_CREDIT.name} · ₹${payableTotal.toLocaleString("en-IN")}`
+              : t("checkoutSuccessBody"),
+        });
+      }
       goSuccess(created.bookingId);
     } catch (err) {
       toast({
@@ -465,50 +551,105 @@ export function MachineRentalCheckoutClient() {
   }
 
   const total = paymentAmount;
+  const chargeNow =
+    pendingPartialCharge != null && pendingPartialCharge > 0
+      ? pendingPartialCharge
+      : total;
   const showOnlinePay =
-    pendingPayBookingId && (paymentMethod === "razorpay" || paymentMethod === "cashfree");
+    pendingPayBookingId &&
+    (paymentMethod === "razorpay" ||
+      paymentMethod === "cashfree" ||
+      (paymentMethod === "partial" &&
+        (partialAdvanceMethod === "razorpay" || partialAdvanceMethod === "cashfree")));
 
   const confirmLabel =
     paymentMethod === "cod"
       ? t("checkoutConfirmCod")
-      : paymentMethod === "imagineering_credit"
-        ? `Confirm · ${IMAGINEERING_CREDIT.name}`
-        : t("checkoutPay");
+      : paymentMethod === "sbicollect" ||
+          (paymentMethod === "partial" && partialAdvanceMethod === "sbicollect")
+        ? sbi.hasReceipt
+          ? paymentMethod === "partial"
+            ? "Place order (partial · SBI Collect)"
+            : "Place order (SBI Collect)"
+          : paymentMethod === "partial"
+            ? `Pay via SBI Collect · ₹${partialAmount.toLocaleString("en-IN")}`
+            : "Pay via SBI Collect"
+        : paymentMethod === "imagineering_credit"
+          ? `Confirm · ${IMAGINEERING_CREDIT.name}`
+          : paymentMethod === "partial"
+            ? `Pay ₹${partialAmount.toLocaleString("en-IN")} now`
+            : t("checkoutPay");
 
   const renderPayButton = () => {
-    if (showOnlinePay && paymentMethod === "razorpay" && pendingPayBookingId) {
+    const onlineMethod =
+      paymentMethod === "partial" ? partialAdvanceMethod : paymentMethod;
+    if (showOnlinePay && onlineMethod === "razorpay" && pendingPayBookingId) {
       return (
         <RazorpayCheckout
           bookingId={pendingPayBookingId}
-          amount={total}
+          amount={chargeNow}
           couponUsageId={appliedCoupon?.usageId}
-          creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+          creditsToApply={
+            paymentMethod === "partial"
+              ? undefined
+              : creditsToApply > 0
+                ? creditsToApply
+                : undefined
+          }
           bookingDescription={`Machine rental · ${serviceTitle}`}
+          bookingPayload={
+            paymentMethod === "partial"
+              ? {
+                  paymentMethod: "partial",
+                  partialAmount: chargeNow,
+                  partialPaymentMethod: "razorpay",
+                }
+              : undefined
+          }
           className="h-11 w-full rounded-xl font-semibold"
           onSuccess={() => goSuccess(pendingPayBookingId)}
           onError={(msg) =>
             toast({ title: t("checkoutError"), description: msg, variant: "destructive" })
           }
         >
-          {t("checkoutPay")}
+          {paymentMethod === "partial"
+            ? `Pay ₹${chargeNow.toLocaleString("en-IN")} now`
+            : t("checkoutPay")}
         </RazorpayCheckout>
       );
     }
-    if (showOnlinePay && paymentMethod === "cashfree" && pendingPayBookingId) {
+    if (showOnlinePay && onlineMethod === "cashfree" && pendingPayBookingId) {
       return (
         <CashfreeCheckout
           bookingId={pendingPayBookingId}
-          amount={total}
+          amount={chargeNow}
           couponUsageId={appliedCoupon?.usageId}
-          creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+          creditsToApply={
+            paymentMethod === "partial"
+              ? undefined
+              : creditsToApply > 0
+                ? creditsToApply
+                : undefined
+          }
           bookingDescription={`Machine rental · ${serviceTitle}`}
+          bookingPayload={
+            paymentMethod === "partial"
+              ? {
+                  paymentMethod: "partial",
+                  partialAmount: chargeNow,
+                  partialPaymentMethod: "cashfree",
+                }
+              : undefined
+          }
           className="h-11 w-full rounded-xl font-semibold"
           onSuccess={() => goSuccess(pendingPayBookingId)}
           onError={(msg) =>
             toast({ title: t("checkoutError"), description: msg, variant: "destructive" })
           }
         >
-          {t("checkoutPay")}
+          {paymentMethod === "partial"
+            ? `Pay ₹${chargeNow.toLocaleString("en-IN")} now`
+            : t("checkoutPay")}
         </CashfreeCheckout>
       );
     }
@@ -921,10 +1062,60 @@ export function MachineRentalCheckoutClient() {
                     setCreditsToApply(0);
                     setCreditsDiscount(0);
                   }
+                  if (v !== "sbicollect" && !(v === "partial" && partialAdvanceMethod === "sbicollect")) {
+                    sbi.clearReceipt();
+                  }
+                  if (v === "partial") {
+                    setPartialAmountInput(
+                      String(computePartialBreakdown(paymentAmount).partialAmount)
+                    );
+                  }
                 }}
                 amount={paymentMethod === "imagineering_credit" ? payableTotal : paymentAmount}
                 showImagineeringCredit={canUseImagineeringCredit}
+                showPartialPayment
               />
+              {paymentMethod === "partial" ? (
+                <div className="mt-4">
+                  <PartialPaymentPanel
+                    orderTotal={paymentAmount}
+                    amountInput={partialAmountInput}
+                    onAmountInputChange={setPartialAmountInput}
+                    advanceMethod={partialAdvanceMethod}
+                    onAdvanceMethodChange={(m) => {
+                      setPartialAdvanceMethod(m);
+                      if (m !== "sbicollect") sbi.clearReceipt();
+                    }}
+                  >
+                    {partialAdvanceMethod === "sbicollect" ? (
+                      <div className="mt-3 space-y-3 border-t pt-3">
+                        <SbiCollectPaymentPanel
+                          amount={partialAmount}
+                          details={sbi.details}
+                          loading={sbi.loading}
+                          receiptFile={sbi.receiptFile}
+                          onReceiptFileChange={sbi.setReceiptFile}
+                          onOpenLink={() => sbi.openLink()}
+                          inputId="mr-partial-sbicollect-receipt-upload"
+                        />
+                      </div>
+                    ) : null}
+                  </PartialPaymentPanel>
+                </div>
+              ) : null}
+              {paymentMethod === "sbicollect" ? (
+                <div className="mt-4">
+                  <SbiCollectPaymentPanel
+                    amount={paymentAmount}
+                    details={sbi.details}
+                    loading={sbi.loading}
+                    receiptFile={sbi.receiptFile}
+                    onReceiptFileChange={sbi.setReceiptFile}
+                    onOpenLink={() => sbi.openLink()}
+                    inputId="mr-sbicollect-receipt-upload"
+                  />
+                </div>
+              ) : null}
               <ImagineeringCreditCheckoutPanel
                 orderTotal={payableTotal}
                 selected={paymentMethod === "imagineering_credit"}
