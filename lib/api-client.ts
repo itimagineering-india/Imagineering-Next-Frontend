@@ -1636,6 +1636,7 @@ export const api = {
       serviceId: string;
       machineCount: number;
       duration: number;
+      priceType?: string;
     }) =>
       apiRequest<{
         subtotal: number;
@@ -1659,6 +1660,7 @@ export const api = {
       serviceId: string;
       machineCount: number;
       duration: number;
+      priceType?: string;
       startDate?: string;
       startTime?: string;
       paymentMethod: string;
