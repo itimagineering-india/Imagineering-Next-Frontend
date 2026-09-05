@@ -198,6 +198,7 @@ export const CONSTRUCTION_MATERIAL_FORM_KEYS: readonly string[] = [
   "loadingUnloading",
   "providerVariants",
   "providerVariantAxes",
+  "providerVariantPrices",
 ];
 
 /**
