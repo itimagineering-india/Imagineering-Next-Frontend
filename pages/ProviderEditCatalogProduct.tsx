@@ -6,12 +6,16 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import api from "@/lib/api-client";
 import { CatalogProductsPage } from "@/components/services/catalog/CatalogProductsPage";
+import { MachineRentalFormPage } from "@/components/services/catalog/MachineRentalFormPage";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { isMachineRentalListing } from "@/lib/machineRental";
 
 export async function getServerSideProps() {
   return { props: {} };
 }
+
+type EditKind = "cm" | "rental" | null;
 
 export default function ProviderEditCatalogProduct() {
   const params = useParams();
@@ -19,6 +23,7 @@ export default function ProviderEditCatalogProduct() {
   const serviceId = typeof params?.id === "string" ? params.id : "";
 
   const [loading, setLoading] = useState(true);
+  const [editKind, setEditKind] = useState<EditKind>(null);
   const [subcategory, setSubcategory] = useState("");
   const [catalogProductId, setCatalogProductId] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -45,16 +50,25 @@ export default function ProviderEditCatalogProduct() {
           subcategory?: string;
           catalogProductId?: string;
           category?: { slug?: string } | string;
+          metadata?: Record<string, unknown>;
+          formVariant?: string;
         };
         const cat = svc.category;
         const catSlug =
           cat && typeof cat === "object" && cat !== null && "slug" in cat
             ? String((cat as { slug?: string }).slug ?? "")
             : "";
+
+        if (isMachineRentalListing(svc)) {
+          setEditKind("rental");
+          return;
+        }
+
         if (!isConstructionMaterialsCategorySlug(catSlug) && !isB2bCategorySlug(catSlug)) {
           router.replace("/dashboard/provider/services");
           return;
         }
+        setEditKind("cm");
         setSubcategory(svc.subcategory || "");
         setCatalogProductId(svc.catalogProductId || null);
       } catch {
@@ -86,6 +100,10 @@ export default function ProviderEditCatalogProduct() {
         </Button>
       </div>
     );
+  }
+
+  if (editKind === "rental") {
+    return <MachineRentalFormPage serviceId={serviceId} />;
   }
 
   return (
