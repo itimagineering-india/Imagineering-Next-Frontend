@@ -49,6 +49,18 @@ import { AddToCartButton } from "@/components/services/AddToCartButton";
 import { BestSupplierCard } from "@/components/routing/BestSupplierCard";
 import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
+import {
+  catalogAxisOptionValues,
+  catalogVariantLabel,
+  defaultVariantSelection,
+  findCatalogVariant,
+  parseProviderVariantPrices,
+  readCatalogVariants,
+  resolveExactPriceForVariant,
+  resolveProviderAxisSelection,
+  selectionAfterAxisChange,
+} from "@/lib/catalogVariants";
+import type { CatalogProductItem } from "@/lib/productCatalog";
 import { useTranslation } from "react-i18next";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
@@ -66,6 +78,11 @@ const EXCLUDED_METADATA_KEYS = new Set([
   "category",
   "subcategory",
   "location",
+  "providerVariants",
+  "providerVariantAxes",
+  "providerVariantPrices",
+  "formVariant",
+  "materialType",
 ]);
 
 function toReadableFieldLabel(key: string): string {
@@ -194,6 +211,7 @@ interface ServiceData {
     type: 'text' | 'number' | 'boolean' | 'select';
   }>;
   metadata?: Record<string, unknown>;
+  catalogProductId?: string;
 }
 
 export default function ServiceDetails() {
@@ -212,6 +230,8 @@ export default function ServiceDetails() {
   const [quotesModalOpen, setQuotesModalOpen] = useState(false);
   const [offersModalOpen, setOffersModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [catalogProduct, setCatalogProduct] = useState<CatalogProductItem | null>(null);
+  const [variantSel, setVariantSel] = useState<Record<string, string>>({});
   const [service, setService] = useState<ServiceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -358,6 +378,9 @@ export default function ServiceDetails() {
             tags: serviceData.tags || [],
             featured: serviceData.featured || false,
             metadata: serviceData.metadata,
+            catalogProductId: serviceData.catalogProductId
+              ? String(serviceData.catalogProductId)
+              : undefined,
             customFields:
               serviceData.customFields && serviceData.customFields.length > 0
                 ? serviceData.customFields
@@ -445,6 +468,149 @@ export default function ServiceDetails() {
     () => isConstructionMaterialsCategorySlug(categorySlug),
     [categorySlug],
   );
+
+  useEffect(() => {
+    const catalogId = service?.catalogProductId;
+    if (!catalogId || !isConstructionMaterialPage) {
+      setCatalogProduct(null);
+      setVariantSel({});
+      return;
+    }
+    let cancelled = false;
+    api.productCatalog
+      .getById(catalogId)
+      .then((res) => {
+        if (cancelled || !res.success) return;
+        const product = ((res.data as { product?: CatalogProductItem })?.product ||
+          res.data) as CatalogProductItem;
+        if (!product?._id) return;
+        setCatalogProduct(product);
+        const parsed = readCatalogVariants(product as unknown as Record<string, unknown>);
+        if (parsed.hasVariants) {
+          const axesSel = resolveProviderAxisSelection(product, service?.metadata || null);
+          const defaults = defaultVariantSelection(parsed.variantAxes, parsed.variants);
+          // Prefer a sellable combination when provider limited axes.
+          const preferred: Record<string, string> = { ...defaults };
+          for (const axis of parsed.variantAxes) {
+            const allowed = axesSel[axis.key] || [];
+            if (allowed.length && !allowed.includes(preferred[axis.key] || "")) {
+              preferred[axis.key] = allowed[0];
+            }
+          }
+          setVariantSel(preferred);
+        } else {
+          setVariantSel({});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogProduct(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service?.catalogProductId, service?.metadata, isConstructionMaterialPage]);
+
+  const catalogVariants = useMemo(
+    () => readCatalogVariants((catalogProduct || undefined) as Record<string, unknown> | undefined),
+    [catalogProduct],
+  );
+
+  const providerAxisSel = useMemo(
+    () =>
+      catalogProduct
+        ? resolveProviderAxisSelection(catalogProduct, service?.metadata || null)
+        : {},
+    [catalogProduct, service?.metadata],
+  );
+
+  const selectedCatalogVariant = useMemo(() => {
+    if (!catalogVariants.hasVariants) return undefined;
+    return findCatalogVariant(
+      catalogVariants.variants,
+      variantSel,
+      catalogVariants.variantAxes,
+    );
+  }, [catalogVariants, variantSel]);
+
+  const variantPrices = useMemo(
+    () => parseProviderVariantPrices(service?.metadata || null),
+    [service?.metadata],
+  );
+
+  const resolvedUnitPrice = useMemo(() => {
+    if (!service || isRangePrice) return null;
+    return resolveExactPriceForVariant(
+      service.price,
+      variantPrices,
+      selectedCatalogVariant?.id,
+    );
+  }, [service, isRangePrice, variantPrices, selectedCatalogVariant?.id]);
+
+  const displayFormattedPrice = useMemo(() => {
+    if (!service) return "";
+    if (isRangePrice || resolvedUnitPrice == null) return formattedServicePrice;
+    return formatServicePrice({
+      ...service,
+      price: resolvedUnitPrice,
+      priceMode: "exact",
+    });
+  }, [service, isRangePrice, resolvedUnitPrice, formattedServicePrice]);
+
+  const variantPickerNode = useMemo(() => {
+    if (!catalogVariants.hasVariants || !canAddToCart) return null;
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {catalogVariants.variantAxes.map((axis) => {
+          const allValues = catalogAxisOptionValues(axis, catalogVariants.variants);
+          const allowed = providerAxisSel[axis.key] || [];
+          const values = allowed.length
+            ? allValues.filter((v) => allowed.includes(v))
+            : allValues;
+          if (!values.length) return null;
+          return (
+            <label key={axis.key} className="space-y-1 text-sm">
+              <span className="font-medium text-foreground">{axis.label}</span>
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={variantSel[axis.key] || ""}
+                onChange={(e) =>
+                  setVariantSel((prev) =>
+                    selectionAfterAxisChange(
+                      catalogVariants.variantAxes,
+                      catalogVariants.variants,
+                      prev,
+                      axis.key,
+                      e.target.value,
+                    ),
+                  )
+                }
+              >
+                {values.map((val) => (
+                  <option key={val} value={val}>
+                    {val}
+                  </option>
+                ))}
+              </select>
+            </label>
+          );
+        })}
+        {selectedCatalogVariant && Object.keys(variantPrices).length > 0 ? (
+          <p className="sm:col-span-2 text-xs text-muted-foreground">
+            Showing price for{" "}
+            {catalogVariantLabel(selectedCatalogVariant, catalogVariants.variantAxes)}.
+            Other sizes may differ if the supplier set overrides.
+          </p>
+        ) : null}
+      </div>
+    );
+  }, [
+    canAddToCart,
+    catalogVariants,
+    providerAxisSel,
+    selectedCatalogVariant,
+    variantPrices,
+    variantSel,
+  ]);
 
   const specFields = useMemo(() => {
     if (!service) return [];
@@ -865,7 +1031,7 @@ export default function ServiceDetails() {
                 service={service}
                 categoryName={categoryName}
                 categorySlug={categorySlug}
-                formattedPrice={formattedServicePrice}
+                formattedPrice={displayFormattedPrice}
                 isRangePrice={isRangePrice}
                 showPricing={showPricing}
                 specFields={specFields}
@@ -875,6 +1041,9 @@ export default function ServiceDetails() {
                 onShare={handleShare}
                 onFavorite={handleToggleFavorite}
                 isSaved={isSaved}
+                variantPicker={variantPickerNode}
+                unitPrice={resolvedUnitPrice}
+                catalogVariantId={selectedCatalogVariant?.id}
               />
             )}
 
@@ -968,7 +1137,7 @@ export default function ServiceDetails() {
                               {!isRangePrice && service.mrp != null && service.mrp > service.price && (
                                 <span className="text-lg font-semibold tabular-nums text-muted-foreground line-through">₹{service.mrp.toLocaleString()}</span>
                               )}
-                              <span className="min-w-0 break-words text-3xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">{formattedServicePrice}</span>
+                              <span className="min-w-0 break-words text-3xl font-extrabold tabular-nums tracking-[-0.04em] text-primary sm:text-5xl lg:text-[52px]">{displayFormattedPrice}</span>
                               {isRangePrice && <Badge variant="outline" className="mb-1">Enquiry only</Badge>}
                             </div>
                           ) : (
@@ -1037,7 +1206,8 @@ export default function ServiceDetails() {
                           className="h-12 w-full text-base font-semibold"
                           priceType={service.priceType}
                           categorySlug={categorySlug}
-                          unitPrice={typeof service.price === "number" ? service.price : Number(service.price) || null}
+                          unitPrice={resolvedUnitPrice ?? (typeof service.price === "number" ? service.price : Number(service.price) || null)}
+                          catalogVariantId={selectedCatalogVariant?.id}
                         />
                       ) : showPricing && isRangePrice ? (
                         <Button onClick={handleGetBestQuotes} className="h-12 w-full text-base font-semibold">
@@ -1251,7 +1421,8 @@ export default function ServiceDetails() {
                 className="h-11 w-full text-sm font-semibold"
                 priceType={service.priceType}
                 categorySlug={categorySlug}
-                unitPrice={typeof service.price === "number" ? service.price : Number(service.price) || null}
+                unitPrice={resolvedUnitPrice ?? (typeof service.price === "number" ? service.price : Number(service.price) || null)}
+                catalogVariantId={selectedCatalogVariant?.id}
               />
             ) : showPricing && isRangePrice ? (
               <Button onClick={handleGetBestQuotes} className="h-11 w-full text-sm font-semibold">
