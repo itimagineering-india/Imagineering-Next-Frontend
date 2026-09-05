@@ -386,3 +386,23 @@ export function resolveExactPriceForVariant(
   if (Number.isFinite(override) && override > 0) return override;
   return base;
 }
+
+/**
+ * Buyer can add this size to cart when:
+ * - provider set a per-variant exact ₹, or
+ * - listing is Exact mode with a default price (applies to all offered sizes).
+ * Range listings without a variant override → Get Quotes only.
+ */
+export function variantAllowsAddToCart(opts: {
+  priceMode?: string | null;
+  defaultPrice?: number | null;
+  variantPrices?: ProviderVariantPrices | null;
+  catalogVariantId?: string | null;
+}): boolean {
+  const id = String(opts.catalogVariantId || "").trim();
+  const override = id ? Number(opts.variantPrices?.[id]) : NaN;
+  if (Number.isFinite(override) && override > 0) return true;
+  if (String(opts.priceMode || "").toLowerCase() === "range") return false;
+  const base = Number(opts.defaultPrice);
+  return Number.isFinite(base) && base > 0;
+}
