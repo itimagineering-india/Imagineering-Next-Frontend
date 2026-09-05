@@ -47,9 +47,9 @@ type Props = {
 };
 
 function toReadableText(raw: unknown): string {
-  if (raw == null) return "—";
+  if (raw == null) return "";
   const text = String(raw).trim();
-  if (!text) return "—";
+  if (!text) return "";
   return text
     // camelCase → "camel Case"
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -58,6 +58,43 @@ function toReadableText(raw: unknown): string {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isPlaceholderSpecValue(raw: unknown): boolean {
+  const n = String(raw ?? "")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (
+    !n ||
+    n === "—" ||
+    n === "-" ||
+    n === "brand" ||
+    n === "not specified" ||
+    n === "n/a" ||
+    n === "na" ||
+    n === "custom" ||
+    n === "select" ||
+    n === "none"
+  );
+}
+
+/** Collapse Brand / Steel Brand / Tile Brand into one key. */
+function normalizeSpecKey(label: string): string {
+  const n = label.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  if (
+    n === "brand" ||
+    n === "steelbrand" ||
+    n === "tilebrand" ||
+    n === "brandname" ||
+    n === "make" ||
+    n === "manufacturer" ||
+    n.endsWith("brand")
+  ) {
+    return "brand";
+  }
+  return n;
 }
 
 function similarToServiceCard(product: MaterialsProduct) {
@@ -210,43 +247,89 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
 
   const specs = useMemo(() => {
     const rows: { label: string; value: string }[] = [];
-    if (mapped?.brand) rows.push({ label: "Brand", value: mapped.brand });
-    if (mapped?.grade && !catalogVariants.hasVariants) {
-      rows.push({ label: "Grade / Spec", value: mapped.grade });
-    }
-    if (mapped?.avgDeliveryDays) {
-      rows.push({ label: "Avg delivery", value: `${mapped.avgDeliveryDays} days` });
-    }
-    if (selectedVariant) {
-      catalogVariants.variantAxes.forEach((axis) => {
-        const val = selectedVariant.attributes?.[axis.key];
-        if (val) rows.push({ label: axis.label, value: val });
+    const seen = new Set<string>();
+
+    const pushRow = (label: string, value: unknown) => {
+      const lab = String(label || "").trim();
+      const val = typeof value === "number" ? String(value) : toReadableText(value);
+      if (!lab || isPlaceholderSpecValue(val)) return;
+      const key = normalizeSpecKey(lab);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      rows.push({
+        label: key === "brand" ? "Brand" : lab,
+        value: val,
       });
-    }
+    };
+
     const meta =
       raw?.metadata && typeof raw.metadata === "object"
         ? (raw.metadata as Record<string, unknown>)
         : {};
+    const resolveSelect = (key: string, customKey: string) => {
+      const v = String(meta[key] ?? "").trim();
+      const custom = String(meta[customKey] ?? "").trim();
+      if (v.toLowerCase() === "custom" && custom) return custom;
+      return v;
+    };
+
+    // One Brand: whatever was saved/selected on the catalog product (not a fixed brand)
+    pushRow(
+      "Brand",
+      raw?.brand ||
+        mapped?.brand ||
+        resolveSelect("brand", "brandCustom") ||
+        resolveSelect("steelBrand", "steelBrandCustom") ||
+        resolveSelect("tileBrand", "tileBrandCustom") ||
+        "",
+    );
+
+    if (mapped?.grade && !catalogVariants.hasVariants) {
+      pushRow("Grade / Spec", mapped.grade);
+    }
+    if (mapped?.avgDeliveryDays) {
+      pushRow("Avg delivery", `${mapped.avgDeliveryDays} days`);
+    }
+    if (selectedVariant) {
+      for (const axis of catalogVariants.variantAxes) {
+        pushRow(axis.label, selectedVariant.attributes?.[axis.key]);
+      }
+    }
+
     const skipMeta = new Set([
       "formVariant",
+      "materialType",
+      "brand",
+      "brandCustom",
+      "steelBrand",
+      "steelBrandCustom",
+      "tileBrand",
+      "tileBrandCustom",
+      "avgDeliveryDays",
+      "deliveryDays",
       ...(catalogVariants.hasVariants
-        ? ["steelGrade", "steelSize", "steelCustomSize", "steelGradeCustom"]
+        ? [
+            "steelGrade",
+            "steelSize",
+            "steelCustomSize",
+            "steelGradeCustom",
+            "steelType",
+            "steelTypeCustom",
+          ]
         : []),
     ]);
     Object.entries(meta).forEach(([k, v]) => {
       if (v == null || v === "") return;
       if (skipMeta.has(k)) return;
-      rows.push({ label: toReadableText(k), value: toReadableText(v) });
+      if (/Custom$/i.test(k)) return;
+      pushRow(toReadableText(k), v);
     });
+
     const custom = Array.isArray(raw?.customFields)
       ? (raw!.customFields as Array<{ label?: string; value?: string }>)
       : [];
     custom.forEach((field) => {
-      if (!field?.label && !field?.value) return;
-      rows.push({
-        label: String(field.label || "Spec").trim(),
-        value: String(field.value || "—").trim(),
-      });
+      pushRow(String(field.label || "").trim(), field.value);
     });
     return rows;
   }, [catalogVariants, mapped, raw, selectedVariant]);
@@ -519,7 +602,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
             rating: mapped.rating ?? 4.5,
             reviewCount: mapped.reviewCount ?? 0,
             subcategory: subcategoryLabel,
-            provider: { name: mapped.brand, businessName: mapped.brand },
+            provider: { name: mapped.brand || mapped.name, businessName: mapped.brand || mapped.name },
           }}
           categoryName={hubLabel}
           categorySlug={isB2b ? "b2b-services" : "construction-materials"}
