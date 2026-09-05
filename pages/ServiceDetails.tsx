@@ -59,10 +59,11 @@ import {
   resolveExactPriceForVariant,
   resolveProviderAxisSelection,
   selectionAfterAxisChange,
+  variantAllowsAddToCart,
 } from "@/lib/catalogVariants";
 import type { CatalogProductItem } from "@/lib/productCatalog";
 import { useTranslation } from "react-i18next";
-import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { isConstructionMaterialsCategorySlug, CONSTRUCTION_SELECT_TO_CUSTOM } from "@/lib/constructionMaterials";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import type { ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
@@ -85,8 +86,25 @@ const EXCLUDED_METADATA_KEYS = new Set([
   "materialType",
 ]);
 
+const CUSTOM_FIELD_KEYS = new Set(Object.values(CONSTRUCTION_SELECT_TO_CUSTOM));
+
 function toReadableFieldLabel(key: string): string {
   return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Turn slug-like values (structural_steel, jsw_steel) into readable text. */
+function toReadableFieldValue(raw: unknown): string {
+  if (raw == null) return "";
+  if (typeof raw === "boolean") return raw ? "Yes" : "No";
+  if (typeof raw === "number") return String(raw);
+  const text = String(raw).trim();
+  if (!text) return "";
+  return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -108,31 +126,48 @@ function metadataToCustomFields(metadata: unknown): Array<{
 }> {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return [];
 
+  const meta = metadata as Record<string, unknown>;
   const out: Array<{
     label: string;
     value: string | number | boolean;
     type: "text" | "number" | "boolean" | "select";
   }> = [];
 
-  for (const [key, rawValue] of Object.entries(metadata as Record<string, unknown>)) {
+  for (const [key, rawValue] of Object.entries(meta)) {
     if (EXCLUDED_METADATA_KEYS.has(key)) continue;
+    if (CUSTOM_FIELD_KEYS.has(key)) continue;
+    if (/Custom$/i.test(key) || key.includes("Custom")) continue;
     if (rawValue === null || rawValue === undefined) continue;
 
     if (typeof rawValue === "string") {
-      const v = rawValue.trim();
+      let v = rawValue.trim();
       if (!v) continue;
-      out.push({ label: toReadableFieldLabel(key), value: v, type: "text" });
+      const customKey = CONSTRUCTION_SELECT_TO_CUSTOM[key];
+      if (customKey) {
+        const customVal = String(meta[customKey] || "").trim();
+        if (v.toLowerCase() === "custom" && customVal) v = customVal;
+        else if (customVal && !v) v = customVal;
+      }
+      out.push({
+        label: toReadableFieldLabel(key),
+        value: toReadableFieldValue(v),
+        type: "text",
+      });
       continue;
     }
 
     if (typeof rawValue === "number" || typeof rawValue === "boolean") {
-      out.push({ label: toReadableFieldLabel(key), value: rawValue, type: inferFieldType(rawValue) });
+      out.push({
+        label: toReadableFieldLabel(key),
+        value: typeof rawValue === "boolean" ? (rawValue ? "Yes" : "No") : rawValue,
+        type: inferFieldType(rawValue),
+      });
       continue;
     }
 
     if (Array.isArray(rawValue)) {
       const joined = rawValue
-        .map((item) => (item == null ? "" : String(item).trim()))
+        .map((item) => toReadableFieldValue(item))
         .filter(Boolean)
         .join(", ");
       if (joined) {
@@ -140,16 +175,40 @@ function metadataToCustomFields(metadata: unknown): Array<{
       }
       continue;
     }
-
-    if (typeof rawValue === "object") {
-      const serialized = JSON.stringify(rawValue);
-      if (serialized && serialized !== "{}") {
-        out.push({ label: toReadableFieldLabel(key), value: serialized, type: "text" });
-      }
-    }
   }
 
   return out;
+}
+
+/** Collapse duplicated title/description blocks from catalog listing payloads. */
+function cleanServiceOverviewDescription(
+  title: string,
+  description: string,
+  catalogDescription?: string | null,
+): string {
+  const catalogDesc = String(catalogDescription || "").trim();
+  const raw = String(description || "").trim();
+  const parts = raw
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const unique: string[] = [];
+  for (const part of parts) {
+    if (!unique.some((u) => u.toLowerCase() === part.toLowerCase())) unique.push(part);
+  }
+  let text = unique.join("\n\n").trim();
+  const titleNorm = String(title || "")
+    .trim()
+    .toLowerCase();
+  const looksLikeTitleOnly =
+    !text ||
+    unique.every((p) => {
+      const n = p.toLowerCase();
+      return n === titleNorm || n === `${titleNorm} ${titleNorm}`;
+    });
+  if (looksLikeTitleOnly && catalogDesc) return catalogDesc;
+  if (!text && catalogDesc) return catalogDesc;
+  return text || catalogDesc || "";
 }
 
 interface ServiceData {
@@ -163,6 +222,7 @@ interface ServiceData {
   priceMax?: number;
   mrp?: number;
   priceType: string;
+  brandName?: string;
   images: string[];
   category: {
     _id: string;
@@ -343,6 +403,7 @@ export default function ServiceDetails() {
             priceMax: serviceData.priceMax,
             mrp: serviceData.mrp,
             priceType: serviceData.priceType || "fixed",
+            brandName: serviceData.brandName ? String(serviceData.brandName) : undefined,
             images: serviceData.images && serviceData.images.length > 0 
               ? serviceData.images 
               : serviceData.image 
@@ -457,21 +518,21 @@ export default function ServiceDetails() {
     () => (service ? isRangePricedService(service) : false),
     [service]
   );
-  const canAddToCart = showPricing && !isRangePrice;
 
   const categorySlug = useMemo(() => {
     if (!service) return "";
     return typeof service.category === "object" ? service.category.slug : "";
   }, [service]);
 
-  const isConstructionMaterialPage = useMemo(
-    () => isConstructionMaterialsCategorySlug(categorySlug),
-    [categorySlug],
-  );
+  /** Any catalog-linked listing (CM / B2B traders / material suppliers) gets size pickers + hybrid CTAs. */
+  const useMaterialsDetailLayout = useMemo(() => {
+    if (service?.catalogProductId) return true;
+    return isConstructionMaterialsCategorySlug(categorySlug);
+  }, [categorySlug, service?.catalogProductId]);
 
   useEffect(() => {
-    const catalogId = service?.catalogProductId;
-    if (!catalogId || !isConstructionMaterialPage) {
+    const catalogId = String(service?.catalogProductId || "").trim();
+    if (!catalogId) {
       setCatalogProduct(null);
       setVariantSel({});
       return;
@@ -508,7 +569,7 @@ export default function ServiceDetails() {
     return () => {
       cancelled = true;
     };
-  }, [service?.catalogProductId, service?.metadata, isConstructionMaterialPage]);
+  }, [service?.catalogProductId, service?.metadata]);
 
   const catalogVariants = useMemo(
     () => readCatalogVariants((catalogProduct || undefined) as Record<string, unknown> | undefined),
@@ -538,26 +599,51 @@ export default function ServiceDetails() {
   );
 
   const resolvedUnitPrice = useMemo(() => {
-    if (!service || isRangePrice) return null;
-    return resolveExactPriceForVariant(
-      service.price,
-      variantPrices,
-      selectedCatalogVariant?.id,
-    );
+    if (!service) return null;
+    const variantId = selectedCatalogVariant?.id;
+    const override =
+      variantId != null ? Number(variantPrices[variantId]) : NaN;
+    if (Number.isFinite(override) && override > 0) return override;
+    if (isRangePrice) return null;
+    const n = resolveExactPriceForVariant(service.price, variantPrices, variantId);
+    return n > 0 ? n : null;
   }, [service, isRangePrice, variantPrices, selectedCatalogVariant?.id]);
+
+  const canAddToCart = useMemo(() => {
+    if (!showPricing || !service) return false;
+    if (catalogVariants.hasVariants) {
+      if (!selectedCatalogVariant) return false;
+      return variantAllowsAddToCart({
+        priceMode: service.priceMode,
+        defaultPrice: service.price,
+        variantPrices,
+        catalogVariantId: selectedCatalogVariant.id,
+      });
+    }
+    return !isRangePrice && Number(service.price) > 0;
+  }, [
+    showPricing,
+    service,
+    catalogVariants.hasVariants,
+    selectedCatalogVariant,
+    variantPrices,
+    isRangePrice,
+  ]);
 
   const displayFormattedPrice = useMemo(() => {
     if (!service) return "";
-    if (isRangePrice || resolvedUnitPrice == null) return formattedServicePrice;
-    return formatServicePrice({
-      ...service,
-      price: resolvedUnitPrice,
-      priceMode: "exact",
-    });
-  }, [service, isRangePrice, resolvedUnitPrice, formattedServicePrice]);
+    if (resolvedUnitPrice != null && resolvedUnitPrice > 0) {
+      return formatServicePrice({
+        ...service,
+        price: resolvedUnitPrice,
+        priceMode: "exact",
+      });
+    }
+    return formattedServicePrice;
+  }, [service, resolvedUnitPrice, formattedServicePrice]);
 
   const variantPickerNode = useMemo(() => {
-    if (!catalogVariants.hasVariants || !canAddToCart) return null;
+    if (!catalogVariants.hasVariants) return null;
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {catalogVariants.variantAxes.map((axis) => {
@@ -594,13 +680,17 @@ export default function ServiceDetails() {
             </label>
           );
         })}
-        {selectedCatalogVariant && Object.keys(variantPrices).length > 0 ? (
+        {selectedCatalogVariant ? (
           <p className="sm:col-span-2 text-xs text-muted-foreground">
-            Showing price for{" "}
-            {catalogVariantLabel(selectedCatalogVariant, catalogVariants.variantAxes)}.
-            Other sizes may differ if the supplier set overrides.
+            {canAddToCart
+              ? `Exact price for ${catalogVariantLabel(selectedCatalogVariant, catalogVariants.variantAxes)} — add to cart.`
+              : `No exact price for ${catalogVariantLabel(selectedCatalogVariant, catalogVariants.variantAxes)} — request a quote.`}
           </p>
-        ) : null}
+        ) : (
+          <p className="sm:col-span-2 text-xs text-muted-foreground">
+            Select a full size combination to continue.
+          </p>
+        )}
       </div>
     );
   }, [
@@ -608,16 +698,183 @@ export default function ServiceDetails() {
     catalogVariants,
     providerAxisSel,
     selectedCatalogVariant,
-    variantPrices,
     variantSel,
   ]);
 
+  const overviewDescription = useMemo(() => {
+    if (!service) return "";
+    const catalogDesc = String(catalogProduct?.description || "").trim();
+    // Catalog-imported listings: always prefer what admin saved on the catalog product.
+    if (service.catalogProductId && catalogDesc) {
+      return catalogDesc;
+    }
+    return cleanServiceOverviewDescription(
+      service.title,
+      service.description,
+      catalogDesc,
+    );
+  }, [service, catalogProduct?.description]);
+
   const specFields = useMemo(() => {
     if (!service) return [];
-    const fromCustom = service.customFields || [];
-    if (fromCustom.length > 0) return fromCustom;
-    return metadataToCustomFields(service.metadata);
-  }, [service]);
+    const rows: Array<{ label: string; value: string | number | boolean; type?: string }> = [];
+    const seen = new Set<string>();
+
+    const isPlaceholder = (raw: unknown) => {
+      const n = String(raw ?? "")
+        .toLowerCase()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return (
+        !n ||
+        n === "brand" ||
+        n === "not specified" ||
+        n === "n/a" ||
+        n === "na" ||
+        n === "custom" ||
+        n === "select" ||
+        n === "none"
+      );
+    };
+
+    /** Collapse Brand / Steel Brand / Brand Name into one row. */
+    const normalizeSpecKey = (label: string) => {
+      const n = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "");
+      if (
+        n === "steelbrand" ||
+        n === "tilebrand" ||
+        n === "brandname" ||
+        n === "make" ||
+        n === "manufacturer" ||
+        n === "brand" ||
+        n.endsWith("brand")
+      ) {
+        return "brand";
+      }
+      return n;
+    };
+
+    const pushRow = (label: string, value: unknown) => {
+      const lab = String(label || "").trim();
+      const val =
+        typeof value === "number" || typeof value === "boolean"
+          ? value
+          : toReadableFieldValue(value);
+      if (!lab || val === "" || val == null) return;
+      const key = normalizeSpecKey(lab);
+      if (!key || seen.has(key)) return;
+      if (key === "brand" && isPlaceholder(val)) return;
+      seen.add(key);
+      rows.push({
+        label: key === "brand" ? "Brand" : lab,
+        value: val,
+        type: "text",
+      });
+    };
+
+    const isCatalogListing = Boolean(service.catalogProductId && catalogProduct);
+    const hasVariants = Boolean(catalogVariants.hasVariants && selectedCatalogVariant);
+    const serviceMeta =
+      typeof service.metadata === "object" && service.metadata && !Array.isArray(service.metadata)
+        ? (service.metadata as Record<string, unknown>)
+        : {};
+    const catalogMeta =
+      catalogProduct?.metadata && typeof catalogProduct.metadata === "object"
+        ? (catalogProduct.metadata as Record<string, unknown>)
+        : {};
+    const resolveSelect = (meta: Record<string, unknown>, key: string, customKey: string) => {
+      const v = String(meta[key] ?? "").trim();
+      const custom = String(meta[customKey] ?? "").trim();
+      if (v.toLowerCase() === "custom" && custom) return custom;
+      return v;
+    };
+
+    if (hasVariants) {
+      for (const axis of catalogVariants.variantAxes) {
+        pushRow(axis.label, selectedCatalogVariant!.attributes?.[axis.key]);
+      }
+    }
+
+    // One Brand — whatever admin/provider saved (catalog brand first, then form selects)
+    pushRow(
+      "Brand",
+      catalogProduct?.brand ||
+        service.brandName ||
+        resolveSelect(catalogMeta, "brand", "brandCustom") ||
+        resolveSelect(serviceMeta, "brand", "brandCustom") ||
+        resolveSelect(catalogMeta, "steelBrand", "steelBrandCustom") ||
+        resolveSelect(serviceMeta, "steelBrand", "steelBrandCustom") ||
+        resolveSelect(catalogMeta, "tileBrand", "tileBrandCustom") ||
+        resolveSelect(serviceMeta, "tileBrand", "tileBrandCustom") ||
+        "",
+    );
+    if (catalogProduct?.productCode) {
+      pushRow("Product Code", catalogProduct.productCode);
+    }
+
+    const catalogCustom = Array.isArray(catalogProduct?.customFields)
+      ? catalogProduct!.customFields
+      : [];
+    for (const field of catalogCustom) {
+      pushRow(String(field.label || ""), field.value);
+    }
+
+    if (isCatalogListing && catalogProduct?.metadata) {
+      for (const field of metadataToCustomFields(catalogProduct.metadata)) {
+        const k = normalizeSpecKey(field.label);
+        // Variant axes already cover size/grade; skip duplicate steel size/grade template keys
+        if (
+          hasVariants &&
+          (k === "steelsize" ||
+            k === "steelgrade" ||
+            k === "steelcustomsize" ||
+            k === "steelgradecustom" ||
+            k === "steeltype" ||
+            k === "steeltypecustom" ||
+            k === "materialtype")
+        ) {
+          continue;
+        }
+        pushRow(field.label, field.value);
+      }
+    }
+
+    if (!isCatalogListing) {
+      const serviceCustom = service.customFields || [];
+      if (serviceCustom.length > 0 && catalogCustom.length === 0) {
+        for (const field of serviceCustom) {
+          pushRow(String(field.label || ""), field.value);
+        }
+      }
+      for (const field of metadataToCustomFields(service.metadata)) {
+        pushRow(field.label, field.value);
+      }
+    } else {
+      // Listing-only operational fields (delivery / stock) from provider metadata
+      for (const field of metadataToCustomFields(service.metadata)) {
+        const k = normalizeSpecKey(field.label);
+        if (
+          k.includes("delivery") ||
+          k.includes("availability") ||
+          k.includes("quantity") ||
+          k.includes("loading") ||
+          k.includes("charge")
+        ) {
+          pushRow(field.label, field.value);
+        }
+      }
+    }
+
+    return rows;
+  }, [
+    service,
+    catalogProduct,
+    catalogVariants,
+    selectedCatalogVariant,
+  ]);
 
   const cityLabel = service?.location?.city || "your city";
 
@@ -1025,14 +1282,18 @@ export default function ServiceDetails() {
   return (
     <div className="min-h-screen max-w-full overflow-x-clip flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
         <main className="min-w-0 flex-1 overflow-x-clip">
-          <div className={`layout-shell overflow-x-clip pt-4 sm:pt-6 md:pt-8 ${isConstructionMaterialPage ? "pb-28 lg:pb-28" : "pb-28 lg:pb-8"}`}>
-            {isConstructionMaterialPage && (
+          <div className={`layout-shell overflow-x-clip pt-4 sm:pt-6 md:pt-8 ${useMaterialsDetailLayout ? "pb-28 lg:pb-28" : "pb-28 lg:pb-8"}`}>
+            {useMaterialsDetailLayout && (
               <ConstructionMaterialProductLayout
-                service={service}
+                responsive
+                service={{
+                  ...service,
+                  description: overviewDescription || service.description,
+                }}
                 categoryName={categoryName}
                 categorySlug={categorySlug}
                 formattedPrice={displayFormattedPrice}
-                isRangePrice={isRangePrice}
+                isRangePrice={!canAddToCart}
                 showPricing={showPricing}
                 specFields={specFields}
                 similarServices={similarServices}
@@ -1042,12 +1303,14 @@ export default function ServiceDetails() {
                 onFavorite={handleToggleFavorite}
                 isSaved={isSaved}
                 variantPicker={variantPickerNode}
+                allowAddToCart={canAddToCart}
                 unitPrice={resolvedUnitPrice}
                 catalogVariantId={selectedCatalogVariant?.id}
               />
             )}
 
-            <div className={isConstructionMaterialPage ? "lg:hidden" : undefined}>
+            {!useMaterialsDetailLayout && (
+            <div>
             <nav className="mb-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 text-xs text-muted-foreground sm:mb-6 sm:text-sm">
               <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
                 <Home className="h-3.5 w-3.5" />
@@ -1101,6 +1364,14 @@ export default function ServiceDetails() {
 
                     <div className="space-y-3">
                       <h1 className="text-2xl font-bold leading-[1.14] tracking-[-0.035em] text-foreground sm:text-4xl lg:text-[42px]">{service.title}</h1>
+                      {(service.provider?.businessName || service.provider?.name) ? (
+                        <p className="text-sm text-muted-foreground sm:text-base">
+                          Sold by{" "}
+                          <span className="font-semibold text-foreground">
+                            {service.provider.businessName || service.provider.name}
+                          </span>
+                        </p>
+                      ) : null}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground sm:text-sm lg:text-base">
                         <span className="inline-flex items-center gap-1 font-semibold tabular-nums text-foreground">
                           <Star className="h-4 w-4 fill-warning text-warning" />
@@ -1409,8 +1680,10 @@ export default function ServiceDetails() {
               </div>
             )}
             </div>
+            )}
           </div>
         </main>
+        {!useMaterialsDetailLayout ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur lg:hidden">
           <div>
             {canAddToCart ? (
@@ -1424,7 +1697,7 @@ export default function ServiceDetails() {
                 unitPrice={resolvedUnitPrice ?? (typeof service.price === "number" ? service.price : Number(service.price) || null)}
                 catalogVariantId={selectedCatalogVariant?.id}
               />
-            ) : showPricing && isRangePrice ? (
+            ) : showPricing ? (
               <Button onClick={handleGetBestQuotes} className="h-11 w-full text-sm font-semibold">
                 Get Best Quotes
               </Button>
@@ -1435,6 +1708,7 @@ export default function ServiceDetails() {
             )}
           </div>
         </div>
+        ) : null}
 
         {service && (
           <GetBestQuotesModal
