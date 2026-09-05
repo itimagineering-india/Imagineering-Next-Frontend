@@ -78,6 +78,9 @@ export interface ConstructionMaterialProductLayoutProps {
   /** When true, always show quote CTAs (no add-to-cart). */
   forceQuoteCtas?: boolean;
   variantPicker?: ReactNode;
+  /** Resolved unit price for selected variant (hybrid exact pricing). */
+  unitPrice?: number | null;
+  catalogVariantId?: string | null;
 }
 
 const WHY_BUY_POINTS = [
@@ -130,6 +133,8 @@ export function ConstructionMaterialProductLayout({
   inQuoteList = false,
   forceQuoteCtas = false,
   variantPicker,
+  unitPrice,
+  catalogVariantId,
 }: ConstructionMaterialProductLayoutProps) {
   const [overviewExpanded, setOverviewExpanded] = useState(false);
   const canAddToCart = !forceQuoteCtas && showPricing && !isRangePrice && Boolean(service.id);
@@ -266,6 +271,8 @@ export function ConstructionMaterialProductLayout({
                   providerName={service.provider?.name || service.provider?.businessName}
                   label="Add to Cart"
                   className="h-12 w-full text-base font-semibold"
+                  unitPrice={unitPrice ?? (typeof service.price === "number" ? service.price : null)}
+                  catalogVariantId={catalogVariantId}
                 />
               ) : showGetBestQuotes ? (
                 <Button size="lg" className="h-12 w-full text-base font-semibold" onClick={onGetQuotes}>
@@ -393,6 +400,8 @@ export function ConstructionMaterialProductLayout({
                       providerName={service.provider?.name || service.provider?.businessName}
                       label="Add to Cart"
                       className="h-11 w-full font-semibold"
+                      unitPrice={unitPrice ?? (typeof service.price === "number" ? service.price : null)}
+                      catalogVariantId={catalogVariantId}
                     />
                   ) : null}
                 </>
@@ -495,6 +504,8 @@ export function ConstructionMaterialProductLayout({
               providerName={service.provider?.name || service.provider?.businessName}
               label="Add to Cart"
               className="h-10 w-auto min-w-[120px] max-w-[180px] shrink-0 px-4 text-sm font-semibold sm:min-w-[140px] sm:px-5"
+              unitPrice={unitPrice ?? (typeof service.price === "number" ? service.price : null)}
+              catalogVariantId={catalogVariantId}
             />
           ) : onAddToQuote ? (
             <div className="flex shrink-0 gap-2">
