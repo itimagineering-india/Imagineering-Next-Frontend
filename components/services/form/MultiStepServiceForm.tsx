@@ -68,11 +68,12 @@ import {
  type CatalogProductItem,
 } from "@/lib/productCatalog";
 import {
- listProviderSellableVariants,
+ activeCatalogVariants,
  parseProviderVariantPrices,
  resolveProviderAxisSelection,
  serializeProviderVariantAxes,
  serializeProviderVariantPrices,
+ type CatalogVariant,
  type ProviderAxisSelection,
  type ProviderVariantPrices,
 } from "@/lib/catalogVariants";
@@ -1155,7 +1156,9 @@ export function MultiStepServiceForm({
        (() => {
          if (!selectedCatalogProduct) return providerVariantPrices;
          const allowed = new Set(
-           listProviderSellableVariants(selectedCatalogProduct, providerVariantAxes).map((v) => v.id),
+           activeCatalogVariants((selectedCatalogProduct.variants || []) as CatalogVariant[]).map(
+             (v) => v.id,
+           ),
          );
          const pruned: ProviderVariantPrices = {};
          for (const [id, price] of Object.entries(providerVariantPrices)) {
@@ -1407,17 +1410,6 @@ export function MultiStepServiceForm({
           selection={providerVariantAxes}
           onChange={(next) => {
            setProviderVariantAxes(next);
-           setProviderVariantPrices((prev) => {
-            if (!selectedCatalogProduct) return prev;
-            const allowed = new Set(
-             listProviderSellableVariants(selectedCatalogProduct, next).map((v) => v.id),
-            );
-            const pruned: ProviderVariantPrices = {};
-            for (const [id, price] of Object.entries(prev)) {
-             if (allowed.has(id)) pruned[id] = price;
-            }
-            return pruned;
-           });
            setErrors((prev) => ({ ...prev, providerVariants: undefined }));
           }}
           error={errors.providerVariants}
