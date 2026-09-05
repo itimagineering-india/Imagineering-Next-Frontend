@@ -45,13 +45,15 @@ export function MaterialsProductCard({
           />
         ) : (
           <div className="flex aspect-square w-full items-center justify-center bg-slate-50 text-lg font-bold text-slate-300">
-            {product.brand.slice(0, 2).toUpperCase()}
+            {(product.brand || product.name || "NA").slice(0, 2).toUpperCase()}
           </div>
         )}
         <div className="space-y-1 p-2">
+          {product.brand ? (
           <p className="truncate text-[10px] font-bold uppercase tracking-wide text-orange-600">
             {product.brand}
           </p>
+          ) : null}
           <p className="truncate text-xs font-bold leading-[1.25] text-slate-900">
             {product.name}
           </p>
