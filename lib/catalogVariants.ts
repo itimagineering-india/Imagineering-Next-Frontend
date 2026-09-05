@@ -64,9 +64,12 @@ export function catalogVariantPriceBounds(variants: CatalogVariant[]): { min?: n
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
+/** All distinct values for an axis across active variants (and axis.options). */
 export function catalogAxisOptionValues(
   axis: CatalogVariantAxis,
   variants: CatalogVariant[],
+  _axes?: CatalogVariantAxis[],
+  _selection?: Record<string, string>,
 ): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -83,7 +86,12 @@ export function catalogAxisOptionValues(
   return out;
 }
 
-/** After changing one axis, keep a valid combination without wiping earlier picks. */
+/**
+ * After changing one axis, keep earlier axes sticky. Later axes stay when still
+ * valid with (earlier + new value); otherwise they snap to the first compatible
+ * values. If no SKU exists for earlier + new value, earlier axes still stay —
+ * only the changed axis updates (user can adjust other fields next).
+ */
 export function selectionAfterAxisChange(
   axes: CatalogVariantAxis[],
   variants: CatalogVariant[],
@@ -91,6 +99,7 @@ export function selectionAfterAxisChange(
   axisKey: string,
   value: string,
 ): Record<string, string> {
+  const axisIndex = axes.findIndex((a) => a.key === axisKey);
   const next = { ...current, [axisKey]: value };
   const active = activeCatalogVariants(variants);
 
@@ -105,38 +114,49 @@ export function selectionAfterAxisChange(
   );
   if (exact) return toSelection(exact);
 
-  const candidates = active.filter((v) => v.attributes?.[axisKey] === value);
-  if (!candidates.length) return next;
+  const earlierAxes = axisIndex > 0 ? axes.slice(0, axisIndex) : [];
 
-  // Prefer candidates that keep the user's other selections (earlier axes weigh more).
-  let best: CatalogVariant | null = null;
-  let bestScore = -1;
-  for (const variant of candidates) {
-    let score = 0;
-    axes.forEach((axis, i) => {
-      if (axis.key === axisKey) return;
-      const want = current[axis.key];
-      if (want && variant.attributes?.[axis.key] === want) {
-        score += 1 << (axes.length - 1 - i);
-      }
+  // Candidates that honor earlier sticky picks + the new value.
+  let candidates = active.filter((v) => {
+    if ((v.attributes?.[axisKey] || "") !== value) return false;
+    return earlierAxes.every((a) => {
+      const want = String(current[a.key] || "").trim();
+      if (!want) return true;
+      return (v.attributes?.[a.key] || "") === want;
     });
-    if (score > bestScore) {
-      bestScore = score;
-      best = variant;
+  });
+
+  const result: Record<string, string> = { ...current, [axisKey]: value };
+
+  // Lock earlier axes from current (never rewind them for a later pick).
+  for (const axis of earlierAxes) {
+    result[axis.key] = String(current[axis.key] || "").trim();
+  }
+  result[axisKey] = value;
+
+  if (!candidates.length) {
+    // No complete SKU for this combination — keep earlier sticky; leave later as-is.
+    return result;
+  }
+
+  // Fill axes after the one changed from remaining candidates.
+  for (let i = axisIndex + 1; i < axes.length; i++) {
+    const axis = axes[i];
+    const preferred = String(result[axis.key] || "").trim();
+    const kept = preferred
+      ? candidates.filter((v) => (v.attributes?.[axis.key] || "") === preferred)
+      : [];
+    if (kept.length) {
+      candidates = kept;
+      result[axis.key] = preferred;
+    } else {
+      const fallback = candidates[0]?.attributes?.[axis.key] || "";
+      result[axis.key] = fallback;
+      candidates = candidates.filter((v) => (v.attributes?.[axis.key] || "") === fallback);
     }
   }
 
-  if (best && bestScore > 0) return toSelection(best);
-
-  // No overlap with prior picks — still try to keep the first axis (e.g. Grade) if possible.
-  const primaryKey = axes[0]?.key;
-  if (primaryKey && primaryKey !== axisKey && current[primaryKey]) {
-    const keepPrimary = candidates.find((v) => v.attributes?.[primaryKey] === current[primaryKey]);
-    if (keepPrimary) return toSelection(keepPrimary);
-  }
-
-  // Keep the user's explicit selection as-is instead of jumping to an unrelated default combo.
-  return next;
+  return result;
 }
 
 export function findCatalogVariant(
