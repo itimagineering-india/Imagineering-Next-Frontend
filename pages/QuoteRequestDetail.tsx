@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { formatOfferTotalQtyLabel, quoteOfferItems, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
+import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
 
@@ -386,9 +386,9 @@ export default function QuoteRequestPage() {
   const startEditQty = () => {
     const next: Record<string, string> = {};
     for (const item of materials) {
-      const sid = String(item.serviceId || "").trim();
-      if (!sid) continue;
-      next[sid] = String(item.quantity ?? 1);
+      const key = quoteLineKey(item);
+      if (!String(item.serviceId || "").trim()) continue;
+      next[key] = String(item.quantity ?? 1);
     }
     setDraftQty(next);
     setRemovedIds({});
@@ -399,12 +399,12 @@ export default function QuoteRequestPage() {
     () =>
       materials.filter((item) => {
         const sid = String(item.serviceId || "").trim();
-        return sid && !removedIds[sid];
+        return sid && !removedIds[quoteLineKey(item)];
       }),
     [materials, removedIds]
   );
 
-  const removeDraftItem = (serviceId: string) => {
+  const removeDraftItem = (lineKey: string) => {
     if (editableMaterials.length <= 1) {
       toast({
         title: "Keep at least one product",
@@ -413,10 +413,10 @@ export default function QuoteRequestPage() {
       });
       return;
     }
-    setRemovedIds((prev) => ({ ...prev, [serviceId]: true }));
+    setRemovedIds((prev) => ({ ...prev, [lineKey]: true }));
     setDraftQty((prev) => {
       const next = { ...prev };
-      delete next[serviceId];
+      delete next[lineKey];
       return next;
     });
   };
@@ -426,12 +426,18 @@ export default function QuoteRequestPage() {
       .map((item) => {
         const serviceId = String(item.serviceId || "").trim();
         if (!serviceId) return null;
-        const raw = draftQty[serviceId] ?? String(item.quantity ?? 1);
+        const key = quoteLineKey(item);
+        const raw = draftQty[key] ?? String(item.quantity ?? 1);
         const quantity = Number(raw);
         if (!Number.isFinite(quantity) || quantity <= 0) return null;
-        return { serviceId, quantity };
+        const catalogVariantId = String(item.catalogVariantId || "").trim();
+        return {
+          serviceId,
+          quantity,
+          ...(catalogVariantId ? { catalogVariantId } : {}),
+        };
       })
-      .filter(Boolean) as Array<{ serviceId: string; quantity: number }>;
+      .filter(Boolean) as Array<{ serviceId: string; quantity: number; catalogVariantId?: string }>;
 
     if (items.length < 1) {
       toast({
@@ -639,9 +645,10 @@ export default function QuoteRequestPage() {
               <ul className="divide-y divide-stone-200 border-y border-stone-200 bg-white/60">
                 {(editingQty ? editableMaterials : materials).map((item, idx) => {
                   const sid = String(item.serviceId || "").trim();
+                  const lineKey = quoteLineKey(item, idx);
                   return (
                     <li
-                      key={`${sid || item.title}-${idx}`}
+                      key={`${lineKey}-${idx}`}
                       className="flex items-start justify-between gap-3 px-1 py-3"
                     >
                       <span className="min-w-0 text-sm font-medium leading-snug text-stone-800">
@@ -655,16 +662,16 @@ export default function QuoteRequestPage() {
                             step={0.01}
                             inputMode="decimal"
                             className="h-8 w-24 text-right text-xs tabular-nums"
-                            value={draftQty[sid] ?? String(item.quantity ?? 1)}
+                            value={draftQty[lineKey] ?? String(item.quantity ?? 1)}
                             onChange={(e) =>
-                              setDraftQty((prev) => ({ ...prev, [sid]: e.target.value }))
+                              setDraftQty((prev) => ({ ...prev, [lineKey]: e.target.value }))
                             }
                           />
                           <button
                             type="button"
                             aria-label={`Remove ${item.title}`}
                             disabled={editableMaterials.length <= 1 || savingQty}
-                            onClick={() => removeDraftItem(sid)}
+                            onClick={() => removeDraftItem(lineKey)}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
