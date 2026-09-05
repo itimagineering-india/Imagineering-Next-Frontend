@@ -48,6 +48,7 @@ import {
 import { CreditsRedeemSection } from "@/components/wallet/CreditsRedeemSection";
 import {
   formatDurationQtyLabel,
+  getPriceTypeLabel,
   getQuantityUnitNoun,
   isDurationPriceType,
 } from "@/lib/priceTypeDisplay";
@@ -98,6 +99,9 @@ export function MachineRentalCheckoutClient() {
   const [duration, setDuration] = useState(() =>
     clampInt(Number(sp.get("duration") || 1), 1, 365)
   );
+  const [selectedPriceType, setSelectedPriceType] = useState(() =>
+    String(sp.get("priceType") || "").trim().toLowerCase()
+  );
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -119,7 +123,7 @@ export function MachineRentalCheckoutClient() {
   const appliedCouponRef = useRef<AppliedCoupon | null>(null);
   appliedCouponRef.current = appliedCoupon;
 
-  const priceType = String(preview?.priceType || "daily");
+  const priceType = String(selectedPriceType || preview?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
   const unitNoun = getQuantityUnitNoun(priceType) || "day";
   const availableMachines = Math.max(
@@ -165,6 +169,7 @@ export function MachineRentalCheckoutClient() {
         serviceId,
         machineCount,
         duration,
+        ...(selectedPriceType ? { priceType: selectedPriceType } : {}),
       })
       .then((res) => {
         if (cancelled) return;
@@ -184,6 +189,9 @@ export function MachineRentalCheckoutClient() {
             duration: Number(d.duration) || duration,
             durationLabel: d.durationLabel,
           });
+          if (d.priceType && !selectedPriceType) {
+            setSelectedPriceType(String(d.priceType));
+          }
         } else {
           setPreview(null);
         }
@@ -198,7 +206,7 @@ export function MachineRentalCheckoutClient() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preview.priceType drives needsDuration after first load
-  }, [serviceId, machineCount, duration, isAuthenticated]);
+  }, [serviceId, machineCount, duration, selectedPriceType, isAuthenticated]);
 
   const skipCouponResetOnMount = useRef(true);
   useEffect(() => {
@@ -223,7 +231,7 @@ export function MachineRentalCheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [machineCount, duration, serviceId]);
+  }, [machineCount, duration, selectedPriceType, serviceId]);
 
   const payableTotal = useMemo(() => {
     if (appliedCoupon && Number.isFinite(appliedCoupon.finalAmount)) {
@@ -378,6 +386,7 @@ export function MachineRentalCheckoutClient() {
       serviceId,
       machineCount,
       duration: needsDuration ? duration : 1,
+      priceType: priceType || undefined,
       startDate: startDatePayload,
       startTime: startTime || undefined,
       paymentMethod,
@@ -406,6 +415,7 @@ export function MachineRentalCheckoutClient() {
     needsDuration,
     notes,
     paymentMethod,
+    priceType,
     selectedAddress,
     serviceId,
     startDate,
@@ -537,6 +547,14 @@ export function MachineRentalCheckoutClient() {
           <Badge className="bg-orange-50 text-orange-900 hover:bg-orange-50">
             {t("machinesCountBadge", { count: machineCount })}
           </Badge>
+          {priceType ? (
+            <Badge variant="outline" className="border-orange-200 text-orange-900">
+              {getPriceTypeLabel(priceType) || priceType}
+              {preview?.unitPrice
+                ? ` · ₹${Number(preview.unitPrice).toLocaleString("en-IN")}`
+                : ""}
+            </Badge>
+          ) : null}
           {needsDuration ? (
             <Badge variant="outline" className="border-orange-200 text-orange-900">
               {durationText}
