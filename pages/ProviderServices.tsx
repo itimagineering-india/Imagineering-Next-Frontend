@@ -36,7 +36,7 @@ import {
 } from "@/lib/constructionMaterials";
 import { usesCatalogSelectFlow } from "@/lib/manpowerCatalog";
 import { isB2bCategorySlug, usesB2bCatalogOrManualListing } from "@/lib/b2b/b2bCategories";
-import { isMachineRentalCategorySlug } from "@/lib/machineRental";
+import { isMachineRentalCategorySlug, isMachineRentalListing } from "@/lib/machineRental";
 import { parseToolsFieldsFromService } from "@/lib/toolsService";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -243,7 +243,9 @@ export default function ProviderServices() {
    ).trim();
    if (
     isConstructionMaterialsCategorySlug(catSlug) ||
-    (isB2bCategorySlug(catSlug) && catalogProductId)
+    (isB2bCategorySlug(catSlug) && catalogProductId) ||
+    isMachineRentalCategorySlug(catSlug) ||
+    isMachineRentalListing(service as { category?: { slug?: string }; metadata?: Record<string, unknown> })
    ) {
     router.push(`/dashboard/provider/services/${service._id}/edit`);
     return;
