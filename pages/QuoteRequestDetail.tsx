@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
+import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow, type QuoteRequestItemLike } from "@/lib/b2b/quoteRequestDisplay";
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
 
@@ -360,7 +360,7 @@ export default function QuoteRequestPage() {
   const serviceTitle = useMemo(() => quoteRequestHeadline(data), [data]);
   const requestItems = useMemo(() => quoteRequestItems(data), [data]);
 
-  const materials = useMemo(() => {
+  const materials = useMemo((): QuoteRequestItemLike[] => {
     if (requestItems.length > 0) return requestItems;
     const serviceRef = data?.service;
     const serviceId =
