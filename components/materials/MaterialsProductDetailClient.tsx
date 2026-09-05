@@ -35,8 +35,10 @@ import {
   B2B_QUOTE_CART_MAX,
   loadB2bQuoteCart,
   normalizeB2bQuoteItemType,
+  saveB2bQuoteCart,
   upsertB2bQuoteCartLine,
 } from "@/lib/b2b/b2bQuoteCart";
+import type { QuoteModalLine } from "@/components/service-details/GetBestQuotesModal";
 
 type Props = {
   productId: string;
@@ -99,6 +101,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const [linkedServiceId, setLinkedServiceId] = useState<string | null>(null);
   const [linkedServiceTitle, setLinkedServiceTitle] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteModalItems, setQuoteModalItems] = useState<QuoteModalLine[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [inQuoteList, setInQuoteList] = useState(false);
   const [variantSel, setVariantSel] = useState<Record<string, string>>({});
@@ -278,7 +281,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     : undefined;
 
   const handleGetQuotes = useCallback(() => {
-    if (!linkedServiceId) {
+    if (!linkedServiceId || !mapped) {
       toast({
         title: t("noListingTitle"),
         description: t("noListingBody"),
@@ -290,8 +293,95 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
       router.push(`/login?redirect=${encodeURIComponent(productPath)}`);
       return;
     }
+
+    const variantId = selectedVariant?.id;
+    const variantLabel = selectedVariant
+      ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
+      : undefined;
+    const priceType =
+      selectedVariant?.suggestedPriceType ||
+      (raw?.suggestedPriceType as string) ||
+      mapped.unitType ||
+      undefined;
+    const itemType = normalizeB2bQuoteItemType(mapped.categoryId);
+
+    // Keep current size in the quote list so switching sizes accumulates lines.
+    if (isB2b) {
+      const key = variantId ? `catalog:${mapped.id}:${variantId}` : `catalog:${mapped.id}`;
+      const cart = loadB2bQuoteCart();
+      if (!cart.some((l) => l.key === key)) {
+        const result = upsertB2bQuoteCartLine(cart, {
+          key,
+          catalogProductId: mapped.id,
+          catalogVariantId: variantId,
+          variantLabel,
+          title: mapped.name,
+          priceType,
+          itemType: itemType || undefined,
+          serviceId: linkedServiceId,
+          quantity: 1,
+        });
+        if (!result.error) {
+          setInQuoteList(true);
+        }
+      } else {
+        setInQuoteList(true);
+      }
+    }
+
+    const cartLines = loadB2bQuoteCart().filter(
+      (l) =>
+        l.catalogProductId === mapped.id ||
+        l.key === `catalog:${mapped.id}` ||
+        l.key.startsWith(`catalog:${mapped.id}:`)
+    );
+
+    const lines: QuoteModalLine[] =
+      cartLines.length > 0
+        ? cartLines.map((l) => ({
+            serviceId: l.serviceId || linkedServiceId,
+            title: l.variantLabel ? `${mapped.name} · ${l.variantLabel}` : mapped.name,
+            quantity: l.quantity,
+            catalogProductId: mapped.id,
+            catalogVariantId: l.catalogVariantId,
+            variantLabel: l.variantLabel,
+            priceType: l.priceType || priceType,
+          }))
+        : [
+            {
+              serviceId: linkedServiceId,
+              title: variantLabel ? `${mapped.name} · ${variantLabel}` : mapped.name,
+              catalogProductId: mapped.id,
+              catalogVariantId: variantId,
+              variantLabel,
+              priceType,
+            },
+          ];
+
+    // Prefer distinct variants; if somehow empty, fall back to current.
+    const seen = new Set<string>();
+    const deduped = lines.filter((line) => {
+      const key = line.catalogVariantId || line.serviceId;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    setQuoteModalItems(deduped.length ? deduped : lines);
     setQuoteOpen(true);
-  }, [isAuthenticated, linkedServiceId, productPath, router, t, toast]);
+  }, [
+    catalogVariants.variantAxes,
+    isAuthenticated,
+    isB2b,
+    linkedServiceId,
+    mapped,
+    productPath,
+    raw?.suggestedPriceType,
+    router,
+    selectedVariant,
+    t,
+    toast,
+  ]);
 
   const handleAddToQuote = useCallback(() => {
     if (!mapped) return;
@@ -447,36 +537,46 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           isSaved={isSaved}
           variantPicker={
             catalogVariants.hasVariants ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {catalogVariants.variantAxes.map((axis) => {
-                  const values = catalogAxisOptionValues(axis, catalogVariants.variants);
-                  return (
-                    <label key={axis.key} className="space-y-1 text-sm">
-                      <span className="font-medium text-foreground">{axis.label}</span>
-                      <select
-                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        value={variantSel[axis.key] || ""}
-                        onChange={(e) =>
-                          setVariantSel((prev) =>
-                            selectionAfterAxisChange(
-                              catalogVariants.variantAxes,
-                              catalogVariants.variants,
-                              prev,
-                              axis.key,
-                              e.target.value,
-                            ),
-                          )
-                        }
-                      >
-                        {values.map((val) => (
-                          <option key={val} value={val}>
-                            {val}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                })}
+              <div className="space-y-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {catalogVariants.variantAxes.map((axis) => {
+                    const values = catalogAxisOptionValues(axis, catalogVariants.variants);
+                    return (
+                      <label key={axis.key} className="space-y-1 text-sm">
+                        <span className="font-medium text-foreground">{axis.label}</span>
+                        <select
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          value={variantSel[axis.key] || ""}
+                          onChange={(e) =>
+                            setVariantSel((prev) =>
+                              selectionAfterAxisChange(
+                                catalogVariants.variantAxes,
+                                catalogVariants.variants,
+                                prev,
+                                axis.key,
+                                e.target.value,
+                              ),
+                            )
+                          }
+                        >
+                          {values.map((val) => (
+                            <option key={val} value={val}>
+                              {val}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+                {isB2b ? (
+                  <p className="text-xs text-muted-foreground">
+                    Need more than one size (e.g. 100 and 150)? Select each, tap{" "}
+                    <span className="font-medium text-foreground">Add to quote</span>, then{" "}
+                    <span className="font-medium text-foreground">Get Best Quotes</span> — each size
+                    gets its own quantity.
+                  </p>
+                ) : null}
               </div>
             ) : null
           }
@@ -488,27 +588,29 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           open={quoteOpen}
           onOpenChange={setQuoteOpen}
           serviceId={linkedServiceId}
-          serviceTitle={displayTitle || linkedServiceTitle || mapped.name}
+          serviceTitle={
+            quoteModalItems.length > 1
+              ? `${quoteModalItems.length} variants · ${mapped.name}`
+              : quoteModalItems[0]?.title || displayTitle || linkedServiceTitle || mapped.name
+          }
           priceType={
+            quoteModalItems[0]?.priceType ||
             selectedVariant?.suggestedPriceType ||
             (raw?.suggestedPriceType as string) ||
             mapped.unitType
           }
-          items={[
-            {
-              serviceId: linkedServiceId,
-              title: mapped.name,
-              catalogProductId: mapped.id,
-              catalogVariantId: selectedVariant?.id,
-              variantLabel: selectedVariant
-                ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
-                : undefined,
-              priceType:
-                selectedVariant?.suggestedPriceType ||
-                (raw?.suggestedPriceType as string) ||
-                mapped.unitType,
-            },
-          ]}
+          items={quoteModalItems.length > 0 ? quoteModalItems : undefined}
+          onSubmitted={() => {
+            const kept = loadB2bQuoteCart().filter(
+              (l) =>
+                l.catalogProductId !== mapped.id &&
+                l.key !== `catalog:${mapped.id}` &&
+                !l.key.startsWith(`catalog:${mapped.id}:`)
+            );
+            saveB2bQuoteCart(kept);
+            setInQuoteList(false);
+            setQuoteModalItems([]);
+          }}
           noCountdown
         />
       ) : null}
