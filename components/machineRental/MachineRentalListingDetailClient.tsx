@@ -23,15 +23,21 @@ import { formatServicePrice } from "@/lib/formatServicePrice";
 import {
   formatDurationQtyLabel,
   formatInr,
+  formatPriceLine,
+  getPriceTypeLabel,
   getQuantityUnitNoun,
   isDurationPriceType,
 } from "@/lib/priceTypeDisplay";
 import { resolveMachineRentalMediaUrl } from "@/lib/machineRental/media";
 import { resolveRentalCategoryKey } from "@/lib/machineRental/machineRentalHubCatalog";
-import { resolveAvailableMachinesFromService } from "@/lib/machineRental";
+import {
+  parseRentalRates,
+  resolveAvailableMachinesFromService,
+} from "@/lib/machineRental";
 import { RENTAL_AMBER } from "@/components/machineRental/MachineRentalHub";
 import { CustomFields } from "@/components/service-details/CustomFields";
 import { SimilarServices } from "@/components/service-details/SimilarServices";
+import { cn } from "@/lib/utils";
 
 type SpecField = {
   label: string;
@@ -102,6 +108,11 @@ const EXCLUDED_METADATA_KEYS = new Set([
   "formVariant",
   "categorySlug",
   "itemType",
+  "rentalRates",
+  "availableMachines",
+  "operatorIncluded",
+  "securityDeposit",
+  "machineModel",
 ]);
 
 function toReadableFieldLabel(key: string): string {
@@ -166,6 +177,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
   const [activeImage, setActiveImage] = useState(0);
   const [machineCount, setMachineCount] = useState(1);
   const [duration, setDuration] = useState(1);
+  const [selectedPriceType, setSelectedPriceType] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -207,12 +219,37 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
 
   const title =
     String(service?.title || service?.name || "").trim() || t("listingUntitled");
-  const priceType = String(service?.priceType || "daily");
+
+  const rentalRates = useMemo(
+    () =>
+      parseRentalRates(service?.metadata, {
+        priceType: service?.priceType,
+        price: service?.price,
+      }),
+    [service]
+  );
+
+  useEffect(() => {
+    if (!rentalRates.length) {
+      setSelectedPriceType(String(service?.priceType || "daily"));
+      return;
+    }
+    setSelectedPriceType((prev) => {
+      if (prev && rentalRates.some((r) => r.priceType === prev)) return prev;
+      const daily = rentalRates.find((r) => r.priceType === "daily");
+      const matchService = rentalRates.find((r) => r.priceType === service?.priceType);
+      return (daily || matchService || rentalRates[0]).priceType;
+    });
+  }, [rentalRates, service?.priceType]);
+
+  const priceType = String(selectedPriceType || service?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
   const unitNoun = getQuantityUnitNoun(priceType) || "day";
   const durationPlural = formatDurationQtyLabel(duration, priceType);
 
   const unitPrice = useMemo(() => {
+    const hit = rentalRates.find((r) => r.priceType === priceType);
+    if (hit) return hit.price;
     if (!service) return 0;
     if (String(service.priceMode || "").toLowerCase() === "range") {
       const min = Number(service.priceMin);
@@ -222,22 +259,25 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
     if (Number.isFinite(p) && p > 0) return p;
     const mrp = Number(service.mrp);
     return Number.isFinite(mrp) && mrp > 0 ? mrp : 0;
-  }, [service]);
+  }, [priceType, rentalRates, service]);
 
   const estimated = useMemo(() => {
     const d = needsDuration ? duration : 1;
     return Math.round(unitPrice * machineCount * d);
   }, [duration, machineCount, needsDuration, unitPrice]);
 
-  const priceLabel = service
-    ? formatServicePrice({
-        price: service.price,
-        priceMode: service.priceMode,
-        priceMin: service.priceMin,
-        priceMax: service.priceMax,
-        priceType: service.priceType,
-      })
-    : "";
+  const priceLabel = useMemo(() => {
+    const line = formatPriceLine(unitPrice, priceType);
+    if (line) return line.primary;
+    if (!service) return "";
+    return formatServicePrice({
+      price: service.price,
+      priceMode: service.priceMode,
+      priceMin: service.priceMin,
+      priceMax: service.priceMax,
+      priceType: service.priceType,
+    });
+  }, [priceType, service, unitPrice]);
 
   const gallery = useMemo(() => {
     const raw = [
@@ -324,6 +364,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
     qs.set("serviceId", serviceId);
     qs.set("machineCount", String(machineCount));
     qs.set("duration", String(needsDuration ? duration : 1));
+    qs.set("priceType", priceType);
     qs.set("name", title);
     if (!isAuthenticated) {
       router.push(
@@ -332,7 +373,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
       return;
     }
     router.push(`/machine-rental/checkout?${qs.toString()}`);
-  }, [duration, isAuthenticated, machineCount, needsDuration, router, serviceId, title]);
+  }, [duration, isAuthenticated, machineCount, needsDuration, priceType, router, serviceId, title]);
 
   if (loading) {
     return (
@@ -356,6 +397,36 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
 
   const bookingControls = (
     <>
+      {rentalRates.length > 1 ? (
+        <div className="mb-4">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Billing unit
+          </Label>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {rentalRates.map((rate) => (
+              <button
+                key={rate.priceType}
+                type="button"
+                onClick={() => setSelectedPriceType(rate.priceType)}
+                className={cn(
+                  "rounded-xl border px-3 py-2.5 text-left transition",
+                  priceType === rate.priceType
+                    ? "border-orange-700 bg-orange-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-orange-300",
+                )}
+              >
+                <span className="block text-sm font-semibold text-slate-900">
+                  {getPriceTypeLabel(rate.priceType) || rate.priceType}
+                </span>
+                <span className="mt-0.5 block text-xs font-medium text-orange-800">
+                  ₹{formatInr(rate.price)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
