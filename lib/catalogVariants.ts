@@ -317,3 +317,72 @@ export function serializeProviderVariantAxes(selection: ProviderAxisSelection): 
   }
   return JSON.stringify(out);
 }
+
+/** Catalog variants that match the provider's selected axis options. */
+export function listProviderSellableVariants(
+  product: AxisProductShape & { variants?: CatalogVariant[] },
+  selection: ProviderAxisSelection,
+): CatalogVariant[] {
+  const axes = product.variantAxes || [];
+  const active = activeCatalogVariants((product.variants || []) as CatalogVariant[]);
+  if (!axes.length) return active;
+  return active.filter((variant) =>
+    axes.every((axis) => {
+      const allowed = selection[axis.key] || [];
+      if (!allowed.length) return false;
+      const value = String(variant.attributes?.[axis.key] || "").trim();
+      return Boolean(value) && allowed.includes(value);
+    }),
+  );
+}
+
+/** Optional exact ₹ overrides keyed by catalog variant id. Empty = use listing default price. */
+export type ProviderVariantPrices = Record<string, number>;
+
+export function parseProviderVariantPrices(meta: unknown): ProviderVariantPrices {
+  if (!meta || typeof meta !== "object") return {};
+  const raw = (meta as Record<string, unknown>).providerVariantPrices;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  const out: ProviderVariantPrices = {};
+  for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+    const key = String(id || "").trim();
+    const n = Number(value);
+    if (!key || !Number.isFinite(n) || n <= 0) continue;
+    out[key] = Math.round(n * 100) / 100;
+  }
+  return out;
+}
+
+export function serializeProviderVariantPrices(prices: ProviderVariantPrices): string {
+  const out: ProviderVariantPrices = {};
+  for (const [id, value] of Object.entries(prices || {})) {
+    const key = String(id || "").trim();
+    const n = Number(value);
+    if (!key || !Number.isFinite(n) || n <= 0) continue;
+    out[key] = Math.round(n * 100) / 100;
+  }
+  return JSON.stringify(out);
+}
+
+/** Exact listing price for a variant: override if set, else service default. */
+export function resolveExactPriceForVariant(
+  defaultPrice: number | null | undefined,
+  prices: ProviderVariantPrices | null | undefined,
+  catalogVariantId?: string | null,
+): number {
+  const fallback = Number(defaultPrice);
+  const base = Number.isFinite(fallback) && fallback > 0 ? fallback : 0;
+  const id = String(catalogVariantId || "").trim();
+  if (!id || !prices) return base;
+  const override = Number(prices[id]);
+  if (Number.isFinite(override) && override > 0) return override;
+  return base;
+}
