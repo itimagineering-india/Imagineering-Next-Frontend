@@ -4,12 +4,15 @@ import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  activeCatalogVariants,
   catalogVariantLabel,
   listProviderSellableVariants,
+  type CatalogVariant,
   type ProviderAxisSelection,
   type ProviderVariantPrices,
 } from "@/lib/catalogVariants";
 import type { CatalogProductItem } from "@/lib/productCatalog";
+import { cn } from "@/lib/utils";
 
 type Props = {
   product: CatalogProductItem;
@@ -29,11 +32,15 @@ export function ProviderVariantPriceOverrides({
   defaultPrice,
   disabled,
 }: Props) {
+  const axes = product.variantAxes || [];
   const rows = useMemo(
-    () => listProviderSellableVariants(product, selection),
+    () => activeCatalogVariants((product.variants || []) as CatalogVariant[]),
+    [product],
+  );
+  const sellableIds = useMemo(
+    () => new Set(listProviderSellableVariants(product, selection).map((v) => v.id)),
     [product, selection],
   );
-  const axes = product.variantAxes || [];
   const placeholder =
     defaultPrice && Number(defaultPrice) > 0 ? `Default ₹${defaultPrice}` : "Use default price";
 
@@ -42,8 +49,7 @@ export function ProviderVariantPriceOverrides({
       <div className="rounded-lg border border-dashed p-3">
         <Label className="text-base">Variant prices (optional)</Label>
         <p className="mt-1 text-xs text-muted-foreground">
-          Select what you sell above, then set optional exact prices per size. Leave blank to use
-          your listing default price.
+          This product has no active catalog sizes yet.
         </p>
       </div>
     );
@@ -54,20 +60,31 @@ export function ProviderVariantPriceOverrides({
       <div>
         <Label className="text-base">Variant prices (optional)</Label>
         <p className="mt-1 text-xs text-muted-foreground">
-          Default exact price applies to all sizes. Override only where the rate differs — buyers
-          can add that size to cart at your price.
+          All catalog sizes are listed. Default exact price applies unless you override. Sizes not
+          enabled under What you sell stay inactive for buyers.
         </p>
       </div>
-      <ul className="max-h-64 divide-y overflow-y-auto rounded-md border">
+      <ul className="max-h-[28rem] divide-y overflow-y-auto rounded-md border">
         {rows.map((variant) => {
           const label = catalogVariantLabel(variant, axes) || variant.id;
           const current = prices[variant.id];
+          const offered = sellableIds.has(variant.id);
           return (
             <li
               key={variant.id}
-              className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+              className={cn(
+                "flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between",
+                !offered && "bg-muted/30",
+              )}
             >
-              <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{label}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium leading-snug">{label}</p>
+                {!offered ? (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Not in What you sell — enable options above to offer this size
+                  </p>
+                ) : null}
+              </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-xs text-muted-foreground">₹</span>
                 <Input
@@ -97,7 +114,7 @@ export function ProviderVariantPriceOverrides({
         })}
       </ul>
       <p className="text-[11px] text-muted-foreground">
-        {rows.length} sellable combination{rows.length === 1 ? "" : "s"} ·{" "}
+        {rows.length} catalog size{rows.length === 1 ? "" : "s"} · {sellableIds.size} offered ·{" "}
         {Object.keys(prices).length} override{Object.keys(prices).length === 1 ? "" : "s"} set
       </p>
     </div>
