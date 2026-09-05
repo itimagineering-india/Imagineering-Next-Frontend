@@ -31,11 +31,56 @@ import {
   isProviderAxisSelectionComplete,
   ProviderVariantPicker,
 } from "@/components/services/form/ProviderVariantPicker";
+import { ProviderVariantPriceOverrides } from "@/components/services/form/ProviderVariantPriceOverrides";
+import { PricingSection } from "@/components/services/form/PricingSection";
 import {
+  activeCatalogVariants,
+  parseProviderVariantPrices,
   resolveProviderAxisSelection,
+  type CatalogVariant,
   type ProviderAxisSelection,
+  type ProviderVariantPrices,
 } from "@/lib/catalogVariants";
 import type { ProviderBusinessAddressSnapshot } from "@/components/services/ServiceLocationInput";
+
+type ListingPriceDraft = {
+  priceMode: "exact" | "range";
+  pricingType: string;
+  startingPrice: string;
+  priceMin: string;
+  priceMax: string;
+  providerVariantPrices: ProviderVariantPrices;
+};
+
+function draftFromCatalogProduct(product: CatalogProductItem): ListingPriceDraft {
+  const min = product.suggestedPriceMin;
+  const max = product.suggestedPriceMax;
+  const hasRange = min != null && max != null && min > 0 && max > 0 && max > min;
+  return {
+    priceMode: hasRange ? "range" : "exact",
+    pricingType: product.suggestedPriceType || "per_kg",
+    startingPrice: min != null && min > 0 ? String(min) : "",
+    priceMin: min != null && min > 0 ? String(min) : "",
+    priceMax: max != null && max > 0 ? String(max) : "",
+    providerVariantPrices: {},
+  };
+}
+
+function draftFromService(service: Record<string, unknown>, product: CatalogProductItem): ListingPriceDraft {
+  const base = draftFromCatalogProduct(product);
+  const mode = String(service.priceMode || "").toLowerCase() === "range" ? "range" : "exact";
+  const price = Number(service.price);
+  const priceMin = Number(service.priceMin);
+  const priceMax = Number(service.priceMax);
+  return {
+    priceMode: mode,
+    pricingType: String(service.priceType || base.pricingType || "per_kg"),
+    startingPrice: Number.isFinite(price) && price > 0 ? String(price) : base.startingPrice,
+    priceMin: Number.isFinite(priceMin) && priceMin > 0 ? String(priceMin) : base.priceMin,
+    priceMax: Number.isFinite(priceMax) && priceMax > 0 ? String(priceMax) : base.priceMax,
+    providerVariantPrices: parseProviderVariantPrices(service.metadata),
+  };
+}
 
 interface Category {
   _id: string;
@@ -107,8 +152,10 @@ export function CatalogProductsPage({
   const [variantConfigByProduct, setVariantConfigByProduct] = useState<
     Record<string, ProviderAxisSelection>
   >({});
+  const [priceByProduct, setPriceByProduct] = useState<Record<string, ListingPriceDraft>>({});
   const [variantError, setVariantError] = useState<string | null>(null);
   const [variantErrorProductId, setVariantErrorProductId] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
   const [businessAddress, setBusinessAddress] = useState<ProviderBusinessAddressSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -223,6 +270,13 @@ export function CatalogProductsPage({
           [item._id]: resolveProviderAxisSelection(item, meta),
         });
       }
+      if (service && typeof service === "object") {
+        setPriceByProduct({
+          [item._id]: draftFromService(service as Record<string, unknown>, item),
+        });
+      } else {
+        setPriceByProduct({ [item._id]: draftFromCatalogProduct(item) });
+      }
     })();
     return () => {
       cancelled = true;
@@ -248,10 +302,16 @@ export function CatalogProductsPage({
     (product: CatalogProductItem) => {
       setVariantError(null);
       setVariantErrorProductId(null);
+      setPriceError(null);
       setSelectedProducts((prev) => {
         const exists = prev.some((p) => p._id === product._id);
         if (exists) {
           setVariantConfigByProduct((cfg) => {
+            const next = { ...cfg };
+            delete next[product._id];
+            return next;
+          });
+          setPriceByProduct((cfg) => {
             const next = { ...cfg };
             delete next[product._id];
             return next;
@@ -268,6 +328,7 @@ export function CatalogProductsPage({
               ? { [product._id]: defaultProviderAxisSelection(product) }
               : {},
           );
+          setPriceByProduct({ [product._id]: draftFromCatalogProduct(product) });
           if (hasVariantSetup) {
             requestAnimationFrame(() => {
               document
@@ -289,6 +350,10 @@ export function CatalogProductsPage({
               ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
           });
         }
+        setPriceByProduct((cfg) => ({
+          ...cfg,
+          [product._id]: cfg[product._id] || draftFromCatalogProduct(product),
+        }));
         return [...prev, product];
       });
       setErrors((e) => ({ ...e, products: undefined }));
@@ -304,8 +369,10 @@ export function CatalogProductsPage({
     setErrors({});
     setSelectedProducts([]);
     setVariantConfigByProduct({});
+    setPriceByProduct({});
     setVariantError(null);
     setVariantErrorProductId(null);
+    setPriceError(null);
     if (!usesSharedConstructionMaterialsCatalog(category?.slug, subcategory)) {
       setMaterialType("");
     }
@@ -332,9 +399,66 @@ export function CatalogProductsPage({
       }
     }
 
+    for (const product of selectedProducts) {
+      const draft = priceByProduct[product._id] || draftFromCatalogProduct(product);
+      if (draft.priceMode === "range") {
+        const min = Number(draft.priceMin);
+        const max = Number(draft.priceMax);
+        if (!(min > 0) || !(max > 0) || max < min) {
+          setPriceError(`Enter a valid price range for “${product.name}”.`);
+          document
+            .getElementById(`provider-pricing-${product._id}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      } else {
+        const exact = Number(draft.startingPrice);
+        if (!(exact > 0)) {
+          setPriceError(`Enter an exact price for “${product.name}”.`);
+          document
+            .getElementById(`provider-pricing-${product._id}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "center" });
+          return;
+        }
+      }
+    }
+    setPriceError(null);
+
     setSubmitting(true);
     try {
       const location = businessAddress;
+
+      const pricingOptsFor = (product: CatalogProductItem) => {
+        const draft = priceByProduct[product._id] || draftFromCatalogProduct(product);
+        const axes =
+          product.hasVariants && (product.variantAxes || []).length
+            ? variantConfigByProduct[product._id] || defaultProviderAxisSelection(product)
+            : undefined;
+        let providerVariantPrices = draft.providerVariantPrices;
+        if (draft.priceMode === "exact") {
+          const allowed = new Set(
+            activeCatalogVariants((product.variants || []) as CatalogVariant[]).map((v) => v.id),
+          );
+          const pruned: ProviderVariantPrices = {};
+          for (const [id, price] of Object.entries(providerVariantPrices || {})) {
+            if (allowed.has(id)) pruned[id] = price;
+          }
+          providerVariantPrices = pruned;
+        } else {
+          providerVariantPrices = {};
+        }
+        return {
+          providerVariantAxes: axes,
+          pricing: {
+            priceMode: draft.priceMode,
+            pricingType: draft.pricingType,
+            startingPrice: draft.startingPrice,
+            priceMin: draft.priceMin,
+            priceMax: draft.priceMax,
+            providerVariantPrices,
+          },
+        };
+      };
 
       if (isEdit && serviceId) {
         const product = selectedProducts[0];
@@ -344,10 +468,7 @@ export function CatalogProductsPage({
           subcategory,
           itemType: materialType,
           location,
-          providerVariantAxes:
-            product.hasVariants && (product.variantAxes || []).length
-              ? variantConfigByProduct[product._id] || defaultProviderAxisSelection(product)
-              : undefined,
+          ...pricingOptsFor(product),
         });
         const response = await api.services.update(serviceId, payload);
         if (response.success) {
@@ -372,10 +493,7 @@ export function CatalogProductsPage({
               subcategory,
               itemType: materialType,
               location,
-              providerVariantAxes:
-                product.hasVariants && (product.variantAxes || []).length
-                  ? variantConfigByProduct[product._id] || defaultProviderAxisSelection(product)
-                  : undefined,
+              ...pricingOptsFor(product),
             }),
           ),
         ),
@@ -581,8 +699,10 @@ export function CatalogProductsPage({
                     setMaterialType("");
                     setSelectedProducts([]);
                     setVariantConfigByProduct({});
+                    setPriceByProduct({});
                     setVariantError(null);
                     setVariantErrorProductId(null);
+                    setPriceError(null);
                     return;
                   }
                   setStep(1);
@@ -608,8 +728,10 @@ export function CatalogProductsPage({
                       setMaterialType(type);
                       setSelectedProducts([]);
                       setVariantConfigByProduct({});
+                      setPriceByProduct({});
                       setVariantError(null);
                       setVariantErrorProductId(null);
+                      setPriceError(null);
                       setErrors((e) => ({ ...e, products: undefined }));
                     }}
                     className="group relative overflow-hidden rounded-lg border border-border text-left transition-all hover:border-primary/40"
@@ -682,6 +804,118 @@ export function CatalogProductsPage({
             </div>
           ) : null}
 
+          {selectedProducts.length > 0 ? (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-medium">Pricing</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Exact price lets buyers add to cart. Range is quote-only. Optional per-size rates
+                  when you use Exact.
+                </p>
+              </div>
+              {selectedProducts.map((product) => {
+                const draft = priceByProduct[product._id] || draftFromCatalogProduct(product);
+                const axesSel =
+                  variantConfigByProduct[product._id] ||
+                  (product.hasVariants && (product.variantAxes || []).length
+                    ? defaultProviderAxisSelection(product)
+                    : {});
+                const showVariantPrices =
+                  draft.priceMode === "exact" &&
+                  Boolean(product.hasVariants) &&
+                  (product.variantAxes || []).length > 0;
+                return (
+                  <div
+                    key={`price-${product._id}`}
+                    id={`provider-pricing-${product._id}`}
+                    className="rounded-lg border border-border p-3 sm:p-4 space-y-4"
+                  >
+                    {selectedProducts.length > 1 ? (
+                      <p className="text-sm font-medium">{product.name}</p>
+                    ) : null}
+                    <PricingSection
+                      pricingType={draft.pricingType as any}
+                      priceMode={draft.priceMode}
+                      startingPrice={draft.startingPrice}
+                      priceMin={draft.priceMin}
+                      priceMax={draft.priceMax}
+                      availability={{ days: [], timeSlots: [{ start: "09:00", end: "18:00" }] }}
+                      showAvailability={false}
+                      onPriceModeChange={(value) => {
+                        setPriceError(null);
+                        setPriceByProduct((cfg) => ({
+                          ...cfg,
+                          [product._id]: {
+                            ...(cfg[product._id] || draftFromCatalogProduct(product)),
+                            priceMode: value,
+                          },
+                        }));
+                      }}
+                      onPricingTypeChange={(value) => {
+                        setPriceByProduct((cfg) => ({
+                          ...cfg,
+                          [product._id]: {
+                            ...(cfg[product._id] || draftFromCatalogProduct(product)),
+                            pricingType: value,
+                          },
+                        }));
+                      }}
+                      onStartingPriceChange={(value) => {
+                        setPriceError(null);
+                        setPriceByProduct((cfg) => ({
+                          ...cfg,
+                          [product._id]: {
+                            ...(cfg[product._id] || draftFromCatalogProduct(product)),
+                            startingPrice: value,
+                          },
+                        }));
+                      }}
+                      onPriceMinChange={(value) => {
+                        setPriceError(null);
+                        setPriceByProduct((cfg) => ({
+                          ...cfg,
+                          [product._id]: {
+                            ...(cfg[product._id] || draftFromCatalogProduct(product)),
+                            priceMin: value,
+                          },
+                        }));
+                      }}
+                      onPriceMaxChange={(value) => {
+                        setPriceError(null);
+                        setPriceByProduct((cfg) => ({
+                          ...cfg,
+                          [product._id]: {
+                            ...(cfg[product._id] || draftFromCatalogProduct(product)),
+                            priceMax: value,
+                          },
+                        }));
+                      }}
+                      onAvailabilityChange={() => {}}
+                    />
+                    {showVariantPrices ? (
+                      <ProviderVariantPriceOverrides
+                        product={product}
+                        selection={axesSel}
+                        prices={draft.providerVariantPrices}
+                        defaultPrice={draft.startingPrice}
+                        onChange={(prices) => {
+                          setPriceByProduct((cfg) => ({
+                            ...cfg,
+                            [product._id]: {
+                              ...(cfg[product._id] || draftFromCatalogProduct(product)),
+                              providerVariantPrices: prices,
+                            },
+                          }));
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+              {priceError ? <p className="text-sm text-destructive">{priceError}</p> : null}
+            </div>
+          ) : null}
+
           {errors.products && (
             <p className="text-sm text-destructive">{errors.products}</p>
           )}
@@ -698,8 +932,10 @@ export function CatalogProductsPage({
                       setMaterialType("");
                       setSelectedProducts([]);
                       setVariantConfigByProduct({});
+                      setPriceByProduct({});
                       setVariantError(null);
                       setVariantErrorProductId(null);
+                      setPriceError(null);
                       return;
                     }
                     setStep(1);
