@@ -72,9 +72,16 @@ function applyProviderQuoteFormFromRow(
   const rates: Record<string, string> = {};
   requestLines.forEach((line, idx) => {
     const key = quoteLineKey(line, idx);
+    const lineVid = String(line.catalogVariantId || "").trim();
     const match =
-      offered.find((o) => o.serviceId && o.serviceId === line.serviceId) ||
-      offered.find((o) => o.title && o.title === line.title);
+      offered.find(
+        (o) =>
+          o.serviceId &&
+          o.serviceId === line.serviceId &&
+          String(o.catalogVariantId || "").trim() === lineVid
+      ) ||
+      offered.find((o) => o.serviceId && o.serviceId === line.serviceId && o.title === line.title) ||
+      offered.find((o) => o.serviceId && o.serviceId === line.serviceId);
     rates[key] = match?.unitPrice != null ? String(match.unitPrice) : "";
   });
   setters.setQuoteLineRates(rates);
@@ -257,6 +264,7 @@ export default function ProviderLeads() {
       requestLines.length > 0
         ? requestLines.map((line, idx) => ({
             serviceId: String(line.serviceId || ""),
+            catalogVariantId: String(line.catalogVariantId || "").trim() || undefined,
             unitPrice: Number(quoteLineRates[quoteLineKey(line, idx)] || 0),
             title: String(line.title || "Product"),
             quantity: parseQuoteQuantity(line.quantity),
@@ -309,7 +317,11 @@ export default function ProviderLeads() {
         amount,
         items:
           offerItems.length > 0
-            ? offerItems.map((line) => ({ serviceId: line.serviceId, unitPrice: line.unitPrice }))
+            ? offerItems.map((line) => ({
+                serviceId: line.serviceId,
+                unitPrice: line.unitPrice,
+                ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),
+              }))
             : undefined,
         notes: quoteNotes.trim() || undefined,
         estimatedDelivery: quoteDelivery.trim() || undefined,
