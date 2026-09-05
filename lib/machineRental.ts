@@ -25,22 +25,121 @@ export function isMachineRentalCategorySlug(slug: string | undefined): boolean {
 }
 
 export type MachineRentalPriceType =
-  | "daily"
   | "hourly"
+  | "daily"
+  | "monthly"
+  | "per_km"
   | "per_trip"
-  | "fixed"
-  | "monthly";
+  | "fixed";
 
 export const MACHINE_RENTAL_PRICE_TYPES: ReadonlyArray<{
   value: MachineRentalPriceType;
   title: string;
 }> = [
-  { value: "daily", title: "Per day" },
   { value: "hourly", title: "Per hour" },
+  { value: "daily", title: "Per day" },
+  { value: "monthly", title: "Per month" },
+  { value: "per_km", title: "Per km" },
   { value: "per_trip", title: "Per trip" },
   { value: "fixed", title: "Fixed" },
-  { value: "monthly", title: "Per month" },
 ];
+
+export type MachineRentalRate = {
+  priceType: MachineRentalPriceType;
+  price: number;
+};
+
+const PRIMARY_RATE_ORDER: MachineRentalPriceType[] = [
+  "daily",
+  "hourly",
+  "monthly",
+  "per_km",
+  "per_trip",
+  "fixed",
+];
+
+const ALLOWED_RATE_TYPES = new Set<string>(
+  MACHINE_RENTAL_PRICE_TYPES.map((o) => o.value)
+);
+
+export function isMachineRentalPriceType(value: unknown): value is MachineRentalPriceType {
+  return ALLOWED_RATE_TYPES.has(String(value || "").trim().toLowerCase());
+}
+
+/** Normalize metadata.rentalRates (or legacy single price) into a clean rate list. */
+export function parseRentalRates(
+  metadata: Record<string, unknown> | null | undefined,
+  fallback?: { priceType?: string | null; price?: number | null }
+): MachineRentalRate[] {
+  const raw = metadata?.rentalRates;
+  const out: MachineRentalRate[] = [];
+  const seen = new Set<string>();
+
+  if (Array.isArray(raw)) {
+    for (const row of raw) {
+      if (!row || typeof row !== "object") continue;
+      const priceType = String((row as { priceType?: unknown }).priceType || "")
+        .trim()
+        .toLowerCase();
+      const price = Number((row as { price?: unknown }).price);
+      if (!isMachineRentalPriceType(priceType)) continue;
+      if (!Number.isFinite(price) || price <= 0) continue;
+      if (seen.has(priceType)) continue;
+      seen.add(priceType);
+      out.push({ priceType, price });
+    }
+  }
+
+  if (out.length === 0 && fallback) {
+    const priceType = String(fallback.priceType || "daily")
+      .trim()
+      .toLowerCase();
+    const price = Number(fallback.price);
+    if (isMachineRentalPriceType(priceType) && Number.isFinite(price) && price > 0) {
+      out.push({ priceType, price });
+    }
+  }
+
+  return out;
+}
+
+export function pickPrimaryRate(rates: MachineRentalRate[]): MachineRentalRate | null {
+  if (!rates.length) return null;
+  for (const preferred of PRIMARY_RATE_ORDER) {
+    const hit = rates.find((r) => r.priceType === preferred);
+    if (hit) return hit;
+  }
+  return rates[0] || null;
+}
+
+export function resolveRentalUnitPrice(
+  rates: MachineRentalRate[],
+  selectedPriceType?: string | null,
+  legacyPrice?: number | null
+): { priceType: MachineRentalPriceType; unitPrice: number } | null {
+  if (rates.length > 0) {
+    const wanted = String(selectedPriceType || "")
+      .trim()
+      .toLowerCase();
+    if (wanted) {
+      const hit = rates.find((r) => r.priceType === wanted);
+      if (!hit) return null;
+      return { priceType: hit.priceType, unitPrice: hit.price };
+    }
+    const primary = pickPrimaryRate(rates);
+    return primary
+      ? { priceType: primary.priceType, unitPrice: primary.price }
+      : null;
+  }
+  const legacy = Number(legacyPrice);
+  if (Number.isFinite(legacy) && legacy > 0) {
+    const pt = isMachineRentalPriceType(selectedPriceType)
+      ? selectedPriceType
+      : "daily";
+    return { priceType: pt, unitPrice: legacy };
+  }
+  return null;
+}
 
 export type MachineRentalSpecRow = {
   id: string;
@@ -79,8 +178,8 @@ export function buildMachineRentalServicePayload(opts: {
   brandName?: string;
   description: string;
   images: string[];
-  priceType: MachineRentalPriceType;
-  price: number;
+  /** Multi-unit rate card — at least one required. */
+  rates: MachineRentalRate[];
   /** How many identical units the provider can rent out for this listing. */
   availableMachines: number;
   securityDeposit?: string;
@@ -101,14 +200,22 @@ export function buildMachineRentalServicePayload(opts: {
     Math.max(1, Math.floor(Number(opts.availableMachines) || 1))
   );
 
+  const rates = (opts.rates || []).filter(
+    (r) => isMachineRentalPriceType(r.priceType) && Number.isFinite(r.price) && r.price > 0
+  );
+  const primary = pickPrimaryRate(rates);
+  if (!primary) {
+    throw new Error("At least one rental rate is required");
+  }
+
   const payload: Record<string, unknown> = {
     title: opts.title.trim(),
     description: opts.description.trim(),
     category: opts.categoryId,
     subcategory: opts.subcategory.trim(),
     priceMode: "exact",
-    price: opts.price,
-    priceType: opts.priceType,
+    price: primary.price,
+    priceType: primary.priceType,
     deliveryTime: "1-2 days",
     featured: false,
     contactMode: "platform",
@@ -119,6 +226,10 @@ export function buildMachineRentalServicePayload(opts: {
       itemType: "machine",
       availableMachines: String(availableMachines),
       operatorIncluded: opts.operatorIncluded ? "yes" : "no",
+      rentalRates: rates.map((r) => ({
+        priceType: r.priceType,
+        price: r.price,
+      })),
       ...(opts.securityDeposit?.trim()
         ? { securityDeposit: opts.securityDeposit.trim() }
         : {}),
