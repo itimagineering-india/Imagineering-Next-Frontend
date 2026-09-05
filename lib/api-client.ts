@@ -2870,7 +2870,7 @@ export const api = {
       apiRequest<{ data: any }>(`/api/quote-requests/${id}/cancel`, { method: 'POST' }),
     updateQuantities: (
       id: string,
-      data: { items: Array<{ serviceId: string; quantity: number }> }
+      data: { items: Array<{ serviceId: string; quantity: number; catalogVariantId?: string }> }
     ) =>
       apiRequest<{ data: any }>(`/api/quote-requests/${id}/quantities`, {
         method: 'PATCH',
@@ -2903,7 +2903,7 @@ export const api = {
       deliveryOption?: 'free' | 'paid' | 'not_available';
       deliveryCharge?: number;
       sampleImages?: string[];
-      items?: Array<{ serviceId: string; unitPrice: number }>;
+      items?: Array<{ serviceId: string; unitPrice: number; catalogVariantId?: string }>;
       gstPercent?: number;
       gstAmount?: number;
       priceIncludesGst?: boolean;
@@ -3385,10 +3385,14 @@ export const api = {
 
   // Cart (longer timeout: pricing + populate can be slow)
   cart: {
-    add: (serviceId: string, quantity = 1) =>
+    add: (serviceId: string, quantity = 1, opts?: { catalogVariantId?: string }) =>
       apiRequest('/api/cart/add?minimal=1', {
         method: 'POST',
-        body: JSON.stringify({ serviceId, quantity }),
+        body: JSON.stringify({
+          serviceId,
+          quantity,
+          ...(opts?.catalogVariantId ? { catalogVariantId: opts.catalogVariantId } : {}),
+        }),
         timeoutMs: 20000,
       }),
     get: () =>
