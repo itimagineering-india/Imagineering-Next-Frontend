@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -284,6 +284,7 @@ export default function QuoteRequestPage() {
   const [liveBanner, setLiveBanner] = useState<string | null>(null);
   const [editingQty, setEditingQty] = useState(false);
   const [draftQty, setDraftQty] = useState<Record<string, string>>({});
+  const [removedIds, setRemovedIds] = useState<Record<string, true>>({});
   const [savingQty, setSavingQty] = useState(false);
   const prevOfferCount = useRef(0);
   const prevRecommended = useRef<string | null>(null);
@@ -390,11 +391,38 @@ export default function QuoteRequestPage() {
       next[sid] = String(item.quantity ?? 1);
     }
     setDraftQty(next);
+    setRemovedIds({});
     setEditingQty(true);
   };
 
+  const editableMaterials = useMemo(
+    () =>
+      materials.filter((item) => {
+        const sid = String(item.serviceId || "").trim();
+        return sid && !removedIds[sid];
+      }),
+    [materials, removedIds]
+  );
+
+  const removeDraftItem = (serviceId: string) => {
+    if (editableMaterials.length <= 1) {
+      toast({
+        title: "Keep at least one product",
+        description: "Cancel the whole request instead if you no longer need quotes.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setRemovedIds((prev) => ({ ...prev, [serviceId]: true }));
+    setDraftQty((prev) => {
+      const next = { ...prev };
+      delete next[serviceId];
+      return next;
+    });
+  };
+
   const saveQuantities = async () => {
-    const items = materials
+    const items = editableMaterials
       .map((item) => {
         const serviceId = String(item.serviceId || "").trim();
         if (!serviceId) return null;
@@ -405,7 +433,16 @@ export default function QuoteRequestPage() {
       })
       .filter(Boolean) as Array<{ serviceId: string; quantity: number }>;
 
-    if (items.length !== materials.filter((m) => m.serviceId).length) {
+    if (items.length < 1) {
+      toast({
+        title: "Keep at least one product",
+        description: "Cancel the whole request instead if you no longer need quotes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (items.length !== editableMaterials.length) {
       toast({
         title: "Invalid quantity",
         description: "Enter a valid quantity for each product.",
@@ -420,8 +457,10 @@ export default function QuoteRequestPage() {
       if (!res.success) throw new Error((res as any)?.error?.message || "Update failed");
       applyRow((res as any).data);
       setEditingQty(false);
+      setRemovedIds({});
+      const removedCount = Object.keys(removedIds).length;
       toast({
-        title: "Quantities updated",
+        title: removedCount > 0 ? "Items updated" : "Quantities updated",
         description: "All suppliers see the update; quoted prices refresh automatically.",
       });
     } catch (err: any) {
@@ -588,37 +627,49 @@ export default function QuoteRequestPage() {
                       className="inline-flex items-center gap-1 text-xs font-semibold text-teal-800 hover:text-teal-900"
                     >
                       <Pencil className="h-3 w-3" aria-hidden />
-                      Edit qty
+                      Edit items
                     </button>
                   ) : null}
                   <span className="text-xs tabular-nums text-stone-500">
-                    {materials.length} {materials.length === 1 ? "item" : "items"}
+                    {(editingQty ? editableMaterials : materials).length}{" "}
+                    {(editingQty ? editableMaterials : materials).length === 1 ? "item" : "items"}
                   </span>
                 </div>
               </div>
               <ul className="divide-y divide-stone-200 border-y border-stone-200 bg-white/60">
-                {materials.map((item, idx) => {
+                {(editingQty ? editableMaterials : materials).map((item, idx) => {
                   const sid = String(item.serviceId || "").trim();
                   return (
                     <li
                       key={`${sid || item.title}-${idx}`}
-                      className="flex items-start justify-between gap-4 px-1 py-3"
+                      className="flex items-start justify-between gap-3 px-1 py-3"
                     >
                       <span className="min-w-0 text-sm font-medium leading-snug text-stone-800">
                         {item.title}
                       </span>
                       {editingQty && sid ? (
-                        <Input
-                          type="number"
-                          min={0.01}
-                          step={0.01}
-                          inputMode="decimal"
-                          className="h-8 w-24 shrink-0 text-right text-xs tabular-nums"
-                          value={draftQty[sid] ?? String(item.quantity ?? 1)}
-                          onChange={(e) =>
-                            setDraftQty((prev) => ({ ...prev, [sid]: e.target.value }))
-                          }
-                        />
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Input
+                            type="number"
+                            min={0.01}
+                            step={0.01}
+                            inputMode="decimal"
+                            className="h-8 w-24 text-right text-xs tabular-nums"
+                            value={draftQty[sid] ?? String(item.quantity ?? 1)}
+                            onChange={(e) =>
+                              setDraftQty((prev) => ({ ...prev, [sid]: e.target.value }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item.title}`}
+                            disabled={editableMaterials.length <= 1 || savingQty}
+                            onClick={() => removeDraftItem(sid)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       ) : (
                         <span className="shrink-0 text-right text-xs font-semibold tabular-nums text-stone-500">
                           {formatQuoteQtyLabel(Number(item.quantity ?? 1), item.priceType)}
@@ -636,13 +687,16 @@ export default function QuoteRequestPage() {
                     disabled={savingQty}
                     onClick={() => void saveQuantities()}
                   >
-                    {savingQty ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save quantities"}
+                    {savingQty ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     disabled={savingQty}
-                    onClick={() => setEditingQty(false)}
+                    onClick={() => {
+                      setEditingQty(false);
+                      setRemovedIds({});
+                    }}
                   >
                     Cancel
                   </Button>
@@ -650,8 +704,8 @@ export default function QuoteRequestPage() {
               ) : null}
               {canEditQty && !editingQty ? (
                 <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
-                  Wrong quantity? Edit above — all suppliers see the update and quoted prices refresh
-                  automatically.
+                  Wrong quantity or product? Edit above — remove items or change qty; suppliers see
+                  the update and quoted prices refresh automatically.
                 </p>
               ) : (
                 <p className="mt-3 text-[11px] leading-relaxed text-stone-500">
