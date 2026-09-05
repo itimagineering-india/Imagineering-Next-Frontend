@@ -5,8 +5,8 @@ import {
   pickConstructionMetadataFields,
   resolveMaterialTypeKeyForServiceForm,
 } from "@/lib/constructionMaterials";
-import type { ProviderAxisSelection } from "@/lib/catalogVariants";
-import { serializeProviderVariantAxes } from "@/lib/catalogVariants";
+import type { ProviderAxisSelection, ProviderVariantPrices } from "@/lib/catalogVariants";
+import { serializeProviderVariantAxes, serializeProviderVariantPrices } from "@/lib/catalogVariants";
 import { fitListingShortDescription } from "@/lib/serviceListingAiContext";
 
 export interface CatalogProductItem {
@@ -122,6 +122,15 @@ export function buildServicePayloadFromCatalogProduct(
     itemType?: string;
     location?: CatalogServiceLocation | null;
     providerVariantAxes?: ProviderAxisSelection;
+    /** When set, overrides catalog suggested pricing (edit / custom rates). */
+    pricing?: {
+      priceMode?: "exact" | "range";
+      pricingType?: string;
+      startingPrice?: string;
+      priceMin?: string;
+      priceMax?: string;
+      providerVariantPrices?: ProviderVariantPrices;
+    };
   },
 ): Record<string, unknown> {
   const patch = mapCatalogProductToListingForm(
@@ -131,9 +140,23 @@ export function buildServicePayloadFromCatalogProduct(
     opts.itemType || "",
   );
 
-  const description = patch.shortDescription
-    ? `${patch.shortDescription}\n\n${patch.detailedDescription}`.trim()
-    : patch.detailedDescription;
+  const pricing = opts.pricing;
+  if (pricing) {
+    if (pricing.priceMode === "exact" || pricing.priceMode === "range") {
+      patch.priceMode = pricing.priceMode;
+    }
+    if (pricing.pricingType?.trim()) patch.pricingType = pricing.pricingType.trim();
+    if (pricing.startingPrice != null) patch.startingPrice = String(pricing.startingPrice);
+    if (pricing.priceMin != null) patch.priceMin = String(pricing.priceMin);
+    if (pricing.priceMax != null) patch.priceMax = String(pricing.priceMax);
+  }
+
+  const short = patch.shortDescription.trim();
+  const detailed = patch.detailedDescription.trim();
+  const description =
+    short && detailed && short.toLowerCase() !== detailed.toLowerCase()
+      ? `${short}\n\n${detailed}`
+      : detailed || short;
 
   const min = parseFloat(patch.startingPrice);
   const priceMin = parseFloat(patch.priceMin);
@@ -155,6 +178,15 @@ export function buildServicePayloadFromCatalogProduct(
   if (opts.providerVariantAxes && Object.keys(opts.providerVariantAxes).length) {
     delete meta.providerVariants;
     meta.providerVariantAxes = serializeProviderVariantAxes(opts.providerVariantAxes);
+  }
+
+  const variantPrices = pricing?.providerVariantPrices;
+  if (variantPrices && Object.keys(variantPrices).length) {
+    const priceJson = serializeProviderVariantPrices(variantPrices);
+    if (priceJson !== "{}") meta.providerVariantPrices = priceJson;
+    else delete meta.providerVariantPrices;
+  } else {
+    delete meta.providerVariantPrices;
   }
 
   const payload: Record<string, unknown> = {
