@@ -14,6 +14,7 @@ const PRICE_TYPE_SUFFIX: Record<string, string> = {
   per_sqm: "/sqm",
   per_load: "/load",
   per_trip: "/trip",
+  per_km: "/km",
   per_cuft: "/cuft",
   per_cum: "/cum",
   per_metre: "/metre",
@@ -39,6 +40,7 @@ const PRICE_TYPE_LABEL: Record<string, string> = {
   per_sqm: "Per sq m",
   per_load: "Per load",
   per_trip: "Per trip",
+  per_km: "Per km",
   per_cuft: "Per cu ft",
   per_cum: "Per cum",
   per_metre: "Per metre",
@@ -65,6 +67,7 @@ const QUANTITY_UNIT_NOUN: Record<string, string> = {
   per_litre: "litre",
   per_load: "load",
   per_trip: "trip",
+  per_km: "km",
   per_unit: "unit",
   per_article: "article",
   per_sqft: "sq ft",
@@ -97,6 +100,7 @@ export function getQuantityUnitFieldLabel(priceType: string | null | undefined):
     day: "Days",
     hour: "Hours",
     trip: "Trips",
+    km: "Kilometers",
     month: "Months",
     min: "Minutes",
     bag: "Bags",
@@ -120,7 +124,13 @@ export function isDurationPriceType(priceType: string | null | undefined): boole
   const key = String(priceType || "")
     .trim()
     .toLowerCase();
-  return key === "daily" || key === "hourly" || key === "per_trip" || key === "monthly";
+  return (
+    key === "daily" ||
+    key === "hourly" ||
+    key === "per_trip" ||
+    key === "per_km" ||
+    key === "monthly"
+  );
 }
 
 export function formatQuoteQtyLabel(quantity: number, priceType?: string | null): string {
@@ -150,9 +160,13 @@ export function formatDurationQtyLabel(quantity: number, priceType?: string | nu
             ? n === 1
               ? "month"
               : "months"
-            : n === 1
-              ? unit
-              : `${unit}s`;
+            : unit === "km"
+              ? n === 1
+                ? "km"
+                : "km"
+              : n === 1
+                ? unit
+                : `${unit}s`;
   return `${n} ${shortPlural}`;
 }
 
