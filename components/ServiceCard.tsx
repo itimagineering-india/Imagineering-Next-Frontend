@@ -20,6 +20,8 @@ import { withListImageParams } from "@/utils/serviceImageUrl";
 import { shouldShowPricing, type ServiceWithInteraction } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
+import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
+import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 
 export interface ServiceCardProps {
  id: string;
@@ -100,7 +102,12 @@ function ServiceCardComponent({
   [price, priceMode, priceMin, priceMax, priceType]
  );
  const isRangePrice = isRangePricedService({ priceMode });
- const canAddToCart = showPricing && !isRangePrice;
+ const categorySlug = typeof category === "object" ? category?.slug : undefined;
+ /** Materials / B2B catalog listings need size selection on the product page. */
+ const requiresProductPageCheckout =
+  isConstructionMaterialsCategorySlug(categorySlug) || isB2bCategorySlug(categorySlug);
+ const canAddToCart = showPricing && !isRangePrice && !requiresProductPageCheckout;
+ const secondaryCtaLabel = "View Product";
  const [isFavorite, setIsFavorite] = useState(false);
  const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
  const [hasCheckedFavorite, setHasCheckedFavorite] = useState(false);
@@ -387,13 +394,25 @@ function ServiceCardComponent({
           </a>
          </Button>
         )}
+        {hideProviderDetails && !canAddToCart ? (
+         <Button
+          size="sm"
+          asChild
+          variant={isRangePrice ? "outline" : "default"}
+          className="h-8 sm:h-9 w-full px-2 sm:px-3"
+         >
+          <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
+           {secondaryCtaLabel}
+          </Link>
+         </Button>
+        ) : null}
        </div>
        {canAddToCart && (
         <AddToCartButton
          serviceId={id}
          providerName={provider?.name}
          priceType={priceType}
-         categorySlug={typeof category === "object" ? category?.slug : undefined}
+         categorySlug={categorySlug}
          unitPrice={price}
         />
        )}
@@ -562,13 +581,25 @@ function ServiceCardComponent({
         </a>
        </Button>
       )}
+      {hideProviderDetails && !canAddToCart ? (
+       <Button
+        size="sm"
+        asChild
+        variant={isRangePrice ? "outline" : "default"}
+        className="w-full h-8 px-2 sm:px-3"
+       >
+        <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
+         {secondaryCtaLabel}
+        </Link>
+       </Button>
+      ) : null}
      </div>
      {canAddToCart && (
       <AddToCartButton
        serviceId={id}
        providerName={provider?.name}
        priceType={priceType}
-       categorySlug={typeof category === "object" ? category?.slug : undefined}
+       categorySlug={categorySlug}
        unitPrice={price}
       />
      )}
