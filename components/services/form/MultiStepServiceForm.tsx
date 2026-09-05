@@ -68,10 +68,15 @@ import {
  type CatalogProductItem,
 } from "@/lib/productCatalog";
 import {
+ listProviderSellableVariants,
+ parseProviderVariantPrices,
  resolveProviderAxisSelection,
  serializeProviderVariantAxes,
+ serializeProviderVariantPrices,
  type ProviderAxisSelection,
+ type ProviderVariantPrices,
 } from "@/lib/catalogVariants";
+import { ProviderVariantPriceOverrides } from "@/components/services/form/ProviderVariantPriceOverrides";
 
 interface Category {
  _id: string;
@@ -258,6 +263,7 @@ export function MultiStepServiceForm({
  const [selectedCatalogProductId, setSelectedCatalogProductId] = useState<string | null>(null);
  const [selectedCatalogProduct, setSelectedCatalogProduct] = useState<CatalogProductItem | null>(null);
  const [providerVariantAxes, setProviderVariantAxes] = useState<ProviderAxisSelection>({});
+ const [providerVariantPrices, setProviderVariantPrices] = useState<ProviderVariantPrices>({});
  const [catalogCustomFields, setCatalogCustomFields] = useState<
   Array<{ label: string; value: string; type: "text" }>
  >([]);
@@ -348,6 +354,7 @@ export function MultiStepServiceForm({
    setSelectedCatalogProductId(initialData.catalogProductId ?? null);
    setSelectedCatalogProduct(null);
    setProviderVariantAxes({});
+   setProviderVariantPrices(parseProviderVariantPrices(initialData.dynamicData || null));
    setCatalogCustomFields(initialData.catalogCustomFields ?? []);
   }
  }, [open, initialData]);
@@ -372,8 +379,14 @@ export function MultiStepServiceForm({
       }
       return resolveProviderAxisSelection(product, initialData?.dynamicData || null);
      });
+     setProviderVariantPrices((prev) =>
+      Object.keys(prev).length
+       ? prev
+       : parseProviderVariantPrices(initialData?.dynamicData || null),
+     );
     } else {
      setProviderVariantAxes({});
+     setProviderVariantPrices({});
     }
    })
    .catch(() => undefined);
@@ -486,6 +499,7 @@ export function MultiStepServiceForm({
     setSelectedCatalogProductId(null);
     setSelectedCatalogProduct(null);
     setProviderVariantAxes({});
+    setProviderVariantPrices({});
     setCatalogCustomFields([]);
     setFormData((prev) => ({
      ...prev,
@@ -517,6 +531,7 @@ export function MultiStepServiceForm({
      ? defaultProviderAxisSelection(product)
      : {},
    );
+   setProviderVariantPrices({});
    setCatalogCustomFields(patch.catalogCustomFields);
    setFormData((prev) => ({
     ...prev,
@@ -1136,6 +1151,21 @@ export function MultiStepServiceForm({
     ) {
      delete meta.providerVariants;
      meta.providerVariantAxes = serializeProviderVariantAxes(providerVariantAxes);
+     const priceJson = serializeProviderVariantPrices(
+       (() => {
+         if (!selectedCatalogProduct) return providerVariantPrices;
+         const allowed = new Set(
+           listProviderSellableVariants(selectedCatalogProduct, providerVariantAxes).map((v) => v.id),
+         );
+         const pruned: ProviderVariantPrices = {};
+         for (const [id, price] of Object.entries(providerVariantPrices)) {
+           if (allowed.has(id)) pruned[id] = price;
+         }
+         return pruned;
+       })(),
+     );
+     if (priceJson !== "{}") meta.providerVariantPrices = priceJson;
+     else delete meta.providerVariantPrices;
     }
     servicePayload.metadata = buildConstructionMetadataPayload(mt, meta);
    }
@@ -1377,6 +1407,17 @@ export function MultiStepServiceForm({
           selection={providerVariantAxes}
           onChange={(next) => {
            setProviderVariantAxes(next);
+           setProviderVariantPrices((prev) => {
+            if (!selectedCatalogProduct) return prev;
+            const allowed = new Set(
+             listProviderSellableVariants(selectedCatalogProduct, next).map((v) => v.id),
+            );
+            const pruned: ProviderVariantPrices = {};
+            for (const [id, price] of Object.entries(prev)) {
+             if (allowed.has(id)) pruned[id] = price;
+            }
+            return pruned;
+           });
            setErrors((prev) => ({ ...prev, providerVariants: undefined }));
           }}
           error={errors.providerVariants}
@@ -1729,6 +1770,19 @@ export function MultiStepServiceForm({
         }}
         errors={errors}
        />
+       {formData.priceMode === "exact" &&
+       selectedCatalogProduct?.hasVariants &&
+       (selectedCatalogProduct.variantAxes || []).length > 0 ? (
+        <div className="mt-4">
+         <ProviderVariantPriceOverrides
+          product={selectedCatalogProduct}
+          selection={providerVariantAxes}
+          prices={providerVariantPrices}
+          onChange={setProviderVariantPrices}
+          defaultPrice={formData.startingPrice}
+         />
+        </div>
+       ) : null}
       </CardContent>
      </Card>
     );
