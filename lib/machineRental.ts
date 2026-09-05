@@ -24,6 +24,27 @@ export function isMachineRentalCategorySlug(slug: string | undefined): boolean {
   return (MACHINE_RENTAL_CATEGORY_SLUGS as readonly string[]).includes(s);
 }
 
+/** True when a provider listing belongs to the machine rental form (not generic MultiStep). */
+export function isMachineRentalListing(service: {
+  category?: { slug?: string } | string | null;
+  metadata?: Record<string, unknown> | null;
+  formVariant?: string | null;
+} | null | undefined): boolean {
+  if (!service) return false;
+  const cat = service.category;
+  const catSlug =
+    cat && typeof cat === "object" && cat !== null
+      ? String((cat as { slug?: string }).slug || "")
+      : "";
+  if (isMachineRentalCategorySlug(catSlug)) return true;
+  const formVariant = String(
+    service.metadata?.formVariant || service.formVariant || ""
+  )
+    .toLowerCase()
+    .trim();
+  return formVariant.includes("rental");
+}
+
 export type MachineRentalPriceType =
   | "hourly"
   | "daily"
