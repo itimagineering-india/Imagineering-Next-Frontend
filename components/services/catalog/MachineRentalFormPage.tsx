@@ -23,6 +23,7 @@ import {
   buildMachineRentalServicePayload,
   createMachineRentalSpecRow,
   isMachineRentalCategorySlug,
+  parseRentalRates,
   type MachineRentalLocation,
   type MachineRentalPriceType,
   type MachineRentalSpecRow,
@@ -37,6 +38,22 @@ function emptyRateDraft(defaultEnabled: MachineRentalPriceType = "daily"): RateD
     draft[opt.value] = {
       enabled: opt.value === defaultEnabled,
       price: "",
+    };
+  }
+  return draft;
+}
+
+function rateDraftFromRates(
+  rates: Array<{ priceType: MachineRentalPriceType; price: number }>
+): RateDraft {
+  const draft = emptyRateDraft(rates[0]?.priceType || "daily");
+  for (const opt of MACHINE_RENTAL_PRICE_TYPES) {
+    draft[opt.value] = { enabled: false, price: "" };
+  }
+  for (const rate of rates) {
+    draft[rate.priceType] = {
+      enabled: true,
+      price: String(rate.price),
     };
   }
   return draft;
@@ -106,12 +123,13 @@ async function fetchProviderSnapshot(userId: string): Promise<{
   return { businessAddress, primaryCategoryId, primarySubcategory };
 }
 
-export function MachineRentalFormPage() {
+export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}) {
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
   const { status: kycStatus } = useProviderKycStatus();
   const isKycApproved = kycStatus === "KYC_APPROVED";
+  const editMode = Boolean(serviceId);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [category, setCategory] = useState<Category | null>(null);
@@ -167,6 +185,75 @@ export function MachineRentalFormPage() {
             merged.length > 0 ? merged : [...MACHINE_RENTAL_FALLBACK_TYPES],
           );
         }
+
+        if (serviceId) {
+          const res = await api.services.getById(serviceId);
+          if (cancelled) return;
+          if (!res.success || !res.data) {
+            toast({
+              title: "Listing not found",
+              description: "This machine rental listing could not be loaded.",
+              variant: "destructive",
+            });
+            router.replace("/dashboard/provider/services");
+            return;
+          }
+          const raw =
+            (res.data as { service?: Record<string, unknown> }).service ?? res.data;
+          const svc = raw as {
+            title?: string;
+            description?: string;
+            brandName?: string;
+            subcategory?: string;
+            images?: string[];
+            image?: string;
+            price?: number;
+            priceType?: string;
+            metadata?: Record<string, unknown>;
+            customFields?: Array<{ label?: string; value?: string }>;
+            location?: MachineRentalLocation;
+          };
+          const meta = svc.metadata && typeof svc.metadata === "object" ? svc.metadata : {};
+          const rates = parseRentalRates(meta, {
+            priceType: svc.priceType,
+            price: svc.price,
+          });
+          setTitle(String(svc.title || ""));
+          setBrandName(String(svc.brandName || meta.machineModel || ""));
+          setShortDescription(String(svc.description || "").trim());
+          const sub = String(svc.subcategory || "").trim();
+          setSubcategory(sub);
+          if (sub) {
+            setMachineTypes((prev) => (prev.includes(sub) ? prev : [...prev, sub]));
+          }
+          const imgs = Array.isArray(svc.images)
+            ? svc.images.filter(Boolean).map(String)
+            : svc.image
+              ? [String(svc.image)]
+              : [];
+          setImages(imgs);
+          setRateDraft(rateDraftFromRates(rates));
+          const units = String(meta.availableMachines || "1");
+          setAvailableMachines(units);
+          setSecurityDeposit(String(meta.securityDeposit || ""));
+          setOperatorIncluded(
+            String(meta.operatorIncluded || "").toLowerCase() === "yes" ||
+              meta.operatorIncluded === true
+          );
+          const specRows = Array.isArray(svc.customFields)
+            ? svc.customFields
+                .filter((f) => f?.label?.trim() && String(f.value || "").trim())
+                .map((f) => ({
+                  ...createMachineRentalSpecRow(String(f.label).trim()),
+                  value: String(f.value).trim(),
+                }))
+            : [];
+          setSpecs(specRows);
+          if (svc.location && (svc.location.address || svc.location.city)) {
+            setBusinessAddress(svc.location);
+          }
+          if (sub) setStep(2);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -174,7 +261,7 @@ export function MachineRentalFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, serviceId, router, toast]);
 
   const goToDetails = useCallback((type: string) => {
     setSubcategory(type);
@@ -260,30 +347,34 @@ export function MachineRentalFormPage() {
         ? shortDescription.trim()
         : `${title.trim()} available for rent on Imagineering India.`;
 
-      const response = await api.services.create(
-        buildMachineRentalServicePayload({
-          categoryId: category._id,
-          categorySlug: category.slug,
-          subcategory,
-          title,
-          brandName,
-          description,
-          images: allImages,
-          rates: collectRates(),
-          availableMachines: Math.floor(Number(availableMachines)) || 1,
-          securityDeposit,
-          operatorIncluded,
-          specs,
-          location: businessAddress,
-        }),
-      );
+      const payload = buildMachineRentalServicePayload({
+        categoryId: category._id,
+        categorySlug: category.slug,
+        subcategory,
+        title,
+        brandName,
+        description,
+        images: allImages,
+        rates: collectRates(),
+        availableMachines: Math.floor(Number(availableMachines)) || 1,
+        securityDeposit,
+        operatorIncluded,
+        specs,
+        location: businessAddress,
+      });
+
+      const response = editMode && serviceId
+        ? await api.services.update(serviceId, payload)
+        : await api.services.create(payload);
 
       if (response.success) {
         toast({
-          title: "Listing added",
-          description: isKycApproved
-            ? "It will be reviewed before going live."
-            : "Saved as draft. Complete KYC to go live.",
+          title: editMode ? "Listing updated" : "Listing added",
+          description: editMode
+            ? "Your machine rental listing has been saved."
+            : isKycApproved
+              ? "It will be reviewed before going live."
+              : "Saved as draft. Complete KYC to go live.",
         });
         router.push("/dashboard/provider/services");
       } else {
@@ -347,7 +438,7 @@ export function MachineRentalFormPage() {
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-            Add a machine for rent
+            {editMode ? "Edit machine rental listing" : "Add a machine for rent"}
           </h1>
           <span className="text-sm text-muted-foreground shrink-0">Step {step} of 2</span>
         </div>
@@ -676,6 +767,8 @@ export function MachineRentalFormPage() {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Saving…
                   </>
+                ) : editMode ? (
+                  "Save changes"
                 ) : (
                   "Add listing"
                 )}
