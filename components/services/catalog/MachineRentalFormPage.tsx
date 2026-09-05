@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,19 @@ import {
   type MachineRentalSpecRow,
 } from "@/lib/machineRental";
 import { getPriceTypeLabel } from "@/lib/priceTypeDisplay";
+
+type RateDraft = Record<MachineRentalPriceType, { enabled: boolean; price: string }>;
+
+function emptyRateDraft(defaultEnabled: MachineRentalPriceType = "daily"): RateDraft {
+  const draft = {} as RateDraft;
+  for (const opt of MACHINE_RENTAL_PRICE_TYPES) {
+    draft[opt.value] = {
+      enabled: opt.value === defaultEnabled,
+      price: "",
+    };
+  }
+  return draft;
+}
 
 interface Category {
   _id: string;
@@ -109,8 +122,7 @@ export function MachineRentalFormPage() {
   const [shortDescription, setShortDescription] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
-  const [priceType, setPriceType] = useState<MachineRentalPriceType>("daily");
-  const [price, setPrice] = useState("");
+  const [rateDraft, setRateDraft] = useState<RateDraft>(() => emptyRateDraft("daily"));
   const [availableMachines, setAvailableMachines] = useState("1");
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
@@ -185,11 +197,35 @@ export function MachineRentalFormPage() {
     }
   };
 
+  const collectRates = () => {
+    const rates: Array<{ priceType: MachineRentalPriceType; price: number }> = [];
+    for (const opt of MACHINE_RENTAL_PRICE_TYPES) {
+      const row = rateDraft[opt.value];
+      if (!row?.enabled) continue;
+      const amount = parseFloat(row.price);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      rates.push({ priceType: opt.value, price: amount });
+    }
+    return rates;
+  };
+
   const validateDetails = () => {
     const next: Record<string, string> = {};
     if (!title.trim()) next.title = "Enter a listing title";
-    const amount = parseFloat(price);
-    if (!Number.isFinite(amount) || amount <= 0) next.price = "Enter a valid rental price";
+    const rates = collectRates();
+    if (rates.length === 0) {
+      next.price = "Enable at least one rental rate and enter a valid ₹ amount";
+    } else {
+      for (const opt of MACHINE_RENTAL_PRICE_TYPES) {
+        const row = rateDraft[opt.value];
+        if (!row?.enabled) continue;
+        const amount = parseFloat(row.price);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          next.price = `Enter a valid price for ${opt.title}`;
+          break;
+        }
+      }
+    }
     const units = Math.floor(Number(availableMachines));
     if (!Number.isFinite(units) || units < 1) {
       next.availableMachines = "Enter how many machines you can rent (at least 1)";
@@ -233,8 +269,7 @@ export function MachineRentalFormPage() {
           brandName,
           description,
           images: allImages,
-          priceType,
-          price: parseFloat(price),
+          rates: collectRates(),
           availableMachines: Math.floor(Number(availableMachines)) || 1,
           securityDeposit,
           operatorIncluded,
@@ -268,11 +303,6 @@ export function MachineRentalFormPage() {
       setSubmitting(false);
     }
   };
-
-  const pricePlaceholder = useMemo(() => {
-    const label = getPriceTypeLabel(priceType);
-    return label ? `Price (${label}) in ₹` : "Rental price in ₹";
-  }, [priceType]);
 
   const progress = step === 1 ? 50 : 100;
 
@@ -423,39 +453,68 @@ export function MachineRentalFormPage() {
           </div>
 
           <div className="space-y-3">
-            <Label>
-              Rental rate <span className="text-destructive">*</span>
-            </Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              {MACHINE_RENTAL_PRICE_TYPES.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setPriceType(option.value)}
-                  className={cn(
-                    "rounded-xl border p-3 text-left transition hover:border-primary/60",
-                    priceType === option.value
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border bg-background",
-                  )}
-                >
-                  <span className="block text-sm font-medium">{option.title}</span>
-                </button>
-              ))}
+            <div>
+              <Label>
+                Rental rates <span className="text-destructive">*</span>
+              </Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enable every unit you offer (hour, day, month, km…). Buyers pick one at checkout.
+              </p>
             </div>
-            <Input
-              id="rental-price"
-              type="number"
-              min="0"
-              step="1"
-              value={price}
-              onChange={(e) => {
-                setPrice(e.target.value);
-                setErrors((prev) => ({ ...prev, price: "" }));
-              }}
-              placeholder={pricePlaceholder}
-              className={errors.price ? "border-destructive" : ""}
-            />
+            <div className="space-y-2">
+              {MACHINE_RENTAL_PRICE_TYPES.map((option) => {
+                const row = rateDraft[option.value];
+                return (
+                  <div
+                    key={option.value}
+                    className={cn(
+                      "flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:gap-3",
+                      row.enabled ? "border-primary/40 bg-primary/5" : "border-border bg-background",
+                    )}
+                  >
+                    <label className="flex min-w-[7.5rem] cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={row.enabled}
+                        onCheckedChange={(checked) => {
+                          setRateDraft((prev) => ({
+                            ...prev,
+                            [option.value]: {
+                              ...prev[option.value],
+                              enabled: checked === true,
+                            },
+                          }));
+                          setErrors((prev) => ({ ...prev, price: "" }));
+                        }}
+                      />
+                      <span className="text-sm font-medium">{option.title}</span>
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      disabled={!row.enabled}
+                      value={row.price}
+                      onChange={(e) => {
+                        setRateDraft((prev) => ({
+                          ...prev,
+                          [option.value]: {
+                            ...prev[option.value],
+                            enabled: true,
+                            price: e.target.value,
+                          },
+                        }));
+                        setErrors((prev) => ({ ...prev, price: "" }));
+                      }}
+                      placeholder={`₹ ${getPriceTypeLabel(option.value) || option.title}`}
+                      className={cn(
+                        "sm:flex-1",
+                        errors.price && row.enabled ? "border-destructive" : "",
+                      )}
+                    />
+                  </div>
+                );
+              })}
+            </div>
             {errors.price ? <p className="text-sm text-destructive">{errors.price}</p> : null}
           </div>
 
