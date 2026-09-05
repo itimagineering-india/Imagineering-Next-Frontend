@@ -38,7 +38,7 @@ type CartContextState = {
   totals: CartTotals;
   loading: boolean;
   isRefreshing: boolean;
-  addToCart: (serviceId: string, quantity?: number, options?: { silent?: boolean }) => Promise<void>;
+  addToCart: (serviceId: string, quantity?: number, options?: { silent?: boolean; catalogVariantId?: string }) => Promise<void>;
   removeFromCart: (serviceId: string) => Promise<void>;
   updateQuantity: (serviceId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
@@ -97,10 +97,12 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   }, [refreshCart]);
 
   const addToCart = useCallback(
-    async (serviceId: string, quantity = 1, options?: { silent?: boolean }) => {
+    async (serviceId: string, quantity = 1, options?: { silent?: boolean; catalogVariantId?: string }) => {
       setLoading(true);
       try {
-        const res = await api.cart.add(serviceId, quantity);
+        const res = await api.cart.add(serviceId, quantity, {
+          catalogVariantId: options?.catalogVariantId,
+        });
         if (res.success && res.data) {
           const totalsData = (res.data as any).totals || { subtotal: 0, total: 0 };
           setTotals(totalsData);
