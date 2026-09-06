@@ -22,6 +22,10 @@ import { AddToCartButton } from "@/components/services/AddToCartButton";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
+import {
+  formatRentalMoreRatesHint,
+  isMachineRentalCategorySlug,
+} from "@/lib/machineRental";
 
 export interface ServiceCardProps {
  id: string;
@@ -66,6 +70,8 @@ export interface ServiceCardProps {
  /** Distance from user search / GPS (km), when known */
  distanceKm?: number;
  hideProviderDetails?: boolean;
+ /** Used for machine-rental multi-rate hint on cards */
+ metadata?: Record<string, unknown> | null;
 }
 
 function ServiceCardComponent({
@@ -91,6 +97,7 @@ function ServiceCardComponent({
  category,
  distanceKm,
  hideProviderDetails = false,
+ metadata,
 }: ServiceCardProps) {
  // Memoize expensive computations
  const service: ServiceWithInteraction = useMemo(() => ({ category }), [category]);
@@ -101,13 +108,26 @@ function ServiceCardComponent({
   () => formatServicePrice({ price, priceMode, priceMin, priceMax, priceType }),
   [price, priceMode, priceMin, priceMax, priceType]
  );
- const isRangePrice = isRangePricedService({ priceMode });
  const categorySlug = typeof category === "object" ? category?.slug : undefined;
- /** Materials / B2B catalog listings need size selection on the product page. */
+ const formVariant = String(metadata?.formVariant || "").toLowerCase();
+ const isMachineRental =
+  isMachineRentalCategorySlug(categorySlug) || formVariant.includes("rental");
+ const rentalMoreRatesHint = useMemo(() => {
+  if (!isMachineRental) return null;
+  return formatRentalMoreRatesHint(metadata, { priceType, price });
+ }, [isMachineRental, metadata, priceType, price]);
+ const isRangePrice = isRangePricedService({ priceMode });
+ /** Materials / B2B / machine rental need options chosen on the listing page. */
  const requiresProductPageCheckout =
-  isConstructionMaterialsCategorySlug(categorySlug) || isB2bCategorySlug(categorySlug);
+  isConstructionMaterialsCategorySlug(categorySlug) ||
+  isB2bCategorySlug(categorySlug) ||
+  isMachineRental;
  const canAddToCart = showPricing && !isRangePrice && !requiresProductPageCheckout;
- const secondaryCtaLabel = "View Product";
+ const secondaryCtaLabel = isMachineRental
+  ? rentalMoreRatesHint
+    ? "View rates"
+    : "Book now"
+  : "View Product";
  const [isFavorite, setIsFavorite] = useState(false);
  const [isLoadingFavorite, setIsLoadingFavorite] = useState(false);
  const [hasCheckedFavorite, setHasCheckedFavorite] = useState(false);
@@ -194,7 +214,9 @@ function ServiceCardComponent({
   }
  };
 
- const serviceUrl = `/service/${slug || id}`;
+ const serviceUrl = isMachineRental
+  ? `/machine-rental/listing/${id}`
+  : `/service/${slug || id}`;
  const imageSrc = withListImageParams(image, 300);
  const hasServiceImage = imageSrc.length > 0;
  const locationLine = useMemo(() => {
@@ -364,6 +386,11 @@ function ServiceCardComponent({
           {formattedPrice}
          </p>
          {isRangePrice && <Badge variant="outline" className="text-[10px]">Enquiry only</Badge>}
+         {rentalMoreRatesHint ? (
+          <p className="basis-full text-[10px] font-medium leading-snug text-muted-foreground">
+           {rentalMoreRatesHint}
+          </p>
+         ) : null}
         </div>
        ) : (
         <p className="caption ">Contact for pricing</p>
@@ -551,6 +578,11 @@ function ServiceCardComponent({
        {formattedPrice}
       </p>
       {isRangePrice && <Badge variant="outline" className="mt-1 text-[10px]">Enquiry only</Badge>}
+      {rentalMoreRatesHint ? (
+       <p className="mt-0.5 text-[10px] font-medium leading-snug text-muted-foreground">
+        {rentalMoreRatesHint}
+       </p>
+      ) : null}
      </div>
     ) : (
      <div className="w-full sm:w-auto caption">
@@ -630,7 +662,8 @@ const areEqual = (prevProps: ServiceCardProps, nextProps: ServiceCardProps) => {
   prevProps.className !== nextProps.className ||
   prevProps.viewMode !== nextProps.viewMode ||
   prevProps.distanceKm !== nextProps.distanceKm ||
-  prevProps.hideProviderDetails !== nextProps.hideProviderDetails
+  prevProps.hideProviderDetails !== nextProps.hideProviderDetails ||
+  prevProps.metadata !== nextProps.metadata
  ) {
   return false;
  }
