@@ -815,7 +815,7 @@ export default function ProviderProfile() {
                         priceMin={service.priceMin}
                         priceMax={service.priceMax}
                         priceType={service.priceType}
-                        image={service.images?.[0] || service.image || "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"}
+                        image={service.images?.[0] || service.image || ""}
                         provider={{
                           id: service.provider._id || service.provider.id || "",
                           name: service.provider.name,
