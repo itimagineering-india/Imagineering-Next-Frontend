@@ -10,7 +10,8 @@ interface CategoryProviderCardProps {
   id: string;
   name: string;
   image: string;
-  location: string;
+  /** @deprecated Location is no longer shown on home category cards. */
+  location?: string;
   price: number;
   priceMode?: "exact" | "range";
   priceMin?: number;
@@ -20,6 +21,8 @@ interface CategoryProviderCardProps {
   priceLabel: string;
   rating: number;
   reviewCount: number;
+  href?: string;
+  hideFavorite?: boolean;
   className?: string;
   style?: CSSProperties;
   priority?: boolean;
@@ -35,14 +38,13 @@ export const CATEGORY_PROVIDER_CARD_MIN_WIDTH = 140;
 export const CATEGORY_PROVIDER_CARD_WIDTH = CATEGORY_PROVIDER_CARD_MAX_WIDTH;
 /** @deprecated Use scroll metrics from container width; kept for fallbacks. */
 export const CATEGORY_PROVIDER_CARD_HEIGHT = 248;
-/** Fixed text block under the 4:3 image (title, location, price). */
+/** Fixed text block under the 4:3 image (title + price). */
 function getCategoryProviderBodyHeight(cardWidth: number): number {
   const padding = cardWidth >= 168 ? 24 : 16;
   const titleBlock = cardWidth >= 168 ? 42 : 40;
-  const locationBlock = 18;
   const priceBlock = 38;
-  const spacing = 10;
-  return padding + titleBlock + locationBlock + priceBlock + spacing;
+  const spacing = 8;
+  return padding + titleBlock + priceBlock + spacing;
 }
 
 export function getCategoryProviderCardHeight(cardWidth: number): number {
@@ -120,7 +122,6 @@ function CategoryProviderCardComponent({
   id,
   name,
   image,
-  location,
   price,
   priceMode,
   priceMin,
@@ -129,22 +130,27 @@ function CategoryProviderCardComponent({
   mrp,
   rating,
   reviewCount,
+  href,
+  hideFavorite = false,
   className,
   style,
   priority = false,
   isFavorite,
   onToggleFavorite,
 }: CategoryProviderCardProps) {
-  const optimizedImage = optimizeImageUrl(image, CARD_IMAGE_WIDTH);
-  const fallbackImage = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=240&q=75&auto=format&fit=crop";
+  const rawImage = String(image || "").trim();
+  const hasRealImage = rawImage.length > 0 && !/images\.unsplash\.com/i.test(rawImage);
+  const optimizedImage = hasRealImage ? optimizeImageUrl(rawImage, CARD_IMAGE_WIDTH) : "";
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const isRangePrice = isRangePricedService({ priceMode });
   const formattedPrice = formatServicePrice({ price, priceMode, priceMin, priceMax, priceType });
+  const detailHref = href || `/service/${id}`;
 
   return (
     <Link
-      href={`/service/${id}`}
+      href={detailHref}
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
@@ -154,27 +160,32 @@ function CategoryProviderCardComponent({
       style={{ contentVisibility: "auto", ...style }}
     >
       <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-muted">
-        <img
-          ref={imgRef}
-          src={optimizedImage}
-          alt={name}
-          loading="lazy"
-          decoding="async"
-          width="180"
-          height="135"
-          className={cn(
-            "h-full w-full object-cover transition-transform duration-500 group-hover:scale-110",
-            "transition-opacity duration-200",
-            loaded ? "opacity-100" : "opacity-0"
-          )}
-          onLoad={() => setLoaded(true)}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = fallbackImage;
-            setLoaded(true);
-          }}
-        />
-        {!priority && (
+        {hasRealImage && optimizedImage && !failed ? (
+          <img
+            ref={imgRef}
+            src={optimizedImage}
+            alt={name}
+            loading="lazy"
+            decoding="async"
+            width="180"
+            height="135"
+            className={cn(
+              "h-full w-full object-cover transition-transform duration-500 group-hover:scale-110",
+              "transition-opacity duration-200",
+              loaded ? "opacity-100" : "opacity-0"
+            )}
+            onLoad={() => setLoaded(true)}
+            onError={() => {
+              setFailed(true);
+              setLoaded(true);
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center px-2 text-center text-[10px] font-medium text-muted-foreground md:text-xs">
+            No Image
+          </div>
+        )}
+        {!priority && !hideFavorite ? (
           <Button
             variant="icon"
             size="icon"
@@ -192,7 +203,7 @@ function CategoryProviderCardComponent({
           >
             <Heart className={cn("h-3 w-3 md:h-3.5 md:w-3.5", isFavorite && "fill-current")} />
           </Button>
-        )}
+        ) : null}
       </div>
 
       <div className="flex shrink-0 flex-col p-2 md:p-3">
@@ -202,9 +213,6 @@ function CategoryProviderCardComponent({
         >
           {name}
         </h3>
-        <p className="mt-1 min-h-4 truncate text-[11px] leading-4 text-muted-foreground md:text-xs">
-          {location}
-        </p>
 
         <div className="mt-2 flex min-h-9 shrink-0 min-w-0 items-center justify-between gap-2">
           <div className="min-w-0 flex-1 truncate text-xs font-bold leading-tight text-foreground md:text-sm">
