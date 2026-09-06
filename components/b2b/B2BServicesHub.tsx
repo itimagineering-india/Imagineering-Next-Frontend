@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Package, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
@@ -184,6 +184,15 @@ export function B2BServicesHub() {
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<B2bHubSort>("relevance");
+  const [searchIndex, setSearchIndex] = useState<{
+    materials: MaterialsProduct[];
+    listings: ListingCard[];
+  } | null>(null);
+  const [searchIndexLoading, setSearchIndexLoading] = useState(false);
+  const searchIndexRef = useRef<{
+    materials: MaterialsProduct[];
+    listings: ListingCard[];
+  } | null>(null);
   const [quoteCart, setQuoteCart] = useState<B2bQuoteCartLine[]>([]);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteService, setQuoteService] = useState<{
@@ -217,6 +226,8 @@ export function B2BServicesHub() {
           subcategories: getSubcategoryNames(c.subcategories),
         }));
         setCategories(filtered);
+        searchIndexRef.current = null;
+        setSearchIndex(null);
         const fromUrl = filtered.find((c) => c.slug === urlCategory);
         const first = fromUrl || filtered[0];
         setActiveSlug(first?.slug || "");
@@ -321,6 +332,73 @@ export function B2BServicesHub() {
       cancelled = true;
     };
   }, [activeSlug, activeSub, toast]);
+
+  // Cross-category search index — category/sub filters must not hide query matches.
+  useEffect(() => {
+    const q = search.trim();
+    if (!q || categories.length === 0) return;
+    if (searchIndexRef.current) {
+      setSearchIndex(searchIndexRef.current);
+      return;
+    }
+    let cancelled = false;
+    setSearchIndexLoading(true);
+    (async () => {
+      try {
+        const parts = await Promise.all(
+          categories.map(async (cat) => {
+            if (isConstructionMaterialsB2bSlug(cat.slug)) {
+              const hub = await fetchMaterialsHubData();
+              return {
+                materials: hub.products.filter((p) => p.available),
+                listings: [] as ListingCard[],
+              };
+            }
+            const rawCatalog = await listAllCatalogProducts({ categorySlug: cat.slug });
+            const mapped = rawCatalog
+              .map((row) => mapCatalogProduct(row, slugifyMaterialsId(cat.slug) || "general"))
+              .filter(Boolean) as MaterialsProduct[];
+            const available = mapped.filter((p) => p.available);
+            if (available.length > 0) {
+              return { materials: available, listings: [] as ListingCard[] };
+            }
+            const serviceListings = await listAllCategoryServices(cat.slug, null);
+            return { materials: [] as MaterialsProduct[], listings: serviceListings };
+          })
+        );
+        if (cancelled) return;
+        const materials: MaterialsProduct[] = [];
+        const listings: ListingCard[] = [];
+        const seenMat = new Set<string>();
+        const seenList = new Set<string>();
+        for (const part of parts) {
+          for (const p of part.materials) {
+            if (seenMat.has(p.id)) continue;
+            seenMat.add(p.id);
+            materials.push(p);
+          }
+          for (const item of part.listings) {
+            if (seenList.has(item.id)) continue;
+            seenList.add(item.id);
+            listings.push(item);
+          }
+        }
+        const idx = { materials, listings };
+        searchIndexRef.current = idx;
+        setSearchIndex(idx);
+      } catch {
+        if (!cancelled) {
+          searchIndexRef.current = null;
+          setSearchIndex({ materials: [], listings: [] });
+        }
+      } finally {
+        if (!cancelled) setSearchIndexLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [search, categories]);
 
   const addToQuote = useCallback(
     (line: Omit<B2bQuoteCartLine, "quantity"> & { quantity?: number }) => {
@@ -467,35 +545,55 @@ export function B2BServicesHub() {
   );
 
   const query = search.trim();
+  const isSearching = query.length > 0;
   const visibleMaterials = useMemo(() => {
+    const source =
+      isSearching && searchIndex ? searchIndex.materials : materialsProducts;
     const matched = !query
-      ? materialsProducts
-      : materialsProducts.filter((p) => productMatchesQuery(p, query));
+      ? source
+      : source.filter((p) => productMatchesQuery(p, query));
     if (sort === "relevance") return matched;
     const next = [...matched];
     next.sort((a, b) =>
       sort === "name_asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
     );
     return next;
-  }, [materialsProducts, query, sort]);
+  }, [isSearching, materialsProducts, query, searchIndex, sort]);
   const visibleListings = useMemo(() => {
-    const matched = !query ? listings : listings.filter((item) => listingMatchesQuery(item, query));
+    const source = isSearching && searchIndex ? searchIndex.listings : listings;
+    const matched = !query ? source : source.filter((item) => listingMatchesQuery(item, query));
     if (sort === "relevance") return matched;
     const next = [...matched];
     next.sort((a, b) =>
       sort === "name_asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
     );
     return next;
-  }, [listings, query, sort]);
+  }, [isSearching, listings, query, searchIndex, sort]);
 
-  const showingCatalog = isMaterials || materialsProducts.length > 0;
+  const itemsLoading = isSearching ? searchIndexLoading : loadingItems;
+  const browseUsesCatalog = isMaterials || materialsProducts.length > 0;
+  const showingCatalog = isSearching ? visibleMaterials.length > 0 : browseUsesCatalog;
   const catalogEmpty =
-    !loadingItems && (showingCatalog ? materialsProducts.length === 0 : listings.length === 0);
-  const filteredEmpty =
-    !loadingItems &&
+    !itemsLoading &&
+    !isSearching &&
+    (browseUsesCatalog ? materialsProducts.length === 0 : listings.length === 0);
+  const browseFilteredEmpty =
+    !isSearching &&
+    !itemsLoading &&
     !catalogEmpty &&
-    (showingCatalog ? visibleMaterials.length === 0 : visibleListings.length === 0);
-  const resultCount = showingCatalog ? visibleMaterials.length : visibleListings.length;
+    (browseUsesCatalog ? visibleMaterials.length === 0 : visibleListings.length === 0);
+  const searchEmpty =
+    isSearching &&
+    !searchIndexLoading &&
+    !!searchIndex &&
+    visibleMaterials.length === 0 &&
+    visibleListings.length === 0;
+  const displayEmpty = isSearching ? searchEmpty : browseFilteredEmpty;
+  const resultCount = isSearching
+    ? visibleMaterials.length + visibleListings.length
+    : showingCatalog
+      ? visibleMaterials.length
+      : visibleListings.length;
   const quoteCartItemType = getB2bQuoteCartItemType(quoteCart);
 
   return (
@@ -592,7 +690,11 @@ export function B2BServicesHub() {
         ) : (
           <>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Select value={activeSlug || undefined} onValueChange={selectCategory}>
+              <Select
+                value={activeSlug || undefined}
+                onValueChange={selectCategory}
+                disabled={isSearching}
+              >
                 <SelectTrigger
                   aria-label="Category"
                   className="h-10 w-full min-w-0 rounded-xl border-slate-200 bg-white text-sm sm:w-[240px]"
@@ -612,6 +714,7 @@ export function B2BServicesHub() {
                 <Select
                   value={activeSub || SUBCATEGORY_ALL}
                   onValueChange={(v) => selectSub(v === SUBCATEGORY_ALL ? null : v)}
+                  disabled={isSearching}
                 >
                   <SelectTrigger
                     aria-label="Subcategory"
@@ -646,10 +749,16 @@ export function B2BServicesHub() {
               </Select>
             </div>
 
-            {loadingItems ? (
+            {isSearching ? (
+              <p className="text-xs text-slate-500 sm:text-sm">
+                Searching all B2B categories — category filters are paused until you clear search.
+              </p>
+            ) : null}
+
+            {itemsLoading ? (
               <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Loading products…
+                {isSearching ? "Searching products…" : "Loading products…"}
               </div>
             ) : catalogEmpty ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
@@ -659,14 +768,14 @@ export function B2BServicesHub() {
                   Suppliers in this category have not listed items. Check another category or try later.
                 </p>
               </div>
-            ) : filteredEmpty ? (
+            ) : displayEmpty ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
                 <Search className="mx-auto h-8 w-8 text-slate-300" />
                 <p className="mt-3 text-sm font-semibold text-slate-900">
                   No products matching “{query}”
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Try another keyword, pick a popular search, or switch category.
+                  Try another keyword or pick a popular search.
                 </p>
                 <Button type="button" variant="outline" className="mt-4" onClick={() => setSearch("")}>
                   Clear search
@@ -674,7 +783,7 @@ export function B2BServicesHub() {
               </div>
             ) : showingCatalog ? (
               <>
-                {query ? (
+                {isSearching ? (
                   <p className="text-sm text-slate-500">
                     {resultCount} result{resultCount === 1 ? "" : "s"} for “{query}”
                   </p>
@@ -695,10 +804,53 @@ export function B2BServicesHub() {
                   />
                 ))}
               </div>
+              {isSearching && visibleListings.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2.5 min-[400px]:gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {visibleListings.map((item) => (
+                    <article
+                      key={item.id}
+                      className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                    >
+                      <Link href={`/service/${item.id}`} className="block" target="_blank" rel="noopener noreferrer">
+                        {item.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className="aspect-square w-full bg-slate-50 object-cover"
+                          />
+                        ) : (
+                          <div className="flex aspect-square items-center justify-center bg-slate-50 text-slate-300">
+                            <Package className="h-8 w-8" />
+                          </div>
+                        )}
+                        <div className="space-y-1 p-2">
+                          <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-900">
+                            {item.title}
+                          </p>
+                        </div>
+                      </Link>
+                      <div className="px-2 pb-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={quoteCart.some((l) => l.key === `service:${item.id}`) ? "secondary" : "outline"}
+                          className="w-full"
+                          onClick={() => handleAddListing(item)}
+                        >
+                          {quoteCart.some((l) => l.key === `service:${item.id}`)
+                            ? "Added to quote"
+                            : "Add to quote"}
+                        </Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
               </>
             ) : (
               <>
-                {query ? (
+                {isSearching ? (
                   <p className="text-sm text-slate-500">
                     {resultCount} result{resultCount === 1 ? "" : "s"} for “{query}”
                   </p>
