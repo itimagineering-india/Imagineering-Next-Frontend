@@ -313,3 +313,20 @@ export function resolveAvailableMachinesFromService(
   }
   return Math.min(99, Math.max(1, Math.floor(fallback)));
 }
+
+/** Card hint when listing has multiple rental units (hour/day/month/…). */
+export function formatRentalMoreRatesHint(
+  metadata?: Record<string, unknown> | null,
+  fallback?: { priceType?: string | null; price?: number | null }
+): string | null {
+  const rates = parseRentalRates(metadata, fallback);
+  if (rates.length <= 1) return null;
+  const primary = pickPrimaryRate(rates);
+  const others = rates.filter((r) => r.priceType !== primary?.priceType);
+  if (others.length === 0) return null;
+  const labels = others.map((r) => {
+    const opt = MACHINE_RENTAL_PRICE_TYPES.find((o) => o.value === r.priceType);
+    return opt?.title || r.priceType.replace(/_/g, " ");
+  });
+  return `More rates: ${labels.join(" · ")}`;
+}
