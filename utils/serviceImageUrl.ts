@@ -1,10 +1,12 @@
 /**
  * Append width hint for CDNs or image workers that support `?w=` (no-op for hosts that ignore it).
+ * Stock Unsplash placeholders are treated as missing (no real upload).
  */
 export function withListImageParams(raw: string | undefined | null, width = 300): string {
   if (raw == null || typeof raw !== "string") return "";
   const trimmed = raw.trim();
   if (!trimmed) return "";
+  if (/images\.unsplash\.com/i.test(trimmed)) return "";
 
   try {
     const base =
