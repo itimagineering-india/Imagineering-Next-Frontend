@@ -62,6 +62,8 @@ import type { CatalogProductItem } from "@/lib/productCatalog";
 import { useTranslation } from "react-i18next";
 import { isConstructionMaterialsCategorySlug, CONSTRUCTION_SELECT_TO_CUSTOM } from "@/lib/constructionMaterials";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
+import { isMachineRentalListing } from "@/lib/machineRental";
+import { MachineRentalListingDetailClient } from "@/components/machineRental/MachineRentalListingDetailClient";
 import type { ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -454,9 +456,21 @@ export default function ServiceDetails() {
           setIsSaved(isFavoriteResult);
           setSimilarServices(similarServicesResult);
 
+          // Machine rental has its own PDP (rate picker + book flow)
+          const serviceIdVal = serviceData._id || serviceData.id;
+          if (
+            serviceIdVal &&
+            isMachineRentalListing({
+              category: serviceData.category,
+              metadata: serviceData.metadata,
+            })
+          ) {
+            router.replace(`/machine-rental/listing/${serviceIdVal}`, { scroll: false });
+            return;
+          }
+
           // Redirect to slug URL when visiting by id (for SEO-friendly URLs)
           const slug = serviceData.slug;
-          const serviceIdVal = serviceData._id || serviceData.id;
           const isIdParam = /^[a-fA-F0-9]{24}$/.test(idForThisRun || "");
           if (slug && isIdParam && idForThisRun === serviceIdVal?.toString?.()) {
             router.replace(`/service/${slug}`, { scroll: false });
@@ -1280,6 +1294,9 @@ export default function ServiceDetails() {
     );
   }
 
+  if (isMachineRentalListing(service)) {
+    return <MachineRentalListingDetailClient serviceId={service.id} />;
+  }
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
