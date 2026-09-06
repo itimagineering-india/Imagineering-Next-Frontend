@@ -3,9 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Package, Search, ShoppingCart, X } from "lucide-react";
+import { Loader2, Package, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { GetBestQuotesModal, type QuoteModalLine } from "@/components/service-details/GetBestQuotesModal";
 import { MaterialsProductCard } from "@/components/materials/MaterialsProductCard";
 import { useToast } from "@/hooks/use-toast";
@@ -55,7 +62,10 @@ type ListingCard = {
   subcategory?: string;
 };
 
+type B2bHubSort = "relevance" | "name_asc" | "name_desc";
+
 const POPULAR_B2B_SEARCHES = ["Cement", "TMT", "Cables", "Plywood", "Furniture", "Hardware"] as const;
+const SUBCATEGORY_ALL = "__all__";
 
 function listingImage(row: Record<string, unknown>): string | undefined {
   const image = typeof row.image === "string" ? row.image : "";
@@ -173,6 +183,7 @@ export function B2BServicesHub() {
   const [listings, setListings] = useState<ListingCard[]>([]);
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<B2bHubSort>("relevance");
   const [quoteCart, setQuoteCart] = useState<B2bQuoteCartLine[]>([]);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteService, setQuoteService] = useState<{
@@ -457,13 +468,25 @@ export function B2BServicesHub() {
 
   const query = search.trim();
   const visibleMaterials = useMemo(() => {
-    if (!query) return materialsProducts;
-    return materialsProducts.filter((p) => productMatchesQuery(p, query));
-  }, [materialsProducts, query]);
+    const matched = !query
+      ? materialsProducts
+      : materialsProducts.filter((p) => productMatchesQuery(p, query));
+    if (sort === "relevance") return matched;
+    const next = [...matched];
+    next.sort((a, b) =>
+      sort === "name_asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
+    );
+    return next;
+  }, [materialsProducts, query, sort]);
   const visibleListings = useMemo(() => {
-    if (!query) return listings;
-    return listings.filter((item) => listingMatchesQuery(item, query));
-  }, [listings, query]);
+    const matched = !query ? listings : listings.filter((item) => listingMatchesQuery(item, query));
+    if (sort === "relevance") return matched;
+    const next = [...matched];
+    next.sort((a, b) =>
+      sort === "name_asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
+    );
+    return next;
+  }, [listings, query, sort]);
 
   const showingCatalog = isMaterials || materialsProducts.length > 0;
   const catalogEmpty =
@@ -568,51 +591,60 @@ export function B2BServicesHub() {
           </p>
         ) : (
           <>
-            <div className="flex flex-wrap gap-2">
-              {categories.map((cat) => {
-                const on = cat.slug === activeSlug;
-                return (
-                  <button
-                    key={cat.slug}
-                    type="button"
-                    onClick={() => selectCategory(cat.slug)}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                      on
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                    }`}
-                  >
-                    {cat.name}
-                  </button>
-                );
-              })}
-            </div>
-
-            {activeCategory && activeCategory.subcategories.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => selectSub(null)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                    !activeSub ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-600"
-                  }`}
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <Select value={activeSlug || undefined} onValueChange={selectCategory}>
+                <SelectTrigger
+                  aria-label="Category"
+                  className="h-10 w-full rounded-xl border-slate-200 bg-white text-sm sm:w-[240px]"
                 >
-                  All
-                </button>
-                {activeCategory.subcategories.map((sub) => (
-                  <button
-                    key={sub}
-                    type="button"
-                    onClick={() => selectSub(sub)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium ${
-                      activeSub === sub ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-600"
-                    }`}
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.slug} value={cat.slug}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {activeCategory && activeCategory.subcategories.length > 0 ? (
+                <Select
+                  value={activeSub || SUBCATEGORY_ALL}
+                  onValueChange={(v) => selectSub(v === SUBCATEGORY_ALL ? null : v)}
+                >
+                  <SelectTrigger
+                    aria-label="Subcategory"
+                    className="h-10 w-full rounded-xl border-slate-200 bg-white text-sm sm:w-[220px]"
                   >
-                    {sub}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+                    <SelectValue placeholder="Subcategory" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SUBCATEGORY_ALL}>All subcategories</SelectItem>
+                    {activeCategory.subcategories.map((sub) => (
+                      <SelectItem key={sub} value={sub}>
+                        {sub}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+
+              <Select value={sort} onValueChange={(v) => setSort(v as B2bHubSort)}>
+                <SelectTrigger
+                  aria-label="Sort products"
+                  className="h-10 w-full rounded-xl border-slate-200 bg-white text-sm sm:ml-auto sm:w-[180px]"
+                >
+                  <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relevance">Featured</SelectItem>
+                  <SelectItem value="name_asc">Name A–Z</SelectItem>
+                  <SelectItem value="name_desc">Name Z–A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {loadingItems ? (
               <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
