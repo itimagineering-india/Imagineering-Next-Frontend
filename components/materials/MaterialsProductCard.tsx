@@ -33,39 +33,45 @@ export function MaterialsProductCard({
   const quickCta = product.hasVariants ? undefined : onCta;
 
   return (
-    <article className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md">
-      <Link href={href} className="block">
+    <article className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md">
+      <Link href={href} className="flex min-h-0 flex-1 flex-col">
         {product.imageUri ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.imageUri}
             alt={product.name}
-            className="aspect-square w-full bg-slate-50 object-cover"
+            className="aspect-square w-full shrink-0 bg-slate-50 object-cover"
             loading="lazy"
           />
         ) : (
-          <div className="flex aspect-square w-full items-center justify-center bg-slate-50 text-lg font-bold text-slate-300">
+          <div className="flex aspect-square w-full shrink-0 items-center justify-center bg-slate-50 text-lg font-bold text-slate-300">
             {(product.brand || product.name || "NA").slice(0, 2).toUpperCase()}
           </div>
         )}
-        <div className="space-y-1 p-2">
-          {product.brand ? (
-          <p className="truncate text-[10px] font-bold uppercase tracking-wide text-orange-600">
-            {product.brand}
+        <div className="flex flex-1 flex-col space-y-1 p-2">
+          <p className="h-3.5 truncate text-[10px] font-bold uppercase tracking-wide text-orange-600">
+            {product.brand || "\u00A0"}
           </p>
-          ) : null}
           <p className="truncate text-xs font-bold leading-[1.25] text-slate-900">
             {product.name}
           </p>
           {product.variantSummary ? (
             <p className="truncate text-[10px] text-slate-500">{product.variantSummary} available</p>
-          ) : null}
-          {hidePrice ? null : (
+          ) : (
+            <p className="h-3.5 truncate text-[10px] text-transparent" aria-hidden>
+              &nbsp;
+            </p>
+          )}
+          {hidePrice ? (
+            <p className="h-4" aria-hidden>
+              &nbsp;
+            </p>
+          ) : (
             <p className="truncate text-xs font-semibold text-slate-900">{product.priceRange}</p>
           )}
         </div>
       </Link>
-      <div className="space-y-1 px-2 pb-2">
+      <div className="mt-auto space-y-1 px-2 pb-2">
         {quickAddToQuote ? (
           <button
             type="button"
