@@ -579,7 +579,7 @@ export function B2BServicesHub() {
         </div>
       </section>
 
-      <div className="home-shell space-y-8 py-8 md:py-10">
+      <div className="home-shell min-w-0 space-y-6 py-6 sm:space-y-8 sm:py-8 md:py-10">
         {loadingCats ? (
           <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -591,11 +591,11 @@ export function B2BServicesHub() {
           </p>
         ) : (
           <>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <Select value={activeSlug || undefined} onValueChange={selectCategory}>
                 <SelectTrigger
                   aria-label="Category"
-                  className="h-10 w-full rounded-xl border-slate-200 bg-white text-sm sm:w-[240px]"
+                  className="h-10 w-full min-w-0 rounded-xl border-slate-200 bg-white text-sm sm:w-[240px]"
                 >
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
@@ -615,7 +615,7 @@ export function B2BServicesHub() {
                 >
                   <SelectTrigger
                     aria-label="Subcategory"
-                    className="h-10 w-full rounded-xl border-slate-200 bg-white text-sm sm:w-[220px]"
+                    className="h-10 w-full min-w-0 rounded-xl border-slate-200 bg-white text-sm sm:w-[220px]"
                   >
                     <SelectValue placeholder="Subcategory" />
                   </SelectTrigger>
@@ -633,7 +633,7 @@ export function B2BServicesHub() {
               <Select value={sort} onValueChange={(v) => setSort(v as B2bHubSort)}>
                 <SelectTrigger
                   aria-label="Sort products"
-                  className="h-10 w-full rounded-xl border-slate-200 bg-white text-sm sm:ml-auto sm:w-[180px]"
+                  className="h-10 w-full min-w-0 rounded-xl border-slate-200 bg-white text-sm sm:ml-auto sm:w-[180px]"
                 >
                   <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
                   <SelectValue placeholder="Sort" />
@@ -679,7 +679,7 @@ export function B2BServicesHub() {
                     {resultCount} result{resultCount === 1 ? "" : "s"} for “{query}”
                   </p>
                 ) : null}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2.5 min-[400px]:gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {visibleMaterials.map((product) => (
                   <MaterialsProductCard
                     key={product.id}
@@ -703,11 +703,11 @@ export function B2BServicesHub() {
                     {resultCount} result{resultCount === 1 ? "" : "s"} for “{query}”
                   </p>
                 ) : null}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2.5 min-[400px]:gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {visibleListings.map((item) => (
                   <article
                     key={item.id}
-                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                    className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                   >
                     <Link href={`/service/${item.id}`} className="block" target="_blank" rel="noopener noreferrer">
                       {item.image ? (
