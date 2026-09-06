@@ -124,6 +124,7 @@ interface ServiceData {
     state?: string;
     address?: string;
   };
+  metadata?: Record<string, unknown> | null;
 }
 
 export default function ProviderProfile() {
@@ -319,9 +320,13 @@ export default function ProviderProfile() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (service) =>
-          service.title.toLowerCase().includes(query) ||
-          service.description.toLowerCase().includes(query) ||
-          service.tags?.some((tag) => tag.toLowerCase().includes(query))
+          String(service.title || "")
+            .toLowerCase()
+            .includes(query) ||
+          String(service.description || "")
+            .toLowerCase()
+            .includes(query) ||
+          service.tags?.some((tag) => String(tag || "").toLowerCase().includes(query))
       );
     }
 
@@ -830,6 +835,7 @@ export default function ProviderProfile() {
                         viewMode={viewMode}
                         location={service.location}
                         category={service.category}
+                        metadata={service.metadata}
                         hideProviderDetails
                       />
                     ))}
@@ -903,10 +909,13 @@ export default function ProviderProfile() {
                 <div className="space-y-4">
                   <h2 className="text-2xl font-bold text-foreground">{t("portfolio")}</h2>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {providerDisplay.portfolio.map((item) => {
+                    {providerDisplay.portfolio.map((item, index) => {
                       const isVideo = (item as { mediaType?: string }).mediaType === 'video';
+                      const key =
+                        String(item.id || "").trim() ||
+                        `${item.title || "portfolio"}-${item.image || index}-${index}`;
                       return (
-                      <Card key={item.id} className="overflow-hidden group cursor-pointer">
+                      <Card key={key} className="overflow-hidden group cursor-pointer">
                         <div className="aspect-[4/3] overflow-hidden bg-muted">
                           {isVideo ? (
                             <video
@@ -917,7 +926,7 @@ export default function ProviderProfile() {
                             />
                           ) : (
                             <img
-                              src={item.image}
+                              src={item.image || undefined}
                               alt={item.title}
                               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
