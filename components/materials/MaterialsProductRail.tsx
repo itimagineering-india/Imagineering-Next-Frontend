@@ -68,13 +68,13 @@ export function MaterialsProductRail({
       </div>
       <div
         ref={scrollerRef}
-        className="flex items-start gap-2.5 sm:gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-1 snap-x snap-mandatory"
+        className="flex items-stretch gap-2.5 sm:gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-1 snap-x snap-mandatory"
       >
         {products.map((product) => (
           <div
             key={product.id}
             data-material-product-card
-            className="w-[140px] sm:w-[148px] md:w-[156px] shrink-0 snap-start"
+            className="flex w-[140px] sm:w-[148px] md:w-[156px] shrink-0 snap-start"
           >
             <MaterialsProductCard
               product={product}
