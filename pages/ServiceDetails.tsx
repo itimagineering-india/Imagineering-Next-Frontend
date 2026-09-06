@@ -404,11 +404,17 @@ export default function ServiceDetails() {
             mrp: serviceData.mrp,
             priceType: serviceData.priceType || "fixed",
             brandName: serviceData.brandName ? String(serviceData.brandName) : undefined,
-            images: serviceData.images && serviceData.images.length > 0 
-              ? serviceData.images 
-              : serviceData.image 
-                ? [serviceData.image] 
-                : ["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"],
+            images: (() => {
+              const raw =
+                serviceData.images && serviceData.images.length > 0
+                  ? serviceData.images
+                  : serviceData.image
+                    ? [serviceData.image]
+                    : [];
+              return raw
+                .map((u: unknown) => String(u || "").trim())
+                .filter((u: string) => u.length > 0 && !/images\.unsplash\.com/i.test(u));
+            })(),
             category: serviceData.category || { _id: "", name: "Services", slug: "services" },
             subcategory: serviceData.subcategory || "",
             itemType: serviceData.itemType,
