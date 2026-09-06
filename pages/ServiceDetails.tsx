@@ -9,11 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
   BadgeCheck,
-  BadgePercent,
   Boxes,
   ChevronRight,
   Clock3,
-  CreditCard,
   Heart,
   Home,
   MapPin,
@@ -47,7 +45,6 @@ import {
 } from "@/lib/interactionType";
 import { AddToCartButton } from "@/components/services/AddToCartButton";
 import { BestSupplierCard } from "@/components/routing/BestSupplierCard";
-import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
 import {
   catalogAxisOptionValues,
@@ -288,7 +285,6 @@ export default function ServiceDetails() {
   const { toast } = useToast();
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [quotesModalOpen, setQuotesModalOpen] = useState(false);
-  const [offersModalOpen, setOffersModalOpen] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [catalogProduct, setCatalogProduct] = useState<CatalogProductItem | null>(null);
   const [variantSel, setVariantSel] = useState<Record<string, string>>({});
@@ -1423,44 +1419,6 @@ export default function ServiceDetails() {
                             </p>
                           )}
                         </div>
-                        <div className="rounded-2xl border border-white/70 bg-white/85 p-3 shadow-sm">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm font-bold tracking-[-0.01em] text-foreground">Offers & EMI Plans</p>
-                              <p className="text-xs font-medium text-muted-foreground">
-                                Provider promotions, platform deals & coupon codes
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="w-full sm:w-auto shrink-0 rounded-full border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                              onClick={() => setOffersModalOpen(true)}
-                            >
-                              View offers
-                            </Button>
-                          </div>
-                          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                            {[
-                              { label: "Bulk order offer", value: "Best price on quantity orders", icon: BadgePercent },
-                              { label: "EMI plans", value: "Available on eligible orders", icon: CreditCard },
-                            ].map((offer) => {
-                              const Icon = offer.icon;
-                              return (
-                                <div key={offer.label} className="flex gap-2 rounded-xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 p-2.5 sm:p-3">
-                                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                                    <Icon className="h-4 w-4 text-primary" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{offer.label}</p>
-                                    <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">{offer.value}</p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
                       </CardContent>
                     </Card>
 
@@ -1787,14 +1745,6 @@ export default function ServiceDetails() {
             }}
           />
         )}
-
-        <ProviderOffersModal
-          open={offersModalOpen}
-          onOpenChange={setOffersModalOpen}
-          providerId={service?.provider?.slug || service?.provider?._id || null}
-          serviceId={service?.id || null}
-          providerName={service?.provider?.businessName || service?.provider?.name}
-        />
       </div>
   );
 }
