@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Star, MapPin, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatServicePrice } from "@/lib/formatServicePrice";
@@ -64,7 +63,11 @@ export function SimilarServices({
 
       <Carousel className="w-full max-w-full overflow-x-clip">
         <CarouselContent className="-ml-2 md:-ml-4">
-          {services.map((service) => (
+          {services.map((service) => {
+            const imageSrc = String(service.image || "").trim();
+            const hasImage =
+              imageSrc.length > 0 && !/images\.unsplash\.com/i.test(imageSrc);
+            return (
             <CarouselItem
               key={service.id}
               className="basis-3/4 pl-2 sm:basis-1/2 md:pl-4 lg:basis-1/4 xl:basis-1/5"
@@ -72,13 +75,19 @@ export function SimilarServices({
               <Link href={`${base}/${service.slug || service.id}`}>
                 <Card className="group h-full cursor-pointer overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-white via-white to-rose-50/60 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg">
                   <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-100 to-rose-50">
-                    <img
-                      src={service.image}
-                      alt={service.title}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
+                    {hasImage ? (
+                      <img
+                        src={imageSrc}
+                        alt={service.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center px-2 text-center text-xs font-medium text-muted-foreground">
+                        No Image
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     <div className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/35 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
                       <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
@@ -87,34 +96,25 @@ export function SimilarServices({
                     </div>
                   </div>
                   <CardContent className="space-y-3 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge variant="outline" className="rounded-full px-2 py-0.5 leading-tight">
-                        {service.category}
-                      </Badge>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-primary lg:text-base">
-                          {formatServicePrice(service)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <h3 className="line-clamp-1 text-sm font-semibold leading-tight lg:text-[15px]">{service.title}</h3>
+                    <h3 className="truncate text-sm font-semibold leading-tight lg:text-[15px]">
+                      {service.title}
+                    </h3>
+                    <p className="text-sm font-bold text-primary lg:text-base">
+                      {formatServicePrice(service)}
+                    </p>
 
                     {service.location ? (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground lg:text-sm">
-                        <MapPin className="h-3 w-3" />
+                        <MapPin className="h-3 w-3 shrink-0" />
                         <span className="line-clamp-1">{service.location}</span>
                       </div>
                     ) : null}
-
-                    <div className="flex h-8 w-full items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-xs font-semibold text-primary transition-colors group-hover:bg-primary group-hover:text-white lg:text-sm">
-                      Quick View
-                    </div>
                   </CardContent>
                 </Card>
               </Link>
             </CarouselItem>
-          ))}
+            );
+          })}
         </CarouselContent>
         <CarouselPrevious className="left-2 hidden sm:inline-flex xl:-left-12" />
         <CarouselNext className="right-2 hidden sm:inline-flex xl:-right-12" />
