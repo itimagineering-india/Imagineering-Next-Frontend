@@ -77,6 +77,19 @@ export function isB2bServicesHubSlug(slug: string | undefined): boolean {
   return s.includes("trader");
 }
 
+/** Business profile primaryCategory is B2B Traders (not CM / Electrical purchase categories). */
+export function isB2bTradersProfileCategory(cat: {
+  slug?: string;
+  name?: string;
+} | null | undefined): boolean {
+  if (!cat) return false;
+  if (isB2bServicesHubSlug(cat.slug)) return true;
+  const n = normalizeB2bCategoryName(cat.name || "");
+  if (!n) return false;
+  if (n === "b2b traders" || n === "traders" || n === "vendors" || n === "vendor") return true;
+  return n.includes("trader");
+}
+
 export function usesB2bCatalogOrManualListing(
   cat: { slug?: string; name?: string; interactionType?: string } | null | undefined
 ): boolean {
