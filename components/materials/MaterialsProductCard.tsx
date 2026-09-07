@@ -28,8 +28,8 @@ export function MaterialsProductCard({
   const href = detailHref || `/construction-materials/product/${product.id}`;
   const label =
     ctaLabel || (product.isPriceRange ? "Get Best Quote" : "Add to Cart");
-  // Variants need selection on the detail page before quote/cart.
-  const quickAddToQuote = product.hasVariants ? undefined : onAddToQuote;
+  // Variant products still show Add to quote when the parent opens a picker modal.
+  const quickAddToQuote = onAddToQuote;
   const quickCta = product.hasVariants ? undefined : onCta;
 
   return (
