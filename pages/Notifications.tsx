@@ -94,7 +94,7 @@ export default function Notifications() {
           
           if (notif.metadata?.type) {
             const t = notif.metadata.type === "lead" ? "request" : notif.metadata.type;
-            frontendType = t === "QUOTE_OFFER" ? "request" : t;
+            frontendType = t === "QUOTE_OFFER" || t === "QUOTE_REQUEST" ? "request" : t;
           } else if (notif.link) {
             if (notif.link.includes('/quote-requests')) frontendType = "request";
             else if (notif.link.includes('/leads')) frontendType = "request";
@@ -104,15 +104,15 @@ export default function Notifications() {
             else if (notif.link.includes('/reviews')) frontendType = "review";
           } else if (notif.metadata?.type === "QUOTE_OFFER") {
             frontendType = "request";
-          } else if (notif.type === "success" && notif.message.toLowerCase().includes("payment")) {
-            frontendType = "payment";
+          } else if (notif.type === "success" && (notif.message.toLowerCase().includes("quote") || notif.message.toLowerCase().includes("payment"))) {
+            frontendType = notif.message.toLowerCase().includes("quote") ? "request" : "payment";
           } else if (notif.type === "announcement") {
             frontendType = "announcement";
           } else if (notif.message.toLowerCase().includes("review") || notif.message.toLowerCase().includes("rating")) {
             frontendType = "review";
           } else if (notif.message.toLowerCase().includes("job") || notif.message.toLowerCase().includes("booking")) {
             frontendType = "job";
-          } else if (notif.type === "info") {
+          } else if (notif.type === "info" || notif.type === "success") {
             frontendType = "info";
           }
           
