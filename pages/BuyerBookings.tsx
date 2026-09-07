@@ -156,6 +156,10 @@ export default function BuyerBookings() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const buyerUserId =
+    (user as { _id?: string; id?: string } | null)?._id ||
+    (user as { _id?: string; id?: string } | null)?.id ||
+    null;
 
   useEffect(() => {
     fetchBookings();
@@ -424,18 +428,17 @@ export default function BuyerBookings() {
   };
 
   useEffect(() => {
-    if (!selectedBooking || !user) {
+    if (!selectedBooking || !buyerUserId) {
       setReviewingServiceId(null);
       setReviewRating(0);
       setReviewComment("");
+      setReviewedServiceIds(new Set());
       return;
     }
     setReviewingServiceId(null);
     setReviewRating(0);
     setReviewComment("");
     const items = getServiceItems(selectedBooking);
-    const userId = (user as { _id?: string; id?: string })._id || (user as { _id?: string; id?: string }).id;
-    if (!userId) return;
 
     const checkReviewed = async () => {
       const reviewed = new Set<string>();
@@ -458,7 +461,7 @@ export default function BuyerBookings() {
             typeof buyer === "object" && buyer !== null
               ? buyer._id || buyer.id
               : buyer;
-          return bid && String(bid) === String(userId);
+          return bid && String(bid) === String(buyerUserId);
         });
         if (hasReviewed) {
           reviewed.add(uniqueServiceIds[index]);
@@ -469,7 +472,7 @@ export default function BuyerBookings() {
     };
 
     void checkReviewed();
-  }, [selectedBooking?._id, user]);
+  }, [selectedBooking?._id, buyerUserId]);
 
   const handleSubmitReview = async (serviceId: string) => {
     if (reviewRating === 0 || !reviewComment.trim()) {
@@ -1941,20 +1944,31 @@ export default function BuyerBookings() {
                                   <div>
                                     <label className="text-sm font-medium mb-1 block">Rating</label>
                                     <div className="flex gap-1">
-                                      {[1, 2, 3, 4, 5].map((s) => (
-                                        <button
-                                          key={s}
-                                          type="button"
-                                          onClick={() => setReviewRating(s)}
-                                          className="focus:outline-none"
-                                        >
-                                          <Star
-                                            className={`h-6 w-6 ${
-                                              s <= reviewRating ? "fill-warning text-warning" : "text-muted-foreground"
-                                            }`}
-                                          />
-                                        </button>
-                                      ))}
+                                      {[1, 2, 3, 4, 5].map((s) => {
+                                        const selected = s <= reviewRating;
+                                        return (
+                                          <button
+                                            key={s}
+                                            type="button"
+                                            aria-label={`Rate ${s} star${s === 1 ? "" : "s"}`}
+                                            aria-pressed={selected}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setReviewRating(s);
+                                            }}
+                                            className="rounded p-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                                          >
+                                            <Star
+                                              className={`h-7 w-7 pointer-events-none ${
+                                                selected ? "text-amber-500" : "text-slate-300"
+                                              }`}
+                                              fill={selected ? "currentColor" : "none"}
+                                              stroke="currentColor"
+                                            />
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                   <div>
