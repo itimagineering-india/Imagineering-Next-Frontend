@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Printer, Trash2 } from "lucide-react";
 import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,6 +44,151 @@ function shortLocation(data: any) {
   const pin = data?.address?.zipCode || "";
   const line = [city, state, pin].filter(Boolean).join(", ");
   return line || data?.addressLabel || data?.address?.address || "Delivery location set";
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function printLiveQuotesSummary(opts: {
+  title: string;
+  location: string;
+  requestedAt: string;
+  materials: QuoteRequestItemLike[];
+  offers: any[];
+}) {
+  const materialsHtml = opts.materials
+    .map((item) => {
+      const qty = Number(item.quantity || 1);
+      const qtyLabel = formatQuoteQtyLabel(qty, item.priceType);
+      return `<tr><td>${escapeHtml(item.title)}</td><td class="num">${escapeHtml(qtyLabel)}</td></tr>`;
+    })
+    .join("");
+
+  const offersHtml = opts.offers
+    .map((offer, index) => {
+      const total = Number(
+        offer.totalAmount ?? Number(offer.amount || 0) + Number(offer.deliveryCharge || 0)
+      );
+      const material = Number(offer.materialAmount ?? (offer.amount || 0));
+      const delivery = Number(offer.deliveryCharge || 0);
+      const gst = Number(offer.gstAmount || 0);
+      const provider =
+        offer.providerName || offer.provider?.businessName || offer.provider?.name || `Offer ${index + 1}`;
+      const lineItems = quoteOfferItems(offer);
+      const linesHtml =
+        lineItems.length > 0
+          ? `<table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Line total</th></tr></thead><tbody>${lineItems
+              .map((item) => {
+                const qty = Number(item.quantity || 1);
+                const unit = Number(item.unitPrice || 0);
+                const lineTotal = Number(item.lineTotal || unit * qty);
+                return `<tr>
+                  <td>${escapeHtml(item.title)}</td>
+                  <td class="num">${escapeHtml(qty)}</td>
+                  <td class="num">${escapeHtml(formatINR(unit))}</td>
+                  <td class="num">${escapeHtml(formatINR(lineTotal))}</td>
+                </tr>`;
+              })
+              .join("")}</tbody></table>`
+          : "";
+      const deliveryLabel =
+        offer.deliveryOption === "not_available"
+          ? "Not available"
+          : delivery > 0
+            ? formatINR(delivery)
+            : "Free";
+      const badges = [
+        offer.isRecommended ? "Recommended" : "",
+        offer.verified ? "Verified" : "",
+        offer.gstLabel ? String(offer.gstLabel) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      return `<section class="offer">
+        <h3>${escapeHtml(provider)}${offer.isRecommended ? ' <span class="badge">Recommended</span>' : ""}</h3>
+        ${badges ? `<p class="meta">${escapeHtml(badges)}</p>` : ""}
+        <p class="total">${escapeHtml(formatINR(total))}</p>
+        <table class="summary">
+          <tr><td>Material</td><td class="num">${escapeHtml(formatINR(material))}</td></tr>
+          <tr><td>Delivery</td><td class="num">${escapeHtml(deliveryLabel)}</td></tr>
+          <tr><td>GST${offer.gstPercent != null && Number(offer.gstPercent) > 0 ? ` (${escapeHtml(offer.gstPercent)}%)` : ""}</td><td class="num">${escapeHtml(gst > 0 ? formatINR(gst) : "—")}</td></tr>
+          <tr><td>ETA</td><td class="num">${escapeHtml(offer.estimatedDelivery || "—")}</td></tr>
+        </table>
+        ${linesHtml}
+        ${offer.notes ? `<p class="notes">${escapeHtml(offer.notes)}</p>` : ""}
+      </section>`;
+    })
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Live quotes — ${escapeHtml(opts.title)}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; color: #1c1917; margin: 24px; font-size: 12px; line-height: 1.45; }
+    h1 { font-size: 20px; margin: 4px 0 0; }
+    h2 { font-size: 14px; margin: 20px 0 8px; }
+    h3 { font-size: 14px; margin: 0 0 4px; }
+    .brand { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #78716c; font-weight: 700; }
+    .sub { color: #57534e; margin: 6px 0 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 6px 4px; vertical-align: top; border-bottom: 1px solid #e7e5e4; }
+    th { font-size: 11px; color: #78716c; font-weight: 600; }
+    .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .offer { break-inside: avoid; border: 1px solid #d6d3d1; border-radius: 10px; padding: 12px; margin: 12px 0; }
+    .total { font-size: 22px; font-weight: 800; margin: 6px 0 8px; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; background: #fef3c7; color: #78350f; padding: 2px 6px; border-radius: 999px; }
+    .meta, .notes { color: #57534e; margin: 4px 0 0; }
+    .summary { margin-bottom: 8px; }
+    .lines { margin-top: 6px; }
+    .footer { margin-top: 24px; color: #a8a29e; font-size: 10px; }
+    @media print {
+      body { margin: 12mm; }
+      .offer { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <p class="brand">Imagineering India · Live quotes</p>
+  <h1>${escapeHtml(opts.title)}</h1>
+  <p class="sub">${escapeHtml(opts.location)}${opts.requestedAt ? ` · Requested ${escapeHtml(opts.requestedAt)}` : ""}</p>
+  <p class="sub">${opts.offers.length} offer${opts.offers.length === 1 ? "" : "s"} · Printed ${escapeHtml(
+    new Date().toLocaleString("en-IN")
+  )}</p>
+
+  <h2>Your materials (${opts.materials.length})</h2>
+  <table>
+    <thead><tr><th>Item</th><th class="num">Quantity</th></tr></thead>
+    <tbody>${materialsHtml || `<tr><td colspan="2">No materials listed</td></tr>`}</tbody>
+  </table>
+
+  <h2>Offers</h2>
+  ${offersHtml || `<p>No offers received.</p>`}
+
+  <p class="footer">Generated from Imagineering India. Use your browser print dialog to print or save as PDF.</p>
+  <script>
+    window.onload = function () {
+      window.focus();
+      window.print();
+    };
+  </script>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+  if (!win) return false;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  return true;
 }
 
 function ScoreMeter({ score }: { score: number }) {
@@ -730,10 +875,39 @@ export default function QuoteRequestPage() {
           </aside>
 
           <section className="min-w-0">
-            <div className="mb-4 flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-bold text-stone-900">Offers</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-baseline gap-3">
+                <h2 className="text-base font-bold text-stone-900">Offers</h2>
+                {offers.length > 0 ? (
+                  <span className="text-xs tabular-nums text-stone-500">{offers.length} received</span>
+                ) : null}
+              </div>
               {offers.length > 0 ? (
-                <span className="text-xs tabular-nums text-stone-500">{offers.length} received</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                  onClick={() => {
+                    const ok = printLiveQuotesSummary({
+                      title: serviceTitle,
+                      location: shortLocation(data),
+                      requestedAt: formatCreatedAt(data?.createdAt),
+                      materials,
+                      offers,
+                    });
+                    if (!ok) {
+                      toast({
+                        title: "Pop-up blocked",
+                        description: "Allow pop-ups for this site to print or save as PDF.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  <Printer className="h-3.5 w-3.5" aria-hidden />
+                  Print / PDF
+                </Button>
               ) : null}
             </div>
 
