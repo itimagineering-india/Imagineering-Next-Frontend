@@ -60,6 +60,13 @@ type GetBestQuotesModalProps = {
   noCountdown?: boolean;
   /** marketplace (default) | b2b_services — controls trader retail opt-in matching */
   source?: "marketplace" | "b2b_services";
+  /**
+   * When true (or targetProviderUserId is set), notify only this listing's seller —
+   * do not float to other stockists of the same product.
+   */
+  exclusiveToListing?: boolean;
+  /** Provider user id for exclusive listing RFQs. */
+  targetProviderUserId?: string;
 };
 
 export function GetBestQuotesModal({
@@ -72,6 +79,8 @@ export function GetBestQuotesModal({
   onSubmitted,
   noCountdown = false,
   source = "marketplace",
+  exclusiveToListing = false,
+  targetProviderUserId,
 }: GetBestQuotesModalProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -92,6 +101,7 @@ export function GetBestQuotesModal({
     [items]
   );
   const isMulti = Boolean(quoteLines && quoteLines.length > 1);
+  const exclusive = Boolean(exclusiveToListing || targetProviderUserId);
   const headline = isMulti ? `${quoteLines!.length} products` : serviceTitle;
   const quantityUnit = useMemo(() => getQuantityUnitNoun(priceType), [priceType]);
   const quantityUnitLabel = useMemo(() => getPriceTypeLabel(priceType), [priceType]);
@@ -210,6 +220,14 @@ export function GetBestQuotesModal({
         coordinates: selectedAddress.coordinates || undefined,
         notes: notes.trim() || undefined,
         source,
+        ...(exclusive
+          ? {
+              exclusiveToListing: true,
+              ...(targetProviderUserId
+                ? { targetProviderUserId: String(targetProviderUserId) }
+                : {}),
+            }
+          : {}),
       });
 
       const id = (res as any)?.data?.id;
@@ -228,13 +246,17 @@ export function GetBestQuotesModal({
       onOpenChange(false);
       toast({
         title: "Request sent",
-        description: noCountdown || (res as any)?.data?.timedWindow === false
+        description: exclusive
           ? isMulti
-            ? "Listed suppliers will share a combined quote. There is no time limit."
-            : "Providers who list this product will share prices. There is no time limit."
-          : isMulti
-            ? "Listed suppliers will share a combined quote within 30 minutes."
-            : "Providers who list this product will share prices within 30 minutes.",
+            ? "This seller will share a quote for your selected services."
+            : "This seller received your quote request."
+          : noCountdown || (res as any)?.data?.timedWindow === false
+            ? isMulti
+              ? "Listed suppliers will share a combined quote. There is no time limit."
+              : "Providers who list this product will share prices. There is no time limit."
+            : isMulti
+              ? "Listed suppliers will share a combined quote within 30 minutes."
+              : "Providers who list this product will share prices within 30 minutes.",
       });
       router.push(`/quote-requests/${id}`);
     } catch (err: any) {
@@ -251,7 +273,9 @@ export function GetBestQuotesModal({
           onOpenChange(false);
           toast({
             title: "Request sent",
-            description: "Listed suppliers received your request. Track it from My requirements.",
+            description: exclusive
+              ? "This seller received your quote request. Track it from My requirements."
+              : "Listed suppliers received your request. Track it from My requirements.",
           });
           router.push(`/quote-requests/${recoveredId}`);
           return;
@@ -276,12 +300,25 @@ export function GetBestQuotesModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="flex max-h-[min(90vh,720px)] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
           <DialogHeader className="shrink-0 space-y-1 border-b border-border px-4 pb-3 pt-5 text-left sm:px-6">
-            <DialogTitle>Get Best Quotes</DialogTitle>
+            <DialogTitle>{exclusive ? "Request quote" : "Get Best Quotes"}</DialogTitle>
             <DialogDescription className="text-sm leading-snug">
               {isMulti ? (
+                exclusive ? (
+                  <>
+                    Enter quantity for each selected service, then pick schedule and delivery
+                    address. This request goes only to this seller.
+                  </>
+                ) : (
+                  <>
+                    Enter quantity for each product, then pick schedule and delivery address.
+                    {noCountdown ? "" : " Suppliers reply within 30 minutes."}
+                  </>
+                )
+              ) : exclusive ? (
                 <>
-                  Enter quantity for each product, then pick schedule and delivery address.
-                  {noCountdown ? "" : " Suppliers reply within 30 minutes."}
+                  Share quantity, schedule, and delivery address for{" "}
+                  <span className="font-medium text-foreground">{serviceTitle}</span>. This
+                  request goes only to this seller.
                 </>
               ) : (
                 <>
