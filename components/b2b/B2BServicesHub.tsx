@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/select";
 import { GetBestQuotesModal, type QuoteModalLine } from "@/components/service-details/GetBestQuotesModal";
 import { MaterialsProductCard } from "@/components/materials/MaterialsProductCard";
+import {
+  QuoteVariantPickerModal,
+  type QuoteVariantPickerTarget,
+} from "@/components/providers/ProviderQuoteVariantModal";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
@@ -195,6 +199,10 @@ export function B2BServicesHub() {
   } | null>(null);
   const [quoteCart, setQuoteCart] = useState<B2bQuoteCartLine[]>([]);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [variantPickerTarget, setVariantPickerTarget] = useState<QuoteVariantPickerTarget | null>(
+    null,
+  );
+  const [variantPickerItemType, setVariantPickerItemType] = useState<string | undefined>(undefined);
   const [quoteService, setQuoteService] = useState<{
     id: string;
     title: string;
@@ -519,13 +527,22 @@ export function B2BServicesHub() {
 
   const handleAddMaterials = useCallback(
     (product: MaterialsProduct) => {
-      if (product.hasVariants) return;
+      const itemType = normalizeB2bQuoteItemType(product.categoryId) || undefined;
+      if (product.hasVariants) {
+        setVariantPickerItemType(itemType);
+        setVariantPickerTarget({
+          catalogProductId: product.id,
+          title: product.name,
+          priceType: product.unitType,
+        });
+        return;
+      }
       addToQuote({
         key: `catalog:${product.id}`,
         catalogProductId: product.id,
         title: product.name,
         priceType: product.unitType,
-        itemType: normalizeB2bQuoteItemType(product.categoryId),
+        itemType,
       });
     },
     [addToQuote]
@@ -956,6 +973,42 @@ export function B2BServicesHub() {
           source="b2b_services"
         />
       ) : null}
+
+      <QuoteVariantPickerModal
+        open={Boolean(variantPickerTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVariantPickerTarget(null);
+            setVariantPickerItemType(undefined);
+          }
+        }}
+        target={variantPickerTarget}
+        onConfirm={(result) => {
+          if (!result.catalogVariantId) return;
+          addToQuote({
+            key: `catalog:${result.catalogProductId}:${result.catalogVariantId}`,
+            catalogProductId: result.catalogProductId,
+            catalogVariantId: result.catalogVariantId,
+            variantLabel: result.variantLabel,
+            title: result.title,
+            priceType: result.priceType,
+            itemType: variantPickerItemType,
+          });
+          setVariantPickerTarget(null);
+          setVariantPickerItemType(undefined);
+        }}
+        onPlainConfirm={(result) => {
+          addToQuote({
+            key: `catalog:${result.catalogProductId}`,
+            catalogProductId: result.catalogProductId,
+            title: result.title,
+            priceType: result.priceType,
+            itemType: variantPickerItemType,
+          });
+          setVariantPickerTarget(null);
+          setVariantPickerItemType(undefined);
+        }}
+      />
     </div>
   );
 }
