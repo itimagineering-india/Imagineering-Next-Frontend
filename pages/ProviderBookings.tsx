@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, type ReactElement } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -46,6 +47,7 @@ import {
   Search,
   Filter,
   Copy,
+  MessageCircle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +74,7 @@ interface Booking {
   bookingNumber?: string;
   displayId?: string;
   jobTitle: string;
+  buyerId?: string;
   buyerName: string;
   buyerAvatar?: string;
   buyerEmail: string;
@@ -143,6 +146,7 @@ interface ProviderService {
 
 export default function ProviderBookings() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -199,6 +203,7 @@ export default function ProviderBookings() {
           bookingNumber: booking.bookingNumber || undefined,
           displayId: booking.displayId || booking.bookingNumber || undefined,
           jobTitle: booking.jobTitle,
+          buyerId: booking.buyerId || undefined,
           buyerName: booking.buyerName,
           buyerAvatar: booking.buyerAvatar,
           buyerEmail: booking.buyerEmail,
@@ -745,6 +750,24 @@ export default function ProviderBookings() {
     fetchBookingInvoices(booking.id);
   };
 
+  const openChatWithBuyer = (booking: Booking) => {
+    if (!booking.buyerId) {
+      toast({
+        title: "Chat unavailable",
+        description: "Buyer details are missing for this booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const params = new URLSearchParams({
+      providerId: String(booking.buyerId),
+      name: String(booking.buyerName || "Buyer"),
+      ...(booking.serviceId ? { serviceId: String(booking.serviceId) } : {}),
+      message: `Hi, regarding your booking ${booking.displayId || booking.bookingNumber || booking.id}.`,
+    });
+    router.push(`/chat?${params.toString()}`);
+  };
+
   return (
     <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
         {/* Header */}
@@ -1052,6 +1075,17 @@ export default function ProviderBookings() {
                     <div>
                       <p className="font-medium text-sm md:text-base">{selectedBooking.buyerName}</p>
                       <p className="text-xs md:text-sm text-muted-foreground break-all">{selectedBooking.buyerEmail}</p>
+                      {selectedBooking.buyerId ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => openChatWithBuyer(selectedBooking)}
+                        >
+                          <MessageCircle className="mr-1.5 h-4 w-4" />
+                          Chat with buyer
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
