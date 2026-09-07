@@ -59,6 +59,15 @@ export type MachineResaleSpecRow = {
   value: string;
 };
 
+export const MACHINE_RESALE_SPEC_SUGGESTIONS = [
+  "Capacity",
+  "Fuel type",
+  "Hours used",
+  "Operating weight",
+  "Bucket size",
+  "RC / papers",
+] as const;
+
 export function createMachineResaleSpecRow(label = ""): MachineResaleSpecRow {
   return {
     id: `spec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
