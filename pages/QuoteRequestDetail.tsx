@@ -174,20 +174,58 @@ function printLiveQuotesSummary(opts: {
   ${offersHtml || `<p>No offers received.</p>`}
 
   <p class="footer">Generated from Imagineering India. Use your browser print dialog to print or save as PDF.</p>
-  <script>
-    window.onload = function () {
-      window.focus();
-      window.print();
-    };
-  </script>
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
-  if (!win) return false;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", "Print live quotes");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  document.body.appendChild(iframe);
+
+  const frameWindow = iframe.contentWindow;
+  const frameDoc = frameWindow?.document;
+  if (!frameWindow || !frameDoc) {
+    iframe.remove();
+    return false;
+  }
+
+  frameDoc.open();
+  frameDoc.write(html);
+  frameDoc.close();
+
+  const cleanup = () => {
+    try {
+      iframe.remove();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const triggerPrint = () => {
+    try {
+      frameWindow.focus();
+      frameWindow.print();
+    } finally {
+      // Keep iframe briefly so the print dialog can finish loading content.
+      window.setTimeout(cleanup, 1000);
+    }
+  };
+
+  // Some browsers need a tick after document.write before print works.
+  if (frameDoc.readyState === "complete") {
+    window.setTimeout(triggerPrint, 50);
+  } else {
+    iframe.onload = () => window.setTimeout(triggerPrint, 50);
+    window.setTimeout(triggerPrint, 250);
+  }
   return true;
 }
 
@@ -898,8 +936,8 @@ export default function QuoteRequestPage() {
                     });
                     if (!ok) {
                       toast({
-                        title: "Pop-up blocked",
-                        description: "Allow pop-ups for this site to print or save as PDF.",
+                        title: "Could not open print",
+                        description: "Please try again, or use your browser’s Print menu.",
                         variant: "destructive",
                       });
                     }
