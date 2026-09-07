@@ -73,15 +73,28 @@ function applyProviderQuoteFormFromRow(
   requestLines.forEach((line, idx) => {
     const key = quoteLineKey(line, idx);
     const lineVid = String(line.catalogVariantId || "").trim();
+    const lineTitle = String(line.title || "").trim();
     const match =
+      (lineVid
+        ? offered.find(
+            (o) =>
+              o.serviceId &&
+              o.serviceId === line.serviceId &&
+              String(o.catalogVariantId || "").trim() === lineVid
+          )
+        : undefined) ||
       offered.find(
         (o) =>
           o.serviceId &&
           o.serviceId === line.serviceId &&
-          String(o.catalogVariantId || "").trim() === lineVid
+          String(o.title || "").trim() === lineTitle
       ) ||
-      offered.find((o) => o.serviceId && o.serviceId === line.serviceId && o.title === line.title) ||
-      offered.find((o) => o.serviceId && o.serviceId === line.serviceId);
+      (offered[idx] &&
+      String(offered[idx].serviceId || "") === String(line.serviceId || "") &&
+      String(offered[idx].title || "").trim() === lineTitle
+        ? offered[idx]
+        : undefined) ||
+      offered[idx];
     rates[key] = match?.unitPrice != null ? String(match.unitPrice) : "";
   });
   setters.setQuoteLineRates(rates);
