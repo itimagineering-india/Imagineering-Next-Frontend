@@ -58,6 +58,8 @@ type GetBestQuotesModalProps = {
   onSubmitted?: () => void;
   /** B2B product RFQs have no 30-minute countdown. */
   noCountdown?: boolean;
+  /** marketplace (default) | b2b_services — controls trader retail opt-in matching */
+  source?: "marketplace" | "b2b_services";
 };
 
 export function GetBestQuotesModal({
@@ -69,6 +71,7 @@ export function GetBestQuotesModal({
   items,
   onSubmitted,
   noCountdown = false,
+  source = "marketplace",
 }: GetBestQuotesModalProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -206,6 +209,7 @@ export function GetBestQuotesModal({
         zipCode: selectedAddress.zipCode.trim() || undefined,
         coordinates: selectedAddress.coordinates || undefined,
         notes: notes.trim() || undefined,
+        source,
       });
 
       const id = (res as any)?.data?.id;
