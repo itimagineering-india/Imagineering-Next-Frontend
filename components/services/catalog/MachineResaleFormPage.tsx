@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle2, ChevronLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronLeft, Loader2, Plus, X } from "lucide-react";
 import { ServiceImageUpload } from "@/components/services/ServiceImageUpload";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,9 +17,12 @@ import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { cn } from "@/lib/utils";
 import {
   MACHINE_RESALE_FALLBACK_TYPES,
+  MACHINE_RESALE_SPEC_SUGGESTIONS,
   buildMachineResaleServicePayload,
+  createMachineResaleSpecRow,
   isMachineResaleCategorySlug,
   type MachineResaleLocation,
+  type MachineResaleSpecRow,
 } from "@/lib/machineResale";
 
 interface Category {
@@ -113,6 +116,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
   const [availableUnits, setAvailableUnits] = useState("1");
   const [yearOfManufacture, setYearOfManufacture] = useState("");
   const [conditionNotes, setConditionNotes] = useState("");
+  const [specs, setSpecs] = useState<MachineResaleSpecRow[]>([]);
   const [businessAddress, setBusinessAddress] = useState<MachineResaleLocation | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -177,6 +181,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
             image?: string;
             price?: number;
             metadata?: Record<string, unknown>;
+            customFields?: Array<{ label?: string; value?: string }>;
             location?: MachineResaleLocation;
           };
           const meta = svc.metadata && typeof svc.metadata === "object" ? svc.metadata : {};
@@ -199,6 +204,15 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
           setAvailableUnits(units);
           setYearOfManufacture(String(meta.yearOfManufacture || ""));
           setConditionNotes(String(meta.conditionNotes || ""));
+          const specRows = Array.isArray(svc.customFields)
+            ? svc.customFields
+                .filter((f) => f?.label?.trim() && String(f.value || "").trim())
+                .map((f) => ({
+                  ...createMachineResaleSpecRow(String(f.label).trim()),
+                  value: String(f.value).trim(),
+                }))
+            : [];
+          setSpecs(specRows);
           if (svc.location && (svc.location.address || svc.location.city)) {
             setBusinessAddress(svc.location);
           }
@@ -287,6 +301,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
         availableUnits: Math.floor(Number(availableUnits)) || 1,
         yearOfManufacture,
         conditionNotes,
+        specs,
         location: businessAddress,
       });
 
@@ -533,6 +548,104 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
               onChange={(e) => setConditionNotes(e.target.value)}
               placeholder="e.g. Good working condition, recently serviced"
             />
+          </div>
+
+          <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Label>Additional specifications</Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Add capacity, fuel type, hours used, papers, or any other detail buyers should see.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setSpecs((prev) => [...prev, createMachineResaleSpecRow()])}
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Add information
+              </Button>
+            </div>
+
+            {specs.length === 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {MACHINE_RESALE_SPEC_SUGGESTIONS.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setSpecs((prev) => [...prev, createMachineResaleSpecRow(label)])}
+                    className="rounded-full border border-dashed px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground"
+                  >
+                    + {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {specs.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                  >
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Label</Label>
+                      <Input
+                        placeholder="e.g. Capacity"
+                        value={row.label}
+                        onChange={(e) =>
+                          setSpecs((prev) =>
+                            prev.map((item) =>
+                              item.id === row.id ? { ...item, label: e.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Value</Label>
+                      <Input
+                        placeholder="e.g. 20 ton, Diesel"
+                        value={row.value}
+                        onChange={(e) =>
+                          setSpecs((prev) =>
+                            prev.map((item) =>
+                              item.id === row.id ? { ...item, value: e.target.value } : item,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={() => setSpecs((prev) => prev.filter((item) => item.id !== row.id))}
+                      aria-label="Remove specification"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {MACHINE_RESALE_SPEC_SUGGESTIONS.filter(
+                    (label) => !specs.some((row) => row.label.toLowerCase() === label.toLowerCase()),
+                  ).map((label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setSpecs((prev) => [...prev, createMachineResaleSpecRow(label)])}
+                      className="rounded-full border border-dashed px-3 py-1 text-xs text-muted-foreground hover:border-primary hover:text-foreground"
+                    >
+                      + {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <Button
