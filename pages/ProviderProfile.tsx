@@ -23,6 +23,7 @@ import {
   Search,
   Loader2,
   Phone,
+  Package,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,10 @@ import {
 import { type ProviderAchievement } from "@/components/trust/AchievementBadges";
 import { ProviderTrustSummary } from "@/components/trust/ProviderTrustSummary";
 import { ProviderOffersModal } from "@/components/providers/ProviderOffersModal";
+import {
+  GetBestQuotesModal,
+  type QuoteModalLine,
+} from "@/components/service-details/GetBestQuotesModal";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -150,8 +155,54 @@ export default function ProviderProfile() {
   const [bioExpanded, setBioExpanded] = useState(false);
   const [achievements, setAchievements] = useState<ProviderAchievement[]>([]);
   const [offersModalOpen, setOffersModalOpen] = useState(false);
+  const [quoteSelection, setQuoteSelection] = useState<Record<string, QuoteModalLine>>({});
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
 
   const SERVICES_PAGE_SIZE = 20;
+
+  const providerUserId = useMemo(() => {
+    if (!provider?.user) return "";
+    const u = provider.user;
+    if (typeof u === "string") return u;
+    return String(u._id || "").trim();
+  }, [provider?.user]);
+
+  const quoteItems = useMemo(() => Object.values(quoteSelection), [quoteSelection]);
+
+  const toggleQuoteService = useCallback((service: ServiceData) => {
+    const serviceId = String(service._id || service.id || "").trim();
+    if (!serviceId) return;
+    setQuoteSelection((prev) => {
+      if (prev[serviceId]) {
+        const next = { ...prev };
+        delete next[serviceId];
+        return next;
+      }
+      return {
+        ...prev,
+        [serviceId]: {
+          serviceId,
+          title: String(service.title || "Service"),
+          quantity: 1,
+          priceType: service.priceType || undefined,
+        },
+      };
+    });
+  }, []);
+
+  const openSelectedQuote = useCallback(() => {
+    if (quoteItems.length === 0) return;
+    if (!isAuthenticated) {
+      toast({
+        title: "Login required",
+        description: "Please login to request a quote from this provider.",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : "/")}`);
+      return;
+    }
+    setQuoteModalOpen(true);
+  }, [isAuthenticated, quoteItems.length, router, toast]);
 
   // Fetch provider (fast) and services (parallel) so provider card shows within seconds
   useEffect(() => {
@@ -808,10 +859,13 @@ export default function ProviderProfile() {
                         : "space-y-4"
                     }
                   >
-                    {servicesToRender.map((service) => (
+                    {servicesToRender.map((service) => {
+                      const serviceId = String(service._id || service.id || "");
+                      const selected = Boolean(quoteSelection[serviceId]);
+                      return (
+                      <div key={serviceId} className="flex h-full flex-col gap-2">
                       <ServiceCard
-                        key={service._id || service.id}
-                        id={service._id || service.id || ""}
+                        id={serviceId}
                         slug={service.slug}
                         title={service.title}
                         description={service.description}
@@ -838,7 +892,23 @@ export default function ProviderProfile() {
                         metadata={service.metadata}
                         hideProviderDetails
                       />
-                    ))}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={selected ? "default" : "outline"}
+                        className="w-full shrink-0"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleQuoteService(service);
+                        }}
+                      >
+                        <Package className="mr-1.5 h-3.5 w-3.5" />
+                        {selected ? t("addedToQuote", "Added to quote") : t("addToQuote", "Add to quote")}
+                      </Button>
+                      </div>
+                      );
+                    })}
                   </div>
                 ) : null}
                 {!servicesLoading && servicesToRender.length > 0 && totalServices > services.length && !searchQuery && (
@@ -952,6 +1022,47 @@ export default function ProviderProfile() {
         providerId={providerPublicId}
         providerName={providerDisplay?.name}
       />
+
+      {quoteItems.length > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="container flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{quoteItems.length}</span>{" "}
+              {quoteItems.length === 1 ? "service" : "services"} selected for{" "}
+              {providerDisplay?.name || "this provider"}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setQuoteSelection({})}>
+                Clear
+              </Button>
+              <Button size="sm" onClick={openSelectedQuote}>
+                Request quote ({quoteItems.length})
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {quoteItems.length > 0 ? (
+        <GetBestQuotesModal
+          open={quoteModalOpen}
+          onOpenChange={setQuoteModalOpen}
+          serviceId={quoteItems[0].serviceId}
+          serviceTitle={
+            quoteItems.length > 1
+              ? `${quoteItems.length} services from ${providerDisplay?.name || "provider"}`
+              : quoteItems[0].title
+          }
+          priceType={quoteItems[0].priceType}
+          items={quoteItems}
+          exclusiveToListing
+          targetProviderUserId={providerUserId || undefined}
+          onSubmitted={() => {
+            setQuoteSelection({});
+            setQuoteModalOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
