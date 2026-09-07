@@ -953,6 +953,7 @@ export function B2BServicesHub() {
           items={quoteService.items}
           onSubmitted={() => setQuoteCart(clearB2bQuoteCart())}
           noCountdown
+          source="b2b_services"
         />
       ) : null}
     </div>
