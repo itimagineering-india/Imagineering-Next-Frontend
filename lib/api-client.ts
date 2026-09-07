@@ -2859,6 +2859,7 @@ export const api = {
       zipCode?: string;
       coordinates?: { lat: number; lng: number };
       notes?: string;
+      source?: "marketplace" | "b2b_services" | "contractor_hub";
       items?: Array<{
         serviceId: string;
         title?: string;
