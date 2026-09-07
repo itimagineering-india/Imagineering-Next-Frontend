@@ -30,16 +30,17 @@ export function ReviewCard({
               <p className="font-medium text-foreground">{author}</p>
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`h-4 w-4 ${
-                        i < rating
-                          ? "fill-warning text-warning"
-                          : "fill-muted text-muted"
-                      }`}
-                    />
-                  ))}
+                  {[...Array(5)].map((_, i) => {
+                    const filled = i < rating;
+                    return (
+                      <Star
+                        key={i}
+                        className={`h-4 w-4 ${filled ? "text-amber-500" : "text-slate-300"}`}
+                        fill={filled ? "currentColor" : "none"}
+                        stroke="currentColor"
+                      />
+                    );
+                  })}
                 </div>
                 <span className="text-sm text-muted-foreground">
                   {formatDistanceToNow(new Date(date), { addSuffix: true })}
