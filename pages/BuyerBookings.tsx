@@ -32,6 +32,7 @@ import {
   ExternalLink,
   Star,
   Copy,
+  MessageCircle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -63,9 +64,16 @@ interface Booking {
     _id: string;
     title: string;
     provider?: {
+      _id?: string;
       name: string;
       avatar?: string;
     };
+  };
+  /** Provider user id when API returns top-level provider. */
+  provider?: {
+    _id?: string;
+    name?: string;
+    avatar?: string;
   };
   date: string;
   time: string;
@@ -334,6 +342,31 @@ export default function BuyerBookings() {
     ["pending", "confirmed", "in_progress"].includes(
       String(booking?.status || "").toLowerCase()
     );
+
+  const openChatWithProvider = (booking: Booking) => {
+    const providerId =
+      booking.provider?._id ||
+      booking.service?.provider?._id ||
+      "";
+    if (!providerId) {
+      toast({
+        title: "Chat unavailable",
+        description: "Provider details are missing for this booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const providerName =
+      booking.provider?.name || booking.service?.provider?.name || "Provider";
+    const serviceId = booking.service?._id || booking.services?.[0]?._id || "";
+    const params = new URLSearchParams({
+      providerId: String(providerId),
+      name: String(providerName),
+      ...(serviceId ? { serviceId: String(serviceId) } : {}),
+      message: `Hi, regarding booking ${formatBookingId(booking._id)}.`,
+    });
+    router.push(`/chat?${params.toString()}`);
+  };
 
   const openCancelBookingDialog = (booking: Booking) => {
     if (!canCancelBooking(booking)) return;
@@ -688,6 +721,17 @@ export default function BuyerBookings() {
     // Unpaid bookings always have outstanding > 0. That is pending, not partial.
     const normalizedPaymentStatus = paymentMap[booking.paymentStatus] || "pending";
 
+    const providerId =
+      booking.provider?._id?.toString?.() ||
+      booking.provider?.id?.toString?.() ||
+      (typeof booking.provider === "string" ? booking.provider : "") ||
+      booking.service?.provider?._id?.toString?.() ||
+      "";
+    const providerName =
+      booking.provider?.name || booking.service?.provider?.name || "Provider";
+    const providerAvatar =
+      booking.provider?.avatar || booking.service?.provider?.avatar;
+
     return {
       _id: booking._id?.toString() || "",
       rawStatus: String(booking.status || ""),
@@ -695,10 +739,14 @@ export default function BuyerBookings() {
         _id: booking.service?._id?.toString() || "",
         title: booking.service?.title || booking.title || "Service",
         provider: {
-          name: booking.provider?.name || booking.service?.provider?.name || "Provider",
-          avatar: booking.provider?.avatar || booking.service?.provider?.avatar,
+          ...(providerId ? { _id: providerId } : {}),
+          name: providerName,
+          avatar: providerAvatar,
         },
       },
+      provider: providerId
+        ? { _id: providerId, name: providerName, avatar: providerAvatar }
+        : undefined,
       services,
       metadata: {
         ...(booking.metadata && typeof booking.metadata === "object" ? booking.metadata : {}),
@@ -1514,6 +1562,18 @@ export default function BuyerBookings() {
                           {selectedBooking.service?.provider?.name || "N/A"}
                         </p>
                       </div>
+                      {(selectedBooking.provider?._id ||
+                        selectedBooking.service?.provider?._id) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => openChatWithProvider(selectedBooking)}
+                        >
+                          <MessageCircle className="mr-1.5 h-4 w-4" />
+                          Chat with provider
+                        </Button>
+                      )}
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Provider GSTIN</p>
