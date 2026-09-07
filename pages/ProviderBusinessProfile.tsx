@@ -19,6 +19,7 @@ import { MapPin, Loader2, Upload, X } from "lucide-react";
 import api from "@/lib/api-client";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import { getReachableImageUrl } from "@/lib/mediaUrl";
+import { isB2bTradersProfileCategory } from "@/lib/b2b/b2bCategories";
 import { useGoogleGeocoder } from "@/hooks/useGoogleGeocoder";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -103,6 +104,7 @@ export default function ProviderBusinessProfile() {
     googleMapLink: "",
     gstRegistered: false,
     gstNumber: "",
+    acceptsRetailMaterialQuotes: false,
     coordinates: { lat: "", lng: "" },
   });
 
@@ -230,6 +232,7 @@ export default function ProviderBusinessProfile() {
             googleMapLink: provider.googleMapLink || "",
             gstRegistered: Boolean(provider.gstRegistered ?? (provider.gstNumber && String(provider.gstNumber).trim())),
             gstNumber: provider.gstNumber || "",
+            acceptsRetailMaterialQuotes: Boolean(provider.acceptsRetailMaterialQuotes),
             coordinates: {
               lat: provider.businessAddress?.coordinates?.lat?.toString() || "",
               lng: provider.businessAddress?.coordinates?.lng?.toString() || "",
@@ -281,6 +284,7 @@ export default function ProviderBusinessProfile() {
       } else {
         updateData.gstNumber = "";
       }
+      updateData.acceptsRetailMaterialQuotes = Boolean(businessProfile.acceptsRetailMaterialQuotes);
       if (businessProfile.businessLogo) updateData.businessLogo = businessProfile.businessLogo;
       if (businessProfile.coverImage) updateData.coverImage = businessProfile.coverImage;
       if (businessProfile.primaryCategory) updateData.primaryCategory = businessProfile.primaryCategory;
@@ -463,6 +467,37 @@ export default function ProviderBusinessProfile() {
                     </div>
                   </div>
                 </div>
+
+                {(() => {
+                  const selectedCat = categories.find((c) => c._id === businessProfile.primaryCategory);
+                  if (!isB2bTradersProfileCategory(selectedCat)) return null;
+                  return (
+                    <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-4 space-y-2">
+                      <div className="flex items-start space-x-2">
+                        <Checkbox
+                          id="accepts-retail-quotes"
+                          checked={businessProfile.acceptsRetailMaterialQuotes}
+                          onCheckedChange={(checked) =>
+                            setBusinessProfile((prev) => ({
+                              ...prev,
+                              acceptsRetailMaterialQuotes: Boolean(checked),
+                            }))
+                          }
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <Label htmlFor="accepts-retail-quotes" className="cursor-pointer font-medium">
+                            Also accept retail / B2C material quotes
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Turn on if you also sell to normal buyers on Construction Materials. You will get
+                            retail quote requests for catalog products you list. Leave off for wholesale-only.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-2">
                   <Label htmlFor="years-experience">Years of Experience</Label>
