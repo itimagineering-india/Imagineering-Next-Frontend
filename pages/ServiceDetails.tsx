@@ -1699,6 +1699,10 @@ export default function ServiceDetails() {
             serviceTitle={service.title}
             priceType={service.priceType}
             noCountdown={isB2bCategorySlug(categorySlug)}
+            exclusiveToListing
+            targetProviderUserId={
+              service.provider?._id ? String(service.provider._id) : undefined
+            }
           />
         )}
 
