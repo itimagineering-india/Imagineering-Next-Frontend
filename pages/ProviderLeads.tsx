@@ -602,7 +602,7 @@ export default function ProviderLeads() {
         </Card>
 
         <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+          <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>
                 {activeQuote ? quoteRequestHeadline(activeQuote) : "Submit quote"}
@@ -712,7 +712,7 @@ export default function ProviderLeads() {
                                 <Input
                                   type="number"
                                   min={0.01}
-                                  step="0.01"
+                                  step="0.001"
                                   placeholder={unit ? `₹/${unit}` : "Rate"}
                                   value={quoteLineRates[key] || ""}
                                   onChange={(e) =>
