@@ -695,15 +695,20 @@ export default function ProviderLeads() {
                           const lineTotal =
                             Number.isFinite(rate) && rate > 0 ? Math.round(rate * qty * 100) / 100 : 0;
                           return (
-                            <div key={key} className="grid grid-cols-[1fr_7.5rem] items-center gap-2">
+                            <div
+                              key={`${key}-${idx}`}
+                              className="grid grid-cols-1 gap-2 border-b border-border/60 pb-3 last:border-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_7.5rem] sm:items-start"
+                            >
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-foreground">{line.title}</p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="break-words text-sm font-medium leading-snug text-foreground">
+                                  {line.title}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
                                   {formatQuoteQtyLabel(qty, line.priceType)}
                                   {lineTotal > 0 ? ` · ${formatINR(lineTotal)}` : ""}
                                 </p>
                               </div>
-                              <div className="space-y-0.5">
+                              <div className="space-y-0.5 sm:pt-0.5">
                                 <Input
                                   type="number"
                                   min={0.01}
