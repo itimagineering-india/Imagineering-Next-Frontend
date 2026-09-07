@@ -42,6 +42,7 @@ import {
   GetBestQuotesModal,
   type QuoteModalLine,
 } from "@/components/service-details/GetBestQuotesModal";
+import { ProviderQuoteVariantModal } from "@/components/providers/ProviderQuoteVariantModal";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -130,6 +131,7 @@ interface ServiceData {
     address?: string;
   };
   metadata?: Record<string, unknown> | null;
+  catalogProductId?: string;
 }
 
 export default function ProviderProfile() {
@@ -157,6 +159,7 @@ export default function ProviderProfile() {
   const [offersModalOpen, setOffersModalOpen] = useState(false);
   const [quoteSelection, setQuoteSelection] = useState<Record<string, QuoteModalLine>>({});
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [variantModalService, setVariantModalService] = useState<ServiceData | null>(null);
 
   const SERVICES_PAGE_SIZE = 20;
 
@@ -169,26 +172,63 @@ export default function ProviderProfile() {
 
   const quoteItems = useMemo(() => Object.values(quoteSelection), [quoteSelection]);
 
-  const toggleQuoteService = useCallback((service: ServiceData) => {
-    const serviceId = String(service._id || service.id || "").trim();
-    if (!serviceId) return;
+  const quoteKeyForLine = useCallback((line: QuoteModalLine) => {
+    return line.catalogVariantId
+      ? `${line.serviceId}:${line.catalogVariantId}`
+      : line.serviceId;
+  }, []);
+
+  const countSelectedForService = useCallback(
+    (serviceId: string) =>
+      Object.values(quoteSelection).filter((line) => line.serviceId === serviceId).length,
+    [quoteSelection],
+  );
+
+  const upsertQuoteLine = useCallback(
+    (line: QuoteModalLine) => {
+      const key = quoteKeyForLine(line);
+      setQuoteSelection((prev) => ({ ...prev, [key]: line }));
+    },
+    [quoteKeyForLine],
+  );
+
+  const removeQuoteLinesForService = useCallback((serviceId: string) => {
     setQuoteSelection((prev) => {
-      if (prev[serviceId]) {
-        const next = { ...prev };
-        delete next[serviceId];
-        return next;
+      const next: Record<string, QuoteModalLine> = {};
+      for (const [key, line] of Object.entries(prev)) {
+        if (line.serviceId !== serviceId) next[key] = line;
       }
-      return {
-        ...prev,
-        [serviceId]: {
+      return next;
+    });
+  }, []);
+
+  const onAddToQuoteClick = useCallback(
+    (service: ServiceData) => {
+      const serviceId = String(service._id || service.id || "").trim();
+      if (!serviceId) return;
+      const catalogId = String(service.catalogProductId || "").trim();
+      const selectedCount = countSelectedForService(serviceId);
+
+      // Plain services (no catalog): toggle on/off.
+      if (!catalogId) {
+        if (selectedCount > 0) {
+          removeQuoteLinesForService(serviceId);
+          return;
+        }
+        upsertQuoteLine({
           serviceId,
           title: String(service.title || "Service"),
           quantity: 1,
           priceType: service.priceType || undefined,
-        },
-      };
-    });
-  }, []);
+        });
+        return;
+      }
+
+      // Catalog products may have variants — always open picker (can add multiple sizes).
+      setVariantModalService(service);
+    },
+    [countSelectedForService, removeQuoteLinesForService, upsertQuoteLine],
+  );
 
   const openSelectedQuote = useCallback(() => {
     if (quoteItems.length === 0) return;
@@ -861,7 +901,8 @@ export default function ProviderProfile() {
                   >
                     {servicesToRender.map((service) => {
                       const serviceId = String(service._id || service.id || "");
-                      const selected = Boolean(quoteSelection[serviceId]);
+                      const selectedCount = countSelectedForService(serviceId);
+                      const selected = selectedCount > 0;
                       return (
                       <div key={serviceId} className="flex h-full flex-col gap-2">
                       <ServiceCard
@@ -900,11 +941,18 @@ export default function ProviderProfile() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          toggleQuoteService(service);
+                          onAddToQuoteClick(service);
                         }}
                       >
                         <Package className="mr-1.5 h-3.5 w-3.5" />
-                        {selected ? t("addedToQuote", "Added to quote") : t("addToQuote", "Add to quote")}
+                        {selected
+                          ? selectedCount > 1
+                            ? t("addedToQuoteCount", "Added ({{count}})").replace(
+                                "{{count}}",
+                                String(selectedCount),
+                              )
+                            : t("addedToQuote", "Added to quote")
+                          : t("addToQuote", "Add to quote")}
                       </Button>
                       </div>
                       );
@@ -1063,6 +1111,15 @@ export default function ProviderProfile() {
           }}
         />
       ) : null}
+
+      <ProviderQuoteVariantModal
+        open={Boolean(variantModalService)}
+        onOpenChange={(open) => {
+          if (!open) setVariantModalService(null);
+        }}
+        service={variantModalService}
+        onConfirm={upsertQuoteLine}
+      />
     </div>
   );
 }
