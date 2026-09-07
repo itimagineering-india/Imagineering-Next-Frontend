@@ -37,6 +37,7 @@ import {
 import { usesCatalogSelectFlow } from "@/lib/manpowerCatalog";
 import { isB2bCategorySlug, usesB2bCatalogOrManualListing } from "@/lib/b2b/b2bCategories";
 import { isMachineRentalCategorySlug, isMachineRentalListing } from "@/lib/machineRental";
+import { isMachineResaleCategorySlug, isMachineResaleListing } from "@/lib/machineResale";
 import { parseToolsFieldsFromService } from "@/lib/toolsService";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -245,7 +246,9 @@ export default function ProviderServices() {
     isConstructionMaterialsCategorySlug(catSlug) ||
     (isB2bCategorySlug(catSlug) && catalogProductId) ||
     isMachineRentalCategorySlug(catSlug) ||
-    isMachineRentalListing(service as { category?: { slug?: string }; metadata?: Record<string, unknown> })
+    isMachineRentalListing(service as { category?: { slug?: string }; metadata?: Record<string, unknown> }) ||
+    isMachineResaleCategorySlug(catSlug) ||
+    isMachineResaleListing(service as { category?: { slug?: string }; metadata?: Record<string, unknown> })
    ) {
     router.push(`/dashboard/provider/services/${service._id}/edit`);
     return;
@@ -300,6 +303,10 @@ export default function ProviderServices() {
    const primaryCat = resolveProviderPrimaryCategory(provider, cats);
    const catSlug = primaryCat.slug;
    if (isMachineRentalCategorySlug(catSlug)) {
+    router.push("/dashboard/provider/services/add");
+    return;
+   }
+   if (isMachineResaleCategorySlug(catSlug)) {
     router.push("/dashboard/provider/services/add");
     return;
    }
