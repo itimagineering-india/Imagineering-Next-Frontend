@@ -56,9 +56,15 @@ export function quoteLineKey(
 ) {
   const sid = String(row.serviceId || "").trim();
   const vid = String(row.catalogVariantId || "").trim();
+  const title = String(row.title || "").trim().toLowerCase();
+  // Prefer variant id when present (true SKU lines).
   if (sid && vid) return `${sid}:${vid}`;
-  if (sid) return sid;
-  return String(row.title || index);
+  // Same service can appear as multiple RFQ lines (e.g. ISMC 100 + ISMC 150)
+  // without catalogVariantId — include title so rate inputs stay independent.
+  if (sid && title) return `${sid}::${title}`;
+  if (sid) return `${sid}#${index}`;
+  if (title) return `t:${title}#${index}`;
+  return `idx:${index}`;
 }
 
 export function quoteRequestHeadline(data: {
