@@ -77,7 +77,11 @@ export function Reviews({ serviceId, averageRating, totalReviews, reviews: initi
             <CardTitle className="text-lg sm:text-xl lg:text-2xl">Reviews</CardTitle>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-warning text-warning" />
+                <Star
+                  className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500"
+                  fill="currentColor"
+                  stroke="currentColor"
+                />
                 <span className="text-xl sm:text-2xl font-bold">{averageRating.toFixed(1)}</span>
               </div>
               <span className="text-xs sm:text-sm lg:text-base text-muted-foreground">
@@ -118,17 +122,20 @@ export function Reviews({ serviceId, averageRating, totalReviews, reviews: initi
                       <div className="min-w-0">
                         <p className="font-medium text-sm sm:text-base lg:text-lg truncate">{review.reviewerName}</p>
                         <div className="flex items-center gap-0.5 sm:gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={cn(
-                                "h-3 w-3 sm:h-4 sm:w-4",
-                                i < review.rating
-                                  ? "fill-warning text-warning"
-                                  : "text-muted-foreground"
-                              )}
-                            />
-                          ))}
+                          {[...Array(5)].map((_, i) => {
+                            const filled = i < review.rating;
+                            return (
+                              <Star
+                                key={i}
+                                className={cn(
+                                  "h-3 w-3 sm:h-4 sm:w-4",
+                                  filled ? "text-amber-500" : "text-slate-300"
+                                )}
+                                fill={filled ? "currentColor" : "none"}
+                                stroke="currentColor"
+                              />
+                            );
+                          })}
                         </div>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
