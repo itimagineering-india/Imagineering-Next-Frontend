@@ -2860,6 +2860,9 @@ export const api = {
       coordinates?: { lat: number; lng: number };
       notes?: string;
       source?: "marketplace" | "b2b_services" | "contractor_hub";
+      /** Lock RFQ to the listing seller (no peer float). */
+      exclusiveToListing?: boolean;
+      targetProviderUserId?: string;
       items?: Array<{
         serviceId: string;
         title?: string;
