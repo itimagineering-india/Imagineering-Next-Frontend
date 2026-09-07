@@ -7,15 +7,17 @@ import { Button } from "@/components/ui/button";
 import api from "@/lib/api-client";
 import { CatalogProductsPage } from "@/components/services/catalog/CatalogProductsPage";
 import { MachineRentalFormPage } from "@/components/services/catalog/MachineRentalFormPage";
+import { MachineResaleFormPage } from "@/components/services/catalog/MachineResaleFormPage";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { isConstructionMaterialsCategorySlug } from "@/lib/constructionMaterials";
 import { isMachineRentalListing } from "@/lib/machineRental";
+import { isMachineResaleListing } from "@/lib/machineResale";
 
 export async function getServerSideProps() {
   return { props: {} };
 }
 
-type EditKind = "cm" | "rental" | null;
+type EditKind = "cm" | "rental" | "resale" | null;
 
 export default function ProviderEditCatalogProduct() {
   const params = useParams();
@@ -64,6 +66,11 @@ export default function ProviderEditCatalogProduct() {
           return;
         }
 
+        if (isMachineResaleListing(svc)) {
+          setEditKind("resale");
+          return;
+        }
+
         if (!isConstructionMaterialsCategorySlug(catSlug) && !isB2bCategorySlug(catSlug)) {
           router.replace("/dashboard/provider/services");
           return;
@@ -104,6 +111,10 @@ export default function ProviderEditCatalogProduct() {
 
   if (editKind === "rental") {
     return <MachineRentalFormPage serviceId={serviceId} />;
+  }
+
+  if (editKind === "resale") {
+    return <MachineResaleFormPage serviceId={serviceId} />;
   }
 
   return (
