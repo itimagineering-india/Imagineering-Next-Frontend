@@ -117,8 +117,10 @@ interface Booking {
     durationNote?: string;
     rentalStartDate?: string;
     rentalStartTime?: string;
-    [key: string]: unknown;
-  };
+    shippingAddress?: unknown;
+    billingAddress?: unknown;
+    billingSameAsShipping?: boolean;
+  } & Record<string, unknown>;
   location?: {
     address: string;
     city: string;
@@ -1027,7 +1029,7 @@ export default function ProviderBookings() {
                 </div>
 
                 {/* Service Items */}
-                {selectedBooking.services && selectedBooking.services.length > 0 && (
+                {selectedBooking.services && selectedBooking.services.length > 0 ? (
                   <div>
                     <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Service Items</h3>
                     <div className="border rounded-lg overflow-hidden">
@@ -1071,9 +1073,8 @@ export default function ProviderBookings() {
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
-                {/* Buyer Info */}
                 <div>
                   <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Buyer Information</h3>
                   <div className="flex items-center gap-2 md:gap-3">
@@ -1306,9 +1307,9 @@ export default function ProviderBookings() {
                 )}
 
                 {/* Addresses — shipping + billing when available */}
-                {(selectedBooking.location ||
-                  selectedBooking.metadata?.shippingAddress ||
-                  selectedBooking.metadata?.billingAddress) && (
+                {selectedBooking.location ||
+                selectedBooking.metadata?.shippingAddress ||
+                selectedBooking.metadata?.billingAddress ? (
                   <div>
                     <h3 className="font-semibold mb-3">Addresses</h3>
                     {(() => {
@@ -1406,7 +1407,7 @@ export default function ProviderBookings() {
                       );
                     })()}
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </DialogContent>
