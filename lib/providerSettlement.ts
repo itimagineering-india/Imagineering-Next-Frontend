@@ -31,12 +31,14 @@ export function isOfflineCollectPaymentMethod(method?: string | null): boolean {
 export type ProviderSettlementBooking = {
   amount: number;
   totalAmount: number;
+  amountPaid?: number;
   commission: number;
   netEarnings: number;
   outstandingAmount?: number;
   paymentStatus?: string;
   requiresOfflinePaymentConfirmation?: boolean;
   paymentMethod?: string;
+  balanceCollectionMethod?: string;
 };
 
 export function providerCommissionBreakup(
