@@ -90,15 +90,17 @@ interface Booking {
   startDate?: string;
   endDate?: string;
   status: "new" | "ongoing" | "completed" | "cancelled" | "PENDING_PROVIDER" | "CONFIRMED" | "REJECTED_BY_PROVIDER" | "IN_PROGRESS" | "OUT_FOR_DELIVERY" | "DELIVERED" | "COMPLETED" | "CANCELLED_BY_USER" | "CANCELLED_BY_ADMIN" | "CANCELLED_BY_SYSTEM";
-  paymentStatus: "paid" | "pending" | "hold";
+  paymentStatus: "paid" | "pending" | "hold" | "refunded";
   amount: number;
   totalAmount: number;
+  amountPaid?: number;
   commission: number;
   commissionRate: number;
   netEarnings: number;
   basePriceWithGst: number;
   hasGST: boolean;
   outstandingAmount?: number;
+  balanceCollectionMethod?: string;
   requiresOfflinePaymentConfirmation?: boolean;
   paymentMethod?: string;
   quoteSource?: string;
@@ -221,12 +223,14 @@ export default function ProviderBookings() {
           paymentStatus: booking.paymentStatus,
           amount: booking.amount ?? booking.totalAmount ?? 0,
           totalAmount: booking.totalAmount || 0,
+          amountPaid: Number(booking.amountPaid || 0),
           commission: booking.commission || 0,
           commissionRate: booking.commissionRate ?? 0.9,
           netEarnings: booking.netEarnings || 0,
           basePriceWithGst: booking.basePriceWithGst || booking.amount || 0,
           hasGST: booking.hasGST || false,
           outstandingAmount: Number(booking.outstandingAmount || 0),
+          balanceCollectionMethod: booking.balanceCollectionMethod || booking.metadata?.remainingPaymentMethod,
           requiresOfflinePaymentConfirmation: !!booking.requiresOfflinePaymentConfirmation,
           paymentMethod: booking.metadata?.paymentMethod || booking.metadata?.paymentOption,
           quoteSource: booking.metadata?.source,
@@ -415,7 +419,12 @@ export default function ProviderBookings() {
       case "pending":
         return <Badge className="bg-yellow-500 text-white">Pending</Badge>;
       case "hold":
+        // Legacy API alias for booking paymentStatus `partial`
         return <Badge className="bg-orange-500 text-white">Partial</Badge>;
+      case "partial":
+        return <Badge className="bg-orange-500 text-white">Partial</Badge>;
+      case "refunded":
+        return <Badge className="bg-gray-500 text-white">Refunded</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -1108,6 +1117,42 @@ export default function ProviderBookings() {
                     });
                     return (
                       <div className="rounded-xl border overflow-hidden">
+                        <div className="px-4 py-3 space-y-2 border-b bg-slate-50/80">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Total</span>
+                            <span className="font-semibold tabular-nums">
+                              {formatInr(selectedBooking.totalAmount || 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Paid</span>
+                            <span className="font-semibold tabular-nums text-emerald-700">
+                              {formatInr(Number(selectedBooking.amountPaid || 0))}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Remaining</span>
+                            <span className="font-semibold tabular-nums text-orange-700">
+                              {formatInr(
+                                Number(
+                                  selectedBooking.outstandingAmount ??
+                                    Math.max(
+                                      0,
+                                      (selectedBooking.totalAmount || 0) -
+                                        (selectedBooking.amountPaid || 0)
+                                    )
+                                )
+                              )}
+                            </span>
+                          </div>
+                          {selectedBooking.balanceCollectionMethod === "COD" ||
+                          String(selectedBooking.balanceCollectionMethod || "").toUpperCase() ===
+                            "COD" ? (
+                            <p className="text-xs text-muted-foreground pt-1">
+                              Remaining balance to be collected at delivery (COD)
+                            </p>
+                          ) : null}
+                        </div>
                         {settlement.needsCollect ? (
                           <div className="px-4 py-2 bg-amber-50 border-b">
                             <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
@@ -1865,6 +1910,7 @@ function BookingsTable({
                       </Button>
                     )}
                     {onRequestModification &&
+                      booking.status !== "OUT_FOR_DELIVERY" &&
                       booking.status !== "COMPLETED" &&
                       booking.status !== "DELIVERED" &&
                       booking.status !== "CANCELLED_BY_USER" &&
