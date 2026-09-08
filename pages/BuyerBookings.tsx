@@ -87,7 +87,9 @@ interface Booking {
     | "cancelled";
   paymentStatus: "pending" | "partial" | "paid" | "failed" | "refunded";
   totalAmount: number;
+  amountPaid?: number;
   outstandingAmount?: number;
+  balanceCollectionMethod?: string;
   couponCode?: string;
   couponDiscount?: number;
   creditsApplied?: number;
@@ -774,9 +776,12 @@ export default function BuyerBookings() {
       status: statusMap[booking.status] || "pending",
       paymentStatus: normalizedPaymentStatus,
       totalAmount: booking.totalAmount || booking.metadata?.totalAmountWithGst || booking.amount || 0,
+      amountPaid: Number(booking.amountPaid || 0),
       amount: booking.amount || 0,
       buyerFee: booking.buyerFee || 0,
       outstandingAmount: booking.outstandingAmount || 0,
+      balanceCollectionMethod:
+        booking.balanceCollectionMethod || booking.metadata?.remainingPaymentMethod,
       location: booking.location || undefined,
       requirementNote: booking.notes || booking.description || "",
       createdAt: booking.createdAt,
@@ -1134,7 +1139,7 @@ export default function BuyerBookings() {
       case "pending":
         return <Badge className="bg-yellow-500 text-white">Pending</Badge>;
       case "partial":
-        return <Badge className="bg-orange-500 text-white">Partial</Badge>;
+        return <Badge className="bg-orange-500 text-white">Partial Payment</Badge>;
       case "failed":
         return <Badge variant="destructive">Failed</Badge>;
       case "refunded":
@@ -1316,11 +1321,19 @@ export default function BuyerBookings() {
                           <div className="font-semibold">
                             ₹{getTotal(booking).toLocaleString()}
                           </div>
-                          {booking.paymentStatus !== "paid" && getOutstanding(booking) > 0 && (
-                            <div className="text-xs text-orange-600">
-                              Outstanding: ₹{getOutstanding(booking).toLocaleString()}
+                          {booking.paymentStatus === "partial" ||
+                          (booking.paymentStatus !== "paid" && getOutstanding(booking) > 0) ? (
+                            <div className="text-xs space-y-0.5">
+                              <div className="text-emerald-700">
+                                Paid: ₹{Number(booking.amountPaid || 0).toLocaleString()}
+                              </div>
+                              {getOutstanding(booking) > 0 ? (
+                                <div className="text-orange-600">
+                                  Remaining: ₹{getOutstanding(booking).toLocaleString()}
+                                </div>
+                              ) : null}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
@@ -1762,15 +1775,33 @@ export default function BuyerBookings() {
                       {getPaymentBadge(selectedBooking)}
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Amount</p>
-                      <p className="font-semibold text-lg">
-                        ₹{getComputedTotal(selectedBooking).toLocaleString()}
-                      </p>
-                      {getOutstanding(selectedBooking) > 0 && (
-                        <p className="text-sm text-orange-600">
-                          Outstanding: ₹{getOutstanding(selectedBooking).toLocaleString()}
-                        </p>
-                      )}
+                      <p className="text-sm text-muted-foreground">Payment</p>
+                      <div className="space-y-1 mt-1">
+                        <div className="flex justify-between gap-4 text-sm">
+                          <span className="text-muted-foreground">Total</span>
+                          <span className="font-semibold">
+                            ₹{getComputedTotal(selectedBooking).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4 text-sm">
+                          <span className="text-muted-foreground">Paid</span>
+                          <span className="font-semibold text-emerald-700">
+                            ₹{Number(selectedBooking.amountPaid || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4 text-sm">
+                          <span className="text-muted-foreground">Remaining</span>
+                          <span className="font-semibold text-orange-700">
+                            ₹{getOutstanding(selectedBooking).toLocaleString()}
+                          </span>
+                        </div>
+                        {String(selectedBooking.balanceCollectionMethod || "").toUpperCase() ===
+                          "COD" && getOutstanding(selectedBooking) > 0 ? (
+                          <p className="text-xs text-muted-foreground pt-1">
+                            Remaining balance will be collected at delivery (COD)
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                     {canCancelBooking(selectedBooking) && (
                       <div className="col-span-2">
