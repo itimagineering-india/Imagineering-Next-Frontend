@@ -65,6 +65,7 @@ import {
   getPriceTypeSuffix,
   isMachineRentalBookingMeta,
 } from "@/lib/priceTypeDisplay";
+import { quoteLineDisplayParts } from "@/lib/b2b/quoteRequestDisplay";
 import { openLocationOnGoogleMaps } from "@/lib/geocodeAddress";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -85,6 +86,9 @@ interface Booking {
     quantity: number;
     price: number;
     priceType?: string;
+    title?: string;
+    catalogVariantId?: string;
+    variantLabel?: string;
   }>;
   bookingDate: string;
   startDate?: string;
@@ -1052,12 +1056,21 @@ export default function ProviderBookings() {
                           const priceSuffix =
                             getPriceTypeSuffix(item.priceType) ||
                             (item.priceType ? `/${item.priceType}` : "");
+                          const { productName, variantLabel } = quoteLineDisplayParts({
+                            title: item.title || item.service?.title,
+                            variantLabel: item.variantLabel,
+                          });
                           return (
                           <div key={`${serviceId || idx}`} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
                             <div className="min-w-0">
-                              <span className="block truncate">{item.service?.title || "Service"}</span>
+                              <span className="block truncate font-medium">{productName || "Service"}</span>
+                              {variantLabel ? (
+                                <span className="mt-1 inline-flex max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                  {variantLabel}
+                                </span>
+                              ) : null}
                               {serviceId ? (
-                                <span className="block text-[11px] text-muted-foreground font-mono break-all">
+                                <span className="mt-1 block text-[11px] text-muted-foreground font-mono break-all">
                                   ID {serviceId}
                                 </span>
                               ) : null}
