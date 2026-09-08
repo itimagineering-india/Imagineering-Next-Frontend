@@ -26,9 +26,22 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import api from "@/lib/api-client";
-import { quoteLineKey, quoteOfferItems, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow } from "@/lib/b2b/quoteRequestDisplay";
+import {
+  formatQuoteLineDetailRows,
+  matchOfferUnitPrice,
+  quoteLineDisplayParts,
+  quoteLineKey,
+  quoteOfferItems,
+  quoteRequestHeadline,
+  quoteRequestItems,
+  isTimedQuoteWindow,
+} from "@/lib/b2b/quoteRequestDisplay";
 import { subscribeToUserQuoteUpdates } from "@/lib/quoteRealtime";
-import { parseQuoteQuantity } from "@/lib/quoteQuantity";
+import {
+  parseQuoteQuantity,
+  roundQuoteUnitPrice,
+  sanitizeQuoteUnitPriceInput,
+} from "@/lib/quoteQuantity";
 import { formatQuoteQtyLabel, getQuantityUnitNoun } from "@/lib/priceTypeDisplay";
 import {
   parseQuoteGstAmount,
@@ -72,30 +85,8 @@ function applyProviderQuoteFormFromRow(
   const rates: Record<string, string> = {};
   requestLines.forEach((line, idx) => {
     const key = quoteLineKey(line, idx);
-    const lineVid = String(line.catalogVariantId || "").trim();
-    const lineTitle = String(line.title || "").trim();
-    const match =
-      (lineVid
-        ? offered.find(
-            (o) =>
-              o.serviceId &&
-              o.serviceId === line.serviceId &&
-              String(o.catalogVariantId || "").trim() === lineVid
-          )
-        : undefined) ||
-      offered.find(
-        (o) =>
-          o.serviceId &&
-          o.serviceId === line.serviceId &&
-          String(o.title || "").trim() === lineTitle
-      ) ||
-      (offered[idx] &&
-      String(offered[idx].serviceId || "") === String(line.serviceId || "") &&
-      String(offered[idx].title || "").trim() === lineTitle
-        ? offered[idx]
-        : undefined) ||
-      offered[idx];
-    rates[key] = match?.unitPrice != null ? String(match.unitPrice) : "";
+    const matched = matchOfferUnitPrice(line, offered);
+    rates[key] = matched != null ? String(matched) : "";
   });
   setters.setQuoteLineRates(rates);
   setters.setQuoteAmount(row?.myOffer?.amount != null ? String(row.myOffer.amount) : "");
@@ -278,7 +269,7 @@ export default function ProviderLeads() {
         ? requestLines.map((line, idx) => ({
             serviceId: String(line.serviceId || ""),
             catalogVariantId: String(line.catalogVariantId || "").trim() || undefined,
-            unitPrice: Number(quoteLineRates[quoteLineKey(line, idx)] || 0),
+            unitPrice: roundQuoteUnitPrice(quoteLineRates[quoteLineKey(line, idx)] || 0),
             title: String(line.title || "Product"),
             quantity: parseQuoteQuantity(line.quantity),
           }))
@@ -639,11 +630,17 @@ export default function ProviderLeads() {
                       </button>
                       {quoteSummaryExpanded ? (
                         <ul className="space-y-1 text-foreground">
-                          {activeQuoteLines.map((line, idx) => (
-                            <li key={`${line.title}-${idx}`}>
-                              {line.title} · {formatQuoteQtyLabel(parseQuoteQuantity(line.quantity), line.priceType)}
-                            </li>
-                          ))}
+                          {activeQuoteLines.map((line, idx) => {
+                            const { productName, variantLabel } = quoteLineDisplayParts(line);
+                            return (
+                              <li key={`${quoteLineKey(line, idx)}-${idx}`}>
+                                {productName}
+                                {variantLabel ? ` · ${variantLabel}` : ""}
+                                {" · "}
+                                {formatQuoteQtyLabel(parseQuoteQuantity(line.quantity), line.priceType)}
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : null}
                       <p>
@@ -694,6 +691,8 @@ export default function ProviderLeads() {
                           const rate = Number(quoteLineRates[key] || 0);
                           const lineTotal =
                             Number.isFinite(rate) && rate > 0 ? Math.round(rate * qty * 100) / 100 : 0;
+                          const { productName, variantLabel } = quoteLineDisplayParts(line);
+                          const detailRows = formatQuoteLineDetailRows(line, qty);
                           return (
                             <div
                               key={`${key}-${idx}`}
@@ -701,25 +700,40 @@ export default function ProviderLeads() {
                             >
                               <div className="min-w-0">
                                 <p className="break-words text-sm font-medium leading-snug text-foreground">
-                                  {line.title}
+                                  {productName}
                                 </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {formatQuoteQtyLabel(qty, line.priceType)}
-                                  {lineTotal > 0 ? ` · ${formatINR(lineTotal)}` : ""}
-                                </p>
+                                {variantLabel ? (
+                                  <span className="mt-1 inline-flex rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                    {variantLabel}
+                                  </span>
+                                ) : null}
+                                <div className="mt-1 space-y-0.5">
+                                  {detailRows.map((row) => (
+                                    <p key={`${key}-${row.label}`} className="text-xs text-muted-foreground">
+                                      <span className="font-semibold">{row.label}:</span> {row.value}
+                                    </p>
+                                  ))}
+                                  {lineTotal > 0 ? (
+                                    <p className="text-xs font-semibold text-foreground">
+                                      {formatINR(lineTotal)}
+                                    </p>
+                                  ) : null}
+                                </div>
                               </div>
                               <div className="space-y-0.5 sm:pt-0.5">
                                 <Input
-                                  type="number"
-                                  min={0.01}
-                                  step="0.001"
+                                  type="text"
+                                  inputMode="decimal"
                                   placeholder={unit ? `₹/${unit}` : "Rate"}
                                   value={quoteLineRates[key] || ""}
                                   onChange={(e) =>
-                                    setQuoteLineRates((prev) => ({ ...prev, [key]: e.target.value }))
+                                    setQuoteLineRates((prev) => ({
+                                      ...prev,
+                                      [key]: sanitizeQuoteUnitPriceInput(e.target.value),
+                                    }))
                                   }
                                   disabled={!activeQuote.windowOpen}
-                                  aria-label={`Rate for ${line.title}${unit ? ` per ${unit}` : ""}`}
+                                  aria-label={`Rate for ${productName}${unit ? ` per ${unit}` : ""}`}
                                 />
                                 {unit ? (
                                   <p className="text-center text-[10px] font-medium text-muted-foreground">
