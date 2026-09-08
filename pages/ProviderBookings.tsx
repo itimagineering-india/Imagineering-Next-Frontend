@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+"use client";
+import { useState, useEffect, useMemo, type ReactElement } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -44,21 +46,35 @@ import {
   Loader2,
   Search,
   Filter,
+  Copy,
+  MessageCircle,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
-import api from "@/lib/api";
+import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
+import { providerCommissionBreakup, providerSettlement, quoteDeliveryForProvider } from "@/lib/providerSettlement";
 import {
   BookingFilters,
   BookingStatsCards,
   BookingTable,
 } from "@/components/bookings";
+import {
+  formatMachineRentalBookingQty,
+  getPriceTypeSuffix,
+  isMachineRentalBookingMeta,
+} from "@/lib/priceTypeDisplay";
+import { openLocationOnGoogleMaps } from "@/lib/geocodeAddress";
+
+export async function getServerSideProps() { return { props: {} }; }
 
 interface Booking {
   id: string;
+  bookingNumber?: string;
+  displayId?: string;
   jobTitle: string;
+  buyerId?: string;
   buyerName: string;
   buyerAvatar?: string;
   buyerEmail: string;
@@ -74,18 +90,44 @@ interface Booking {
   startDate?: string;
   endDate?: string;
   status: "new" | "ongoing" | "completed" | "cancelled" | "PENDING_PROVIDER" | "CONFIRMED" | "REJECTED_BY_PROVIDER" | "IN_PROGRESS" | "OUT_FOR_DELIVERY" | "DELIVERED" | "COMPLETED" | "CANCELLED_BY_USER" | "CANCELLED_BY_ADMIN" | "CANCELLED_BY_SYSTEM";
-  paymentStatus: "paid" | "pending" | "hold";
+  paymentStatus: "paid" | "pending" | "hold" | "refunded";
   amount: number;
   totalAmount: number;
+  amountPaid?: number;
   commission: number;
   commissionRate: number;
   netEarnings: number;
   basePriceWithGst: number;
   hasGST: boolean;
+  outstandingAmount?: number;
+  balanceCollectionMethod?: string;
+  requiresOfflinePaymentConfirmation?: boolean;
+  paymentMethod?: string;
+  quoteSource?: string;
+  deliveryCharge?: number;
+  quotedDeliveryCharge?: number;
+  deliveryOption?: string;
+  transport?: string;
+  metadata?: {
+    paymentMethod?: string;
+    formVariant?: string;
+    machineCount?: number;
+    duration?: number;
+    rentalPriceType?: string;
+    durationNote?: string;
+    rentalStartDate?: string;
+    rentalStartTime?: string;
+    [key: string]: unknown;
+  };
   location?: {
     address: string;
     city: string;
     state: string;
+    zipCode?: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
   };
   progress?: number;
   milestones?: Array<{
@@ -94,6 +136,7 @@ interface Booking {
     amount: number;
     status: "pending" | "completed";
   }>;
+  simplifiedBookingFlow?: boolean;
 }
 
 interface ProviderService {
@@ -105,6 +148,7 @@ interface ProviderService {
 
 export default function ProviderBookings() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,6 +169,7 @@ export default function ProviderBookings() {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [providerServices, setProviderServices] = useState<ProviderService[]>([]);
   const [modificationDialogOpen, setModificationDialogOpen] = useState(false);
+  const [mapOpening, setMapOpening] = useState(false);
   const [modificationItems, setModificationItems] = useState<
     Array<{ service: string; quantity: number; price: number; priceType?: string }>
   >([]);
@@ -157,7 +202,10 @@ export default function ProviderBookings() {
         const bookingsData = response.data as any;
         const formattedBookings = (bookingsData.bookings || []).map((booking: any) => ({
           id: booking.id || booking._id,
+          bookingNumber: booking.bookingNumber || undefined,
+          displayId: booking.displayId || booking.bookingNumber || undefined,
           jobTitle: booking.jobTitle,
+          buyerId: booking.buyerId || undefined,
           buyerName: booking.buyerName,
           buyerAvatar: booking.buyerAvatar,
           buyerEmail: booking.buyerEmail,
@@ -165,19 +213,37 @@ export default function ProviderBookings() {
           serviceName: booking.serviceName,
           services: booking.services || [],
           bookingDate: booking.bookingDate ? new Date(booking.bookingDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          startDate: booking.startDate ? new Date(booking.startDate).toISOString().split('T')[0] : undefined,
-          endDate: booking.endDate ? new Date(booking.endDate).toISOString().split('T')[0] : undefined,
+          startDate: booking.startDate
+            ? new Date(booking.startDate).toISOString()
+            : booking.metadata?.rentalStartDate
+              ? String(booking.metadata.rentalStartDate)
+              : undefined,
+          endDate: booking.endDate ? new Date(booking.endDate).toISOString() : undefined,
           status: booking.status,
           paymentStatus: booking.paymentStatus,
           amount: booking.amount ?? booking.totalAmount ?? 0,
           totalAmount: booking.totalAmount || 0,
+          amountPaid: Number(booking.amountPaid || 0),
           commission: booking.commission || 0,
           commissionRate: booking.commissionRate ?? 0.9,
           netEarnings: booking.netEarnings || 0,
           basePriceWithGst: booking.basePriceWithGst || booking.amount || 0,
           hasGST: booking.hasGST || false,
+          outstandingAmount: Number(booking.outstandingAmount || 0),
+          balanceCollectionMethod: booking.balanceCollectionMethod || booking.metadata?.remainingPaymentMethod,
+          requiresOfflinePaymentConfirmation: !!booking.requiresOfflinePaymentConfirmation,
+          paymentMethod: booking.metadata?.paymentMethod || booking.metadata?.paymentOption,
+          quoteSource: booking.metadata?.source,
+          deliveryCharge: Number(booking.metadata?.quoteDeliveryCharge || 0),
+          quotedDeliveryCharge: Number(
+            booking.metadata?.quoteQuotedDeliveryCharge ?? booking.metadata?.quoteDeliveryCharge ?? 0
+          ),
+          deliveryOption: booking.metadata?.quoteDeliveryOption,
+          transport: booking.metadata?.transport,
+          metadata: booking.metadata || undefined,
           location: booking.location,
           progress: booking.progress,
+          simplifiedBookingFlow: !!booking.simplifiedBookingFlow,
         }));
         setBookings(formattedBookings);
       } else {
@@ -280,6 +346,7 @@ export default function ProviderBookings() {
       // Filter by status if statusFilter is set
       const matchesStatus = statusFilter === "all" || booking.status === statusFilter;
       
+      // Show all payment types: paid, hold (partial), and pending (pay on delivery)
       return matchesSearch && matchesStatus;
     });
   }, [bookings, searchQuery, statusFilter]);
@@ -303,14 +370,18 @@ export default function ProviderBookings() {
       maximumFractionDigits: 2,
     })}`;
 
-  const getPlatformFeeBreakup = (commission: number) => {
-    const taxable = Number(commission || 0);
-    const gst = Math.round(taxable * 0.18 * 100) / 100;
-    return {
-      taxable,
-      gst,
-      total: Math.round((taxable + gst) * 100) / 100,
-    };
+  const bookingDisplayId = (booking: Booking) =>
+    String(booking.displayId || booking.bookingNumber || '').trim() ||
+    (booking.id ? `#${String(booking.id).slice(-8).toUpperCase()}` : '—');
+
+  const copyId = async (label: string, value: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({ title: `${label} copied` });
+    } catch {
+      toast({ title: `Could not copy ${label}`, variant: 'destructive' });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -348,7 +419,12 @@ export default function ProviderBookings() {
       case "pending":
         return <Badge className="bg-yellow-500 text-white">Pending</Badge>;
       case "hold":
+        // Legacy API alias for booking paymentStatus `partial`
         return <Badge className="bg-orange-500 text-white">Partial</Badge>;
+      case "partial":
+        return <Badge className="bg-orange-500 text-white">Partial</Badge>;
+      case "refunded":
+        return <Badge className="bg-gray-500 text-white">Refunded</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -651,26 +727,27 @@ export default function ProviderBookings() {
     }
   };
 
-  const getNextStatuses = (currentStatus: string): string[] => {
+  const getNextStatuses = (currentStatus: string, simplified?: boolean): string[] => {
     switch (currentStatus) {
       case "CONFIRMED":
         return ["IN_PROGRESS"];
       case "IN_PROGRESS":
-        return ["OUT_FOR_DELIVERY"];
+        return simplified ? ["DELIVERED"] : ["OUT_FOR_DELIVERY"];
       case "OUT_FOR_DELIVERY":
         return ["DELIVERED"];
       case "DELIVERED":
         return [];
       case "COMPLETED":
-        return []; // No further status updates
+        return [];
       default:
-        // For any other status, allow common transitions
         if (currentStatus !== "COMPLETED" && 
             currentStatus !== "CANCELLED_BY_USER" && 
             currentStatus !== "CANCELLED_BY_ADMIN" && 
             currentStatus !== "CANCELLED_BY_SYSTEM" &&
             currentStatus !== "REJECTED_BY_PROVIDER") {
-          return ["IN_PROGRESS", "OUT_FOR_DELIVERY", "DELIVERED"];
+          return simplified
+            ? ["IN_PROGRESS", "DELIVERED"]
+            : ["IN_PROGRESS", "OUT_FOR_DELIVERY", "DELIVERED"];
         }
         return [];
     }
@@ -682,21 +759,39 @@ export default function ProviderBookings() {
     fetchBookingInvoices(booking.id);
   };
 
+  const openChatWithBuyer = (booking: Booking) => {
+    if (!booking.buyerId) {
+      toast({
+        title: "Chat unavailable",
+        description: "Buyer details are missing for this booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const params = new URLSearchParams({
+      providerId: String(booking.buyerId),
+      name: String(booking.buyerName || "Buyer"),
+      ...(booking.serviceId ? { serviceId: String(booking.serviceId) } : {}),
+      message: `Hi, regarding your booking ${booking.displayId || booking.bookingNumber || booking.id}.`,
+    });
+    router.push(`/chat?${params.toString()}`);
+  };
+
   return (
-    <div className="layout-shell w-full min-w-0 max-w-full overflow-x-hidden py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6">
+    <div className="layout-shell py-4 mobile:py-5 smallTablet:py-6 tablet:py-8 space-y-4 tablet:space-y-6 min-w-0 overflow-x-hidden">
         {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground leading-tight">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4">
+          <div>
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground leading-tight">
               Bookings & Jobs
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm md:text-base text-muted-foreground mt-1">
               Track and manage all your assigned jobs
             </p>
           </div>
-          <Button variant="outline" size="sm" className="shrink-0 w-full sm:w-auto h-10 sm:h-9 text-sm">
-            <Download className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Export report</span>
+          <Button variant="outline" size="sm" className="text-xs md:text-sm self-start sm:self-auto">
+            <Download className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-2" />
+            <span className="hidden sm:inline">Export Report</span>
             <span className="sm:hidden">Export</span>
           </Button>
         </div>
@@ -705,40 +800,38 @@ export default function ProviderBookings() {
         <BookingStatsCards stats={stats} isLoading={isLoading} />
 
         {/* Search and Filters - Only showing paid bookings */}
-        <Card className="border-border/80 shadow-sm">
-          <CardContent className="pt-4 sm:pt-6 space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1 w-full min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col tablet:flex-row gap-4 tablet:items-center">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by job, buyer, or service..."
+                  placeholder="Search paid bookings..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-10"
+                  className="pl-12"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[200px] h-10 shrink-0">
-                  <Filter className="h-4 w-4 mr-2 shrink-0" />
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="PENDING_PROVIDER">Pending approval</SelectItem>
-                  <SelectItem value="CONFIRMED">Confirmed</SelectItem>
-                  <SelectItem value="IN_PROGRESS">In progress</SelectItem>
-                  <SelectItem value="OUT_FOR_DELIVERY">Out for delivery</SelectItem>
-                  <SelectItem value="DELIVERED">Delivered</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                </SelectContent>
-              </Select>
+              {statusFilter !== "all" && (
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full tablet:w-48">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="CONFIRMED">Confirmed</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Includes{" "}
-              <span className="font-medium text-green-600 dark:text-green-500">paid</span>,{" "}
-              <span className="font-medium text-orange-600 dark:text-orange-400">partial</span>, and{" "}
-              <span className="font-medium text-amber-600 dark:text-amber-400">pay on delivery</span>{" "}
-              bookings.
+            <p className="text-xs text-muted-foreground mt-2">
+              Showing all bookings:{" "}
+              <span className="font-semibold text-green-600">Paid</span>,{" "}
+              <span className="font-semibold text-orange-500">Partial</span>,{" "}
+              <span className="font-semibold text-amber-600">Pending (Pay on delivery)</span>
             </p>
           </CardContent>
         </Card>
@@ -763,9 +856,27 @@ export default function ProviderBookings() {
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
             <DialogHeader>
               <DialogTitle className="text-base md:text-lg">Booking Details</DialogTitle>
-              <DialogDescription className="text-xs md:text-sm">
-                Complete information about this booking
-              </DialogDescription>
+              {selectedBooking ? (
+                <DialogDescription className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                  <span className="font-mono font-semibold text-foreground">
+                    Booking ID {bookingDisplayId(selectedBooking)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => void copyId('Booking ID', bookingDisplayId(selectedBooking))}
+                    title="Copy booking ID"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </DialogDescription>
+              ) : (
+                <DialogDescription className="text-xs md:text-sm">
+                  Complete information about this booking
+                </DialogDescription>
+              )}
             </DialogHeader>
             {selectedBooking && (
               <div className="space-y-4 md:space-y-6">
@@ -839,24 +950,75 @@ export default function ProviderBookings() {
                   )}
                 </div>
 
-                {/* Job Info */}
+                {/* Schedule / status */}
                 <div>
-                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Job Information</h3>
+                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Schedule</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                     <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Job Title</p>
-                      <p className="font-medium text-sm md:text-base">{selectedBooking.jobTitle}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Service</p>
-                      <p className="font-medium text-sm md:text-base">{selectedBooking.serviceName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs md:text-sm text-muted-foreground">Booking Date</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">Placed on</p>
                       <p className="font-medium text-sm md:text-base">
-                        {new Date(selectedBooking.bookingDate).toLocaleDateString()}
+                        {new Date(selectedBooking.bookingDate).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
                       </p>
                     </div>
+                    {(() => {
+                      const meta = selectedBooking.metadata || {};
+                      const startRaw =
+                        selectedBooking.startDate ||
+                        (typeof meta.rentalStartDate === "string" ? meta.rentalStartDate : "");
+                      if (!startRaw) return null;
+                      const start = new Date(startRaw);
+                      if (Number.isNaN(start.getTime())) return null;
+                      const timeFromMeta =
+                        typeof meta.rentalStartTime === "string" &&
+                        /^\d{1,2}:\d{2}/.test(meta.rentalStartTime)
+                          ? meta.rentalStartTime.slice(0, 5)
+                          : "";
+                      const timeLabel =
+                        timeFromMeta ||
+                        start.toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        });
+                      const hasMeaningfulTime =
+                        Boolean(timeFromMeta) ||
+                        start.getUTCHours() !== 0 ||
+                        start.getUTCMinutes() !== 0 ||
+                        start.getHours() !== 0 ||
+                        start.getMinutes() !== 0;
+                      return (
+                        <>
+                          <div>
+                            <p className="text-xs md:text-sm text-muted-foreground">
+                              {isMachineRentalBookingMeta(selectedBooking.metadata)
+                                ? "Preferred start date"
+                                : "Scheduled date"}
+                            </p>
+                            <p className="font-medium text-sm md:text-base">
+                              {start.toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                          {hasMeaningfulTime ? (
+                            <div>
+                              <p className="text-xs md:text-sm text-muted-foreground">
+                                {isMachineRentalBookingMeta(selectedBooking.metadata)
+                                  ? "Preferred start time"
+                                  : "Scheduled time"}
+                              </p>
+                              <p className="font-medium text-sm md:text-base">{timeLabel}</p>
+                            </div>
+                          ) : null}
+                        </>
+                      );
+                    })()}
                     <div>
                       <p className="text-xs md:text-sm text-muted-foreground">Status</p>
                       {getStatusBadge(selectedBooking.status)}
@@ -871,20 +1033,41 @@ export default function ProviderBookings() {
                     <div className="border rounded-lg overflow-hidden">
                       <div className="grid grid-cols-3 gap-2 bg-muted px-3 py-2 text-xs font-medium">
                         <span>Service</span>
-                        <span className="text-right">Qty</span>
+                        <span className="text-right">
+                          {isMachineRentalBookingMeta(selectedBooking.metadata)
+                            ? "Machines × duration"
+                            : "Qty"}
+                        </span>
                         <span className="text-right">Price</span>
                       </div>
                       <div className="divide-y">
-                        {selectedBooking.services.map((item, idx) => (
-                          <div key={`${item.service?._id || idx}`} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
-                            <span className="truncate">{item.service?.title || "Service"}</span>
-                            <span className="text-right">{item.quantity || 1}</span>
+                        {selectedBooking.services.map((item, idx) => {
+                          const serviceId = item.service?._id || (idx === 0 ? selectedBooking.serviceId : '');
+                          const qtyLabel = formatMachineRentalBookingQty(
+                            selectedBooking.metadata,
+                            item.quantity || 1
+                          );
+                          const priceSuffix =
+                            getPriceTypeSuffix(item.priceType) ||
+                            (item.priceType ? `/${item.priceType}` : "");
+                          return (
+                          <div key={`${serviceId || idx}`} className="grid grid-cols-3 gap-2 px-3 py-2 text-sm">
+                            <div className="min-w-0">
+                              <span className="block truncate">{item.service?.title || "Service"}</span>
+                              {serviceId ? (
+                                <span className="block text-[11px] text-muted-foreground font-mono break-all">
+                                  ID {serviceId}
+                                </span>
+                              ) : null}
+                            </div>
+                            <span className="text-right leading-snug">{qtyLabel}</span>
                             <span className="text-right">
                               ₹{(item.price || 0).toLocaleString()}
-                              {item.priceType ? `/${item.priceType}` : ""}
+                              {priceSuffix}
                             </span>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -901,52 +1084,184 @@ export default function ProviderBookings() {
                     <div>
                       <p className="font-medium text-sm md:text-base">{selectedBooking.buyerName}</p>
                       <p className="text-xs md:text-sm text-muted-foreground break-all">{selectedBooking.buyerEmail}</p>
+                      {selectedBooking.buyerId ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => openChatWithBuyer(selectedBooking)}
+                        >
+                          <MessageCircle className="mr-1.5 h-4 w-4" />
+                          Chat with buyer
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
 
-                {/* Payment & Commission */}
+                {/* Settlement — same 3 lines as Imagi Mitra */}
                 <div>
-                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Payment & Commission Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                    <Card>
-                      <CardContent className="pt-4 md:pt-6">
-                        <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                          Base Price
-                        </p>
-                        <p className="text-xl md:text-2xl font-bold">
-                          ₹{(selectedBooking.amount || selectedBooking.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4 md:pt-6">
-                        {(() => {
-                          const platformFee = getPlatformFeeBreakup(selectedBooking.commission);
-                          return (
-                            <>
-                              <p className="text-xs md:text-sm text-muted-foreground mb-1">
-                                Platform Fee
+                  <h3 className="font-semibold text-sm md:text-base mb-2 md:mb-3">Amounts</h3>
+                  {(() => {
+                    const settlement = providerSettlement(selectedBooking);
+                    const commissionBreakup = providerCommissionBreakup(
+                      selectedBooking.commission,
+                      selectedBooking.amount
+                    );
+                    const delivery = quoteDeliveryForProvider({
+                      source: selectedBooking.quoteSource,
+                      deliveryCharge: selectedBooking.deliveryCharge,
+                      quotedDeliveryCharge: selectedBooking.quotedDeliveryCharge,
+                      deliveryOption: selectedBooking.deliveryOption,
+                      transport: selectedBooking.transport,
+                    });
+                    return (
+                      <div className="rounded-xl border overflow-hidden">
+                        <div className="px-4 py-3 space-y-2 border-b bg-slate-50/80">
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Total</span>
+                            <span className="font-semibold tabular-nums">
+                              {formatInr(selectedBooking.totalAmount || 0)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Paid</span>
+                            <span className="font-semibold tabular-nums text-emerald-700">
+                              {formatInr(Number(selectedBooking.amountPaid || 0))}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">Remaining</span>
+                            <span className="font-semibold tabular-nums text-orange-700">
+                              {formatInr(
+                                Number(
+                                  selectedBooking.outstandingAmount ??
+                                    Math.max(
+                                      0,
+                                      (selectedBooking.totalAmount || 0) -
+                                        (selectedBooking.amountPaid || 0)
+                                    )
+                                )
+                              )}
+                            </span>
+                          </div>
+                          {selectedBooking.balanceCollectionMethod === "COD" ||
+                          String(selectedBooking.balanceCollectionMethod || "").toUpperCase() ===
+                            "COD" ? (
+                            <p className="text-xs text-muted-foreground pt-1">
+                              Remaining balance to be collected at delivery (COD)
+                            </p>
+                          ) : null}
+                        </div>
+                        {settlement.needsCollect ? (
+                          <div className="px-4 py-2 bg-amber-50 border-b">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                              Collect at delivery
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50/60">
+                          <div>
+                            <p className="text-sm font-semibold">
+                              {settlement.needsCollect ? 'Collect from customer' : 'Customer paid'}
+                            </p>
+                            {settlement.needsCollect ? (
+                              <p className="text-xs text-muted-foreground">Cash to take from the buyer</p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">Already paid to Imagineering India</p>
+                            )}
+                          </div>
+                          <p className="text-lg md:text-xl font-bold text-amber-800 tabular-nums">
+                            {formatInr(settlement.collectFromCustomer)}
+                          </p>
+                        </div>
+                        {delivery ? (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                            <div>
+                              <p className="text-sm font-semibold">Delivery</p>
+                              <p className="text-xs text-muted-foreground">
+                                {delivery.status === 'included'
+                                  ? 'Included in your keep — you get this amount'
+                                  : delivery.status === 'pickup'
+                                    ? delivery.quoted > 0
+                                      ? `Customer chose pickup — your quoted ${formatInr(delivery.quoted)} was not charged`
+                                      : 'Customer chose pickup — no delivery amount'
+                                    : 'Free delivery — no extra amount'}
                               </p>
-                              <p className="text-xl md:text-2xl font-bold text-warning">
-                                {formatInr(platformFee.total)}
+                            </div>
+                            <p
+                              className={`text-lg md:text-xl font-bold tabular-nums ${
+                                delivery.status === 'included' ? 'text-emerald-700' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {delivery.status === 'included' ? formatInr(delivery.charged) : '₹0.00'}
+                            </p>
+                          </div>
+                        ) : null}
+                        {commissionBreakup.total > 0 ? (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-slate-50/80">
+                            <div>
+                              <p className="text-sm font-semibold">Provider commission</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatInr(commissionBreakup.taxable)}
+                                {commissionBreakup.ratePercent > 0
+                                  ? ` (${commissionBreakup.ratePercent}%)`
+                                  : ""}
+                                {" + 18% GST "}
+                                {formatInr(commissionBreakup.gst)}
                               </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Taxable: {formatInr(platformFee.taxable)} + GST 18%: {formatInr(platformFee.gst)}
+                            </div>
+                            <p className="text-lg md:text-xl font-bold tabular-nums text-slate-800">
+                              {formatInr(commissionBreakup.total)}
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                          <div>
+                            <p className="text-sm font-semibold">You keep</p>
+                            <p className="text-xs text-muted-foreground">
+                              {settlement.companyPaysYou > 0
+                                ? 'Your net for this order'
+                                : settlement.needsCollect
+                                  ? 'Keep this from the cash'
+                                  : 'Your net for this order'}
+                              {delivery?.status === 'included' ? ' (includes delivery)' : ''}
+                            </p>
+                          </div>
+                          <p className="text-lg md:text-xl font-bold text-emerald-700 tabular-nums">
+                            {formatInr(settlement.youKeep)}
+                          </p>
+                        </div>
+                        {settlement.companyPaysYou > 0 ? (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t bg-emerald-50/70">
+                            <div>
+                              <p className="text-sm font-semibold">Imagineering India pays you</p>
+                              <p className="text-xs text-muted-foreground">
+                                Buyer used an offer/wallet. Keep all collected cash; we add the rest to your payout.
                               </p>
-                            </>
-                          );
-                        })()}
-                      </CardContent>
-                    </Card>
-                    <Card className="col-span-1 sm:col-span-2">
-                      <CardContent className="pt-4 md:pt-6">
-                        <p className="text-xs md:text-sm text-muted-foreground mb-1">Net Earnings</p>
-                        <p className="text-xl md:text-2xl font-bold text-success">₹{selectedBooking.netEarnings.toLocaleString()}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
+                            </div>
+                            <p className="text-lg md:text-xl font-bold text-emerald-800 tabular-nums">
+                              {formatInr(settlement.companyPaysYou)}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
+                            <div>
+                              <p className="text-sm font-semibold">Pay to Imagineering India</p>
+                              <p className="text-xs text-muted-foreground">
+                                {settlement.needsCollect
+                                  ? 'Give this remaining cash to the company'
+                                  : 'Company share on this order'}
+                              </p>
+                            </div>
+                            <p className="text-lg md:text-xl font-bold tabular-nums">
+                              {formatInr(settlement.payToCompany)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="mt-3 md:mt-4">
                     <p className="text-xs md:text-sm text-muted-foreground mb-2">Payment Status</p>
                     {getPaymentBadge(selectedBooking.paymentStatus)}
@@ -990,19 +1305,106 @@ export default function ProviderBookings() {
                   </div>
                 )}
 
-                {/* Location */}
-                {selectedBooking.location && (
+                {/* Addresses — shipping + billing when available */}
+                {(selectedBooking.location ||
+                  selectedBooking.metadata?.shippingAddress ||
+                  selectedBooking.metadata?.billingAddress) && (
                   <div>
-                    <h3 className="font-semibold mb-3">Location</h3>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{selectedBooking.location.address}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedBooking.location.city}, {selectedBooking.location.state}
-                        </p>
-                      </div>
-                    </div>
+                    <h3 className="font-semibold mb-3">Addresses</h3>
+                    {(() => {
+                      const meta = selectedBooking.metadata || {};
+                      const formatAddr = (raw: unknown) => {
+                        if (!raw || typeof raw !== "object") return "";
+                        const a = raw as Record<string, unknown>;
+                        return [a.address, a.city, a.state, a.zipCode]
+                          .map((p) => String(p || "").trim())
+                          .filter(Boolean)
+                          .join(", ");
+                      };
+                      const shipping =
+                        formatAddr(meta.shippingAddress) ||
+                        [
+                          selectedBooking.location?.address,
+                          selectedBooking.location?.city,
+                          selectedBooking.location?.state,
+                          selectedBooking.location?.zipCode,
+                        ]
+                          .filter(Boolean)
+                          .join(", ");
+                      const billing = formatAddr(meta.billingAddress);
+                      const sameAsShipping =
+                        meta.billingSameAsShipping === true ||
+                        (meta.billingSameAsShipping !== false && !billing);
+                      return (
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Shipping / delivery
+                              </p>
+                              <p className="font-medium">{shipping || "—"}</p>
+                              {selectedBooking.location?.city || selectedBooking.location?.state ? (
+                                <p className="text-sm text-muted-foreground">
+                                  {[selectedBooking.location?.city, selectedBooking.location?.state]
+                                    .filter(Boolean)
+                                    .join(", ")}
+                                </p>
+                              ) : null}
+                              {selectedBooking.location ? (
+                                <button
+                                  type="button"
+                                  disabled={mapOpening}
+                                  className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline disabled:opacity-60"
+                                  onClick={() => {
+                                    void (async () => {
+                                      setMapOpening(true);
+                                      try {
+                                        const ok = await openLocationOnGoogleMaps(
+                                          selectedBooking.location!
+                                        );
+                                        if (!ok) {
+                                          toast({
+                                            title: "Location unavailable",
+                                            description: "Could not open this address on the map.",
+                                            variant: "destructive",
+                                          });
+                                        }
+                                      } finally {
+                                        setMapOpening(false);
+                                      }
+                                    })();
+                                  }}
+                                >
+                                  {mapOpening ? (
+                                    <>
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      Opening map…
+                                    </>
+                                  ) : (
+                                    <>
+                                      View on map
+                                      <ExternalLink className="h-3.5 w-3.5" />
+                                    </>
+                                  )}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Billing
+                              </p>
+                              <p className="font-medium">
+                                {sameAsShipping ? "Same as shipping address" : billing || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -1102,7 +1504,10 @@ export default function ProviderBookings() {
                       <SelectValue placeholder="Select new status" />
                     </SelectTrigger>
                     <SelectContent>
-                      {getNextStatuses(selectedBooking.status).map((status) => (
+                      {getNextStatuses(
+                        selectedBooking.status,
+                        selectedBooking.simplifiedBookingFlow,
+                      ).map((status) => (
                         <SelectItem key={status} value={status}>
                           {status === "IN_PROGRESS" && "In Progress"}
                           {status === "OUT_FOR_DELIVERY" && "Out for Delivery"}
@@ -1117,7 +1522,7 @@ export default function ProviderBookings() {
                   <div className="space-y-3">
                     <div>
                       <label className="text-sm font-medium mb-2 block">
-                        Service Invoice File (Optional)
+                        Service invoice / bill (optional)
                       </label>
                       <input
                         type="file"
@@ -1129,7 +1534,8 @@ export default function ProviderBookings() {
                         className="w-full text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-2 file:text-xs file:font-medium hover:file:bg-muted"
                       />
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Optional. Max size 10MB. Allowed formats: PDF, JPG, PNG, WebP.
+                        Optional. Upload a bill if you have one — you can continue without it.
+                        Max 10MB. PDF, JPG, PNG, or WebP.
                       </p>
                     </div>
                   </div>
@@ -1238,7 +1644,7 @@ export default function ProviderBookings() {
 
         {/* Modification Request Dialog */}
         <Dialog open={modificationDialogOpen} onOpenChange={setModificationDialogOpen}>
-          <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Request Booking Modification</DialogTitle>
               <DialogDescription>
@@ -1247,11 +1653,8 @@ export default function ProviderBookings() {
             </DialogHeader>
             <div className="space-y-4">
               {modificationItems.map((item, index) => (
-                <div
-                  key={`${item.service}-${index}`}
-                  className="flex flex-col gap-3 rounded-lg border border-border/80 p-3 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-end sm:border-0 sm:p-0"
-                >
-                  <div className="sm:col-span-6 space-y-1.5">
+                <div key={`${item.service}-${index}`} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-6">
                     <label className="text-xs font-medium text-muted-foreground">Service</label>
                     <Select
                       value={item.service}
@@ -1264,7 +1667,7 @@ export default function ProviderBookings() {
                         });
                       }}
                     >
-                      <SelectTrigger className="h-10 w-full">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select service" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1276,48 +1679,43 @@ export default function ProviderBookings() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:col-span-5 sm:grid-cols-5 sm:items-end">
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Qty</label>
-                      <Input
-                        type="number"
-                        min={0.01}
-                        step="0.01"
-                        value={item.quantity}
-                        className="h-10"
-                        onChange={(e) =>
-                          handleUpdateModificationItem(index, {
-                            quantity: Math.max(0.01, Number(e.target.value || 0.01)),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Price</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={item.price}
-                        className="h-10"
-                        onChange={(e) =>
-                          handleUpdateModificationItem(index, {
-                            price: Math.max(0, Number(e.target.value || 0)),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex sm:col-span-1 justify-end sm:justify-center sm:pb-0.5">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 shrink-0"
-                        onClick={() => handleRemoveModificationItem(index)}
-                        title="Remove item"
-                        aria-label="Remove item"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Qty</label>
+                    <Input
+                      type="number"
+                      min={0.01}
+                      step="0.01"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        handleUpdateModificationItem(index, {
+                          quantity: Math.max(0.01, Number(e.target.value || 0.01)),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <label className="text-xs font-medium text-muted-foreground">Price</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={item.price}
+                      onChange={(e) =>
+                        handleUpdateModificationItem(index, {
+                          price: Math.max(0, Number(e.target.value || 0)),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveModificationItem(index)}
+                      title="Remove item"
+                      aria-label="Remove item"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -1379,142 +1777,8 @@ interface BookingsTableProps {
   onUpdateStatus?: (booking: Booking) => void;
   onRequestModification?: (booking: Booking) => void;
   actionLoading?: string | null;
-  getStatusBadge: (status: string) => JSX.Element;
-  getPaymentBadge: (status: string) => JSX.Element;
-}
-
-function BookingActionButtons({
-  booking,
-  actionLoading,
-  onAccept,
-  onReject,
-  onUpdateStatus,
-  onRequestModification,
-  onViewDetails,
-  variant,
-}: {
-  booking: Booking;
-  actionLoading?: string | null;
-  onAccept?: (id: string) => void;
-  onReject?: (b: Booking) => void;
-  onUpdateStatus?: (b: Booking) => void;
-  onRequestModification?: (b: Booking) => void;
-  onViewDetails: (b: Booking) => void;
-  variant: "table" | "card";
-}) {
-  const isCard = variant === "card";
-  const btnBase = isCard
-    ? "h-10 min-h-[44px] gap-2 px-3 text-xs font-medium"
-    : "h-8 gap-2";
-  const iconOnly = !isCard;
-
-  return (
-    <div
-      className={
-        isCard
-          ? "flex flex-wrap gap-2 pt-1"
-          : "flex items-center gap-2 flex-wrap"
-      }
-    >
-      {(booking.status === "PENDING_PROVIDER" || booking.status === "new") && onAccept && onReject ? (
-        <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onAccept(booking.id)}
-            disabled={actionLoading === booking.id}
-            className={`${btnBase} text-green-600 border-green-200 hover:text-green-700 hover:bg-green-50 dark:border-green-900 dark:hover:bg-green-950/40`}
-            title="Accept booking"
-          >
-            {actionLoading === booking.id ? (
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-            ) : (
-              <Check className="h-4 w-4 shrink-0" />
-            )}
-            {!iconOnly && <span>Accept</span>}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onReject(booking)}
-            disabled={actionLoading === booking.id}
-            className={`${btnBase} text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40`}
-            title="Reject booking"
-          >
-            {actionLoading === booking.id ? (
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-            ) : (
-              <X className="h-4 w-4 shrink-0" />
-            )}
-            {!iconOnly && <span>Reject</span>}
-          </Button>
-        </>
-      ) : null}
-      {onUpdateStatus &&
-        (booking.paymentStatus === "paid" ||
-          booking.paymentStatus === "hold" ||
-          booking.paymentStatus === "pending") &&
-        booking.status !== "COMPLETED" &&
-        booking.status !== "DELIVERED" &&
-        booking.status !== "CANCELLED_BY_USER" &&
-        booking.status !== "CANCELLED_BY_ADMIN" &&
-        booking.status !== "CANCELLED_BY_SYSTEM" &&
-        booking.status !== "REJECTED_BY_PROVIDER" &&
-        booking.status !== "cancelled" &&
-        booking.status !== "completed" && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onUpdateStatus(booking)}
-            disabled={actionLoading === booking.id}
-            className={`${btnBase} text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-950/40`}
-            title="Update status"
-          >
-            {actionLoading === booking.id ? (
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-            ) : (
-              <Clock className="h-4 w-4 shrink-0" />
-            )}
-            {!iconOnly && <span className="max-w-[7rem] truncate sm:max-w-none">Update</span>}
-            {iconOnly && <span className="hidden sm:inline text-xs">Update</span>}
-          </Button>
-        )}
-      {onRequestModification &&
-        booking.status !== "OUT_FOR_DELIVERY" &&
-        booking.status !== "COMPLETED" &&
-        booking.status !== "DELIVERED" &&
-        booking.status !== "CANCELLED_BY_USER" &&
-        booking.status !== "CANCELLED_BY_ADMIN" &&
-        booking.status !== "CANCELLED_BY_SYSTEM" &&
-        booking.status !== "REJECTED_BY_PROVIDER" &&
-        booking.status !== "cancelled" &&
-        booking.status !== "completed" && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onRequestModification(booking)}
-            disabled={actionLoading === booking.id}
-            className={`${btnBase} text-purple-600 border-purple-200 hover:text-purple-700 hover:bg-purple-50 dark:border-purple-900 dark:hover:bg-purple-950/40`}
-            title="Request modification"
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            {!iconOnly && <span>Modify</span>}
-            {iconOnly && <span className="hidden sm:inline text-xs">Modify</span>}
-          </Button>
-        )}
-      <Button
-        variant={isCard ? "secondary" : "ghost"}
-        size="sm"
-        onClick={() => onViewDetails(booking)}
-        className={isCard ? `${btnBase} flex-1 min-w-[120px]` : "h-8 w-8 shrink-0"}
-        title="View details"
-        aria-label="View booking details"
-      >
-        <Eye className="h-4 w-4 shrink-0" />
-        {!iconOnly && <span className="ml-1">Details</span>}
-      </Button>
-    </div>
-  );
+  getStatusBadge: (status: string) => ReactElement;
+  getPaymentBadge: (status: string) => ReactElement;
 }
 
 function BookingsTable({
@@ -1531,10 +1795,9 @@ function BookingsTable({
 }: BookingsTableProps) {
   if (isLoading) {
     return (
-      <Card className="border-border/80 shadow-sm">
+      <Card>
         <CardContent className="py-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground mb-2" />
-          <p className="text-sm text-muted-foreground">Loading bookings…</p>
+          <p className="text-muted-foreground">Loading bookings...</p>
         </CardContent>
       </Card>
     );
@@ -1542,174 +1805,202 @@ function BookingsTable({
 
   if (bookings.length === 0) {
     return (
-      <Card className="border-border/80 border-dashed shadow-sm">
-        <CardContent className="py-12 text-center px-4">
-          <p className="text-sm font-medium text-foreground">No bookings match</p>
-          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-            Try clearing the search or choosing &quot;All statuses&quot; in the filter.
-          </p>
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-muted-foreground">No bookings found</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="border-border/80 shadow-sm overflow-hidden">
-      <CardHeader className="space-y-1 pb-3 sm:pb-4">
-        <CardTitle className="text-lg sm:text-xl">Your bookings</CardTitle>
-        <CardDescription className="text-xs sm:text-sm">
-          {bookings.length} booking{bookings.length !== 1 ? "s" : ""} — use cards on mobile, table on larger screens
-        </CardDescription>
+    <Card>
+      <CardHeader>
+        <CardTitle>Bookings ({bookings.length})</CardTitle>
+        <CardDescription>Manage and track your jobs</CardDescription>
       </CardHeader>
-      <CardContent className="px-0 sm:px-6 pb-4 sm:pb-6 pt-0">
-        {/* Mobile: stacked cards */}
-        <div className="md:hidden space-y-3 px-3 sm:px-0">
-          {bookings.map((booking) => (
-            <Card
-              key={booking.id}
-              className="border-border/90 shadow-sm overflow-hidden bg-card/50"
-            >
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2 min-w-0">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-mono text-muted-foreground">
-                      #{booking.id.slice(-8).toUpperCase()}
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Booking ID</TableHead>
+              <TableHead>Amounts</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {bookings.map((booking) => (
+              <TableRow key={booking.id}>
+                <TableCell>
+                  <div>
+                    <p className="text-xs font-mono font-semibold">
+                      {booking.displayId || booking.bookingNumber || `#${booking.id.slice(-8).toUpperCase()}`}
                     </p>
-                    <p className="font-semibold text-sm leading-snug line-clamp-2 mt-0.5">
-                      {booking.jobTitle || booking.serviceName || "Booking"}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {booking.buyerName} · {booking.serviceName}
-                    </p>
+                    {booking.id ? (
+                      <p className="text-[10px] font-mono text-muted-foreground break-all">
+                        {booking.id}
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    {getStatusBadge(booking.status)}
-                    {getPaymentBadge(booking.paymentStatus)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5 shrink-0" />
-                  {new Date(booking.bookingDate).toLocaleDateString(undefined, {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </div>
-                <div className="rounded-lg bg-muted/50 border border-border/60 p-3 space-y-1">
-                  <p className="text-base font-bold tabular-nums">
-                    ₹
-                    {booking.basePriceWithGst.toLocaleString("en-IN", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Base price · Net ₹
-                    {booking.netEarnings.toLocaleString("en-IN", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-                {booking.progress !== undefined && (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{booking.progress}%</span>
-                    </div>
-                    <Progress value={booking.progress} className="h-1.5" />
-                  </div>
-                )}
-                <BookingActionButtons
-                  booking={booking}
-                  actionLoading={actionLoading}
-                  onAccept={onAccept}
-                  onReject={onReject}
-                  onUpdateStatus={onUpdateStatus}
-                  onRequestModification={onRequestModification}
-                  onViewDetails={onViewDetails}
-                  variant="card"
-                />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Desktop: table */}
-        <div className="hidden md:block w-full overflow-x-auto rounded-md border border-border/80">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="whitespace-nowrap">ID</TableHead>
-                <TableHead>Job / service</TableHead>
-                <TableHead className="whitespace-nowrap">Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
-                <TableHead className="whitespace-nowrap">Date</TableHead>
-                <TableHead className="text-right min-w-[200px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {bookings.map((booking) => (
-                <TableRow key={booking.id}>
-                  <TableCell className="align-top">
-                    <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
-                      #{booking.id.slice(-8).toUpperCase()}
-                    </span>
-                  </TableCell>
-                  <TableCell className="align-top max-w-[220px]">
-                    <p className="font-medium text-sm line-clamp-2">{booking.jobTitle || "—"}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                      {booking.serviceName}
-                    </p>
-                  </TableCell>
-                  <TableCell className="align-top whitespace-nowrap">
-                    <p className="font-semibold text-sm">
-                      ₹
-                      {booking.basePriceWithGst.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Net ₹
-                      {booking.netEarnings.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </TableCell>
-                  <TableCell className="align-top">{getStatusBadge(booking.status)}</TableCell>
-                  <TableCell className="align-top">{getPaymentBadge(booking.paymentStatus)}</TableCell>
-                  <TableCell className="align-top">
-                    <div className="flex items-center gap-1 text-sm whitespace-nowrap">
-                      <Calendar className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span>{new Date(booking.bookingDate).toLocaleDateString()}</span>
-                    </div>
-                    {booking.progress !== undefined && (
-                      <div className="mt-2 w-24">
-                        <Progress value={booking.progress} className="h-1" />
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{booking.progress}%</p>
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const settlement = providerSettlement(booking);
+                    const delivery = quoteDeliveryForProvider({
+                      source: booking.quoteSource,
+                      deliveryCharge: booking.deliveryCharge,
+                      quotedDeliveryCharge: booking.quotedDeliveryCharge,
+                      deliveryOption: booking.deliveryOption,
+                      transport: booking.transport,
+                    });
+                    return (
+                      <div className="text-xs space-y-0.5">
+                        <p className="font-semibold text-amber-800">
+                          {settlement.needsCollect ? 'Collect' : 'Customer'} {`₹${settlement.collectFromCustomer.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        </p>
+                        {delivery?.status === 'included' ? (
+                          <p className="text-emerald-700">
+                            Delivery ₹{delivery.charged.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} included
+                          </p>
+                        ) : delivery?.status === 'pickup' ? (
+                          <p className="text-muted-foreground">Delivery not charged (pickup)</p>
+                        ) : null}
+                        <p className="text-emerald-700">
+                          You keep ₹{settlement.youKeep.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        {settlement.companyPaysYou > 0 ? (
+                          <p className="text-emerald-800">
+                            Company pays you ₹{settlement.companyPaysYou.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            Company ₹{settlement.payToCompany.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        )}
                       </div>
+                    );
+                  })()}
+                </TableCell>
+                <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                <TableCell>{getPaymentBadge(booking.paymentStatus)}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1 text-sm">
+                    <Calendar className="h-3 w-3 text-muted-foreground" />
+                    <span>{new Date(booking.bookingDate).toLocaleDateString()}</span>
+                  </div>
+                  {booking.progress !== undefined && (
+                    <div className="mt-1">
+                      <Progress value={booking.progress} className="h-1" />
+                      <p className="text-xs text-muted-foreground mt-1">{booking.progress}%</p>
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {/* Show Accept/Reject buttons for PENDING_PROVIDER status */}
+                    {(booking.status === "PENDING_PROVIDER" || booking.status === "new") && onAccept && onReject ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onAccept(booking.id)}
+                          disabled={actionLoading === booking.id}
+                          className="h-8 gap-2 text-green-600 border-green-200 hover:text-green-700 hover:bg-green-50"
+                          title="Accept Booking"
+                        >
+                          {actionLoading === booking.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline text-xs">Accept</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onReject(booking)}
+                          disabled={actionLoading === booking.id}
+                          className="h-8 gap-2 text-red-600 border-red-200 hover:text-red-700 hover:bg-red-50"
+                          title="Reject Booking"
+                        >
+                          {actionLoading === booking.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <X className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline text-xs">Reject</span>
+                        </Button>
+                      </>
+                    ) : null}
+                    {/* Update Status button - Show for paid, partial, or pending (COD) except COMPLETED, CANCELLED, REJECTED */}
+                    {onUpdateStatus && 
+                      (booking.paymentStatus === "paid" || booking.paymentStatus === "hold" || booking.paymentStatus === "pending") &&
+                      booking.status !== "COMPLETED" && 
+                      booking.status !== "DELIVERED" && 
+                      booking.status !== "CANCELLED_BY_USER" && 
+                      booking.status !== "CANCELLED_BY_ADMIN" && 
+                      booking.status !== "CANCELLED_BY_SYSTEM" &&
+                      booking.status !== "REJECTED_BY_PROVIDER" &&
+                      booking.status !== "cancelled" &&
+                      booking.status !== "completed" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onUpdateStatus(booking)}
+                        disabled={actionLoading === booking.id}
+                        className="h-8 gap-2 text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50"
+                        title="Update Status"
+                      >
+                        {actionLoading === booking.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5" />
+                        )}
+                        <span className="hidden sm:inline text-xs">Update Status</span>
+                      </Button>
                     )}
-                  </TableCell>
-                  <TableCell className="align-top text-right">
-                    <BookingActionButtons
-                      booking={booking}
-                      actionLoading={actionLoading}
-                      onAccept={onAccept}
-                      onReject={onReject}
-                      onUpdateStatus={onUpdateStatus}
-                      onRequestModification={onRequestModification}
-                      onViewDetails={onViewDetails}
-                      variant="table"
-                    />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                    {onRequestModification &&
+                      booking.status !== "OUT_FOR_DELIVERY" &&
+                      booking.status !== "COMPLETED" &&
+                      booking.status !== "DELIVERED" &&
+                      booking.status !== "CANCELLED_BY_USER" &&
+                      booking.status !== "CANCELLED_BY_ADMIN" &&
+                      booking.status !== "CANCELLED_BY_SYSTEM" &&
+                      booking.status !== "REJECTED_BY_PROVIDER" &&
+                      booking.status !== "cancelled" &&
+                      booking.status !== "completed" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onRequestModification(booking)}
+                        disabled={actionLoading === booking.id}
+                        className="h-8 gap-2 text-purple-600 border-purple-200 hover:text-purple-700 hover:bg-purple-50"
+                        title="Request Modification"
+                      >
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline text-xs">Modify</span>
+                      </Button>
+                    )}
+                    {/* View Details button - always visible */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onViewDetails(booking)}
+                      className="h-8 w-8"
+                      title="View booking details"
+                      aria-label="View booking details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );
