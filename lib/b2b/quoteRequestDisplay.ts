@@ -1,6 +1,7 @@
 export type QuoteRequestItemLike = {
   serviceId?: string;
   catalogVariantId?: string;
+  variantLabel?: string;
   title?: string;
   quantity?: number;
   /** Product listing unit (Service.priceType). */
@@ -28,7 +29,7 @@ export function quoteOfferItems(offer: { items?: QuoteOfferItemLike[] | null } |
 
 /** Sum of line quantities on an offer (falls back to single `quantity` when no lines). */
 export function quoteOfferTotalQuantity(
-  offer: { items?: QuoteOfferItemLike[] | null; quantity?: number } | null | undefined,
+  offer: { items?: QuoteOfferItemLike[] | null; quantity?: number } | null | undefined
 ): number {
   const items = quoteOfferItems(offer);
   if (items.length > 0) {
@@ -50,6 +51,10 @@ export function formatOfferTotalQtyLabel(totalQty: number): string {
   return `Total qty ${rounded}`;
 }
 
+/**
+ * Stable unique key per RFQ line for rate state.
+ * Always includes index so sibling lines never share an input key.
+ */
 export function quoteLineKey(
   row: { serviceId?: string; catalogVariantId?: string; title?: string },
   index = 0
@@ -57,14 +62,107 @@ export function quoteLineKey(
   const sid = String(row.serviceId || "").trim();
   const vid = String(row.catalogVariantId || "").trim();
   const title = String(row.title || "").trim().toLowerCase();
-  // Prefer variant id when present (true SKU lines).
-  if (sid && vid) return `${sid}:${vid}`;
-  // Same service can appear as multiple RFQ lines (e.g. ISMC 100 + ISMC 150)
-  // without catalogVariantId — include title so rate inputs stay independent.
-  if (sid && title) return `${sid}::${title}`;
+  if (sid && vid) return `${sid}:${vid}#${index}`;
+  if (sid && title) return `${sid}::${title}#${index}`;
   if (sid) return `${sid}#${index}`;
   if (title) return `t:${title}#${index}`;
   return `idx:${index}`;
+}
+
+/** Match a saved offer line to a request line — never fall back by array index alone. */
+export function matchOfferUnitPrice(
+  line: QuoteRequestItemLike,
+  offered: QuoteOfferItemLike[]
+): number | null {
+  const lineVid = String(line.catalogVariantId || "").trim();
+  const lineTitle = String(line.title || "").trim();
+  const match =
+    (lineVid
+      ? offered.find(
+          (o) =>
+            o.serviceId &&
+            o.serviceId === line.serviceId &&
+            String(o.catalogVariantId || "").trim() === lineVid
+        )
+      : undefined) ||
+    offered.find(
+      (o) =>
+        o.serviceId &&
+        o.serviceId === line.serviceId &&
+        String(o.title || "").trim() === lineTitle
+    );
+  if (match?.unitPrice == null) return null;
+  const n = Number(match.unitPrice);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function getQuantityUnitNoun(priceType: string | null | undefined): string {
+  const key = String(priceType || "")
+    .trim()
+    .toLowerCase();
+  if (!key || ["negotiable", "fixed", "lumpsum", "per_project"].includes(key)) return "";
+  if (key === "metric_ton") return "MT";
+  return key.replace(/_/g, " ").replace(/^per\s+/i, "").trim();
+}
+
+export function isRentalLikePriceType(priceType: string | null | undefined): boolean {
+  const key = String(priceType || "")
+    .trim()
+    .toLowerCase();
+  return ["hourly", "daily", "monthly", "per_km", "per_trip"].includes(key);
+}
+
+export function quoteLineDisplayParts(line: QuoteRequestItemLike) {
+  const variantFromField = String(line.variantLabel || "").trim();
+  const rawTitle = String(line.title || "").trim();
+  let productName = rawTitle;
+  let variantLabel = variantFromField;
+
+  if (!variantLabel && rawTitle.includes(" · ")) {
+    const [head, ...rest] = rawTitle.split(" · ");
+    productName = head.trim() || rawTitle;
+    variantLabel = rest.join(" · ").trim();
+  } else if (variantLabel && rawTitle.toLowerCase().endsWith(` · ${variantLabel}`.toLowerCase())) {
+    productName = rawTitle.slice(0, rawTitle.length - ` · ${variantLabel}`.length).trim() || rawTitle;
+  }
+
+  return {
+    productName: productName || "Product",
+    variantLabel: variantLabel || null,
+  };
+}
+
+export function formatQuoteLineDetailRows(
+  line: QuoteRequestItemLike,
+  quantity: number
+): Array<{ label: string; value: string }> {
+  const rows: Array<{ label: string; value: string }> = [];
+  const { variantLabel } = quoteLineDisplayParts(line);
+  if (variantLabel) {
+    rows.push({ label: "Variant", value: variantLabel });
+  }
+  if (isRentalLikePriceType(line.priceType)) {
+    const unit = getQuantityUnitNoun(line.priceType) || String(line.priceType || "");
+    rows.push({ label: "Billing unit", value: unit });
+    rows.push({
+      label: "Requested",
+      value: unit ? `${quantity} × ${unit}` : String(quantity),
+    });
+  } else {
+    rows.push({
+      label: "Qty",
+      value: formatQuoteQtyLabel(quantity, line.priceType).replace(/^Qty\s+/i, ""),
+    });
+  }
+  return rows;
+}
+
+export function formatQuoteQtyLabel(quantity: number, priceType?: string | null): string {
+  const unit = getQuantityUnitNoun(priceType);
+  if (isRentalLikePriceType(priceType)) {
+    return unit ? `Requested ${quantity} ${unit}` : `Requested ${quantity}`;
+  }
+  return unit ? `Qty ${quantity} ${unit}` : `Qty ${quantity}`;
 }
 
 export function quoteRequestHeadline(data: {
