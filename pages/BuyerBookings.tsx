@@ -43,6 +43,10 @@ import {
   getPriceTypeSuffix,
   isMachineRentalBookingMeta,
 } from "@/lib/priceTypeDisplay";
+import {
+  formatQuoteLineDetailRows,
+  quoteLineDisplayParts,
+} from "@/lib/b2b/quoteRequestDisplay";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -57,6 +61,8 @@ interface Booking {
     quantity: number;
     price: number;
     priceType?: string;
+    catalogVariantId?: string;
+    variantLabel?: string;
   }>;
   providerGST?: string;
   providerPAN?: string;
@@ -713,11 +719,13 @@ export default function BuyerBookings() {
 
     const services =
       booking.services?.map((item: any) => ({
-        _id: item.service?._id || item.service?.id || item.service || "",
-        title: item.service?.title || item.title || "Service",
+        _id: item.service?._id || item.service?.id || item._id || item.service || "",
+        title: item.title || item.service?.title || "Service",
         quantity: item.quantity || 1,
         price: item.price || 0,
         priceType: item.priceType || item.service?.priceType || "",
+        catalogVariantId: item.catalogVariantId || undefined,
+        variantLabel: item.variantLabel || undefined,
       })) || [];
 
     // Unpaid bookings always have outstanding > 0. That is pending, not partial.
@@ -1622,7 +1630,7 @@ export default function BuyerBookings() {
                           "N/A"}
                       </p>
                     </div>
-                    {selectedBooking.services && selectedBooking.services.length > 0 && (
+                    {getServiceItems(selectedBooking).length > 0 && (
                       <div className="col-span-2">
                         <p className="text-sm text-muted-foreground">Service Items</p>
                         <div className="mt-2 border rounded-lg overflow-hidden">
@@ -1636,23 +1644,66 @@ export default function BuyerBookings() {
                             <div className="col-span-4 text-right">Price</div>
                           </div>
                           <div className="divide-y">
-                            {getServiceItems(selectedBooking).map((item, index) => (
-                              <div key={`${item._id || index}`} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm">
-                                <div className="col-span-6">{item.title || "Service"}</div>
-                                <div className="col-span-2 text-right leading-snug">
-                                  {formatMachineRentalBookingQty(
-                                    selectedBooking.metadata as Record<string, unknown>,
-                                    item.quantity
-                                  )}
-                                </div>
-                                <div className="col-span-4 text-right">
-                                  ₹{Number(item.price || 0).toLocaleString("en-IN")}
-                                  {item.priceType
-                                    ? getPriceTypeSuffix(item.priceType) || `/${item.priceType}`
-                                    : ""}
-                                </div>
-                              </div>
-                            ))}
+                            {getServiceItems(selectedBooking).map((item, index) => {
+                              const { productName, variantLabel } = quoteLineDisplayParts(item);
+                              const detailRows = formatQuoteLineDetailRows(
+                                item,
+                                Number(item.quantity) || 1
+                              );
+                              return (
+                                <details
+                                  key={`${item._id || index}`}
+                                  className="group px-3 py-2 text-sm"
+                                >
+                                  <summary className="grid cursor-pointer list-none grid-cols-12 gap-2 [&::-webkit-details-marker]:hidden">
+                                    <div className="col-span-6 min-w-0">
+                                      <p className="font-medium leading-snug">{productName}</p>
+                                      {variantLabel ? (
+                                        <span className="mt-1 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                          {variantLabel}
+                                        </span>
+                                      ) : null}
+                                      <span className="mt-1 block text-[11px] font-semibold text-primary group-open:hidden">
+                                        View details
+                                      </span>
+                                      <span className="mt-1 hidden text-[11px] font-semibold text-primary group-open:block">
+                                        Hide details
+                                      </span>
+                                    </div>
+                                    <div className="col-span-2 text-right leading-snug">
+                                      {formatMachineRentalBookingQty(
+                                        selectedBooking.metadata as Record<string, unknown>,
+                                        item.quantity
+                                      )}
+                                    </div>
+                                    <div className="col-span-4 text-right">
+                                      ₹{Number(item.price || 0).toLocaleString("en-IN")}
+                                      {item.priceType
+                                        ? getPriceTypeSuffix(item.priceType) || `/${item.priceType}`
+                                        : ""}
+                                    </div>
+                                  </summary>
+                                  <div className="mt-2 space-y-1 border-t border-dashed pt-2 text-xs text-muted-foreground">
+                                    {detailRows.map((row) => (
+                                      <div key={row.label} className="flex justify-between gap-3">
+                                        <span>{row.label}</span>
+                                        <span className="text-right font-medium text-foreground">
+                                          {row.value}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {item._id ? (
+                                      <div className="flex justify-between gap-3">
+                                        <span>Service ID</span>
+                                        <span className="break-all text-right font-mono text-[11px] text-foreground">
+                                          {item._id}
+                                        </span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </details>
+                              );
+                            })}
                           </div>
                         <div className="px-3 py-2 text-sm border-t space-y-1">
                                 {(() => {
