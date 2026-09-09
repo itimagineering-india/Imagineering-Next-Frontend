@@ -29,7 +29,9 @@ export function readCatalogVariants(raw: Record<string, unknown> | null | undefi
     ? (raw!.variants as CatalogVariant[]).filter((v) => v?.id && v?.attributes)
     : [];
   return {
-    hasVariants: Boolean(raw?.hasVariants) && axes.length > 0 && variants.length > 0,
+    // List/card APIs omit variants[]; trust hasVariants + axes to open the picker.
+    // Detail payloads may still include variants for matching / defaults.
+    hasVariants: axes.length > 0 && (Boolean(raw?.hasVariants) || variants.length > 0),
     variantAxes: axes,
     variants,
   };
@@ -39,7 +41,11 @@ export function activeCatalogVariants(variants: CatalogVariant[]): CatalogVarian
   return variants.filter((v) => v.isActive !== false);
 }
 
-export function catalogVariantLabel(variant: CatalogVariant, axes: CatalogVariantAxis[]): string {
+export function catalogVariantLabel(
+  variant: CatalogVariant | null | undefined,
+  axes: CatalogVariantAxis[]
+): string {
+  if (!variant?.attributes) return "";
   return axes.map((axis) => variant.attributes?.[axis.key]).filter(Boolean).join(" · ");
 }
 
