@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,6 +139,7 @@ interface Booking {
 
 export default function BuyerBookings() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -321,6 +322,32 @@ export default function BuyerBookings() {
       setViewingInvoice(null);
     }
   };
+
+  useEffect(() => {
+    const invoiceId = String(searchParams?.get("invoiceId") || "").trim();
+    if (!invoiceId || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.invoices.getById(invoiceId);
+        const inv = (res as { data?: unknown })?.data ?? res;
+        if (cancelled || !inv || typeof inv !== "object") return;
+        await handleViewInvoice(inv);
+        router.replace("/buyer/orders", { scroll: false });
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Could not open invoice",
+            description: "Please sign in and try again from My Bookings.",
+            variant: "destructive",
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, user]);
 
   // Buyers can download individual invoices from the booking details (eye) modal
   const handleDownloadInvoiceById = async (invoiceId: string, invoiceNumber?: string) => {
