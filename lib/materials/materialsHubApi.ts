@@ -215,13 +215,20 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
     rating,
     reviewCount,
     hasVariants,
-    variantSummary: hasVariants ? catalogVariantSummary(variantAxes, variants) : undefined,
-    variantCount: hasVariants ? variants.filter((v) => v.isActive !== false).length : undefined,
+    variantSummary: hasVariants ? catalogVariantSummary(variantAxes, variants) || undefined : undefined,
+    variantCount: hasVariants
+      ? variants.length
+        ? variants.filter((v) => v.isActive !== false).length
+        : undefined
+      : undefined,
     defaultVariantId: hasVariants
       ? variants.find((v) => v.isActive !== false)?.id
       : undefined,
     defaultVariantLabel: hasVariants
-      ? catalogVariantLabel(variants.find((v) => v.isActive !== false) || variants[0], variantAxes)
+      ? (() => {
+          const v = variants.find((row) => row.isActive !== false) || variants[0];
+          return v ? catalogVariantLabel(v, variantAxes) || undefined : undefined;
+        })()
       : undefined,
   };
 }
