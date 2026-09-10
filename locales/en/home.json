@@ -15,6 +15,10 @@
     "machines": {
       "title": "Rent Machines",
       "description": "Best prices for JCB, Crane, Tractor & more"
+    },
+    "machineResale": {
+      "title": "Machine Resale",
+      "description": "Buy used excavators, JCB, cranes & more"
     }
   },
   "trustStats": {
