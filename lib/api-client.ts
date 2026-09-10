@@ -177,7 +177,6 @@ export const apiRequest = async <T>(
               message:
                 msg ||
                 'Imagineering India is temporarily under maintenance. Please try again shortly.',
-              code: 'MAINTENANCE',
             },
           };
         }
