@@ -39,6 +39,13 @@ const FEATURED_CARDS = [
     descKey: "featuredCategories.machines.description",
     image: machineRentalImg,
   },
+  {
+    slug: "machine-resale",
+    href: "/machine-resale",
+    titleKey: "featuredCategories.machineResale.title",
+    descKey: "featuredCategories.machineResale.description",
+    image: machineRentalImg,
+  },
 ] as const;
 
 export function FeaturedCategoryCardsSection() {
@@ -50,7 +57,7 @@ export function FeaturedCategoryCardsSection() {
       <div className="home-shell">
         <div
           ref={ref}
-          className={`grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 transition-all duration-700 ${
+          className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5 transition-all duration-700 ${
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
           }`}
         >
