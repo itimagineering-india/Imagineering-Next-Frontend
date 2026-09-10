@@ -155,6 +155,43 @@ export const apiRequest = async <T>(
         };
       }
 
+      // Platform maintenance — open gate even mid-session
+      if (response.status === 503) {
+        let payload: Record<string, unknown> = {};
+        try {
+          payload = await response.json();
+        } catch {
+          /* ignore */
+        }
+        const { emitMaintenanceMode, isMaintenancePayload } = await import(
+          '@/lib/maintenanceEvents'
+        );
+        if (isMaintenancePayload(payload) || payload?.code === 'MAINTENANCE') {
+          const msg =
+            (payload?.message as string) ||
+            (payload?.error as { message?: string } | undefined)?.message;
+          emitMaintenanceMode(msg);
+          return {
+            success: false,
+            error: {
+              message:
+                msg ||
+                'Imagineering India is temporarily under maintenance. Please try again shortly.',
+              code: 'MAINTENANCE',
+            },
+          };
+        }
+        return {
+          success: false,
+          error: {
+            message:
+              (payload?.error as { message?: string } | undefined)?.message ||
+              (payload?.message as string) ||
+              'Service temporarily unavailable. Please try again.',
+          },
+        };
+      }
+
       // Handle 401 Unauthorized
       if (response.status === 401) {
         let errorMessage = 'Session expired. Please log in again.';
