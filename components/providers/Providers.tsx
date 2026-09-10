@@ -12,6 +12,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { FloatingActiveQuoteButton } from "@/components/quotes/FloatingActiveQuoteButton";
 import { BuyerQuoteOfferToastListener } from "@/components/quotes/BuyerQuoteOfferToastListener";
 import { OpenNativeApp } from "@/components/layout/OpenNativeApp";
+import { MaintenanceGate } from "@/components/providers/MaintenanceGate";
 import { useEffect, useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -32,18 +33,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
-          <AuthProvider>
-            <UserLocationProvider>
-              <CartProvider>
-                <Toaster />
-                <Sonner />
-                <OpenNativeApp />
-                <BuyerQuoteOfferToastListener />
-                {children}
-                <FloatingActiveQuoteButton />
-              </CartProvider>
-            </UserLocationProvider>
-          </AuthProvider>
+          <MaintenanceGate>
+            <AuthProvider>
+              <UserLocationProvider>
+                <CartProvider>
+                  <Toaster />
+                  <Sonner />
+                  <OpenNativeApp />
+                  <BuyerQuoteOfferToastListener />
+                  {children}
+                  <FloatingActiveQuoteButton />
+                </CartProvider>
+              </UserLocationProvider>
+            </AuthProvider>
+          </MaintenanceGate>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
