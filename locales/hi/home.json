@@ -15,6 +15,10 @@
     "machines": {
       "title": "मशीन किराए पर लें",
       "description": "JCB, क्रेन, ट्रैक्टर और अधिक पर बेस्ट प्राइस"
+    },
+    "machineResale": {
+      "title": "मशीन रीसेल",
+      "description": "यूज़्ड एक्स्केवेटर, JCB, क्रेन और अधिक खरीदें"
     }
   },
   "trustStats": {
