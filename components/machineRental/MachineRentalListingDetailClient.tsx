@@ -31,7 +31,10 @@ import {
 import { resolveMachineRentalMediaUrl } from "@/lib/machineRental/media";
 import { resolveRentalCategoryKey } from "@/lib/machineRental/machineRentalHubCatalog";
 import {
+  estimateWeightBasedPrice,
+  isWeightBasedPriceType,
   parseRentalRates,
+  parseWeightPricing,
   resolveAvailableMachinesFromService,
 } from "@/lib/machineRental";
 import { RENTAL_AMBER } from "@/components/machineRental/MachineRentalHub";
@@ -113,6 +116,7 @@ const EXCLUDED_METADATA_KEYS = new Set([
   "operatorIncluded",
   "securityDeposit",
   "machineModel",
+  "weightPricing",
 ]);
 
 function toReadableFieldLabel(key: string): string {
@@ -177,6 +181,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
   const [activeImage, setActiveImage] = useState(0);
   const [machineCount, setMachineCount] = useState(1);
   const [duration, setDuration] = useState(1);
+  const [weight, setWeight] = useState(1);
   const [selectedPriceType, setSelectedPriceType] = useState<string>("");
 
   useEffect(() => {
@@ -244,6 +249,12 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
 
   const priceType = String(selectedPriceType || service?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
+  const needsWeight = isWeightBasedPriceType(priceType);
+  const weightPricing = useMemo(
+    () => parseWeightPricing(service?.metadata),
+    [service?.metadata]
+  );
+  const durationMax = needsWeight || priceType === "per_km" ? 9999 : 365;
   const unitNoun = getQuantityUnitNoun(priceType) || "day";
   const durationPlural = formatDurationQtyLabel(duration, priceType);
 
@@ -261,12 +272,29 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
     return Number.isFinite(mrp) && mrp > 0 ? mrp : 0;
   }, [priceType, rentalRates, service]);
 
+  const weightEstimate = useMemo(() => {
+    if (!needsWeight) return null;
+    return estimateWeightBasedPrice({
+      priceType,
+      rate: unitPrice,
+      distance: duration,
+      weight,
+      machineCount,
+      slabs: weightPricing.slabs,
+    });
+  }, [duration, machineCount, needsWeight, priceType, unitPrice, weight, weightPricing.slabs]);
+
   const estimated = useMemo(() => {
+    if (needsWeight) return weightEstimate?.subtotal ?? 0;
     const d = needsDuration ? duration : 1;
     return Math.round(unitPrice * machineCount * d);
-  }, [duration, machineCount, needsDuration, unitPrice]);
+  }, [duration, machineCount, needsDuration, needsWeight, unitPrice, weightEstimate]);
 
   const priceLabel = useMemo(() => {
+    if (priceType === "per_km_weight_slab" && weightPricing.slabs.length > 0) {
+      const from = Math.min(...weightPricing.slabs.map((s) => s.ratePerKm));
+      return `From ₹${formatInr(from)}/km (by weight)`;
+    }
     const line = formatPriceLine(unitPrice, priceType);
     if (line) return line.primary;
     if (!service) return "";
@@ -277,7 +305,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
       priceMax: service.priceMax,
       priceType: service.priceType,
     });
-  }, [priceType, service, unitPrice]);
+  }, [priceType, service, unitPrice, weightPricing.slabs]);
 
   const gallery = useMemo(() => {
     const raw = [
@@ -360,12 +388,20 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
 
   const goCheckout = useCallback(() => {
     if (!serviceId) return;
+    if (needsWeight && !(Number(weight) > 0)) {
+      toast({
+        title: t("weightRequired"),
+        variant: "destructive",
+      });
+      return;
+    }
     const qs = new URLSearchParams();
     qs.set("serviceId", serviceId);
     qs.set("machineCount", String(machineCount));
     qs.set("duration", String(needsDuration ? duration : 1));
     qs.set("priceType", priceType);
     qs.set("name", title);
+    if (needsWeight) qs.set("weight", String(weight));
     if (!isAuthenticated) {
       router.push(
         `/login?redirect=${encodeURIComponent(`/machine-rental/checkout?${qs.toString()}`)}`
@@ -373,7 +409,20 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
       return;
     }
     router.push(`/machine-rental/checkout?${qs.toString()}`);
-  }, [duration, isAuthenticated, machineCount, needsDuration, priceType, router, serviceId, title]);
+  }, [
+    duration,
+    isAuthenticated,
+    machineCount,
+    needsDuration,
+    needsWeight,
+    priceType,
+    router,
+    serviceId,
+    t,
+    title,
+    toast,
+    weight,
+  ]);
 
   if (loading) {
     return (
@@ -480,7 +529,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
                 variant="outline"
                 size="icon"
                 className="h-10 w-10 rounded-xl"
-                onClick={() => setDuration((n) => clampInt(n - 1, 1, 365))}
+                onClick={() => setDuration((n) => clampInt(n - 1, 1, durationMax))}
                 aria-label={t("durationDecrease")}
               >
                 <Minus className="h-4 w-4" />
@@ -488,9 +537,9 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
               <Input
                 type="number"
                 min={1}
-                max={365}
+                max={durationMax}
                 value={duration}
-                onChange={(e) => setDuration(clampInt(Number(e.target.value), 1, 365))}
+                onChange={(e) => setDuration(clampInt(Number(e.target.value), 1, durationMax))}
                 className="h-10 w-16 rounded-xl text-center"
               />
               <Button
@@ -498,7 +547,7 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
                 variant="outline"
                 size="icon"
                 className="h-10 w-10 rounded-xl"
-                onClick={() => setDuration((n) => clampInt(n + 1, 1, 365))}
+                onClick={() => setDuration((n) => clampInt(n + 1, 1, durationMax))}
                 aria-label={t("durationIncrease")}
               >
                 <Plus className="h-4 w-4" />
@@ -506,21 +555,63 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
             </div>
           </div>
         ) : null}
+
+        {needsWeight ? (
+          <div>
+            <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("weightLabel", { unit: weightPricing.weightUnit || "ton" })}
+            </Label>
+            <Input
+              type="number"
+              min={0.1}
+              step={0.1}
+              value={weight}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setWeight(Number.isFinite(n) && n > 0 ? Math.min(9999, n) : 0);
+              }}
+              className="mt-2 h-10 rounded-xl"
+            />
+            {priceType === "per_km_weight_slab" && weightPricing.slabs.length > 0 ? (
+              <p className="mt-1.5 text-xs text-slate-500">
+                {t("weightSlabHint", {
+                  slabs: weightPricing.slabs
+                    .map((s) => `≤${s.maxWeight}t → ₹${s.ratePerKm}/km`)
+                    .join(" · "),
+                })}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      {unitPrice > 0 ? (
-        <p className="mt-4 rounded-xl bg-orange-50 px-4 py-3 text-sm font-medium text-orange-950">
-          {needsDuration
-            ? t("estimateLineSimple", {
-                machines: machineCount,
-                duration: durationPlural,
-                amount: `₹${formatInr(estimated)}`,
-              })
-            : t("estimateLineMachinesOnly", {
-                machines: machineCount,
-                amount: `₹${formatInr(estimated)}`,
-              })}
-        </p>
+      {unitPrice > 0 || (needsWeight && (weightEstimate?.subtotal ?? 0) > 0) ? (
+        <div className="mt-4 space-y-2 rounded-xl bg-orange-50 px-4 py-3 text-sm text-orange-950">
+          <p className="font-medium">
+            {needsWeight
+              ? t("estimateLineWeight", {
+                  amount: `₹${formatInr(estimated)}`,
+                })
+              : needsDuration
+                ? t("estimateLineSimple", {
+                    machines: machineCount,
+                    duration: durationPlural,
+                    amount: `₹${formatInr(estimated)}`,
+                  })
+                : t("estimateLineMachinesOnly", {
+                    machines: machineCount,
+                    amount: `₹${formatInr(estimated)}`,
+                  })}
+          </p>
+          {needsWeight && weightEstimate?.formula ? (
+            <p className="text-xs text-orange-900/80">
+              {t("howPriceCalculated")}: {weightEstimate.formula}
+            </p>
+          ) : null}
+          {needsWeight && !weightEstimate ? (
+            <p className="text-xs text-orange-900/80">{t("weightEstimateUnavailable")}</p>
+          ) : null}
+        </div>
       ) : (
         <p className="mt-4 text-sm text-slate-500">{t("noPriceHint")}</p>
       )}
