@@ -64,7 +64,15 @@ const EXCLUDE_SLUG_SET = new Set([
   "machine_rental",
 ]);
 
-const RENTAL_PRICE_TYPES = new Set(["hourly", "daily", "monthly", "per_km", "per_trip"]);
+const RENTAL_PRICE_TYPES = new Set([
+  "hourly",
+  "daily",
+  "monthly",
+  "per_km",
+  "per_km_weight",
+  "per_km_weight_slab",
+  "per_trip",
+]);
 
 function listingSlugCandidates(raw: Record<string, unknown>): string[] {
   return [
