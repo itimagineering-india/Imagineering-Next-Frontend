@@ -22,11 +22,14 @@ import {
   MACHINE_RENTAL_SPEC_SUGGESTIONS,
   buildMachineRentalServicePayload,
   createMachineRentalSpecRow,
+  createWeightPricingDraftSlab,
   isMachineRentalCategorySlug,
   parseRentalRates,
+  parseWeightPricing,
   type MachineRentalLocation,
   type MachineRentalPriceType,
   type MachineRentalSpecRow,
+  type WeightPricingDraftSlab,
 } from "@/lib/machineRental";
 import { getPriceTypeLabel } from "@/lib/priceTypeDisplay";
 
@@ -57,6 +60,12 @@ function rateDraftFromRates(
     };
   }
   return draft;
+}
+
+function ratePlaceholder(priceType: MachineRentalPriceType): string {
+  if (priceType === "per_km_weight") return "₹ / km / ton";
+  if (priceType === "per_km_weight_slab") return "From ₹ / km (set slabs below)";
+  return `₹ ${getPriceTypeLabel(priceType) || priceType}`;
 }
 
 interface Category {
@@ -141,6 +150,11 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
   const [images, setImages] = useState<string[]>([]);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [rateDraft, setRateDraft] = useState<RateDraft>(() => emptyRateDraft("daily"));
+  const [weightSlabs, setWeightSlabs] = useState<WeightPricingDraftSlab[]>(() => [
+    createWeightPricingDraftSlab("5", "30"),
+    createWeightPricingDraftSlab("10", "40"),
+    createWeightPricingDraftSlab("15", "50"),
+  ]);
   const [availableMachines, setAvailableMachines] = useState("1");
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
@@ -233,6 +247,14 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
               : [];
           setImages(imgs);
           setRateDraft(rateDraftFromRates(rates));
+          const wp = parseWeightPricing(meta);
+          if (wp.slabs.length > 0) {
+            setWeightSlabs(
+              wp.slabs.map((s) =>
+                createWeightPricingDraftSlab(String(s.maxWeight), String(s.ratePerKm))
+              )
+            );
+          }
           const units = String(meta.availableMachines || "1");
           setAvailableMachines(units);
           setSecurityDeposit(String(meta.securityDeposit || ""));
@@ -284,11 +306,34 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
     }
   };
 
+  const collectParsedSlabs = () => {
+    const slabs: Array<{ maxWeight: number; ratePerKm: number }> = [];
+    for (const row of weightSlabs) {
+      const maxWeight = Number(row.maxWeight);
+      const ratePerKm = Number(row.ratePerKm);
+      if (!Number.isFinite(maxWeight) || maxWeight <= 0) continue;
+      if (!Number.isFinite(ratePerKm) || ratePerKm <= 0) continue;
+      slabs.push({ maxWeight, ratePerKm });
+    }
+    slabs.sort((a, b) => a.maxWeight - b.maxWeight);
+    return slabs;
+  };
+
   const collectRates = () => {
     const rates: Array<{ priceType: MachineRentalPriceType; price: number }> = [];
+    const slabs = collectParsedSlabs();
+    const slabDisplayPrice =
+      slabs.length > 0 ? Math.min(...slabs.map((s) => s.ratePerKm)) : 0;
+
     for (const opt of MACHINE_RENTAL_PRICE_TYPES) {
       const row = rateDraft[opt.value];
       if (!row?.enabled) continue;
+      if (opt.value === "per_km_weight_slab") {
+        if (slabDisplayPrice > 0) {
+          rates.push({ priceType: opt.value, price: slabDisplayPrice });
+        }
+        continue;
+      }
       const amount = parseFloat(row.price);
       if (!Number.isFinite(amount) || amount <= 0) continue;
       rates.push({ priceType: opt.value, price: amount });
@@ -306,6 +351,14 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
       for (const opt of MACHINE_RENTAL_PRICE_TYPES) {
         const row = rateDraft[opt.value];
         if (!row?.enabled) continue;
+        if (opt.value === "per_km_weight_slab") {
+          const slabs = collectParsedSlabs();
+          if (slabs.length === 0) {
+            next.price = "Add at least one valid weight slab (max weight + ₹/km)";
+            break;
+          }
+          continue;
+        }
         const amount = parseFloat(row.price);
         if (!Number.isFinite(amount) || amount <= 0) {
           next.price = `Enter a valid price for ${opt.title}`;
@@ -361,6 +414,11 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
         operatorIncluded,
         specs,
         location: businessAddress,
+        weightPricing: {
+          weightUnit: "ton",
+          distanceUnit: "km",
+          slabs: collectParsedSlabs(),
+        },
       });
 
       const response = editMode && serviceId
@@ -555,6 +613,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
             <div className="space-y-2">
               {MACHINE_RENTAL_PRICE_TYPES.map((option) => {
                 const row = rateDraft[option.value];
+                const isSlab = option.value === "per_km_weight_slab";
                 return (
                   <div
                     key={option.value}
@@ -563,7 +622,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
                       row.enabled ? "border-primary/40 bg-primary/5" : "border-border bg-background",
                     )}
                   >
-                    <label className="flex min-w-[7.5rem] cursor-pointer items-center gap-2">
+                    <label className="flex min-w-[9.5rem] cursor-pointer items-center gap-2">
                       <Checkbox
                         checked={row.enabled}
                         onCheckedChange={(checked) => {
@@ -579,33 +638,114 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
                       />
                       <span className="text-sm font-medium">{option.title}</span>
                     </label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="1"
-                      disabled={!row.enabled}
-                      value={row.price}
-                      onChange={(e) => {
-                        setRateDraft((prev) => ({
-                          ...prev,
-                          [option.value]: {
-                            ...prev[option.value],
-                            enabled: true,
-                            price: e.target.value,
-                          },
-                        }));
-                        setErrors((prev) => ({ ...prev, price: "" }));
-                      }}
-                      placeholder={`₹ ${getPriceTypeLabel(option.value) || option.title}`}
-                      className={cn(
-                        "sm:flex-1",
-                        errors.price && row.enabled ? "border-destructive" : "",
-                      )}
-                    />
+                    {!isSlab ? (
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        disabled={!row.enabled}
+                        value={row.price}
+                        onChange={(e) => {
+                          setRateDraft((prev) => ({
+                            ...prev,
+                            [option.value]: {
+                              ...prev[option.value],
+                              enabled: true,
+                              price: e.target.value,
+                            },
+                          }));
+                          setErrors((prev) => ({ ...prev, price: "" }));
+                        }}
+                        placeholder={ratePlaceholder(option.value)}
+                        className={cn(
+                          "sm:flex-1",
+                          errors.price && row.enabled ? "border-destructive" : "",
+                        )}
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground sm:flex-1">
+                        Configure weight slabs below when enabled.
+                      </p>
+                    )}
                   </div>
                 );
               })}
             </div>
+            {rateDraft.per_km_weight_slab?.enabled ? (
+              <div className="space-y-3 rounded-xl border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium">Weight slabs (ton → ₹/km)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Buyer weight picks the first slab where weight ≤ max. Formula: Distance × Rate/km.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {weightSlabs.map((slab) => (
+                    <div key={slab.id} className="flex flex-wrap items-center gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={slab.maxWeight}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setWeightSlabs((prev) =>
+                            prev.map((s) =>
+                              s.id === slab.id ? { ...s, maxWeight: value } : s
+                            )
+                          );
+                          setErrors((prev) => ({ ...prev, price: "" }));
+                        }}
+                        placeholder="Max ton"
+                        className="w-28"
+                      />
+                      <span className="text-xs text-muted-foreground">ton →</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={slab.ratePerKm}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setWeightSlabs((prev) =>
+                            prev.map((s) =>
+                              s.id === slab.id ? { ...s, ratePerKm: value } : s
+                            )
+                          );
+                          setErrors((prev) => ({ ...prev, price: "" }));
+                        }}
+                        placeholder="₹ / km"
+                        className="w-28"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={weightSlabs.length <= 1}
+                        onClick={() =>
+                          setWeightSlabs((prev) => prev.filter((s) => s.id !== slab.id))
+                        }
+                        aria-label="Remove slab"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setWeightSlabs((prev) => [...prev, createWeightPricingDraftSlab()])
+                  }
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Add slab
+                </Button>
+              </div>
+            ) : null}
             {errors.price ? <p className="text-sm text-destructive">{errors.price}</p> : null}
           </div>
 
