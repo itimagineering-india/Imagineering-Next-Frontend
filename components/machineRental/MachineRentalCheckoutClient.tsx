@@ -59,6 +59,7 @@ import {
   getQuantityUnitNoun,
   isDurationPriceType,
 } from "@/lib/priceTypeDisplay";
+import { isWeightBasedPriceType } from "@/lib/machineRental";
 import { RENTAL_AMBER } from "@/components/machineRental/MachineRentalHub";
 
 type Preview = {
@@ -74,6 +75,10 @@ type Preview = {
   availableMachines?: number;
   duration?: number;
   durationLabel?: string;
+  weight?: number;
+  weightUnit?: string;
+  applicableRate?: number;
+  pricingFormula?: string;
 };
 
 type AppliedCoupon = {
@@ -104,8 +109,12 @@ export function MachineRentalCheckoutClient() {
     clampInt(Number(sp.get("machineCount") || 1), 1, 99)
   );
   const [duration, setDuration] = useState(() =>
-    clampInt(Number(sp.get("duration") || 1), 1, 365)
+    clampInt(Number(sp.get("duration") || 1), 1, 9999)
   );
+  const [weight, setWeight] = useState(() => {
+    const n = Number(sp.get("weight") || 1);
+    return Number.isFinite(n) && n > 0 ? Math.min(9999, n) : 1;
+  });
   const [selectedPriceType, setSelectedPriceType] = useState(() =>
     String(sp.get("priceType") || "").trim().toLowerCase()
   );
@@ -141,6 +150,9 @@ export function MachineRentalCheckoutClient() {
 
   const priceType = String(selectedPriceType || preview?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
+  const needsWeight = isWeightBasedPriceType(priceType);
+  const durationMax =
+    needsWeight || priceType === "per_km" ? 9999 : 365;
   const unitNoun = getQuantityUnitNoun(priceType) || "day";
   const availableMachines = Math.max(
     1,
@@ -178,6 +190,10 @@ export function MachineRentalCheckoutClient() {
 
   useEffect(() => {
     if (!serviceId || !isAuthenticated) return;
+    if (needsWeight && !(Number(weight) > 0)) {
+      setPreview(null);
+      return;
+    }
     let cancelled = false;
     setLoadingPreview(true);
     api.bookings
@@ -186,6 +202,7 @@ export function MachineRentalCheckoutClient() {
         machineCount,
         duration,
         ...(selectedPriceType ? { priceType: selectedPriceType } : {}),
+        ...(needsWeight ? { weight } : {}),
       })
       .then((res) => {
         if (cancelled) return;
@@ -204,12 +221,23 @@ export function MachineRentalCheckoutClient() {
             availableMachines: Number(d.availableMachines) || 99,
             duration: Number(d.duration) || duration,
             durationLabel: d.durationLabel,
+            weight: d.weight != null ? Number(d.weight) : undefined,
+            weightUnit: d.weightUnit,
+            applicableRate:
+              d.applicableRate != null ? Number(d.applicableRate) : undefined,
+            pricingFormula: d.pricingFormula,
           });
           if (d.priceType && !selectedPriceType) {
             setSelectedPriceType(String(d.priceType));
           }
         } else {
           setPreview(null);
+          if (res.error?.message) {
+            toast({
+              title: res.error.message,
+              variant: "destructive",
+            });
+          }
         }
       })
       .catch(() => {
@@ -222,7 +250,7 @@ export function MachineRentalCheckoutClient() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preview.priceType drives needsDuration after first load
-  }, [serviceId, machineCount, duration, selectedPriceType, isAuthenticated]);
+  }, [serviceId, machineCount, duration, weight, selectedPriceType, isAuthenticated, needsWeight]);
 
   const skipCouponResetOnMount = useRef(true);
   useEffect(() => {
@@ -247,7 +275,7 @@ export function MachineRentalCheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [machineCount, duration, selectedPriceType, serviceId]);
+  }, [machineCount, duration, weight, selectedPriceType, serviceId]);
 
   const payableTotal = useMemo(() => {
     if (appliedCoupon && Number.isFinite(appliedCoupon.finalAmount)) {
@@ -369,6 +397,10 @@ export function MachineRentalCheckoutClient() {
       toast({ title: t("checkoutAddressRequired"), variant: "destructive" });
       return null;
     }
+    if (needsWeight && !(Number(weight) > 0)) {
+      toast({ title: t("weightRequired"), variant: "destructive" });
+      return null;
+    }
     if (!paymentMethod) {
       toast({ title: t("checkoutPaymentRequired"), variant: "destructive" });
       return null;
@@ -415,6 +447,7 @@ export function MachineRentalCheckoutClient() {
       machineCount,
       duration: needsDuration ? duration : 1,
       priceType: priceType || undefined,
+      ...(needsWeight ? { weight } : {}),
       startDate: startDatePayload,
       startTime: startTime || undefined,
       paymentMethod,
@@ -451,6 +484,7 @@ export function MachineRentalCheckoutClient() {
     duration,
     machineCount,
     needsDuration,
+    needsWeight,
     notes,
     partialAdvanceMethod,
     partialAmount,
@@ -462,6 +496,7 @@ export function MachineRentalCheckoutClient() {
     startTime,
     t,
     toast,
+    weight,
   ]);
 
   const onConfirm = async () => {
@@ -871,17 +906,17 @@ export function MachineRentalCheckoutClient() {
                         variant="outline"
                         size="icon"
                         className="h-10 w-10 rounded-xl"
-                        onClick={() => setDuration((n) => clampInt(n - 1, 1, 365))}
+                        onClick={() => setDuration((n) => clampInt(n - 1, 1, durationMax))}
                       >
                         <Minus className="h-4 w-4" />
                       </Button>
                       <Input
                         type="number"
                         min={1}
-                        max={365}
+                        max={durationMax}
                         value={duration}
                         onChange={(e) =>
-                          setDuration(clampInt(Number(e.target.value), 1, 365))
+                          setDuration(clampInt(Number(e.target.value), 1, durationMax))
                         }
                         className="h-10 w-16 rounded-xl text-center"
                       />
@@ -890,14 +925,41 @@ export function MachineRentalCheckoutClient() {
                         variant="outline"
                         size="icon"
                         className="h-10 w-10 rounded-xl"
-                        onClick={() => setDuration((n) => clampInt(n + 1, 1, 365))}
+                        onClick={() => setDuration((n) => clampInt(n + 1, 1, durationMax))}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                 )}
+
+                {needsWeight ? (
+                  <div>
+                    <Label className="text-sm font-semibold text-slate-800">
+                      {t("weightLabel", {
+                        unit: preview?.weightUnit || "ton",
+                      })}
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0.1}
+                      step={0.1}
+                      value={weight}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        setWeight(Number.isFinite(n) && n > 0 ? Math.min(9999, n) : 0);
+                      }}
+                      className="mt-2 h-11 rounded-xl"
+                    />
+                  </div>
+                ) : null}
               </div>
+
+              {preview?.pricingFormula ? (
+                <p className="mt-3 text-xs text-slate-500">
+                  {t("howPriceCalculated")}: {preview.pricingFormula}
+                </p>
+              ) : null}
 
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <div>
