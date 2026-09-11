@@ -1676,6 +1676,7 @@ export const api = {
       machineCount: number;
       duration: number;
       priceType?: string;
+      weight?: number;
     }) =>
       apiRequest<{
         subtotal: number;
@@ -1691,6 +1692,10 @@ export const api = {
         durationLabel?: string;
         lineQuantity: number;
         productName: string;
+        weight?: number;
+        weightUnit?: string;
+        applicableRate?: number;
+        pricingFormula?: string;
       }>("/api/bookings/machine-rental/preview", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -1700,6 +1705,7 @@ export const api = {
       machineCount: number;
       duration: number;
       priceType?: string;
+      weight?: number;
       startDate?: string;
       startTime?: string;
       paymentMethod: string;
