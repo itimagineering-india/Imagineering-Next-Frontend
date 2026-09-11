@@ -15,6 +15,8 @@ const PRICE_TYPE_SUFFIX: Record<string, string> = {
   per_load: "/load",
   per_trip: "/trip",
   per_km: "/km",
+  per_km_weight: "/km/ton",
+  per_km_weight_slab: "/km by weight",
   per_cuft: "/cuft",
   per_cum: "/cum",
   per_metre: "/metre",
@@ -41,6 +43,8 @@ const PRICE_TYPE_LABEL: Record<string, string> = {
   per_load: "Per load",
   per_trip: "Per trip",
   per_km: "Per km",
+  per_km_weight: "Per km × weight",
+  per_km_weight_slab: "Per km + weight slab",
   per_cuft: "Per cu ft",
   per_cum: "Per cum",
   per_metre: "Per metre",
@@ -68,6 +72,8 @@ const QUANTITY_UNIT_NOUN: Record<string, string> = {
   per_load: "load",
   per_trip: "trip",
   per_km: "km",
+  per_km_weight: "km",
+  per_km_weight_slab: "km",
   per_unit: "unit",
   per_article: "article",
   per_sqft: "sq ft",
@@ -129,6 +135,8 @@ export function isDurationPriceType(priceType: string | null | undefined): boole
     key === "hourly" ||
     key === "per_trip" ||
     key === "per_km" ||
+    key === "per_km_weight" ||
+    key === "per_km_weight_slab" ||
     key === "monthly"
   );
 }
