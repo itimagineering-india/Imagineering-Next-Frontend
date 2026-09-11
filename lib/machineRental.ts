@@ -50,6 +50,8 @@ export type MachineRentalPriceType =
   | "daily"
   | "monthly"
   | "per_km"
+  | "per_km_weight"
+  | "per_km_weight_slab"
   | "per_trip"
   | "fixed";
 
@@ -61,6 +63,8 @@ export const MACHINE_RENTAL_PRICE_TYPES: ReadonlyArray<{
   { value: "daily", title: "Per day" },
   { value: "monthly", title: "Per month" },
   { value: "per_km", title: "Per km" },
+  { value: "per_km_weight", title: "Per km × weight" },
+  { value: "per_km_weight_slab", title: "Per km + weight slab" },
   { value: "per_trip", title: "Per trip" },
   { value: "fixed", title: "Fixed" },
 ];
@@ -70,11 +74,30 @@ export type MachineRentalRate = {
   price: number;
 };
 
+export type WeightPricingSlab = {
+  maxWeight: number;
+  ratePerKm: number;
+};
+
+export type WeightPricingConfig = {
+  weightUnit: string;
+  distanceUnit: string;
+  slabs: WeightPricingSlab[];
+};
+
+export type WeightPricingDraftSlab = {
+  id: string;
+  maxWeight: string;
+  ratePerKm: string;
+};
+
 const PRIMARY_RATE_ORDER: MachineRentalPriceType[] = [
   "daily",
   "hourly",
   "monthly",
   "per_km",
+  "per_km_weight",
+  "per_km_weight_slab",
   "per_trip",
   "fixed",
 ];
@@ -85,6 +108,106 @@ const ALLOWED_RATE_TYPES = new Set<string>(
 
 export function isMachineRentalPriceType(value: unknown): value is MachineRentalPriceType {
   return ALLOWED_RATE_TYPES.has(String(value || "").trim().toLowerCase());
+}
+
+export function isWeightBasedPriceType(priceType: string | null | undefined): boolean {
+  const key = String(priceType || "").trim().toLowerCase();
+  return key === "per_km_weight" || key === "per_km_weight_slab";
+}
+
+export function createWeightPricingDraftSlab(
+  maxWeight = "",
+  ratePerKm = ""
+): WeightPricingDraftSlab {
+  return {
+    id: `slab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    maxWeight,
+    ratePerKm,
+  };
+}
+
+export function parseWeightPricing(
+  metadata: Record<string, unknown> | null | undefined
+): WeightPricingConfig {
+  const raw = metadata?.weightPricing;
+  const weightUnit =
+    raw && typeof raw === "object" && String((raw as { weightUnit?: unknown }).weightUnit || "").trim()
+      ? String((raw as { weightUnit?: unknown }).weightUnit).trim().toLowerCase()
+      : "ton";
+  const distanceUnit =
+    raw && typeof raw === "object" && String((raw as { distanceUnit?: unknown }).distanceUnit || "").trim()
+      ? String((raw as { distanceUnit?: unknown }).distanceUnit).trim().toLowerCase()
+      : "km";
+
+  const slabs: WeightPricingSlab[] = [];
+  const rawSlabs =
+    raw && typeof raw === "object" ? (raw as { slabs?: unknown }).slabs : null;
+  if (Array.isArray(rawSlabs)) {
+    for (const row of rawSlabs) {
+      if (!row || typeof row !== "object") continue;
+      const maxWeight = Number((row as { maxWeight?: unknown }).maxWeight);
+      const ratePerKm = Number(
+        (row as { ratePerKm?: unknown }).ratePerKm ?? (row as { rate?: unknown }).rate
+      );
+      if (!Number.isFinite(maxWeight) || maxWeight <= 0) continue;
+      if (!Number.isFinite(ratePerKm) || ratePerKm <= 0) continue;
+      slabs.push({ maxWeight, ratePerKm });
+    }
+  }
+  slabs.sort((a, b) => a.maxWeight - b.maxWeight);
+  return { weightUnit, distanceUnit, slabs };
+}
+
+export function resolveSlabRatePerKm(
+  slabs: WeightPricingSlab[],
+  weight: number
+): number | null {
+  if (!slabs.length || !Number.isFinite(weight) || weight <= 0) return null;
+  for (const slab of slabs) {
+    if (weight <= slab.maxWeight) return slab.ratePerKm;
+  }
+  return null;
+}
+
+/** Client-side estimate (server remains authoritative). */
+export function estimateWeightBasedPrice(opts: {
+  priceType: string;
+  rate: number;
+  distance: number;
+  weight: number;
+  machineCount?: number;
+  slabs?: WeightPricingSlab[];
+}): { subtotal: number; applicableRate: number; formula: string } | null {
+  const machines = Math.max(1, Math.floor(Number(opts.machineCount) || 1));
+  const distance = Math.floor(Number(opts.distance));
+  const weight = Number(opts.weight);
+  const key = String(opts.priceType || "").toLowerCase();
+  if (!Number.isFinite(distance) || distance < 1) return null;
+  if (!Number.isFinite(weight) || weight <= 0) return null;
+
+  if (key === "per_km_weight") {
+    const rate = Number(opts.rate);
+    if (!Number.isFinite(rate) || rate <= 0) return null;
+    const subtotal = Math.round(rate * distance * weight * machines * 100) / 100;
+    return {
+      subtotal,
+      applicableRate: rate,
+      formula: `Total = Distance × Weight × Rate (${distance} × ${weight} × ₹${rate})`,
+    };
+  }
+
+  if (key === "per_km_weight_slab") {
+    const applicableRate = resolveSlabRatePerKm(opts.slabs || [], weight);
+    if (applicableRate == null) return null;
+    const subtotal = Math.round(applicableRate * distance * machines * 100) / 100;
+    return {
+      subtotal,
+      applicableRate,
+      formula: `Total = Distance × Rate for weight (${distance} × ₹${applicableRate}/km)`,
+    };
+  }
+
+  return null;
 }
 
 /** Normalize metadata.rentalRates (or legacy single price) into a clean rate list. */
@@ -207,6 +330,7 @@ export function buildMachineRentalServicePayload(opts: {
   operatorIncluded: boolean;
   specs?: MachineRentalSpecRow[];
   location?: MachineRentalLocation | null;
+  weightPricing?: WeightPricingConfig | null;
 }): Record<string, unknown> {
   const customFields = (opts.specs || [])
     .filter((row) => row.label.trim() && row.value.trim())
@@ -227,6 +351,15 @@ export function buildMachineRentalServicePayload(opts: {
   const primary = pickPrimaryRate(rates);
   if (!primary) {
     throw new Error("At least one rental rate is required");
+  }
+
+  const weightPricing = opts.weightPricing;
+  const hasWeightRate = rates.some(
+    (r) => r.priceType === "per_km_weight" || r.priceType === "per_km_weight_slab"
+  );
+  const hasSlabRate = rates.some((r) => r.priceType === "per_km_weight_slab");
+  if (hasSlabRate && (!weightPricing?.slabs || weightPricing.slabs.length === 0)) {
+    throw new Error("Add at least one weight slab for Per km + weight slab pricing");
   }
 
   const payload: Record<string, unknown> = {
@@ -251,6 +384,22 @@ export function buildMachineRentalServicePayload(opts: {
         priceType: r.priceType,
         price: r.price,
       })),
+      ...(hasWeightRate && weightPricing
+        ? {
+            weightPricing: {
+              weightUnit: weightPricing.weightUnit || "ton",
+              distanceUnit: weightPricing.distanceUnit || "km",
+              ...(weightPricing.slabs?.length
+                ? {
+                    slabs: weightPricing.slabs.map((s) => ({
+                      maxWeight: s.maxWeight,
+                      ratePerKm: s.ratePerKm,
+                    })),
+                  }
+                : {}),
+            },
+          }
+        : {}),
       ...(opts.securityDeposit?.trim()
         ? { securityDeposit: opts.securityDeposit.trim() }
         : {}),
