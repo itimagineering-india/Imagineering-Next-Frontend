@@ -1,6 +1,19 @@
 export interface SubcategoryEntry {
   name: string;
   itemTypes: string[];
+  linkedCategoryId?: string;
+}
+
+function parseLinkedCategoryId(raw: unknown): string | undefined {
+  if (raw == null || raw === '') return undefined;
+  if (typeof raw === 'object') {
+    const value = raw as { _id?: unknown; id?: unknown };
+    const id = value._id ?? value.id;
+    const parsed = id == null ? '' : String(id).trim();
+    return parsed || undefined;
+  }
+  const parsed = String(raw).trim();
+  return parsed || undefined;
 }
 
 export function normalizeSubcategoryEntry(raw: unknown): SubcategoryEntry | null {
@@ -9,7 +22,7 @@ export function normalizeSubcategoryEntry(raw: unknown): SubcategoryEntry | null
     return name ? { name, itemTypes: [] } : null;
   }
   if (raw && typeof raw === 'object') {
-    const entry = raw as { name?: unknown; itemTypes?: unknown };
+    const entry = raw as { name?: unknown; itemTypes?: unknown; linkedCategoryId?: unknown };
     const name = typeof entry.name === 'string' ? entry.name.trim() : '';
     if (!name) return null;
     const itemTypes = Array.isArray(entry.itemTypes)
@@ -17,7 +30,8 @@ export function normalizeSubcategoryEntry(raw: unknown): SubcategoryEntry | null
           .map((item) => (typeof item === 'string' ? item.trim() : ''))
           .filter(Boolean)
       : [];
-    return { name, itemTypes };
+    const linkedCategoryId = parseLinkedCategoryId(entry.linkedCategoryId);
+    return linkedCategoryId ? { name, itemTypes, linkedCategoryId } : { name, itemTypes };
   }
   return null;
 }
