@@ -458,6 +458,12 @@ export const api = {
         body: JSON.stringify(passwordData),
       }),
 
+    setPassword: (password: string) =>
+      apiRequest('/api/auth/set-password', {
+        method: 'PUT',
+        body: JSON.stringify({ password }),
+      }),
+
     updateNotifications: (notificationData: any) =>
       apiRequest('/api/auth/notifications', {
         method: 'PUT',
