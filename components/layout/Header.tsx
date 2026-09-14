@@ -28,12 +28,12 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap, Mic, MicOff, ShoppingCart } from "lucide-react";
+import { Menu, Search, User, ChevronDown, LogOut, LayoutDashboard, UserCircle, X, Loader2, Briefcase, Building2, MapPin, MessageSquare, FileText, Users, Zap, Mic, MicOff, ShoppingCart, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
 import { parseHeaderSearchQuery } from "@/lib/searchNavigation";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
-import { filterB2bCategories } from "@/lib/b2b/b2bCategories";
+import { resolveB2bBrowseCategories } from "@/lib/b2b/b2bCategories";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -161,6 +161,8 @@ export function Header() {
         return <Briefcase className="h-6 w-6" />;
       case "furniture-hardware":
         return <Briefcase className="h-6 w-6" />;
+      case "tools":
+        return <Wrench className="h-6 w-6" />;
       default:
         return <Building2 className="h-6 w-6" />;
     }
@@ -176,7 +178,7 @@ export function Header() {
     const normalized = Array.isArray(cats) ? cats : [];
     const activeCategoriesForExplore = normalized.filter((c: any) => c?.isActive !== false);
 
-       const filteredB2b = filterB2bCategories(normalized);
+       const filteredB2b = resolveB2bBrowseCategories(normalized);
        const withSubcategoryNames = (category: any) => ({
         ...category,
         subcategories: getSubcategoryNames(category?.subcategories),
