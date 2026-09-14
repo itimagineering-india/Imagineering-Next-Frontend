@@ -24,7 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
 import {
-  filterB2bCategories,
+  resolveB2bBrowseCategories,
   isConstructionMaterialsB2bSlug,
   type B2bCategoryLike,
 } from "@/lib/b2b/b2bCategories";
@@ -227,7 +227,7 @@ export function B2BServicesHub() {
       .then((res) => {
         if (cancelled) return;
         const cats = (res.data as { categories?: B2bCategoryLike[] } | undefined)?.categories || [];
-        const filtered = filterB2bCategories(Array.isArray(cats) ? cats : []).map((c) => ({
+        const filtered = resolveB2bBrowseCategories(Array.isArray(cats) ? cats : []).map((c) => ({
           _id: String((c as { _id?: string })._id || ""),
           name: String(c.name || ""),
           slug: String(c.slug || ""),
@@ -631,7 +631,7 @@ export function B2BServicesHub() {
             Source products <span className="text-orange-300">nationwide</span>
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
-            Construction materials, electrical, furniture and hardware. Add products of the same
+            Construction materials, tools, electrical, furniture and hardware. Add products of the same
             item type to your quote list, then get one combined quote from listed suppliers.
           </p>
 
