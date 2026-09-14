@@ -23,7 +23,6 @@ import {
   Search,
   Loader2,
   Phone,
-  Package,
 } from "lucide-react";
 import { apiRequest } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -904,8 +903,8 @@ export default function ProviderProfile() {
                       const selectedCount = countSelectedForService(serviceId);
                       const selected = selectedCount > 0;
                       return (
-                      <div key={serviceId} className="flex h-full flex-col gap-2">
                       <ServiceCard
+                        key={serviceId}
                         id={serviceId}
                         slug={service.slug}
                         title={service.title}
@@ -932,29 +931,13 @@ export default function ProviderProfile() {
                         category={service.category}
                         metadata={service.metadata}
                         hideProviderDetails
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={selected ? "default" : "outline"}
-                        className="w-full shrink-0"
-                        onClick={(e) => {
+                        addToQuoteSelected={selected}
+                        onAddToQuote={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           onAddToQuoteClick(service);
                         }}
-                      >
-                        <Package className="mr-1.5 h-3.5 w-3.5" />
-                        {selected
-                          ? selectedCount > 1
-                            ? t("addedToQuoteCount", "Added ({{count}})").replace(
-                                "{{count}}",
-                                String(selectedCount),
-                              )
-                            : t("addedToQuote", "Added to quote")
-                          : t("addToQuote", "Add to quote")}
-                      </Button>
-                      </div>
+                      />
                       );
                     })}
                   </div>
