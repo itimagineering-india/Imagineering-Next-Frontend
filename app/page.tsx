@@ -47,7 +47,7 @@ export default async function Home() {
         <HeroSection initialBanners={banners} />
         <SearchBarSection />
         <FeaturedCategoryCardsSection />
-        <TrustStatsSection globeMarkers={globeMarkers} />
+        {/* <TrustStatsSection globeMarkers={globeMarkers} /> */}
         <ServicesSection />
         <ConstructionCalculatorBannerSection />
         <HomePromoBannersSection />
