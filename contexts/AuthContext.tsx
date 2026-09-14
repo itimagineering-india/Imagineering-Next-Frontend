@@ -15,6 +15,7 @@ export type AuthUser = {
   role?: string;
   gstNumber?: string;
   panNumber?: string;
+  hasPassword?: boolean;
   [key: string]: unknown;
 } | null;
 
