@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { MaterialsProduct } from "@/lib/materials/constructionMaterialsCatalog";
 
 type Props = {
@@ -52,7 +54,7 @@ export function MaterialsProductCard({
           <p className="min-h-[1rem] truncate text-[10px] font-bold uppercase leading-4 tracking-wide text-orange-600">
             {product.brand || "\u00A0"}
           </p>
-          <p className="line-clamp-2 min-h-[2.5rem] text-xs font-bold leading-snug text-slate-900 sm:min-h-0 sm:truncate sm:leading-[1.25]">
+          <p className="truncate text-xs font-bold leading-snug text-slate-900" title={product.name}>
             {product.name}
           </p>
           {product.variantSummary ? (
@@ -73,17 +75,29 @@ export function MaterialsProductCard({
       </Link>
       <div className="mt-auto space-y-1 px-2.5 pb-2.5 sm:px-2 sm:pb-2">
         {quickAddToQuote ? (
-          <button
-            type="button"
-            onClick={() => quickAddToQuote(product)}
-            className={`inline-flex h-8 w-full items-center justify-center rounded-lg px-2 text-[11px] font-semibold transition sm:h-7 sm:text-[10px] ${
-              inQuoteList
-                ? "border border-emerald-300 bg-emerald-50 text-emerald-800"
-                : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
-            }`}
-          >
-            {inQuoteList ? "Added to quote" : "Add to quote"}
-          </button>
+          <div className="flex w-full gap-1.5">
+            <Button
+              size="sm"
+              asChild
+              variant="outline"
+              className="h-7 min-w-0 flex-1 px-2 text-[10px] sm:text-[11px]"
+            >
+              <Link href={href} target="_blank" rel="noopener noreferrer">
+                View
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={inQuoteList ? "default" : "outline"}
+              className="h-7 w-7 shrink-0 px-0"
+              aria-label={inQuoteList ? "Added to quote" : "Add to quote"}
+              title={inQuoteList ? "Added to quote" : "Add to quote"}
+              onClick={() => quickAddToQuote(product)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         ) : null}
         {quickCta ? (
           <button
