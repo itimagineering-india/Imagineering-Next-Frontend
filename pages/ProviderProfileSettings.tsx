@@ -115,13 +115,12 @@ export default function ProviderProfileSettings() {
   });
 
   // Password State
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
 
   // Other States
   const [notifications, setNotifications] = useState<NotificationPreferences>({
@@ -161,9 +160,10 @@ export default function ProviderProfileSettings() {
     setIsLoading(true);
     try {
       const userRes = await api.auth.getMe();
-      const userData = userRes.data as { user?: { name?: string; email?: string; phone?: string; avatar?: string; id?: string; notificationPreferences?: any; privacySettings?: any; appPreferences?: { language?: string } } } | undefined;
+      const userData = userRes.data as { user?: { name?: string; email?: string; phone?: string; avatar?: string; id?: string; hasPassword?: boolean; notificationPreferences?: any; privacySettings?: any; appPreferences?: { language?: string } } } | undefined;
       if (userRes.success && userData?.user) {
         const u = userData.user;
+        setHasPassword(Boolean(u.hasPassword));
         setProfile({
           name: u.name || "",
           email: u.email || "",
@@ -344,30 +344,35 @@ export default function ProviderProfileSettings() {
   };
 
   const handlePasswordChange = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({ title: "Missing fields", description: "Please fill in all password fields", variant: "destructive" });
+    if (!newPassword || !confirmPassword) {
+      toast({ title: "Missing fields", description: "Please enter and confirm the new password", variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {
       toast({ title: "Passwords don't match", description: "New password and confirm password must match", variant: "destructive" });
       return;
     }
-    if (newPassword.length < 8) {
-      toast({ title: "Password too short", description: "Password must be at least 8 characters long", variant: "destructive" });
+    if (newPassword.length < 6) {
+      toast({ title: "Password too short", description: "Password must be at least 6 characters long", variant: "destructive" });
       return;
     }
 
     setIsChangingPassword(true);
     try {
-      const res = await api.auth.changePassword({ currentPassword, newPassword });
+      const res = await api.auth.setPassword(newPassword);
       if (res.success) {
-        toast({ title: "Password changed", description: "Your password has been updated successfully" });
-        setCurrentPassword("");
+        setHasPassword(true);
         setNewPassword("");
         setConfirmPassword("");
+        toast({
+          title: hasPassword ? "Password reset" : "Password set",
+          description: hasPassword
+            ? "Your password has been reset successfully"
+            : "You can now sign in with email or phone and password",
+        });
       }
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to change password", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to update password", variant: "destructive" });
     } finally {
       setIsChangingPassword(false);
     }
@@ -760,30 +765,14 @@ export default function ProviderProfileSettings() {
           <TabsContent value="security">
             <Card>
               <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>Manage your account password and security</CardDescription>
+                <CardTitle>{hasPassword ? "Reset Password" : "Set Password"}</CardTitle>
+                <CardDescription>
+                  {hasPassword
+                    ? "Enter a new password to replace your current one."
+                    : "Create a password so you can also sign in with email or phone + password."}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="curr-pass">Current Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="curr-pass"
-                      type={showCurrentPassword ? "text" : "password"}
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    >
-                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-pass">New Password</Label>
                   <div className="relative">
@@ -826,7 +815,7 @@ export default function ProviderProfileSettings() {
                 </div>
                 <Button onClick={handlePasswordChange} disabled={isChangingPassword}>
                   {isChangingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Update Password
+                  {hasPassword ? "Reset Password" : "Set Password"}
                 </Button>
 
                 <Separator className="my-6" />
