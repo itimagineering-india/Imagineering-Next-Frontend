@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Package, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
+import { Loader2, Package, Plus, Search, ShoppingCart, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -842,22 +842,42 @@ export function B2BServicesHub() {
                           </div>
                         )}
                         <div className="space-y-1 p-2">
-                          <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-900">
+                          <p className="truncate text-xs font-bold leading-snug text-slate-900" title={item.title}>
                             {item.title}
                           </p>
                         </div>
                       </Link>
-                      <div className="px-2 pb-2">
+                      <div className="flex gap-1.5 px-2 pb-2">
+                        <Button
+                          size="sm"
+                          asChild
+                          variant="outline"
+                          className="h-7 min-w-0 flex-1 px-2 text-[10px] sm:text-[11px]"
+                        >
+                          <Link href={`/service/${item.id}`} target="_blank" rel="noopener noreferrer">
+                            View
+                          </Link>
+                        </Button>
                         <Button
                           type="button"
                           size="sm"
-                          variant={quoteCart.some((l) => l.key === `service:${item.id}`) ? "secondary" : "outline"}
-                          className="w-full"
+                          variant={
+                            quoteCart.some((l) => l.key === `service:${item.id}`) ? "default" : "outline"
+                          }
+                          className="h-7 w-7 shrink-0 px-0"
+                          aria-label={
+                            quoteCart.some((l) => l.key === `service:${item.id}`)
+                              ? "Added to quote"
+                              : "Add to quote"
+                          }
+                          title={
+                            quoteCart.some((l) => l.key === `service:${item.id}`)
+                              ? "Added to quote"
+                              : "Add to quote"
+                          }
                           onClick={() => handleAddListing(item)}
                         >
-                          {quoteCart.some((l) => l.key === `service:${item.id}`)
-                            ? "Added to quote"
-                            : "Add to quote"}
+                          <Plus className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </article>
@@ -892,22 +912,42 @@ export function B2BServicesHub() {
                         </div>
                       )}
                       <div className="space-y-1 p-2">
-                        <p className="line-clamp-2 text-xs font-bold leading-snug text-slate-900">
+                        <p className="truncate text-xs font-bold leading-snug text-slate-900" title={item.title}>
                           {item.title}
                         </p>
                       </div>
                     </Link>
-                    <div className="px-2 pb-2">
+                    <div className="flex gap-1.5 px-2 pb-2">
+                      <Button
+                        size="sm"
+                        asChild
+                        variant="outline"
+                        className="h-7 min-w-0 flex-1 px-2 text-[10px] sm:text-[11px]"
+                      >
+                        <Link href={`/service/${item.id}`} target="_blank" rel="noopener noreferrer">
+                          View
+                        </Link>
+                      </Button>
                       <Button
                         type="button"
                         size="sm"
-                        variant={quoteCart.some((l) => l.key === `service:${item.id}`) ? "secondary" : "outline"}
-                        className="w-full"
+                        variant={
+                          quoteCart.some((l) => l.key === `service:${item.id}`) ? "default" : "outline"
+                        }
+                        className="h-7 w-7 shrink-0 px-0"
+                        aria-label={
+                          quoteCart.some((l) => l.key === `service:${item.id}`)
+                            ? "Added to quote"
+                            : "Add to quote"
+                        }
+                        title={
+                          quoteCart.some((l) => l.key === `service:${item.id}`)
+                            ? "Added to quote"
+                            : "Add to quote"
+                        }
                         onClick={() => handleAddListing(item)}
                       >
-                        {quoteCart.some((l) => l.key === `service:${item.id}`)
-                          ? "Added to quote"
-                          : "Add to quote"}
+                        <Plus className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </article>
