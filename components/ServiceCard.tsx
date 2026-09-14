@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star, Clock, Heart, Share2, MapPin, Crown, MessageCircle } from "lucide-react";
+import { Star, Clock, Heart, Share2, MapPin, Crown, MessageCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
  DropdownMenu,
@@ -70,6 +70,9 @@ export interface ServiceCardProps {
  /** Distance from user search / GPS (km), when known */
  distanceKm?: number;
  hideProviderDetails?: boolean;
+ /** Store / provider profile: add this listing to a quote request */
+ onAddToQuote?: (e: React.MouseEvent) => void;
+ addToQuoteSelected?: boolean;
  /** Used for machine-rental multi-rate hint on cards */
  metadata?: Record<string, unknown> | null;
 }
@@ -98,6 +101,8 @@ function ServiceCardComponent({
  distanceKm,
  hideProviderDetails = false,
  metadata,
+ onAddToQuote,
+ addToQuoteSelected = false,
 }: ServiceCardProps) {
  // Memoize expensive computations
  const service: ServiceWithInteraction = useMemo(() => ({ category }), [category]);
@@ -256,6 +261,40 @@ function ServiceCardComponent({
   }
  };
 
+ const handleAddToQuoteClick = (e: React.MouseEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+  onAddToQuote?.(e);
+ };
+
+ const storeQuoteActions = hideProviderDetails && (onAddToQuote || !canAddToCart) ? (
+  <div className="flex w-full gap-2">
+   <Button
+    size="sm"
+    asChild
+    variant={isRangePrice ? "outline" : "default"}
+    className="h-8 sm:h-9 min-w-0 flex-1 px-2 sm:px-3"
+   >
+    <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
+     {secondaryCtaLabel}
+    </Link>
+   </Button>
+   {onAddToQuote ? (
+    <Button
+     type="button"
+     size="sm"
+     variant={addToQuoteSelected ? "default" : "outline"}
+     className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 px-0"
+     aria-label={addToQuoteSelected ? "Added to quote" : "Add to quote"}
+     title={addToQuoteSelected ? "Added to quote" : "Add to quote"}
+     onClick={handleAddToQuoteClick}
+    >
+     <Plus className="h-4 w-4" />
+    </Button>
+   ) : null}
+  </div>
+ ) : null;
+
  const handleCardClick = (e: React.MouseEvent<HTMLElement>) => {
   if (!hideProviderDetails) return;
   const target = e.target as HTMLElement;
@@ -315,7 +354,7 @@ function ServiceCardComponent({
       <div className="flex-1 min-w-0 flex flex-col gap-2 sm:gap-2">
        <div className="flex gap-2 items-start justify-between min-w-0">
         <Link href={serviceUrl} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
-         <h3 className="subtitle body min-w-0 overflow-hidden text-ellipsis break-words leading-snug line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] sm:leading-normal hover:text-primary transition-colors">
+         <h3 className="subtitle body min-w-0 truncate leading-snug sm:leading-normal hover:text-primary transition-colors" title={title}>
           {title}
          </h3>
         </Link>
@@ -385,7 +424,6 @@ function ServiceCardComponent({
          <p className="listing-title leading-tight m-0">
           {formattedPrice}
          </p>
-         {isRangePrice && <Badge variant="outline" className="text-[10px]">Enquiry only</Badge>}
          {rentalMoreRatesHint ? (
           <p className="basis-full text-[10px] font-medium leading-snug text-muted-foreground">
            {rentalMoreRatesHint}
@@ -397,7 +435,10 @@ function ServiceCardComponent({
        )}
       </div>
 
-      <div className="flex flex-col gap-2 w-full shrink-0 md:w-[148px] lg:w-[160px] md:pt-0">
+      <div className={cn(
+       "flex flex-col gap-2 w-full shrink-0 md:pt-0",
+       hideProviderDetails ? "md:w-[200px] lg:w-[220px]" : "md:w-[148px] lg:w-[160px]"
+      )}>
        <div className={cn("grid gap-2 w-full", hideProviderDetails ? "grid-cols-1" : "grid-cols-2 md:grid-cols-1")}>
         {!hideProviderDetails && (
          <Button size="sm" asChild className="h-8 sm:h-9 w-full px-2 sm:px-3">
@@ -421,20 +462,9 @@ function ServiceCardComponent({
           </a>
          </Button>
         )}
-        {hideProviderDetails && !canAddToCart ? (
-         <Button
-          size="sm"
-          asChild
-          variant={isRangePrice ? "outline" : "default"}
-          className="h-8 sm:h-9 w-full px-2 sm:px-3"
-         >
-          <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
-           {secondaryCtaLabel}
-          </Link>
-         </Button>
-        ) : null}
+        {storeQuoteActions}
        </div>
-       {canAddToCart && (
+       {canAddToCart && !onAddToQuote && (
         <AddToCartButton
          serviceId={id}
          providerName={provider?.name}
@@ -539,10 +569,8 @@ function ServiceCardComponent({
     {/* Title */}
     <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
      <h3
-      className={cn(
-       "subtitle caption min-w-0 overflow-hidden text-ellipsis break-words text-foreground line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] hover:text-primary transition-colors",
-       hideProviderDetails && "min-h-10"
-      )}
+      className="subtitle caption min-w-0 truncate text-foreground hover:text-primary transition-colors"
+      title={title}
      >
       {title}
      </h3>
@@ -577,7 +605,6 @@ function ServiceCardComponent({
       <p className="body text-foreground">
        {formattedPrice}
       </p>
-      {isRangePrice && <Badge variant="outline" className="mt-1 text-[10px]">Enquiry only</Badge>}
       {rentalMoreRatesHint ? (
        <p className="mt-0.5 text-[10px] font-medium leading-snug text-muted-foreground">
         {rentalMoreRatesHint}
@@ -613,20 +640,9 @@ function ServiceCardComponent({
         </a>
        </Button>
       )}
-      {hideProviderDetails && !canAddToCart ? (
-       <Button
-        size="sm"
-        asChild
-        variant={isRangePrice ? "outline" : "default"}
-        className="w-full h-8 px-2 sm:px-3"
-       >
-        <Link href={serviceUrl} target="_blank" rel="noopener noreferrer">
-         {secondaryCtaLabel}
-        </Link>
-       </Button>
-      ) : null}
+     {storeQuoteActions}
      </div>
-     {canAddToCart && (
+     {canAddToCart && !onAddToQuote && (
       <AddToCartButton
        serviceId={id}
        providerName={provider?.name}
@@ -663,6 +679,7 @@ const areEqual = (prevProps: ServiceCardProps, nextProps: ServiceCardProps) => {
   prevProps.viewMode !== nextProps.viewMode ||
   prevProps.distanceKm !== nextProps.distanceKm ||
   prevProps.hideProviderDetails !== nextProps.hideProviderDetails ||
+  prevProps.addToQuoteSelected !== nextProps.addToQuoteSelected ||
   prevProps.metadata !== nextProps.metadata
  ) {
   return false;
