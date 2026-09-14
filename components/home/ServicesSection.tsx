@@ -7,14 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ServicePlaceholderCard, serviceCategories } from "./ServicePlaceholderCard";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
-/** Matches homepage reference order. */
+/** Categories already featured above (materials, manpower, contractors, rental, resale) are omitted. */
 const DISPLAY_ORDER = [
-  "construction-materials",
-  "manpower",
   "technical-manpower",
-  "machine-rental",
-  "machines",
-  "contractors",
   "consultants",
   "real-estate",
   "manufacturer",
