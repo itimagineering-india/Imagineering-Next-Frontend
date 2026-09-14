@@ -46,6 +46,8 @@ import {
   ArrowRight,
   Briefcase,
   ClipboardList,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
 import api from "@/lib/api-client";
@@ -77,6 +79,12 @@ const Profile = () => {
   const [userData, setUserData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [passwordValue, setPasswordValue] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: "",
@@ -246,6 +254,64 @@ const Profile = () => {
       });
       setAvatarPreview(userData.avatar || "");
       setIsEditDialogOpen(true);
+    }
+  };
+
+  const hasPassword = Boolean(userData?.hasPassword);
+
+  const handlePasswordClick = () => {
+    setPasswordValue("");
+    setPasswordConfirm("");
+    setShowPassword(false);
+    setShowPasswordConfirm(false);
+    setIsPasswordDialogOpen(true);
+  };
+
+  const handleSavePassword = async () => {
+    if (passwordValue.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (passwordValue !== passwordConfirm) {
+      toast({
+        title: "Passwords don't match",
+        description: "New password and confirm password must match.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSavingPassword(true);
+    try {
+      const res = await api.auth.setPassword(passwordValue);
+      if (res.success) {
+        setUserData((prev: any) => (prev ? { ...prev, hasPassword: true } : prev));
+        setIsPasswordDialogOpen(false);
+        toast({
+          title: hasPassword ? "Password reset" : "Password set",
+          description: hasPassword
+            ? "Your password has been reset successfully."
+            : "You can now sign in with email or phone and password.",
+        });
+        await refresh();
+      } else {
+        toast({
+          title: "Failed",
+          description: res.error?.message || "Could not update password.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Could not update password.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingPassword(false);
     }
   };
 
@@ -595,7 +661,10 @@ const Profile = () => {
     { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Help", href: "/help", icon: HelpCircle },
     { label: "Edit Profile", icon: User, onClick: handleEditClick },
+    { label: hasPassword ? "Reset Password" : "Set Password", icon: Lock, onClick: handlePasswordClick },
   ];
+
+  const quickActionCount = quickActions.length;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -633,6 +702,9 @@ const Profile = () => {
                 </Button>
                 <Button onClick={handleEditClick} size="sm" className="w-full sm:w-auto text-xs sm:text-sm gap-1">
                   Edit Profile
+                </Button>
+                <Button onClick={handlePasswordClick} size="sm" variant="outline" className="w-full sm:w-auto text-xs sm:text-sm gap-1">
+                  {hasPassword ? "Reset Password" : "Set Password"}
                 </Button>
               </div>
             </div>
@@ -759,31 +831,41 @@ const Profile = () => {
         {/* Imagineering Credit — BNPL credit line for buyers */}
         <ImagineeringCreditHomeCard alwaysShow />
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+        {/* Quick Actions — auto-fit so all items stay visible (no orphan last row). */}
+        <div
+          className="grid gap-3 sm:gap-4"
+          style={{
+            gridTemplateColumns: `repeat(auto-fill, minmax(88px, 1fr))`,
+          }}
+          aria-label={`Quick actions (${quickActionCount})`}
+        >
           {quickActions.map((item) =>
             item.href ? (
               <Link
                 key={item.label}
                 href={item.href}
-                className="flex flex-col items-center gap-2 sm:gap-2 group"
+                className="flex flex-col items-center gap-2 group min-w-0"
               >
                 <div className="rounded-full h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-muted border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors">
                   <item.icon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground group-hover:text-primary" />
                 </div>
-                <span className="text-[10px] sm:text-xs font-medium text-center text-foreground leading-tight max-w-[64px] sm:max-w-[72px]">{item.label}</span>
+                <span className="text-[10px] sm:text-xs font-medium text-center text-foreground leading-tight max-w-[5.5rem] px-0.5 line-clamp-2">
+                  {item.label}
+                </span>
               </Link>
             ) : (
               <button
                 key={item.label}
                 type="button"
                 onClick={item.onClick}
-                className="flex flex-col items-center gap-2 sm:gap-2 group"
+                className="flex flex-col items-center gap-2 group min-w-0"
               >
                 <div className="rounded-full h-11 w-11 sm:h-14 sm:w-14 flex items-center justify-center bg-muted border border-border group-hover:bg-primary/10 group-hover:border-primary/30 transition-colors">
                   <item.icon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground group-hover:text-primary" />
                 </div>
-                <span className="text-[10px] sm:text-xs font-medium text-center text-foreground leading-tight max-w-[64px] sm:max-w-[72px]">{item.label}</span>
+                <span className="text-[10px] sm:text-xs font-medium text-center text-foreground leading-tight max-w-[5.5rem] px-0.5 line-clamp-2">
+                  {item.label}
+                </span>
               </button>
             )
           )}
@@ -1015,10 +1097,14 @@ const Profile = () => {
                   </div>
                 </div>
                 <Separator />
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={handlePasswordClick}
+                  className="flex items-center gap-2 text-xs sm:text-sm text-foreground hover:text-primary transition-colors text-left"
+                >
                   <Lock className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
-                  Security settings — Coming soon
-                </div>
+                  {hasPassword ? "Reset Password" : "Set Password"}
+                </button>
                 <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Bell className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
                   Notification preferences — Coming soon
@@ -1284,6 +1370,79 @@ const Profile = () => {
               className="w-full sm:w-auto"
             >
               {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="w-[95vw] sm:w-full max-w-[440px] mx-3 sm:mx-4">
+          <DialogHeader>
+            <DialogTitle>{hasPassword ? "Reset Password" : "Set Password"}</DialogTitle>
+            <DialogDescription>
+              {hasPassword
+                ? "Enter a new password to replace your current one."
+                : "Create a password so you can also sign in with email or phone + password."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="profile-new-password">New password</Label>
+              <div className="relative">
+                <Input
+                  id="profile-new-password"
+                  type={showPassword ? "text" : "password"}
+                  value={passwordValue}
+                  onChange={(e) => setPasswordValue(e.target.value)}
+                  placeholder="At least 6 characters"
+                  autoComplete="new-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-confirm-password">Confirm password</Label>
+              <div className="relative">
+                <Input
+                  id="profile-confirm-password"
+                  type={showPasswordConfirm ? "text" : "password"}
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  placeholder="Re-enter password"
+                  autoComplete="new-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPasswordConfirm((v) => !v)}
+                >
+                  {showPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsPasswordDialogOpen(false)}
+              disabled={isSavingPassword}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSavePassword()} disabled={isSavingPassword} className="w-full sm:w-auto">
+              {isSavingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {hasPassword ? "Reset Password" : "Set Password"}
             </Button>
           </DialogFooter>
         </DialogContent>
