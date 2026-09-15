@@ -5,7 +5,7 @@ import { LayoutGrid } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { PaintShadeBrowseModal } from "@/components/materials/PaintShadeBrowseModal";
+import { PaintShadeBrowseModal, resolveCatalogBrand } from "@/components/materials/PaintShadeBrowseModal";
 import type { PaintShade } from "@/lib/paintShades";
 import { formatPaintShadeLabel } from "@/lib/paintShades";
 
@@ -21,6 +21,7 @@ export function PaintShadePicker({ value, onChange, brand }: Props) {
   const hasPreview = Boolean(value.hex && /^#[0-9a-fA-F]{6}$/i.test(value.hex));
   const previewHex = hasPreview ? value.hex! : "#e2e8f0";
   const selectedLabel = formatPaintShadeLabel(value);
+  const lockedBrand = resolveCatalogBrand(brand);
 
   return (
     <div className="space-y-3 rounded-lg border border-input bg-background p-3">
@@ -28,7 +29,9 @@ export function PaintShadePicker({ value, onChange, brand }: Props) {
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">Shade</p>
           <p className="text-xs text-muted-foreground">
-            Browse shades to pick code and name.
+            {lockedBrand
+              ? `Browse ${lockedBrand} shades to pick code and name.`
+              : "Browse shades to pick code and name."}
           </p>
         </div>
         <Button
