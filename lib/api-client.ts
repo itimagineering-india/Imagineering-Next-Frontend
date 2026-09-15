@@ -2919,6 +2919,8 @@ export const api = {
         catalogProductId?: string;
         catalogVariantId?: string;
         variantLabel?: string;
+        shadeCode?: string;
+        shadeName?: string;
       }>;
     }) =>
       apiRequest<{ data: any }>('/api/quote-requests', {
