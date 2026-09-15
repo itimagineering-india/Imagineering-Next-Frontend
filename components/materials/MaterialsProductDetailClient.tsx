@@ -39,6 +39,15 @@ import {
   upsertB2bQuoteCartLine,
 } from "@/lib/b2b/b2bQuoteCart";
 import type { QuoteModalLine } from "@/components/service-details/GetBestQuotesModal";
+import { PaintShadePicker } from "@/components/materials/PaintShadePicker";
+import {
+  emptyPaintShade,
+  formatPaintShadeLabel,
+  isShadeSelectionComplete,
+  paintQuoteCartKey,
+  productHasShadePicker,
+  type PaintShade,
+} from "@/lib/paintShades";
 
 type Props = {
   productId: string;
@@ -142,8 +151,10 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const [isSaved, setIsSaved] = useState(false);
   const [inQuoteList, setInQuoteList] = useState(false);
   const [variantSel, setVariantSel] = useState<Record<string, string>>({});
+  const [selectedShade, setSelectedShade] = useState<PaintShade>(() => emptyPaintShade());
 
   const catalogVariants = useMemo(() => readCatalogVariants(raw || undefined), [raw]);
+  const showShadePicker = useMemo(() => productHasShadePicker(raw || undefined), [raw]);
   const selectedVariant = useMemo(() => {
     if (!catalogVariants.hasVariants) return undefined;
     return findCatalogVariant(
@@ -161,18 +172,27 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     } else {
       setVariantSel({});
     }
+    setSelectedShade(emptyPaintShade());
   }, [raw]);
 
   useEffect(() => {
     if (!isB2b) return;
     const variantId = selectedVariant?.id;
-    setInQuoteList(
-      loadB2bQuoteCart().some(
-        (l) =>
-          l.key === (variantId ? `catalog:${productId}:${variantId}` : `catalog:${productId}`)
-      )
-    );
-  }, [isB2b, productId, selectedVariant?.id]);
+    const key = paintQuoteCartKey({
+      catalogProductId: productId,
+      catalogVariantId: variantId,
+      shadeCode: showShadePicker ? selectedShade.code : undefined,
+      shadeName: showShadePicker ? selectedShade.name : undefined,
+    });
+    setInQuoteList(loadB2bQuoteCart().some((l) => l.key === key));
+  }, [
+    isB2b,
+    productId,
+    selectedVariant?.id,
+    selectedShade.code,
+    selectedShade.name,
+    showShadePicker,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -381,16 +401,34 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     const variantLabel = selectedVariant
       ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
       : undefined;
+    const shadeLabel = showShadePicker ? formatPaintShadeLabel(selectedShade) : "";
+    if (showShadePicker && !isShadeSelectionComplete(selectedShade)) {
+      toast({
+        title: "Shade code required",
+        description: "Enter the shade code from your shade card (e.g. 8234).",
+        variant: "destructive",
+      });
+      return;
+    }
     const priceType =
       selectedVariant?.suggestedPriceType ||
       (raw?.suggestedPriceType as string) ||
       mapped.unitType ||
       undefined;
     const itemType = normalizeB2bQuoteItemType(mapped.categoryId);
+    const displayParts = [variantLabel, shadeLabel].filter(Boolean);
+    const lineTitle = displayParts.length
+      ? `${mapped.name} · ${displayParts.join(" · ")}`
+      : mapped.name;
 
-    // Keep current size in the quote list so switching sizes accumulates lines.
+    // Keep current size/shade in the quote list so switching sizes accumulates lines.
     if (isB2b) {
-      const key = variantId ? `catalog:${mapped.id}:${variantId}` : `catalog:${mapped.id}`;
+      const key = paintQuoteCartKey({
+        catalogProductId: mapped.id,
+        catalogVariantId: variantId,
+        shadeCode: selectedShade.code,
+        shadeName: selectedShade.name,
+      });
       const cart = loadB2bQuoteCart();
       if (!cart.some((l) => l.key === key)) {
         const result = upsertB2bQuoteCartLine(cart, {
@@ -398,6 +436,8 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           catalogProductId: mapped.id,
           catalogVariantId: variantId,
           variantLabel,
+          shadeCode: selectedShade.code.trim() || undefined,
+          shadeName: selectedShade.name.trim() || undefined,
           title: mapped.name,
           priceType,
           itemType: itemType || undefined,
@@ -421,30 +461,45 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
 
     const lines: QuoteModalLine[] =
       cartLines.length > 0
-        ? cartLines.map((l) => ({
-            serviceId: l.serviceId || linkedServiceId,
-            title: l.variantLabel ? `${mapped.name} · ${l.variantLabel}` : mapped.name,
-            quantity: l.quantity,
-            catalogProductId: mapped.id,
-            catalogVariantId: l.catalogVariantId,
-            variantLabel: l.variantLabel,
-            priceType: l.priceType || priceType,
-          }))
+        ? cartLines.map((l) => {
+            const parts = [
+              l.variantLabel,
+              l.shadeName || l.shadeCode
+                ? formatPaintShadeLabel({
+                    code: l.shadeCode || "",
+                    name: l.shadeName || l.shadeCode || "",
+                  })
+                : "",
+            ].filter(Boolean);
+            return {
+              serviceId: l.serviceId || linkedServiceId,
+              title: parts.length ? `${mapped.name} · ${parts.join(" · ")}` : mapped.name,
+              quantity: l.quantity,
+              catalogProductId: mapped.id,
+              catalogVariantId: l.catalogVariantId,
+              variantLabel: l.variantLabel,
+              shadeCode: l.shadeCode,
+              shadeName: l.shadeName,
+              priceType: l.priceType || priceType,
+            };
+          })
         : [
             {
               serviceId: linkedServiceId,
-              title: variantLabel ? `${mapped.name} · ${variantLabel}` : mapped.name,
+              title: lineTitle,
               catalogProductId: mapped.id,
               catalogVariantId: variantId,
               variantLabel,
+              shadeCode: selectedShade.code.trim() || undefined,
+              shadeName: selectedShade.name.trim() || undefined,
               priceType,
             },
           ];
 
-    // Prefer distinct variants; if somehow empty, fall back to current.
+    // Prefer distinct variants/shades; if somehow empty, fall back to current.
     const seen = new Set<string>();
     const deduped = lines.filter((line) => {
-      const key = line.catalogVariantId || line.serviceId;
+      const key = `${line.catalogVariantId || line.serviceId}:${line.shadeCode || ""}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -461,22 +516,39 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     productPath,
     raw?.suggestedPriceType,
     router,
+    selectedShade,
     selectedVariant,
+    showShadePicker,
     t,
     toast,
   ]);
 
   const handleAddToQuote = useCallback(() => {
     if (!mapped) return;
+    if (showShadePicker && !isShadeSelectionComplete(selectedShade)) {
+      toast({
+        title: "Shade code required",
+        description: "Enter the shade code from your shade card (e.g. 8234).",
+        variant: "destructive",
+      });
+      return;
+    }
     const variantId = selectedVariant?.id;
     const variantLabel = selectedVariant
       ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
       : undefined;
     const result = upsertB2bQuoteCartLine(loadB2bQuoteCart(), {
-      key: variantId ? `catalog:${mapped.id}:${variantId}` : `catalog:${mapped.id}`,
+      key: paintQuoteCartKey({
+        catalogProductId: mapped.id,
+        catalogVariantId: variantId,
+        shadeCode: selectedShade.code,
+        shadeName: selectedShade.name,
+      }),
       catalogProductId: mapped.id,
       catalogVariantId: variantId,
       variantLabel,
+      shadeCode: selectedShade.code.trim() || undefined,
+      shadeName: selectedShade.name.trim() || undefined,
       title: mapped.name,
       priceType:
         selectedVariant?.suggestedPriceType ||
@@ -505,9 +577,19 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     setInQuoteList(true);
     toast({
       title: result.added ? "Added to quote list" : "Quantity updated",
-      description: variantLabel ? `${mapped.name} · ${variantLabel}` : mapped.name,
+      description: [mapped.name, variantLabel, formatPaintShadeLabel(selectedShade)]
+        .filter(Boolean)
+        .join(" · "),
     });
-  }, [catalogVariants.variantAxes, mapped, raw?.suggestedPriceType, selectedVariant, toast]);
+  }, [
+    catalogVariants.variantAxes,
+    mapped,
+    raw?.suggestedPriceType,
+    selectedShade,
+    selectedVariant,
+    showShadePicker,
+    toast,
+  ]);
 
   const handleShare = useCallback(async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -570,7 +652,8 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const variantLabel = selectedVariant
     ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
     : "";
-  const displayTitle = variantLabel ? `${mapped.name} | ${variantLabel}` : mapped.name;
+  const shadeLabel = showShadePicker ? formatPaintShadeLabel(selectedShade) : "";
+  const displayTitle = [mapped.name, variantLabel, shadeLabel].filter(Boolean).join(" | ");
 
   return (
     <div className="min-h-screen max-w-full overflow-x-clip bg-[radial-gradient(circle_at_top_left,rgba(255,56,92,0.08),transparent_34%),linear-gradient(180deg,#fff,rgba(248,250,252,0.9))]">
@@ -619,45 +702,56 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           onFavorite={handleFavorite}
           isSaved={isSaved}
           variantPicker={
-            catalogVariants.hasVariants ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {catalogVariants.variantAxes.map((axis) => {
-                    const values = catalogAxisOptionValues(axis, catalogVariants.variants);
-                    return (
-                      <label key={axis.key} className="space-y-1 text-sm">
-                        <span className="font-medium text-foreground">{axis.label}</span>
-                        <select
-                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                          value={variantSel[axis.key] || ""}
-                          onChange={(e) =>
-                            setVariantSel((prev) =>
-                              selectionAfterAxisChange(
-                                catalogVariants.variantAxes,
-                                catalogVariants.variants,
-                                prev,
-                                axis.key,
-                                e.target.value,
-                              ),
-                            )
-                          }
-                        >
-                          {values.map((val) => (
-                            <option key={val} value={val}>
-                              {val}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    );
-                  })}
-                </div>
+            catalogVariants.hasVariants || showShadePicker ? (
+              <div className="space-y-3">
+                {catalogVariants.hasVariants ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {catalogVariants.variantAxes.map((axis) => {
+                        const values = catalogAxisOptionValues(axis, catalogVariants.variants);
+                        return (
+                          <label key={axis.key} className="space-y-1 text-sm">
+                            <span className="font-medium text-foreground">{axis.label}</span>
+                            <select
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={variantSel[axis.key] || ""}
+                              onChange={(e) =>
+                                setVariantSel((prev) =>
+                                  selectionAfterAxisChange(
+                                    catalogVariants.variantAxes,
+                                    catalogVariants.variants,
+                                    prev,
+                                    axis.key,
+                                    e.target.value,
+                                  ),
+                                )
+                              }
+                            >
+                              {values.map((val) => (
+                                <option key={val} value={val}>
+                                  {val}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {showShadePicker ? (
+                  <PaintShadePicker
+                    value={selectedShade}
+                    onChange={setSelectedShade}
+                    brand={mapped.brand || String(raw?.brand || "")}
+                  />
+                ) : null}
                 {isB2b ? (
                   <p className="text-xs text-muted-foreground">
-                    Need more than one size (e.g. 100 and 150)? Select each, tap{" "}
+                    Need more than one size or shade? Select each, tap{" "}
                     <span className="font-medium text-foreground">Add to quote</span>, then{" "}
-                    <span className="font-medium text-foreground">Get Best Quotes</span> — each size
-                    gets its own quantity.
+                    <span className="font-medium text-foreground">Get Best Quotes</span> — each
+                    option gets its own quantity.
                   </p>
                 ) : null}
               </div>
