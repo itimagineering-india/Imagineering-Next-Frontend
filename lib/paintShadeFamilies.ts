@@ -1,7 +1,5 @@
 /** Colour families — same idea as Asian Paints colour catalogue. */
 
-import type { CatalogPaintShade } from "./paintShadeCatalog";
-
 export const PAINT_SHADE_FAMILIES = [
   "All",
   "Whites",
@@ -2911,7 +2909,12 @@ function familyFromHex(hex?: string, name = ""): string {
   return "Brown";
 }
 
-export function getPaintShadeFamily(shade: Pick<CatalogPaintShade, "brand" | "code" | "hex" | "name">): string {
+export function getPaintShadeFamily(shade: {
+  brand: string;
+  code: string;
+  hex?: string;
+  name: string;
+}): string {
   const key = `${shade.brand}|${shade.code}`;
   return FAMILY_BY_KEY[key] || familyFromHex(shade.hex, shade.name);
 }
