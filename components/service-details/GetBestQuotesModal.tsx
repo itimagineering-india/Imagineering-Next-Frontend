@@ -30,6 +30,8 @@ export type QuoteModalLine = {
   catalogProductId?: string;
   catalogVariantId?: string;
   variantLabel?: string;
+  shadeCode?: string;
+  shadeName?: string;
 };
 
 function pad2(n: number) {
@@ -173,6 +175,8 @@ export function GetBestQuotesModal({
         catalogProductId: line.catalogProductId,
         catalogVariantId: line.catalogVariantId,
         variantLabel: line.variantLabel,
+        shadeCode: line.shadeCode,
+        shadeName: line.shadeName,
       })) || undefined;
     const firstQty = payloadItems?.[0]?.quantity || quantity;
     if (!payloadItems && (!quantity || quantity < QUOTE_QTY_MIN)) {
