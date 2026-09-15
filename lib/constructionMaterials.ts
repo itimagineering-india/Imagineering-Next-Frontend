@@ -264,7 +264,9 @@ export function resolveConstructionMaterialTypeKeyFromSubcategory(raw: string): 
     [/bricks?\s*&\s*blocks?/i, "bricks"],
     [/tiles?\s*&\s*flooring/i, "tiles_flooring"],
     [/sanitary/i, "sanitary"],
-    [/paint\s*&\s*finishes?/i, "other"],
+    [/paint\s*&\s*finishes?/i, "paint"],
+    [/primer\s*&\s*paints?/i, "paint"],
+    [/paints?/i, "paint"],
   ];
   for (const [re, key] of displayPairs) {
     if (re.test(s)) return key;
