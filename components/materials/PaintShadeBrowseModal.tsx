@@ -16,7 +16,10 @@ import {
   searchPaintShadeCatalog,
   type CatalogPaintShade,
 } from "@/lib/paintShadeCatalog";
-import { PAINT_SHADE_FAMILIES } from "@/lib/paintShadeFamilies";
+import {
+  getPaintShadeFamily,
+  PAINT_SHADE_FAMILIES,
+} from "@/lib/paintShadeFamilies";
 import type { PaintShade } from "@/lib/paintShades";
 
 type Props = {
@@ -57,15 +60,14 @@ export function PaintShadeBrowseModal({
     setVisibleCount(96);
   }, [query, brandFilter, familyFilter]);
 
-  const allShades = useMemo(
-    () =>
-      searchPaintShadeCatalog(query, {
-        brand: brandFilter || brand || undefined,
-        family: familyFilter,
-        limit: 2000,
-      }),
-    [query, brandFilter, familyFilter, brand]
-  );
+  const allShades = useMemo(() => {
+    const list = searchPaintShadeCatalog(query, {
+      brand: brandFilter || brand || undefined,
+      limit: 2000,
+    });
+    if (!familyFilter || familyFilter === "All") return list;
+    return list.filter((s) => getPaintShadeFamily(s) === familyFilter);
+  }, [query, brandFilter, familyFilter, brand]);
   const shades = allShades.slice(0, visibleCount);
   const hasMore = visibleCount < allShades.length;
 
