@@ -16,6 +16,7 @@ import {
   searchPaintShadeCatalog,
   type CatalogPaintShade,
 } from "@/lib/paintShadeCatalog";
+import { PAINT_SHADE_FAMILIES } from "@/lib/paintShadeFamilies";
 import type { PaintShade } from "@/lib/paintShades";
 
 type Props = {
@@ -35,12 +36,14 @@ export function PaintShadeBrowseModal({
 }: Props) {
   const [query, setQuery] = useState("");
   const [brandFilter, setBrandFilter] = useState<string>("");
+  const [familyFilter, setFamilyFilter] = useState<string>("All");
   const [visibleCount, setVisibleCount] = useState(96);
   const brands = useMemo(() => listPaintShadeBrands(), []);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    setFamilyFilter("All");
     setVisibleCount(96);
     const match = brands.find(
       (b) =>
@@ -52,15 +55,16 @@ export function PaintShadeBrowseModal({
 
   useEffect(() => {
     setVisibleCount(96);
-  }, [query, brandFilter]);
+  }, [query, brandFilter, familyFilter]);
 
   const allShades = useMemo(
     () =>
       searchPaintShadeCatalog(query, {
         brand: brandFilter || brand || undefined,
+        family: familyFilter,
         limit: 2000,
       }),
-    [query, brandFilter, brand]
+    [query, brandFilter, familyFilter, brand]
   );
   const shades = allShades.slice(0, visibleCount);
   const hasMore = visibleCount < allShades.length;
@@ -85,6 +89,20 @@ export function PaintShadeBrowseModal({
               className="h-10 pl-9"
               autoFocus
             />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {PAINT_SHADE_FAMILIES.map((family) => (
+              <Button
+                key={family}
+                type="button"
+                size="sm"
+                variant={familyFilter === family ? "default" : "outline"}
+                className="h-7 rounded-full px-2.5 text-xs"
+                onClick={() => setFamilyFilter(family)}
+              >
+                {family === "All" ? "All colours" : family}
+              </Button>
+            ))}
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Button
@@ -153,6 +171,7 @@ export function PaintShadeBrowseModal({
 
         <div className="border-t px-4 py-2.5 text-[11px] text-muted-foreground sm:px-5">
           Showing {shades.length} of {allShades.length}
+          {familyFilter !== "All" ? ` · ${familyFilter}` : ""}
           {brandFilter ? ` · ${brandFilter}` : ""} — colours on screen are approximate.
         </div>
       </DialogContent>
