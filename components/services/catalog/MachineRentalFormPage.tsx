@@ -417,7 +417,9 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
         weightPricing: {
           weightUnit: "ton",
           distanceUnit: "km",
-          slabs: collectParsedSlabs(),
+          slabs: rateDraft.per_km_weight_slab?.enabled
+            ? collectParsedSlabs()
+            : [],
         },
       });
 
