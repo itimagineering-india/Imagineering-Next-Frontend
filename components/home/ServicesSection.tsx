@@ -9,6 +9,7 @@ import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 /** Categories already featured above (materials, manpower, contractors, rental, resale) are omitted. */
 const DISPLAY_ORDER = [
+  "tools",
   "technical-manpower",
   "consultants",
   "real-estate",
