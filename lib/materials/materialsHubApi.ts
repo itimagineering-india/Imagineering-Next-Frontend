@@ -127,13 +127,39 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
   if (!name) return null;
 
   const meta = raw?.metadata && typeof raw.metadata === "object" ? (raw.metadata as Record<string, unknown>) : {};
-  const materialKey =
-    resolveMaterialsMaterialTypeKey(
-      String(raw?.materialTypeKey || raw?.subcategory || meta.materialType || "")
-    ) ||
-    slugifyMaterialsId(String(raw?.subcategory || fallbackCategoryId || "")) ||
-    fallbackCategoryId ||
-    "general";
+  const rawSubcategory = String(raw?.subcategory || "").trim();
+  const rawMaterialKey = String(raw?.materialTypeKey || meta.toolType || meta.materialType || "").trim();
+  const formVariant = String(meta.formVariant || "").trim().toLowerCase();
+  const fallbackNorm = String(fallbackCategoryId || "")
+    .toLowerCase()
+    .replace(/-/g, "_");
+  const isToolsProduct =
+    formVariant === "tools" ||
+    fallbackNorm === "tools" ||
+    fallbackNorm.startsWith("tools_");
+
+  const normalizeSubKey = (rawKey: string) =>
+    String(rawKey || "")
+      .toLowerCase()
+      .trim()
+      .replace(/&/g, " and ")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+
+  // Tools: keep subcategory / materialTypeKey as-is (do not run CM aliases).
+  const materialKey = isToolsProduct
+    ? normalizeSubKey(rawMaterialKey) ||
+      normalizeSubKey(rawSubcategory) ||
+      slugifyMaterialsId(rawSubcategory || fallbackCategoryId || "") ||
+      fallbackCategoryId ||
+      "general"
+    : resolveMaterialsMaterialTypeKey(
+        String(rawMaterialKey || rawSubcategory || meta.materialType || "")
+      ) ||
+      slugifyMaterialsId(String(rawSubcategory || fallbackCategoryId || "")) ||
+      fallbackCategoryId ||
+      "general";
   const pickBrand = (...candidates: unknown[]) => {
     for (const c of candidates) {
       const s = String(c ?? "").trim();
@@ -199,6 +225,7 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
   return {
     id,
     categoryId: materialKey,
+    ...(rawSubcategory ? { subcategory: rawSubcategory } : {}),
     brand,
     name,
     grade,
