@@ -97,26 +97,46 @@ function listingMatchesQuery(item: ListingCard, q: string): boolean {
   );
 }
 
+/** Normalize subcategory keys so hand_tools / hand-tools / "Hand Tools" all match. */
+function normalizeB2bSubKey(raw: string): string {
+  return String(raw || "")
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
 function filterCatalogBySubcategory(
   products: MaterialsProduct[],
   activeSub: string | null,
   hubCategories: { id: string; name: string }[]
 ): MaterialsProduct[] {
   if (!activeSub) return products;
-  const key = activeSub.toLowerCase();
+  const want = normalizeB2bSubKey(activeSub);
+  if (!want) return products;
   const slug = slugifyMaterialsId(activeSub);
   const matchingCatIds = new Set(
     hubCategories
-      .filter((c) => c.name.toLowerCase() === key || c.id.toLowerCase() === key)
+      .filter(
+        (c) =>
+          normalizeB2bSubKey(c.name) === want ||
+          normalizeB2bSubKey(c.id) === want
+      )
       .map((c) => c.id)
   );
-  return products.filter(
-    (p) =>
+  const subLabel = activeSub.toLowerCase().trim();
+  return products.filter((p) => {
+    const cid = normalizeB2bSubKey(p.categoryId);
+    return (
       matchingCatIds.has(p.categoryId) ||
-      p.categoryId.toLowerCase() === key ||
+      cid === want ||
       p.categoryId === slug ||
-      p.name.toLowerCase().includes(key)
-  );
+      normalizeB2bSubKey(p.categoryId) === normalizeB2bSubKey(slug) ||
+      (subLabel.length >= 3 && p.name.toLowerCase().includes(subLabel))
+    );
+  });
 }
 
 function mapServiceRowsToListings(rows: unknown[]): ListingCard[] {
@@ -305,11 +325,25 @@ export function B2BServicesHub() {
           return;
         }
 
-        const rawCatalog = await listAllCatalogProducts({ categorySlug: activeSlug });
+        const rawCatalog = await listAllCatalogProducts({
+          categorySlug: activeSlug,
+          ...(activeSub ? { subcategory: activeSub } : {}),
+        });
         if (cancelled) return;
-        const mappedCatalog = rawCatalog
+        let mappedCatalog = rawCatalog
           .map((row) => mapCatalogProduct(row, slugifyMaterialsId(activeSlug) || "general"))
           .filter(Boolean) as MaterialsProduct[];
+
+        // Exact subcategory query can miss when catalog rows use a different spelling;
+        // fall back to full category list + normalized client filter.
+        if (activeSub && mappedCatalog.length === 0) {
+          const allForCategory = await listAllCatalogProducts({ categorySlug: activeSlug });
+          if (cancelled) return;
+          mappedCatalog = allForCategory
+            .map((row) => mapCatalogProduct(row, slugifyMaterialsId(activeSlug) || "general"))
+            .filter(Boolean) as MaterialsProduct[];
+        }
+
         const catalogProducts = filterCatalogBySubcategory(
           mappedCatalog.filter((p) => p.available),
           activeSub,
@@ -320,9 +354,18 @@ export function B2BServicesHub() {
           return;
         }
 
-        const listings = await listAllCategoryServices(activeSlug, activeSub);
-        if (cancelled) return;
-        setListings(listings);
+        // Catalog empty for this slice — show live supplier listings if any.
+        if (mappedCatalog.length === 0) {
+          const listings = await listAllCategoryServices(activeSlug, activeSub);
+          if (cancelled) return;
+          setListings(listings);
+          return;
+        }
+
+        // Catalog exists but subcategory filter matched nothing — show empty for that sub,
+        // not an unrelated service fallback.
+        setMaterialsProducts([]);
+        setListings([]);
       } catch {
         if (!cancelled) {
           toast({
