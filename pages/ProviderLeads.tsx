@@ -28,6 +28,7 @@ import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import api from "@/lib/api-client";
 import {
   formatQuoteLineDetailRows,
+  matchOfferUnavailable,
   matchOfferUnitPrice,
   quoteLineDisplayParts,
   quoteLineKey,
@@ -67,6 +68,7 @@ function applyProviderQuoteFormFromRow(
   row: any,
   setters: {
     setQuoteLineRates: (v: Record<string, string>) => void;
+    setQuoteUnavailableLines: (v: Record<string, boolean>) => void;
     setQuoteAmount: (v: string) => void;
     setQuoteNotes: (v: string) => void;
     setQuoteDelivery: (v: string) => void;
@@ -83,12 +85,15 @@ function applyProviderQuoteFormFromRow(
   const requestLines = quoteRequestItems(row);
   const offered = quoteOfferItems(row?.myOffer);
   const rates: Record<string, string> = {};
+  const unavailable: Record<string, boolean> = {};
   requestLines.forEach((line, idx) => {
     const key = quoteLineKey(line, idx);
+    unavailable[key] = matchOfferUnavailable(line, offered);
     const matched = matchOfferUnitPrice(line, offered);
-    rates[key] = matched != null ? String(matched) : "";
+    rates[key] = unavailable[key] ? "" : matched != null ? String(matched) : "";
   });
   setters.setQuoteLineRates(rates);
+  setters.setQuoteUnavailableLines(unavailable);
   setters.setQuoteAmount(row?.myOffer?.amount != null ? String(row.myOffer.amount) : "");
   setters.setQuoteNotes(row?.myOffer?.notes || "");
   setters.setQuoteDelivery(row?.myOffer?.estimatedDelivery || "");
@@ -127,6 +132,7 @@ export default function ProviderLeads() {
   const [activeQuote, setActiveQuote] = useState<any>(null);
   const [quoteAmount, setQuoteAmount] = useState("");
   const [quoteLineRates, setQuoteLineRates] = useState<Record<string, string>>({});
+  const [quoteUnavailableLines, setQuoteUnavailableLines] = useState<Record<string, boolean>>({});
   const [quoteNotes, setQuoteNotes] = useState("");
   const [quoteDelivery, setQuoteDelivery] = useState("");
   const [quoteDeliveryOption, setQuoteDeliveryOption] = useState<"free" | "paid" | "not_available">("free");
@@ -168,6 +174,7 @@ export default function ProviderLeads() {
         setActiveQuote(row);
         applyProviderQuoteFormFromRow(row, {
           setQuoteLineRates,
+          setQuoteUnavailableLines,
           setQuoteAmount,
           setQuoteNotes,
           setQuoteDelivery,
@@ -210,6 +217,7 @@ export default function ProviderLeads() {
         const next = { ...cur, ...payload.data };
         applyProviderQuoteFormFromRow(next, {
           setQuoteLineRates,
+          setQuoteUnavailableLines,
           setQuoteAmount,
           setQuoteNotes,
           setQuoteDelivery,
@@ -245,12 +253,14 @@ export default function ProviderLeads() {
   const lineQuoteTotal = useMemo(
     () =>
       activeQuoteLines.reduce((sum, line, idx) => {
-        const rate = Number(quoteLineRates[quoteLineKey(line, idx)] || 0);
+        const key = quoteLineKey(line, idx);
+        if (quoteUnavailableLines[key]) return sum;
+        const rate = Number(quoteLineRates[key] || 0);
         const qty = parseQuoteQuantity(line.quantity);
         if (!Number.isFinite(rate) || rate < 0.01) return sum;
         return sum + rate * qty;
       }, 0),
-    [activeQuoteLines, quoteLineRates]
+    [activeQuoteLines, quoteLineRates, quoteUnavailableLines]
   );
 
   const taxableForGst = activeQuoteLines.length > 0 ? lineQuoteTotal : Number(quoteAmount) || 0;
@@ -264,28 +274,49 @@ export default function ProviderLeads() {
   const submitQuoteOffer = async () => {
     if (!activeQuote?.id) return;
     const requestLines = quoteRequestItems(activeQuote);
+    const allowPartial = requestLines.length > 1;
     const offerItems =
       requestLines.length > 0
-        ? requestLines.map((line, idx) => ({
-            serviceId: String(line.serviceId || ""),
-            catalogVariantId: String(line.catalogVariantId || "").trim() || undefined,
-            unitPrice: roundQuoteUnitPrice(quoteLineRates[quoteLineKey(line, idx)] || 0),
-            title: String(line.title || "Product"),
-            quantity: parseQuoteQuantity(line.quantity),
-          }))
+        ? requestLines.map((line, idx) => {
+            const key = quoteLineKey(line, idx);
+            const unavailable = allowPartial && Boolean(quoteUnavailableLines[key]);
+            return {
+              serviceId: String(line.serviceId || ""),
+              catalogVariantId: String(line.catalogVariantId || "").trim() || undefined,
+              unitPrice: unavailable ? 0 : roundQuoteUnitPrice(quoteLineRates[key] || 0),
+              title: String(line.title || "Product"),
+              quantity: parseQuoteQuantity(line.quantity),
+              unavailable,
+            };
+          })
         : [];
-    const missing = offerItems.filter((line) => !line.serviceId || !Number.isFinite(line.unitPrice) || line.unitPrice < 0.01);
+    const missing = offerItems.filter(
+      (line) =>
+        !line.unavailable &&
+        (!line.serviceId || !Number.isFinite(line.unitPrice) || line.unitPrice < 0.01)
+    );
     if (requestLines.length > 0 && missing.length) {
       toast({
         title: "Enter a rate for each product",
-        description: missing.map((m) => m.title).join(", "),
+        description: `${missing.map((m) => m.title).join(", ")} — or mark as not available`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const availableItems = offerItems.filter((line) => !line.unavailable);
+    if (offerItems.length > 0 && availableItems.length < 1) {
+      toast({
+        title: "Quote at least one product",
+        description: "Mark others as not available if you cannot supply them.",
         variant: "destructive",
       });
       return;
     }
     const amount =
       offerItems.length > 0
-        ? Math.round(offerItems.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0) * 100) / 100
+        ? Math.round(
+            availableItems.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0) * 100
+          ) / 100
         : Number(quoteAmount);
     if (!Number.isFinite(amount) || amount < 1) {
       toast({ title: "Enter a valid price (min ₹1)", variant: "destructive" });
@@ -325,6 +356,7 @@ export default function ProviderLeads() {
                 serviceId: line.serviceId,
                 unitPrice: line.unitPrice,
                 ...(line.catalogVariantId ? { catalogVariantId: line.catalogVariantId } : {}),
+                ...(line.unavailable ? { unavailable: true } : {}),
               }))
             : undefined,
         notes: quoteNotes.trim() || undefined,
@@ -683,16 +715,21 @@ export default function ProviderLeads() {
                   {activeQuoteLines.length > 0 ? (
                     <>
                       <Label>Rate per unit (₹)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Mark items you cannot supply as not available — buyer sees a partial quote.
+                      </p>
                       <div className="space-y-2 rounded-lg border p-3">
                         {activeQuoteLines.map((line, idx) => {
                           const key = quoteLineKey(line, idx);
                           const qty = parseQuoteQuantity(line.quantity);
                           const unit = getQuantityUnitNoun(line.priceType);
-                          const rate = Number(quoteLineRates[key] || 0);
+                          const isUnavailable = Boolean(quoteUnavailableLines[key]);
+                          const rate = isUnavailable ? 0 : Number(quoteLineRates[key] || 0);
                           const lineTotal =
                             Number.isFinite(rate) && rate > 0 ? Math.round(rate * qty * 100) / 100 : 0;
                           const { productName, variantLabel } = quoteLineDisplayParts(line);
                           const detailRows = formatQuoteLineDetailRows(line, qty);
+                          const allowPartial = activeQuoteLines.length > 1;
                           return (
                             <div
                               key={`${key}-${idx}`}
@@ -713,34 +750,65 @@ export default function ProviderLeads() {
                                       <span className="font-semibold">{row.label}:</span> {row.value}
                                     </p>
                                   ))}
-                                  {lineTotal > 0 ? (
+                                  {!isUnavailable && lineTotal > 0 ? (
                                     <p className="text-xs font-semibold text-foreground">
                                       {formatINR(lineTotal)}
                                     </p>
                                   ) : null}
+                                  {isUnavailable ? (
+                                    <p className="text-xs font-semibold text-amber-700">
+                                      Excluded from your quote total
+                                    </p>
+                                  ) : null}
                                 </div>
-                              </div>
-                              <div className="space-y-0.5 sm:pt-0.5">
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder={unit ? `₹/${unit}` : "Rate"}
-                                  value={quoteLineRates[key] || ""}
-                                  onChange={(e) =>
-                                    setQuoteLineRates((prev) => ({
-                                      ...prev,
-                                      [key]: sanitizeQuoteUnitPriceInput(e.target.value),
-                                    }))
-                                  }
-                                  disabled={!activeQuote.windowOpen}
-                                  aria-label={`Rate for ${productName}${unit ? ` per ${unit}` : ""}`}
-                                />
-                                {unit ? (
-                                  <p className="text-center text-[10px] font-medium text-muted-foreground">
-                                    per {unit}
-                                  </p>
+                                {allowPartial ? (
+                                  <Button
+                                    type="button"
+                                    variant={isUnavailable ? "secondary" : "outline"}
+                                    size="sm"
+                                    className="mt-2 h-8 text-xs"
+                                    disabled={!activeQuote.windowOpen}
+                                    onClick={() => {
+                                      setQuoteUnavailableLines((prev) => {
+                                        const next = !prev[key];
+                                        if (next) {
+                                          setQuoteLineRates((rates) => ({ ...rates, [key]: "" }));
+                                        }
+                                        return { ...prev, [key]: next };
+                                      });
+                                    }}
+                                  >
+                                    {isUnavailable ? "Not available — tap to quote" : "I don't have this item"}
+                                  </Button>
                                 ) : null}
                               </div>
+                              {!isUnavailable ? (
+                                <div className="space-y-0.5 sm:pt-0.5">
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder={unit ? `₹/${unit}` : "Rate"}
+                                    value={quoteLineRates[key] || ""}
+                                    onChange={(e) =>
+                                      setQuoteLineRates((prev) => ({
+                                        ...prev,
+                                        [key]: sanitizeQuoteUnitPriceInput(e.target.value),
+                                      }))
+                                    }
+                                    disabled={!activeQuote.windowOpen}
+                                    aria-label={`Rate for ${productName}${unit ? ` per ${unit}` : ""}`}
+                                  />
+                                  {unit ? (
+                                    <p className="text-center text-[10px] font-medium text-muted-foreground">
+                                      per {unit}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-center rounded-md border border-dashed border-amber-300 bg-amber-50 px-2 py-3 text-center text-[11px] font-semibold text-amber-800 sm:pt-0.5">
+                                  Not available
+                                </div>
+                              )}
                             </div>
                           );
                         })}
