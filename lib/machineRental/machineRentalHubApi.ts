@@ -1,5 +1,6 @@
 /**
  * Machine Rental hub — fetch + map backend data into UI shapes (web).
+ * Live listings/providers are scoped to ~5 km to avoid long mobilisation.
  */
 
 import api from "@/lib/api-client";
@@ -20,6 +21,9 @@ import {
   type RentalTopProvider,
 } from "@/lib/machineRental/machineRentalHubCatalog";
 import { resolveMachineRentalMediaUrl } from "@/lib/machineRental/media";
+
+/** Max distance for machine rental browse / book (avoids mobilisation). */
+export const RENTAL_NEARBY_RADIUS_KM = 5;
 
 export type RentalHubData = {
   categories: RentalMachineCategory[];
@@ -168,73 +172,54 @@ async function fetchSubcategories(): Promise<string[]> {
   return [];
 }
 
+function hasValidCoords(lat?: number, lng?: number): boolean {
+  return (
+    lat != null &&
+    lng != null &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  );
+}
+
 export async function fetchRentalHubData(opts?: RentalHubFetchOpts): Promise<RentalHubData> {
   const lat = opts?.lat;
   const lng = opts?.lng;
-  const radiusKm = opts?.radiusKm ?? 50;
-  const locParams =
-    lat != null && lng != null ? { lat, lng, radiusKm } : {};
+  const locationReady = hasValidCoords(lat, lng);
+  const radiusKm = opts?.radiusKm ?? RENTAL_NEARBY_RADIUS_KM;
+  const locParams = locationReady
+    ? { lat: lat!, lng: lng!, radiusKm, precise: 1 as const }
+    : null;
 
-  const [subNames, catalogRes, providersRes, servicesRes] = await Promise.allSettled([
+  const [subNames, providersRes, servicesRes] = await Promise.allSettled([
     fetchSubcategories(),
-    api.productCatalog.list({
-      categorySlug: RENTAL_CATEGORY_SLUG,
-      limit: 120,
-      page: 1,
-    }),
-    api.providers.getAll({
-      categorySlug: RENTAL_CATEGORY_SLUG,
-      limit: 12,
-      page: 1,
-      sort: lat != null && lng != null ? "distance" : "rating",
-      ...locParams,
-    }),
-    api.services.getAll({
-      category: RENTAL_CATEGORY_SLUG,
-      limit: 60,
-      page: 1,
-      sort: "-rating",
-    }),
+    locParams
+      ? api.providers.getAll({
+          categorySlug: RENTAL_CATEGORY_SLUG,
+          limit: 12,
+          page: 1,
+          sort: "distance",
+          lat: locParams.lat,
+          lng: locParams.lng,
+          radiusKm: locParams.radiusKm,
+        })
+      : Promise.resolve(null),
+    locParams
+      ? api.services.getAll({
+          category: RENTAL_CATEGORY_SLUG,
+          limit: 60,
+          page: 1,
+          sort: "distance",
+          lat: locParams.lat,
+          lng: locParams.lng,
+          radiusKm: locParams.radiusKm,
+          precise: locParams.precise,
+        })
+      : Promise.resolve(null),
   ]);
 
   let categories: RentalMachineCategory[] = [];
   if (subNames.status === "fulfilled" && subNames.value.length > 0) {
     categories = subNames.value.map((n, i) => mapCategory(n, i));
-  }
-
-  const catalogLists: RawRow[] = [];
-  const pushCatalogProducts = (rawProducts: unknown) => {
-    if (!Array.isArray(rawProducts)) return;
-    for (const row of rawProducts) {
-      if (isRentalListingRow(row as RawRow)) catalogLists.push(row as RawRow);
-    }
-  };
-
-  if (catalogRes.status === "fulfilled" && catalogRes.value?.success) {
-    pushCatalogProducts((catalogRes.value.data as { products?: unknown } | undefined)?.products);
-  }
-  if (catalogLists.length === 0) {
-    try {
-      const alt = await api.productCatalog.list({
-        categorySlug: "machine-rental",
-        limit: 120,
-        page: 1,
-      });
-      if (alt.success) {
-        pushCatalogProducts((alt.data as { products?: unknown } | undefined)?.products);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  let machines: RentalMachine[] = [];
-  if (catalogLists.length > 0) {
-    machines = uniqueById(
-      catalogLists
-        .map((row) => mapMachine(row, categories[0]?.id || "general"))
-        .filter(Boolean) as RentalMachine[]
-    );
   }
 
   const serviceMachines: RentalMachine[] = [];
@@ -247,16 +232,20 @@ export async function fetchRentalHubData(opts?: RentalHubFetchOpts): Promise<Ren
     }
   };
 
-  if (servicesRes.status === "fulfilled" && servicesRes.value?.success) {
+  if (servicesRes.status === "fulfilled" && servicesRes.value && servicesRes.value.success) {
     ingestServices((servicesRes.value.data as { services?: unknown } | undefined)?.services);
   }
-  if (serviceMachines.length === 0) {
+  if (locationReady && serviceMachines.length === 0) {
     try {
       const altServices = await api.services.getAll({
         category: "machine-rental",
         limit: 60,
         page: 1,
-        sort: "-rating",
+        sort: "distance",
+        lat: lat!,
+        lng: lng!,
+        radiusKm,
+        precise: 1,
       });
       if (altServices.success) {
         ingestServices((altServices.data as { services?: unknown } | undefined)?.services);
@@ -266,7 +255,7 @@ export async function fetchRentalHubData(opts?: RentalHubFetchOpts): Promise<Ren
     }
   }
 
-  machines = uniqueById([...serviceMachines, ...machines]);
+  let machines: RentalMachine[] = uniqueById(serviceMachines);
 
   if (categories.length > 0) {
     const seen = new Map<string, RentalMachineCategory>();
@@ -288,51 +277,70 @@ export async function fetchRentalHubData(opts?: RentalHubFetchOpts): Promise<Ren
       });
     });
     categories = Array.from(seen.values());
-  } else {
+  } else if (!locationReady) {
     categories = RENTAL_FALLBACK_CATEGORIES.map((n, i) => mapCategory(n, i));
   }
 
   let providers: RentalTopProvider[] = [];
-  if (providersRes.status === "fulfilled" && providersRes.value?.success) {
+  if (providersRes.status === "fulfilled" && providersRes.value && providersRes.value.success) {
     const raw = (providersRes.value.data as { providers?: unknown } | undefined)?.providers;
     if (Array.isArray(raw)) {
-      providers = uniqueById(raw.map(mapProvider).filter(Boolean) as RentalTopProvider[]);
+      providers = uniqueById(raw.map(mapProvider).filter(Boolean) as RentalTopProvider[]).filter(
+        (p) => !(Number.isFinite(p.distanceKm) && p.distanceKm > radiusKm)
+      );
     }
   }
 
   return { categories, machines, providers };
 }
 
-export async function fetchRentalMachinesByCategory(categoryId: string): Promise<RentalMachine[]> {
+export async function fetchRentalMachinesByCategory(
+  categoryId: string,
+  opts?: RentalHubFetchOpts
+): Promise<RentalMachine[]> {
   const key = resolveRentalCategoryKey(categoryId) || String(categoryId || "").trim();
   if (!key) return [];
-  try {
-    const res = await api.productCatalog.list({
-      categorySlug: RENTAL_CATEGORY_SLUG,
-      subcategory: key,
-      limit: 100,
-      page: 1,
-    });
-    let mapped: RentalMachine[] = [];
-    if (res.success) {
-      const rawProducts = (res.data as { products?: unknown } | undefined)?.products;
-      if (Array.isArray(rawProducts)) {
-        mapped = uniqueById(
-          rawProducts
-            .filter((row) => isRentalListingRow(row as RawRow))
-            .map((row) => mapMachine(row as RawRow, key))
-            .filter(Boolean) as RentalMachine[]
-        );
-      }
-    }
-    const filtered = mapped.filter((m) => m.categoryId === key);
-    if (filtered.length > 0) return filtered;
 
-    const hub = await fetchRentalHubData();
-    const fromHub = hub.machines.filter(
+  const lat = opts?.lat;
+  const lng = opts?.lng;
+  if (!hasValidCoords(lat, lng)) return [];
+
+  const radiusKm = opts?.radiusKm ?? RENTAL_NEARBY_RADIUS_KM;
+
+  try {
+    for (const slug of RENTAL_CATEGORY_SLUG_ALIASES) {
+      const res = await api.services.getAll({
+        category: slug,
+        subcategory: key,
+        limit: 100,
+        page: 1,
+        sort: "distance",
+        lat: lat!,
+        lng: lng!,
+        radiusKm,
+        precise: 1,
+      });
+      if (!res.success) continue;
+      const rawProducts = (res.data as { services?: unknown } | undefined)?.services;
+      if (!Array.isArray(rawProducts) || rawProducts.length === 0) continue;
+
+      const mapped = uniqueById(
+        rawProducts
+          .filter((row) => isRentalListingRow(row as RawRow))
+          .map((row) => mapMachine(row as RawRow, key, true))
+          .filter(Boolean) as RentalMachine[]
+      );
+      const filtered = mapped.filter(
+        (m) => m.categoryId === key || resolveRentalCategoryKey(m.categoryName || "") === key
+      );
+      if (filtered.length > 0) return filtered;
+      if (mapped.length > 0) return mapped;
+    }
+
+    const hub = await fetchRentalHubData({ lat, lng, radiusKm });
+    return hub.machines.filter(
       (m) => m.categoryId === key || resolveRentalCategoryKey(m.categoryName || "") === key
     );
-    return fromHub.length > 0 ? fromHub : mapped;
   } catch {
     return [];
   }
