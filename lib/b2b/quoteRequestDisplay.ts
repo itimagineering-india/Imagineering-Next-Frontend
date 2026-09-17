@@ -15,6 +15,7 @@ export type QuoteOfferItemLike = {
   quantity?: number;
   unitPrice?: number;
   lineTotal?: number;
+  unavailable?: boolean;
 };
 
 export function quoteRequestItems(data: { items?: QuoteRequestItemLike[] | null } | null | undefined) {
@@ -31,7 +32,7 @@ export function quoteOfferItems(offer: { items?: QuoteOfferItemLike[] | null } |
 export function quoteOfferTotalQuantity(
   offer: { items?: QuoteOfferItemLike[] | null; quantity?: number } | null | undefined
 ): number {
-  const items = quoteOfferItems(offer);
+  const items = quoteOfferItems(offer).filter((row) => row.unavailable !== true);
   if (items.length > 0) {
     return items.reduce((sum, row) => {
       const q = Number(row.quantity);
@@ -70,13 +71,13 @@ export function quoteLineKey(
 }
 
 /** Match a saved offer line to a request line — never fall back by array index alone. */
-export function matchOfferUnitPrice(
+export function matchOfferLine(
   line: QuoteRequestItemLike,
   offered: QuoteOfferItemLike[]
-): number | null {
+): QuoteOfferItemLike | null {
   const lineVid = String(line.catalogVariantId || "").trim();
   const lineTitle = String(line.title || "").trim();
-  const match =
+  return (
     (lineVid
       ? offered.find(
           (o) =>
@@ -90,10 +91,28 @@ export function matchOfferUnitPrice(
         o.serviceId &&
         o.serviceId === line.serviceId &&
         String(o.title || "").trim() === lineTitle
-    );
-  if (match?.unitPrice == null) return null;
+    ) ||
+    null
+  );
+}
+
+/** Match a saved offer line to a request line — never fall back by array index alone. */
+export function matchOfferUnitPrice(
+  line: QuoteRequestItemLike,
+  offered: QuoteOfferItemLike[]
+): number | null {
+  const match = matchOfferLine(line, offered);
+  if (!match || match.unavailable) return null;
+  if (match.unitPrice == null) return null;
   const n = Number(match.unitPrice);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n >= 0.01 ? n : null;
+}
+
+export function matchOfferUnavailable(
+  line: QuoteRequestItemLike,
+  offered: QuoteOfferItemLike[]
+): boolean {
+  return matchOfferLine(line, offered)?.unavailable === true;
 }
 
 export function getQuantityUnitNoun(priceType: string | null | undefined): string {
