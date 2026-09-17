@@ -26,7 +26,11 @@ import {
   type RentalMachine,
   type RentalMachineCategory,
 } from "@/lib/machineRental/machineRentalHubCatalog";
-import { fetchRentalHubData, type RentalHubData } from "@/lib/machineRental/machineRentalHubApi";
+import {
+  fetchRentalHubData,
+  RENTAL_NEARBY_RADIUS_KM,
+  type RentalHubData,
+} from "@/lib/machineRental/machineRentalHubApi";
 import { getMachineRentalCategoryArt } from "@/lib/machineRental/machineRentalCategoryArt";
 import machineRentalHeroImg from "@/assets/services/machine-rental.png";
 
@@ -106,9 +110,14 @@ export function MachineRentalHub() {
   const { t } = useTranslation("machineRental");
   const router = useRouter();
   const { toast } = useToast();
-  const { userLocation, radiusKm } = useUserLocation();
+  const { userLocation, isLoading: locLoading, refreshLocation } = useUserLocation();
+  const hasLocation =
+    userLocation != null &&
+    Number.isFinite(userLocation.lat) &&
+    Number.isFinite(userLocation.lng);
   const pricingCity = userLocation?.city?.trim() || "";
   const [loading, setLoading] = useState(true);
+  const [locationGateReady, setLocationGateReady] = useState(false);
   const [data, setData] = useState<RentalHubData>(EMPTY);
   const [search, setSearch] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -123,14 +132,26 @@ export function MachineRentalHub() {
   }, []);
 
   useEffect(() => {
+    const id = window.setTimeout(() => setLocationGateReady(true), 120);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
+    if (!hasLocation) {
+      setData(EMPTY);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
     (async () => {
       setLoading(true);
       try {
         const hub = await fetchRentalHubData({
-          lat: userLocation?.lat,
-          lng: userLocation?.lng,
-          radiusKm,
+          lat: userLocation!.lat,
+          lng: userLocation!.lng,
+          radiusKm: RENTAL_NEARBY_RADIUS_KM,
         });
         if (!cancelled) setData(hub);
       } catch {
@@ -148,7 +169,10 @@ export function MachineRentalHub() {
     return () => {
       cancelled = true;
     };
-  }, [radiusKm, t, toast, userLocation?.lat, userLocation?.lng]);
+  }, [hasLocation, t, toast, userLocation]);
+
+  const awaitingLocation = !locationGateReady || locLoading;
+  const showLocationPrompt = locationGateReady && !locLoading && !hasLocation;
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -254,181 +278,224 @@ export function MachineRentalHub() {
       </section>
 
       <div className="layout-shell space-y-10 py-8 pb-16">
-        <section>
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold text-slate-900 sm:text-xl">{t("browseByType")}</h2>
-              <p className="mt-1 text-sm text-slate-500">{t("browseByTypeSub")}</p>
-            </div>
-            {!loading && filteredCategories.length > 0 ? (
-              <div className="hidden shrink-0 gap-2 sm:flex">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-orange-50"
-                  onClick={() => scrollCategories("left")}
-                  aria-label="Scroll categories left"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-orange-50"
-                  onClick={() => scrollCategories("right")}
-                  aria-label="Scroll categories right"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : null}
+        {awaitingLocation ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            {t("locationDetecting")}
           </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              {t("loading")}
-            </div>
-          ) : filteredCategories.length === 0 ? (
-            <p className="py-10 text-sm text-slate-500">{t("emptyCategories")}</p>
-          ) : (
-            <div
-              ref={categoryScrollerRef}
-              className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-2"
-            >
-              {filteredCategories.map((category) => (
-                <CategoryCard key={category.id} category={category} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {!loading && featuredMachines.length > 0 ? (
-          <section>
-            <div className="mb-4 flex items-end justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900">{t("featuredListings")}</h2>
-                <p className="mt-1 text-sm text-slate-500">{t("featuredListingsSub")}</p>
-              </div>
-              <Link
-                href="/services?category=machine-rental"
-                className="inline-flex items-center gap-1 text-sm font-semibold text-orange-800 hover:underline"
+        ) : showLocationPrompt ? (
+          <section className="relative overflow-hidden rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 via-white to-amber-50 px-5 py-10 sm:px-10 sm:py-12">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-orange-200/30 blur-2xl" />
+            <div className="relative mx-auto flex max-w-lg flex-col items-center text-center">
+              <span
+                className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-sm"
+                style={{ backgroundColor: RENTAL_AMBER }}
               >
-                {t("viewAllListings")}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-2">
-              {featuredMachines.map((machine) => (
-                <MachineCard key={machine.serviceId || machine.id} machine={machine} />
-              ))}
+                <MapPin className="h-6 w-6" />
+              </span>
+              <h2 className="mt-4 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                {t("locationRequiredTitle")}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                {t("locationRequiredBody")}
+              </p>
+              <Button
+                type="button"
+                className="mt-5 h-10 rounded-xl px-5 font-semibold text-white hover:opacity-95"
+                style={{ backgroundColor: RENTAL_AMBER }}
+                onClick={() => refreshLocation()}
+                disabled={locLoading}
+              >
+                {locLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("locationDetecting")}
+                  </>
+                ) : (
+                  t("locationRequiredCta")
+                )}
+              </Button>
             </div>
           </section>
-        ) : null}
+        ) : (
+          <>
+            <section>
+              <div className="mb-4 flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold text-slate-900 sm:text-xl">{t("browseByType")}</h2>
+                  <p className="mt-1 text-sm text-slate-500">{t("browseByTypeSub")}</p>
+                </div>
+                {!loading && filteredCategories.length > 0 ? (
+                  <div className="hidden shrink-0 gap-2 sm:flex">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-orange-50"
+                      onClick={() => scrollCategories("left")}
+                      aria-label="Scroll categories left"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full border border-slate-200 bg-white hover:bg-orange-50"
+                      onClick={() => scrollCategories("right")}
+                      aria-label="Scroll categories right"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
 
-        {!loading && groupedMachines.length > 0 ? (
-          <section className="space-y-8">
-            {groupedMachines.map(({ category, items }) => (
-              <div key={category.id} className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-bold text-slate-800">{category.name}</h3>
+              {loading ? (
+                <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  {t("loading")}
+                </div>
+              ) : filteredCategories.length === 0 ? (
+                <p className="py-10 text-sm text-slate-500">{t("emptyCategories")}</p>
+              ) : (
+                <div
+                  ref={categoryScrollerRef}
+                  className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-2"
+                >
+                  {filteredCategories.map((category) => (
+                    <CategoryCard key={category.id} category={category} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {!loading && featuredMachines.length > 0 ? (
+              <section>
+                <div className="mb-4 flex items-end justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">{t("featuredListings")}</h2>
+                    <p className="mt-1 text-sm text-slate-500">{t("featuredListingsSub")}</p>
+                  </div>
                   <Link
-                    href={`/machine-rental/${encodeURIComponent(category.id)}`}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-orange-800 hover:underline"
+                    href="/services?category=machine-rental"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-orange-800 hover:underline"
                   >
-                    {t("seeAll")}
+                    {t("viewAllListings")}
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-2">
-                  {items.map((machine) => (
+                  {featuredMachines.map((machine) => (
                     <MachineCard key={machine.serviceId || machine.id} machine={machine} />
                   ))}
                 </div>
-              </div>
-            ))}
-          </section>
-        ) : null}
-
-        <section>
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">{t("topProviders")}</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {pricingCity ? t("topProvidersSubCity", { city: pricingCity }) : t("topProvidersSub")}
-              </p>
-            </div>
-            {!loading && data.providers.length > 0 ? (
-              <Link
-                href="/services?category=machine-rental&view=providers"
-                className="text-sm font-semibold text-orange-800 hover:underline"
-              >
-                {t("viewAllProviders")}
-              </Link>
+              </section>
             ) : null}
-          </div>
-          {loading ? null : data.providers.length > 0 ? (
-            <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-              {data.providers.slice(0, 12).map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/provider/${p.id}`}
-                  className="min-w-[200px] max-w-[220px] shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-700/30 hover:shadow-md"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-orange-900"
-                      style={{ backgroundColor: p.tint }}
-                    >
-                      {p.mark}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
-                      <p className="truncate text-xs text-slate-500">{p.specialty}</p>
+
+            {!loading && groupedMachines.length > 0 ? (
+              <section className="space-y-8">
+                {groupedMachines.map(({ category, items }) => (
+                  <div key={category.id} className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-bold text-slate-800">{category.name}</h3>
+                      <Link
+                        href={`/machine-rental/${encodeURIComponent(category.id)}`}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-orange-800 hover:underline"
+                      >
+                        {t("seeAll")}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-2">
+                      {items.map((machine) => (
+                        <MachineCard key={machine.serviceId || machine.id} machine={machine} />
+                      ))}
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    <span className="font-semibold">{p.rating.toFixed(1)}</span>
-                    <span className="text-slate-400">· {p.city}</span>
-                    {p.verified ? (
-                      <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" aria-label="Verified" />
-                    ) : null}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="relative mt-4 overflow-hidden rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 via-white to-amber-50 px-5 py-8 sm:px-10 sm:py-10">
-              <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-orange-200/30 blur-2xl" />
-              <div className="relative mx-auto flex max-w-lg flex-col items-center text-center">
-                <span
-                  className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-sm"
-                  style={{ backgroundColor: RENTAL_AMBER }}
-                >
-                  <MapPin className="h-6 w-6" />
-                </span>
-                <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                  {pricingCity
-                    ? t("comingSoonTitle", { city: pricingCity })
-                    : t("comingSoonTitleGeneric")}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
-                  {pricingCity ? t("comingSoonBody", { city: pricingCity }) : t("comingSoonBodyGeneric")}
-                </p>
-                <Button
-                  asChild
-                  className="mt-5 h-10 rounded-xl px-5 font-semibold text-white hover:opacity-95"
-                  style={{ backgroundColor: RENTAL_AMBER }}
-                >
-                  <Link href="/requirement/submit">{t("comingSoonCta")}</Link>
-                </Button>
+                ))}
+              </section>
+            ) : null}
+
+            <section>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{t("topProviders")}</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {pricingCity ? t("topProvidersSubCity", { city: pricingCity }) : t("topProvidersSub")}
+                  </p>
+                </div>
+                {!loading && data.providers.length > 0 ? (
+                  <Link
+                    href="/services?category=machine-rental&view=providers"
+                    className="text-sm font-semibold text-orange-800 hover:underline"
+                  >
+                    {t("viewAllProviders")}
+                  </Link>
+                ) : null}
               </div>
-            </div>
-          )}
-        </section>
+              {loading ? null : data.providers.length > 0 ? (
+                <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+                  {data.providers.slice(0, 12).map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/provider/${p.id}`}
+                      className="min-w-[200px] max-w-[220px] shrink-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-700/30 hover:shadow-md"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-orange-900"
+                          style={{ backgroundColor: p.tint }}
+                        >
+                          {p.mark}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-900">{p.name}</p>
+                          <p className="truncate text-xs text-slate-500">{p.specialty}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        <span className="font-semibold">{p.rating.toFixed(1)}</span>
+                        <span className="text-slate-400">· {p.city}</span>
+                        {p.verified ? (
+                          <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" aria-label="Verified" />
+                        ) : null}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="relative mt-4 overflow-hidden rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50 via-white to-amber-50 px-5 py-8 sm:px-10 sm:py-10">
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-orange-200/30 blur-2xl" />
+                  <div className="relative mx-auto flex max-w-lg flex-col items-center text-center">
+                    <span
+                      className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-sm"
+                      style={{ backgroundColor: RENTAL_AMBER }}
+                    >
+                      <MapPin className="h-6 w-6" />
+                    </span>
+                    <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                      {pricingCity
+                        ? t("comingSoonTitle", { city: pricingCity })
+                        : t("comingSoonTitleGeneric")}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+                      {pricingCity ? t("comingSoonBody", { city: pricingCity }) : t("comingSoonBodyGeneric")}
+                    </p>
+                    <Button
+                      asChild
+                      className="mt-5 h-10 rounded-xl px-5 font-semibold text-white hover:opacity-95"
+                      style={{ backgroundColor: RENTAL_AMBER }}
+                    >
+                      <Link href="/requirement/submit">{t("comingSoonCta")}</Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </section>
+          </>
+        )}
 
         <section
           className="flex flex-col items-start justify-between gap-4 rounded-2xl px-5 py-6 sm:flex-row sm:items-center sm:px-8"
