@@ -29,6 +29,8 @@ export type MaterialsTrustBadge = 'most_requested' | 'trending' | 'fast_response
 export type MaterialsProduct = {
   id: string;
   categoryId: MaterialsCategoryId;
+  /** Catalog subcategory label (e.g. "Hand Tools") — used for B2B/Tools filters. */
+  subcategory?: string;
   brand: string;
   name: string;
   grade?: string;
@@ -168,7 +170,8 @@ export function resolveMaterialsMaterialTypeKey(raw: string): string {
   if (n.includes('tile') || n.includes('flooring') || n === 'tiles_flooring') return 'tiles_flooring';
   if (n.includes('sanitary') || n === 'sanitary_bathroom') return 'sanitary';
   if (n.includes('paint')) return 'paint';
-  if (n === 'sand' || n.includes('sand')) return 'sand';
+  // Word-boundary: avoid false positives like "standard_tools" → sand
+  if (n === 'sand' || /(^|_)sand($|_)/.test(n)) return 'sand';
   if (n === 'other') return 'other';
   if (
     ['cement', 'sand', 'steel', 'aggregate', 'bricks', 'tiles_flooring', 'sanitary', 'paint', 'other'].includes(n)
