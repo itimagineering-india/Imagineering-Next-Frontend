@@ -110,6 +110,9 @@ type ProviderApiItem = {
 
 export function catalogProductDetailHref(categorySlug: string | undefined, id: string): string {
   const slug = String(categorySlug || "").trim().toLowerCase();
+  if (slug === "tools" || slug.startsWith("tools-")) {
+    return `/tools/products/${id}`;
+  }
   if (slug === "b2b-services" || slug === "b2b") {
     return `/b2b-services/products/${id}`;
   }
@@ -130,6 +133,9 @@ export function catalogCategoryBrowseHref(categorySlug: string | undefined, titl
   const slug = String(categorySlug || "").trim().toLowerCase();
   if (slug === "construction-materials" || slug === "construction-material") {
     return "/construction-materials";
+  }
+  if (slug === "tools" || slug.startsWith("tools-")) {
+    return "/tools";
   }
   if (slug === "b2b-services" || slug === "b2b") {
     return "/b2b-services";
