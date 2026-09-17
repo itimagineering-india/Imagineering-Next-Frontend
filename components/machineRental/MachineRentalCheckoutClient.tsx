@@ -151,13 +151,15 @@ export function MachineRentalCheckoutClient() {
   const priceType = String(selectedPriceType || preview?.priceType || "daily");
   const needsDuration = isDurationPriceType(priceType);
   const needsWeight = isWeightBasedPriceType(priceType);
-  const durationMax =
-    needsWeight || priceType === "per_km" ? 9999 : 365;
+  const isKmDistanceType =
+    needsWeight || priceType === "per_km";
+  const durationMax = isKmDistanceType ? 9999 : 365;
   const unitNoun = getQuantityUnitNoun(priceType) || "day";
   const availableMachines = Math.max(
     1,
     Math.min(99, Math.floor(Number(preview?.availableMachines) || 99))
   );
+  const previewErrorToastAt = useRef(0);
 
   useEffect(() => {
     setMachineCount((n) => clampInt(n, 1, availableMachines));
@@ -232,11 +234,24 @@ export function MachineRentalCheckoutClient() {
           }
         } else {
           setPreview(null);
-          if (res.error?.message) {
-            toast({
-              title: res.error.message,
-              variant: "destructive",
-            });
+          const msg = String(res.error?.message || "");
+          // Stale/invalid priceType in URL (e.g. slab not on rentalRates) — clear and let next effect retry
+          if (
+            selectedPriceType &&
+            /does not offer a .+ rate/i.test(msg)
+          ) {
+            setSelectedPriceType("");
+            return;
+          }
+          if (msg) {
+            const now = Date.now();
+            if (now - previewErrorToastAt.current > 2500) {
+              previewErrorToastAt.current = now;
+              toast({
+                title: msg,
+                variant: "destructive",
+              });
+            }
           }
         }
       })
@@ -898,7 +913,9 @@ export function MachineRentalCheckoutClient() {
                 {(needsDuration || !preview) && (
                   <div>
                     <Label className="text-sm font-semibold text-slate-800">
-                      {t("durationLabel", { unit: unitNoun })}
+                      {isKmDistanceType
+                        ? t("distanceLabel", { unit: unitNoun })
+                        : t("durationLabel", { unit: unitNoun })}
                     </Label>
                     <div className="mt-2 flex items-center gap-2">
                       <Button
