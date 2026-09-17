@@ -69,7 +69,21 @@ type ListingCard = {
 type B2bHubSort = "relevance" | "name_asc" | "name_desc";
 
 const POPULAR_B2B_SEARCHES = ["Cement", "TMT", "Cables", "Plywood", "Furniture", "Hardware"] as const;
+const POPULAR_TOOLS_SEARCHES = ["Welding", "Drill", "Grinder", "Hand Tools", "Power Tools", "Cutter"] as const;
 const SUBCATEGORY_ALL = "__all__";
+
+export type B2BServicesHubProps = {
+  /** Public Tools hub: lock to Tools and use /tools URLs (not B2B-gated later). */
+  lockedCategorySlug?: string;
+  surface?: "b2b" | "tools";
+};
+
+function isToolsCategorySlug(slug: string): boolean {
+  const s = String(slug || "")
+    .toLowerCase()
+    .trim();
+  return s === "tools" || s.startsWith("tools-");
+}
 
 function listingImage(row: Record<string, unknown>): string | undefined {
   const image = typeof row.image === "string" ? row.image : "";
@@ -129,12 +143,15 @@ function filterCatalogBySubcategory(
   const subLabel = activeSub.toLowerCase().trim();
   return products.filter((p) => {
     const cid = normalizeB2bSubKey(p.categoryId);
+    const subKey = normalizeB2bSubKey(p.subcategory || "");
     return (
       matchingCatIds.has(p.categoryId) ||
       cid === want ||
+      subKey === want ||
       p.categoryId === slug ||
       normalizeB2bSubKey(p.categoryId) === normalizeB2bSubKey(slug) ||
-      (subLabel.length >= 3 && p.name.toLowerCase().includes(subLabel))
+      (subLabel.length >= 3 && p.name.toLowerCase().includes(subLabel)) ||
+      (subLabel.length >= 3 && String(p.subcategory || "").toLowerCase().includes(subLabel))
     );
   });
 }
@@ -189,13 +206,21 @@ async function listAllCategoryServices(category: string, subcategory: string | n
   return collected;
 }
 
-export function B2BServicesHub() {
+export function B2BServicesHub({
+  lockedCategorySlug,
+  surface = "b2b",
+}: B2BServicesHubProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
 
-  const urlCategory = searchParams?.get("category") || "";
+  const isToolsSurface = surface === "tools" || lockedCategorySlug === "tools";
+  const hubBasePath = isToolsSurface ? "/tools" : "/b2b-services";
+  const productBasePath = isToolsSurface ? "/tools/products" : "/b2b-services/products";
+  const popularSearches = isToolsSurface ? POPULAR_TOOLS_SEARCHES : POPULAR_B2B_SEARCHES;
+
+  const urlCategory = lockedCategorySlug || searchParams?.get("category") || "";
   const urlSubcategory = searchParams?.get("subcategory") || "";
 
   const [categories, setCategories] = useState<B2bCategory[]>([]);
@@ -253,13 +278,22 @@ export function B2BServicesHub() {
           slug: String(c.slug || ""),
           subcategories: getSubcategoryNames(c.subcategories),
         }));
-        setCategories(filtered);
+        const scoped = lockedCategorySlug
+          ? filtered.filter((c) => isToolsCategorySlug(c.slug) || c.slug === lockedCategorySlug)
+          : filtered;
+        setCategories(scoped);
         searchIndexRef.current = null;
         setSearchIndex(null);
-        const fromUrl = filtered.find((c) => c.slug === urlCategory);
-        const first = fromUrl || filtered[0];
+        const fromUrl = scoped.find((c) => c.slug === urlCategory);
+        const first = fromUrl || scoped[0];
         setActiveSlug(first?.slug || "");
         if (fromUrl && urlSubcategory && fromUrl.subcategories.includes(urlSubcategory)) {
+          setActiveSub(urlSubcategory);
+        } else if (
+          lockedCategorySlug &&
+          urlSubcategory &&
+          first?.subcategories.includes(urlSubcategory)
+        ) {
           setActiveSub(urlSubcategory);
         } else {
           setActiveSub(null);
@@ -274,17 +308,23 @@ export function B2BServicesHub() {
     return () => {
       cancelled = true;
     };
-  }, [urlCategory, urlSubcategory]);
+  }, [urlCategory, urlSubcategory, lockedCategorySlug]);
 
   const replaceQuery = useCallback(
     (slug: string, sub: string | null) => {
       const params = new URLSearchParams();
+      if (isToolsSurface) {
+        if (sub) params.set("subcategory", sub);
+        const qs = params.toString();
+        router.replace(qs ? `${hubBasePath}?${qs}` : hubBasePath, { scroll: false });
+        return;
+      }
       if (slug) params.set("category", slug);
       if (sub) params.set("subcategory", sub);
       const qs = params.toString();
-      router.replace(qs ? `/b2b-services?${qs}` : "/b2b-services", { scroll: false });
+      router.replace(qs ? `${hubBasePath}?${qs}` : hubBasePath, { scroll: false });
     },
-    [router]
+    [router, isToolsSurface, hubBasePath]
   );
 
   const selectCategory = useCallback(
@@ -487,7 +527,7 @@ export function B2BServicesHub() {
   const openQuoteFromCart = useCallback(async () => {
     if (!quoteCart.length) return;
     if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent("/b2b-services")}`);
+      router.push(`/login?redirect=${encodeURIComponent(hubBasePath)}`);
       return;
     }
     setCtaLoadingId("quote-cart");
@@ -566,7 +606,7 @@ export function B2BServicesHub() {
     } finally {
       setCtaLoadingId(null);
     }
-  }, [isAuthenticated, quoteCart, router, toast, user]);
+  }, [hubBasePath, isAuthenticated, quoteCart, router, toast, user]);
 
   const handleAddMaterials = useCallback(
     (product: MaterialsProduct) => {
@@ -667,20 +707,29 @@ export function B2BServicesHub() {
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
             <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-100/90">
-              Wholesale & trade
+              {isToolsSurface ? "Tools marketplace" : "Wholesale & trade"}
             </span>
           </div>
           <h1 className="mt-4 max-w-[18ch] text-[1.85rem] font-extrabold leading-[1.12] tracking-tight text-white sm:text-[2.35rem]">
-            Source products <span className="text-orange-300">nationwide</span>
+            {isToolsSurface ? (
+              <>
+                Find tools <span className="text-orange-300">for every site</span>
+              </>
+            ) : (
+              <>
+                Source products <span className="text-orange-300">nationwide</span>
+              </>
+            )}
           </h1>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
-            Construction materials, tools, electrical, furniture and hardware. Add products of the same
-            item type to your quote list, then get one combined quote from listed suppliers.
+            {isToolsSurface
+              ? "Browse welding, power and hand tools. Add products of the same item type to your quote list, then get one combined quote from listed suppliers."
+              : "Construction materials, tools, electrical, furniture and hardware. Add products of the same item type to your quote list, then get one combined quote from listed suppliers."}
           </p>
 
           <form
             role="search"
-            aria-label="Search B2B products"
+            aria-label={isToolsSurface ? "Search tools" : "Search B2B products"}
             className="mt-6 max-w-2xl rounded-2xl border border-white/10 bg-white p-1.5 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.7)] sm:p-2"
             onSubmit={(e) => {
               e.preventDefault();
@@ -696,7 +745,11 @@ export function B2BServicesHub() {
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search cement, cables, plywood, furniture…"
+                  placeholder={
+                    isToolsSurface
+                      ? "Search welding tools, drills, grinders…"
+                      : "Search cement, cables, plywood, furniture…"
+                  }
                   className="h-11 border-0 bg-transparent pl-10 pr-10 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-0 sm:h-12"
                   aria-label="Search products on this page"
                 />
@@ -719,7 +772,7 @@ export function B2BServicesHub() {
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Popular</span>
-            {POPULAR_B2B_SEARCHES.map((term) => (
+            {popularSearches.map((term) => (
               <button
                 key={term}
                 type="button"
@@ -739,36 +792,40 @@ export function B2BServicesHub() {
 
       <div className="home-shell min-w-0 space-y-6 py-6 sm:space-y-8 sm:py-8 md:py-10">
         {loadingCats ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
+          <div className="flex items-center gap-2 justify-center py-16 text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin" />
             Loading categories…
           </div>
         ) : categories.length === 0 ? (
           <p className="py-16 text-center text-sm text-slate-500">
-            B2B categories are not configured yet. Add them in Admin → Categories.
+            {isToolsSurface
+              ? "Tools category is not configured yet. Add it in Admin → Categories."
+              : "B2B categories are not configured yet. Add them in Admin → Categories."}
           </p>
         ) : (
           <>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <Select
-                value={activeSlug || undefined}
-                onValueChange={selectCategory}
-                disabled={isSearching}
-              >
-                <SelectTrigger
-                  aria-label="Category"
-                  className="h-10 w-full min-w-0 rounded-xl border-slate-200 bg-white text-sm sm:w-[240px]"
+              {!lockedCategorySlug ? (
+                <Select
+                  value={activeSlug || undefined}
+                  onValueChange={selectCategory}
+                  disabled={isSearching}
                 >
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.slug} value={cat.slug}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <SelectTrigger
+                    aria-label="Category"
+                    className="h-10 w-full min-w-0 rounded-xl border-slate-200 bg-white text-sm sm:w-[240px]"
+                  >
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.slug} value={cat.slug}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
 
               {activeCategory && activeCategory.subcategories.length > 0 ? (
                 <Select
@@ -854,7 +911,7 @@ export function B2BServicesHub() {
                     key={product.id}
                     product={product}
                     hidePrice
-                    detailHref={`/b2b-services/products/${product.id}`}
+                    detailHref={`${productBasePath}/${product.id}`}
                     inQuoteList={quoteCart.some(
                       (l) =>
                         l.key === `catalog:${product.id}` ||
@@ -999,7 +1056,7 @@ export function B2BServicesHub() {
               </>
             )}
 
-            {isMaterials ? (
+            {isMaterials && !isToolsSurface ? (
               <p className="text-center text-sm text-slate-500">
                 Looking for the full materials hub?{" "}
                 <Link href="/construction-materials" className="font-medium text-[hsl(var(--red-accent))] underline">
