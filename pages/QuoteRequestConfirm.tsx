@@ -413,6 +413,7 @@ export default function QuoteRequestConfirmPage() {
           priceType: req?.priceType,
           unitPrice: Number(item.unitPrice || 0),
           lineTotal: Number(item.lineTotal || 0),
+          unavailable: item.unavailable === true,
         };
       });
     }
@@ -422,6 +423,7 @@ export default function QuoteRequestConfirmPage() {
       priceType: item.priceType,
       unitPrice: 0,
       lineTotal: 0,
+      unavailable: false,
     }));
   }, [offerLines, requestItems]);
 
@@ -1511,11 +1513,16 @@ export default function QuoteRequestConfirmPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium leading-snug">{item.title}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {formatQuoteQtyLabel(item.quantity, item.priceType)}
-                      {item.unitPrice > 0 ? ` · ${formatINR(item.unitPrice)} each` : ""}
+                      {item.unavailable
+                        ? "Not available from this seller"
+                        : `${formatQuoteQtyLabel(item.quantity, item.priceType)}${
+                            item.unitPrice > 0 ? ` · ${formatINR(item.unitPrice)} each` : ""
+                          }`}
                     </p>
                   </div>
-                  {item.lineTotal > 0 ? (
+                  {item.unavailable ? (
+                    <p className="shrink-0 text-sm font-medium text-amber-700">—</p>
+                  ) : item.lineTotal > 0 ? (
                     <p className="shrink-0 text-sm font-medium tabular-nums">{formatINR(item.lineTotal)}</p>
                   ) : null}
                 </li>
