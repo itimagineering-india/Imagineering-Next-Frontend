@@ -701,6 +701,10 @@ export const api = {
       limit?: number;
       sort?: string;
       q?: string;
+      lat?: number;
+      lng?: number;
+      radiusKm?: number;
+      precise?: string | number | boolean;
     }) => {
       const queryParams = new URLSearchParams();
       if (params) {
