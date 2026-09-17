@@ -72,7 +72,7 @@ const serviceCategories = [
   { name: "Machines Resale", icon: MachinesIcon, slug: "machines", useCustomIcon: true },
   { name: "Consultants", icon: LandIcon, slug: "consultants", useCustomIcon: true },
   { name: "Real Estate", icon: HomesIcon, slug: "real-estate", useCustomIcon: true },
-  //{ name: "Tools", icon: SpaceIcon, slug: "tools", useCustomIcon: true },
+  { name: "Tools", icon: SpaceIcon, slug: "tools", useCustomIcon: true },
   { name: "Manufacturer", icon: ManufacturerIcon, slug: "manufacturer", useCustomIcon: true },
   { name: "Logistics", icon: LogisticsIcon, slug: "logistics", useCustomIcon: true },
   { name: "Traders", icon: VendorsIcon, slug: "traders", useCustomIcon: true },
@@ -102,6 +102,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
 
   const servicesHref = useMemo(() => {
     if (category?.slug === "construction-materials") return "/construction-materials";
+    if (category?.slug === "tools") return "/tools";
     if (category?.slug === "manpower") return "/manpower";
     return `/services?${buildServicesBrowseQuery(category?.slug ?? "")}`;
   }, [category?.slug]);
