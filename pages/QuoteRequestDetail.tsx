@@ -85,6 +85,14 @@ function printLiveQuotesSummary(opts: {
           ? `<table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Line total</th></tr></thead><tbody>${lineItems
               .map((item) => {
                 const qty = Number(item.quantity || 1);
+                if (item.unavailable) {
+                  return `<tr>
+                  <td>${escapeHtml(item.title)} <em>(not available)</em></td>
+                  <td class="num">${escapeHtml(qty)}</td>
+                  <td class="num">—</td>
+                  <td class="num">—</td>
+                </tr>`;
+                }
                 const unit = Number(item.unitPrice || 0);
                 const lineTotal = Number(item.lineTotal || unit * qty);
                 return `<tr>
@@ -104,6 +112,7 @@ function printLiveQuotesSummary(opts: {
             : "Free";
       const badges = [
         offer.isRecommended ? "Recommended" : "",
+        offer.isPartial ? offer.coverageLabel || "Partial quote" : "",
         offer.verified ? "Verified" : "",
         offer.gstLabel ? String(offer.gstLabel) : "",
       ]
@@ -111,7 +120,9 @@ function printLiveQuotesSummary(opts: {
         .join(" · ");
 
       return `<section class="offer">
-        <h3>${escapeHtml(provider)}${offer.isRecommended ? ' <span class="badge">Recommended</span>' : ""}</h3>
+        <h3>${escapeHtml(provider)}${offer.isRecommended ? ' <span class="badge">Recommended</span>' : ""}${
+          offer.isPartial ? ' <span class="badge partial">Partial</span>' : ""
+        }</h3>
         ${badges ? `<p class="meta">${escapeHtml(badges)}</p>` : ""}
         <p class="total">${escapeHtml(formatINR(total))}</p>
         <table class="summary">
@@ -146,6 +157,7 @@ function printLiveQuotesSummary(opts: {
     .offer { break-inside: avoid; border: 1px solid #d6d3d1; border-radius: 10px; padding: 12px; margin: 12px 0; }
     .total { font-size: 22px; font-weight: 800; margin: 6px 0 8px; }
     .badge { display: inline-block; font-size: 10px; font-weight: 700; background: #fef3c7; color: #78350f; padding: 2px 6px; border-radius: 999px; }
+    .badge.partial { background: #ffedd5; color: #9a3412; }
     .meta, .notes { color: #57534e; margin: 4px 0 0; }
     .summary { margin-bottom: 8px; }
     .lines { margin-top: 6px; }
@@ -268,6 +280,8 @@ function OfferCard({
   const delivery = Number(offer.deliveryCharge || 0);
   const score = Number(offer.offerScore || 0);
   const recommended = Boolean(offer.isRecommended);
+  const isPartial = Boolean(offer.isPartial);
+  const coverageLabel = String(offer.coverageLabel || "").trim();
   const lineItems = quoteOfferItems(offer);
   const totalQty = quoteOfferTotalQuantity(offer);
   const totalQtyLabel = formatOfferTotalQtyLabel(totalQty);
@@ -282,11 +296,18 @@ function OfferCard({
       )}
     >
       <button type="button" className="w-full text-left" onClick={onToggle}>
-        {recommended ? (
-          <span className="mb-2.5 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
-            Recommended
-          </span>
-        ) : null}
+        <div className="mb-2.5 flex flex-wrap gap-1.5">
+          {recommended ? (
+            <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+              Recommended
+            </span>
+          ) : null}
+          {isPartial ? (
+            <span className="inline-flex rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-900">
+              {coverageLabel || "Partial quote"}
+            </span>
+          ) : null}
+        </div>
         {(offer.providerName || offer.provider?.name || offer.provider?.businessName) ? (
           <p className="mb-1.5 text-sm font-semibold text-stone-800">
             {offer.providerName || offer.provider?.businessName || offer.provider?.name}
@@ -296,7 +317,11 @@ function OfferCard({
           {formatINR(total)}
         </p>
         <p className="mt-1 text-xs text-stone-500">
-          {Number(offer.gstAmount) > 0 ? "Total · material + GST + delivery" : "Total · material + delivery"}
+          {isPartial
+            ? "Total for available items only · material + GST + delivery"
+            : Number(offer.gstAmount) > 0
+              ? "Total · material + GST + delivery"
+              : "Total · material + delivery"}
           {totalQtyLabel ? ` · ${totalQtyLabel}` : ""}
         </p>
         {score > 0 ? <ScoreMeter score={score} /> : null}
@@ -357,12 +382,18 @@ function OfferCard({
                 <li key={`${item.serviceId || item.title}-${idx}`} className="flex justify-between gap-3">
                   <span className="min-w-0 text-stone-600">
                     <span className="block truncate font-medium text-stone-800">{item.title}</span>
-                    <span className="text-xs text-stone-500">
-                      Qty {item.quantity ?? 1} × {formatINR(Number(item.unitPrice || 0))}
-                    </span>
+                    {item.unavailable ? (
+                      <span className="text-xs font-medium text-amber-700">Not available from this seller</span>
+                    ) : (
+                      <span className="text-xs text-stone-500">
+                        Qty {item.quantity ?? 1} × {formatINR(Number(item.unitPrice || 0))}
+                      </span>
+                    )}
                   </span>
                   <span className="shrink-0 font-semibold tabular-nums text-stone-900">
-                    {formatINR(Number(item.lineTotal || (item.unitPrice || 0) * (item.quantity || 1)))}
+                    {item.unavailable
+                      ? "—"
+                      : formatINR(Number(item.lineTotal || (item.unitPrice || 0) * (item.quantity || 1)))}
                   </span>
                 </li>
               ))}
