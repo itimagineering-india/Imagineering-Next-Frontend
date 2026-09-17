@@ -2972,7 +2972,12 @@ export const api = {
       deliveryOption?: 'free' | 'paid' | 'not_available';
       deliveryCharge?: number;
       sampleImages?: string[];
-      items?: Array<{ serviceId: string; unitPrice: number; catalogVariantId?: string }>;
+      items?: Array<{
+        serviceId: string;
+        unitPrice: number;
+        catalogVariantId?: string;
+        unavailable?: boolean;
+      }>;
       gstPercent?: number;
       gstAmount?: number;
       priceIncludesGst?: boolean;
