@@ -241,6 +241,15 @@ export function parseRentalRates(
     const price = Number(fallback.price);
     if (isMachineRentalPriceType(priceType) && Number.isFinite(price) && price > 0) {
       out.push({ priceType, price });
+      seen.add(priceType);
+    }
+  }
+
+  const weightPricing = parseWeightPricing(metadata);
+  if (weightPricing.slabs.length > 0 && !seen.has("per_km_weight_slab")) {
+    const price = Math.min(...weightPricing.slabs.map((s) => s.ratePerKm));
+    if (Number.isFinite(price) && price > 0) {
+      out.push({ priceType: "per_km_weight_slab", price });
     }
   }
 
