@@ -521,7 +521,9 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
         {needsDuration ? (
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {t("durationLabel", { unit: unitNoun })}
+              {needsWeight || priceType === "per_km"
+                ? t("distanceLabel", { unit: unitNoun })
+                : t("durationLabel", { unit: unitNoun })}
             </Label>
             <div className="mt-2 flex items-center gap-2">
               <Button
