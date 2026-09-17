@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import api, { getAuthToken, fetchSearchSuggestions } from "@/lib/api-client";
 import { parseHeaderSearchQuery } from "@/lib/searchNavigation";
 import { getSubcategoryNames } from "@/lib/categorySubcategories";
-import { resolveB2bBrowseCategories } from "@/lib/b2b/b2bCategories";
+import { resolveB2bBrowseCategories, b2bPurchaseBrowseHref } from "@/lib/b2b/b2bCategories";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { CartIcon } from "@/components/cart/CartIcon";
@@ -970,10 +970,7 @@ export function Header() {
                                         setActiveB2bSubcategory((prev) => (prev === sub ? prev : sub));
                                       }}
                                       onClick={() => {
-                                        const params = new URLSearchParams();
-                                        params.set("category", active.slug);
-                                        params.set("subcategory", sub);
-                                        router.push(`/b2b-services?${params.toString()}`);
+                                        router.push(b2bPurchaseBrowseHref(active.slug, sub));
                                       }}
                                       className={cn(
                                         "inline-flex items-center justify-center w-full rounded-lg border px-4 py-3 caption leading-snug text-center transition-all duration-150",
@@ -1001,7 +998,7 @@ export function Header() {
                           {subs.length > 0 && (
                             <div className="mt-4 border-t border-slate-100 pt-4 flex justify-center">
                               <Link
-                                href={`/b2b-services?category=${active.slug}`}
+                                href={b2bPurchaseBrowseHref(active.slug)}
                                 className="inline-flex items-center caption text-red-500 hover:text-red-600 hover:underline"
                               >
                                 {t("services:viewAll")} {active.name} <span className="ml-1">→</span>
