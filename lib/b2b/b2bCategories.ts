@@ -114,6 +114,23 @@ export function usesB2bCatalogOrManualListing(
   return String(cat.interactionType || "").toUpperCase() === "PURCHASE_ONLY";
 }
 
+/** Public Tools hub vs B2B browse URL for a purchase category. */
+export function b2bPurchaseBrowseHref(slug: string, subcategory?: string): string {
+  const s = String(slug || "")
+    .toLowerCase()
+    .trim();
+  const params = new URLSearchParams();
+  if (s === "tools" || s.startsWith("tools-")) {
+    if (subcategory) params.set("subcategory", subcategory);
+    const qs = params.toString();
+    return qs ? `/tools?${qs}` : "/tools";
+  }
+  if (slug) params.set("category", slug);
+  if (subcategory) params.set("subcategory", subcategory);
+  const qs = params.toString();
+  return qs ? `/b2b-services?${qs}` : "/b2b-services";
+}
+
 export function filterB2bCategories<T extends B2bCategoryLike>(categories: T[]): T[] {
   const rank = (name: string) => {
     const i = B2B_PURCHASE_ORDER.indexOf(normalizeB2bCategoryName(name));
