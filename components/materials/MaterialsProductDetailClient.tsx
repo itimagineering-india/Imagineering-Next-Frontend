@@ -51,8 +51,8 @@ import {
 
 type Props = {
   productId: string;
-  /** materials = /construction-materials/… ; b2b = /b2b-services/products/… */
-  surface?: "materials" | "b2b";
+  /** materials = /construction-materials/… ; b2b = /b2b-services/products/… ; tools = /tools/products/… */
+  surface?: "materials" | "b2b" | "tools";
 };
 
 function toReadableText(raw: unknown): string {
@@ -134,12 +134,26 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const isB2b = surface === "b2b";
-  const productPath = isB2b
-    ? `/b2b-services/products/${productId}`
-    : `/construction-materials/product/${productId}`;
-  const hubHref = isB2b ? "/b2b-services" : "/construction-materials";
-  const hubLabel = isB2b ? "B2B Services" : "Construction Materials";
-  const productHrefBase = isB2b ? "/b2b-services/products" : "/construction-materials/product";
+  const isTools = surface === "tools";
+  const usesQuoteCart = isB2b || isTools;
+  const productPath = isTools
+    ? `/tools/products/${productId}`
+    : isB2b
+      ? `/b2b-services/products/${productId}`
+      : `/construction-materials/product/${productId}`;
+  const hubHref = isTools ? "/tools" : isB2b ? "/b2b-services" : "/construction-materials";
+  const hubLabel = isTools ? "Tools" : isB2b ? "B2B Services" : "Construction Materials";
+  const productHrefBase = isTools
+    ? "/tools/products"
+    : isB2b
+      ? "/b2b-services/products"
+      : "/construction-materials/product";
+  const backLabel = isTools
+    ? "Back to Tools"
+    : isB2b
+      ? "Back to B2B Services"
+      : t("backToHub");
+  const layoutCategorySlug = isTools ? "tools" : isB2b ? "b2b-services" : "construction-materials";
 
   const [loading, setLoading] = useState(true);
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
@@ -176,7 +190,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   }, [raw]);
 
   useEffect(() => {
-    if (!isB2b) return;
+    if (!usesQuoteCart) return;
     const variantId = selectedVariant?.id;
     const key = paintQuoteCartKey({
       catalogProductId: productId,
@@ -186,7 +200,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     });
     setInQuoteList(loadB2bQuoteCart().some((l) => l.key === key));
   }, [
-    isB2b,
+    usesQuoteCart,
     productId,
     selectedVariant?.id,
     selectedShade.code,
@@ -422,7 +436,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
       : mapped.name;
 
     // Keep current size/shade in the quote list so switching sizes accumulates lines.
-    if (isB2b) {
+    if (usesQuoteCart) {
       const key = paintQuoteCartKey({
         catalogProductId: mapped.id,
         catalogVariantId: variantId,
@@ -510,7 +524,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   }, [
     catalogVariants.variantAxes,
     isAuthenticated,
-    isB2b,
+    usesQuoteCart,
     linkedServiceId,
     mapped,
     productPath,
@@ -593,7 +607,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
 
   const handleShare = useCallback(async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
-    const title = mapped?.name || (isB2b ? "B2B product" : "Construction material");
+    const title = mapped?.name || (isTools ? "Tool" : isB2b ? "B2B product" : "Construction material");
     try {
       if (navigator.share) {
         await navigator.share({ title, url });
@@ -604,7 +618,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
     } catch {
       /* user cancelled share */
     }
-  }, [isB2b, mapped?.name, toast]);
+  }, [isB2b, isTools, mapped?.name, toast]);
 
   const handleFavorite = useCallback(() => {
     if (!isAuthenticated) {
@@ -636,7 +650,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           href={hubHref}
           className="mt-4 inline-block font-semibold text-[hsl(var(--red-accent))]"
         >
-          {isB2b ? "Back to B2B Services" : t("backToHub")}
+          {backLabel}
         </Link>
       </div>
     );
@@ -647,7 +661,9 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   const priceMax =
     Number(selectedVariant?.suggestedPriceMax ?? raw.suggestedPriceMax) || priceMin;
   const b2bCategoryHref = typeKey
-    ? `/b2b-services?category=${encodeURIComponent(MATERIALS_CATEGORY_SLUG)}&subcategory=${encodeURIComponent(typeKey)}`
+    ? isTools
+      ? `/tools?subcategory=${encodeURIComponent(typeKey)}`
+      : `/b2b-services?category=${encodeURIComponent(MATERIALS_CATEGORY_SLUG)}&subcategory=${encodeURIComponent(typeKey)}`
     : hubHref;
   const variantLabel = selectedVariant
     ? catalogVariantLabel(selectedVariant, catalogVariants.variantAxes)
@@ -660,11 +676,11 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
       <div className="layout-shell overflow-x-clip pb-28 pt-4 sm:pt-6 md:pt-8">
         <ConstructionMaterialProductLayout
           responsive
-          forceQuoteCtas={isB2b}
+          forceQuoteCtas={usesQuoteCart}
           similarHrefBase={productHrefBase}
           viewAllHref={hubHref}
           categoryHref={
-            isB2b
+            usesQuoteCart
               ? b2bCategoryHref
               : typeKey
                 ? `/construction-materials/${encodeURIComponent(typeKey)}`
@@ -688,15 +704,15 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
             provider: { name: mapped.brand || mapped.name, businessName: mapped.brand || mapped.name },
           }}
           categoryName={hubLabel}
-          categorySlug={isB2b ? "b2b-services" : "construction-materials"}
+          categorySlug={layoutCategorySlug}
           formattedPrice={priceLabel}
-          isRangePrice={isB2b ? true : isRange}
+          isRangePrice={usesQuoteCart ? true : isRange}
           showPricing
           specFields={specs}
           similarServices={similar.map(similarToServiceCard)}
           cityLabel="your city"
           onGetQuotes={handleGetQuotes}
-          onAddToQuote={isB2b ? handleAddToQuote : undefined}
+          onAddToQuote={usesQuoteCart ? handleAddToQuote : undefined}
           inQuoteList={inQuoteList}
           onShare={handleShare}
           onFavorite={handleFavorite}
@@ -746,7 +762,7 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
                     brand={mapped.brand || String(raw?.brand || "")}
                   />
                 ) : null}
-                {isB2b ? (
+                {usesQuoteCart ? (
                   <p className="text-xs text-muted-foreground">
                     Need more than one size or shade? Select each, tap{" "}
                     <span className="font-medium text-foreground">Add to quote</span>, then{" "}
