@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronRight, Loader2, Calendar, Clock, Package } from "lucide-react";
+import { ChevronRight, Loader2, Calendar, Clock, Package, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api-client";
@@ -57,6 +57,8 @@ type GetBestQuotesModalProps = {
   priceType?: string | null;
   /** Multi-product RFQ. When set, quantities are per line. */
   items?: QuoteModalLine[];
+  /** Called when user removes a line from the multi-product list (e.g. sync B2B cart). */
+  onItemsChange?: (items: QuoteModalLine[]) => void;
   onSubmitted?: () => void;
   /** B2B product RFQs have no 30-minute countdown. */
   noCountdown?: boolean;
@@ -78,6 +80,7 @@ export function GetBestQuotesModal({
   serviceTitle,
   priceType,
   items,
+  onItemsChange,
   onSubmitted,
   noCountdown = false,
   source = "marketplace",
@@ -89,6 +92,7 @@ export function GetBestQuotesModal({
   const { isAuthenticated } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [lineQuantities, setLineQuantities] = useState<number[]>([]);
+  const [editableLines, setEditableLines] = useState<QuoteModalLine[] | null>(null);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
@@ -98,21 +102,47 @@ export function GetBestQuotesModal({
   const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(null);
 
   const minDate = useMemo(() => formatLocalYMD(new Date()), []);
-  const quoteLines = useMemo(
-    () => (Array.isArray(items) && items.length > 0 ? items : null),
-    [items]
-  );
+  const quoteLines = editableLines;
+  const showProductsList = Boolean(quoteLines && quoteLines.length > 0);
   const isMulti = Boolean(quoteLines && quoteLines.length > 1);
   const exclusive = Boolean(exclusiveToListing || targetProviderUserId);
-  const headline = isMulti ? `${quoteLines!.length} products` : serviceTitle;
+  const headline = isMulti
+    ? `${quoteLines!.length} products`
+    : quoteLines?.length === 1
+      ? quoteLines[0].title
+      : serviceTitle;
   const quantityUnit = useMemo(() => getQuantityUnitNoun(priceType), [priceType]);
   const quantityUnitLabel = useMemo(() => getPriceTypeLabel(priceType), [priceType]);
 
   useEffect(() => {
     if (!open) return;
-    setQuantity(parseQuoteQuantity(quoteLines?.[0]?.quantity));
-    setLineQuantities((quoteLines || []).map((line) => parseQuoteQuantity(line.quantity)));
-  }, [open, quoteLines]);
+    if (Array.isArray(items) && items.length > 0) {
+      setEditableLines(items.map((line) => ({ ...line })));
+      setLineQuantities(items.map((line) => parseQuoteQuantity(line.quantity)));
+      setQuantity(parseQuoteQuantity(items[0]?.quantity));
+    } else {
+      setEditableLines(null);
+      setLineQuantities([]);
+      setQuantity(1);
+    }
+  }, [open, items]);
+
+  const removeLine = useCallback(
+    (index: number) => {
+      setEditableLines((prev) => {
+        if (!prev) return prev;
+        const next = prev.filter((_, i) => i !== index);
+        onItemsChange?.(next);
+        if (next.length === 0) {
+          onOpenChange(false);
+          return null;
+        }
+        return next;
+      });
+      setLineQuantities((prev) => prev.filter((_, i) => i !== index));
+    },
+    [onItemsChange, onOpenChange]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -165,7 +195,7 @@ export function GetBestQuotesModal({
         serviceId: line.serviceId,
         title: line.title,
         quantity: parseQuoteQuantity(
-          isMulti
+          showProductsList
             ? lineQuantities[idx] || line.quantity
             : idx === 0
               ? quantity
@@ -181,6 +211,10 @@ export function GetBestQuotesModal({
     const firstQty = payloadItems?.[0]?.quantity || quantity;
     if (!payloadItems && (!quantity || quantity < QUOTE_QTY_MIN)) {
       toast({ title: "Quantity required", description: "Enter a quantity greater than 0.", variant: "destructive" });
+      return;
+    }
+    if (payloadItems && payloadItems.length === 0) {
+      toast({ title: "No products", description: "Add at least one product to request quotes.", variant: "destructive" });
       return;
     }
     if (payloadItems?.some((line) => !line.quantity || line.quantity < QUOTE_QTY_MIN)) {
@@ -337,7 +371,7 @@ export function GetBestQuotesModal({
           </DialogHeader>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
-            {isMulti ? (
+            {showProductsList ? (
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Package className="h-4 w-4" /> Products · quantities
@@ -357,18 +391,31 @@ export function GetBestQuotesModal({
                         : "");
                     return (
                       <li
-                        key={`${line.serviceId}-${line.catalogVariantId || idx}`}
+                        key={`${line.serviceId}-${line.catalogVariantId || line.catalogProductId || idx}`}
                         className="space-y-2 px-3 py-3"
                       >
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold leading-snug text-foreground">
-                            {name}
-                          </p>
-                          {variant ? (
-                            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                              {variant}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold leading-snug text-foreground">
+                              {name}
                             </p>
-                          ) : null}
+                            {variant ? (
+                              <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                                {variant}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                            title="Remove product"
+                            aria-label={`Remove ${name}`}
+                            onClick={() => removeLine(idx)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="shrink-0 text-xs font-medium text-muted-foreground">
