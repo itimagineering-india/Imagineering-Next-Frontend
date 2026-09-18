@@ -20,6 +20,7 @@ import {
   hasProviderVariantLimits,
   listProviderSellableVariants,
   readCatalogVariants,
+  resolveCatalogProductId,
   resolveProviderAxisSelection,
   selectionAfterAxisChange,
   type CatalogVariant,
@@ -273,10 +274,12 @@ export function QuoteVariantPickerModal({
                 catalogVariants.variantAxes,
                 variantSel,
               );
-              const allowed = providerAxisSel[axis.key] || [];
-              const values = allowed.length
-                ? allValues.filter((v) => allowed.includes(v))
-                : allValues;
+              // Provider limits already shrink `pool` when present; don't hide axes
+              // when saved axis labels no longer match active SKUs.
+              const allowed = applyProviderLimits ? providerAxisSel[axis.key] || [] : [];
+              const filtered =
+                allowed.length > 0 ? allValues.filter((v) => allowed.includes(v)) : allValues;
+              const values = filtered.length > 0 ? filtered : allValues;
               if (!values.length) return null;
               const selectValue = values.includes(variantSel[axis.key] || "")
                 ? variantSel[axis.key]
@@ -317,7 +320,9 @@ export function QuoteVariantPickerModal({
               <p className="text-xs text-muted-foreground">
                 {allAxesFilled
                   ? "This combination isn’t available. Change one option to continue."
-                  : "Select a full combination to continue."}
+                  : sellableVariants.length === 0
+                    ? "No sellable sizes for this listing. Ask the seller to update options."
+                    : "Select a full combination to continue."}
               </p>
             )}
           </div>
@@ -371,7 +376,7 @@ export function ProviderQuoteVariantModal({
 }) {
   const target = useMemo((): QuoteVariantPickerTarget | null => {
     if (!service) return null;
-    const catalogProductId = String(service.catalogProductId || "").trim();
+    const catalogProductId = resolveCatalogProductId(service);
     if (!catalogProductId) return null;
     return {
       serviceId: String(service._id || service.id || "").trim() || undefined,
