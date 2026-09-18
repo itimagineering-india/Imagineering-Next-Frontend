@@ -1108,6 +1108,46 @@ export function B2BServicesHub({
           serviceTitle={quoteService.title}
           priceType={quoteService.priceType}
           items={quoteService.items}
+          onItemsChange={(next) => {
+            setQuoteService((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    items: next,
+                    title: next.length > 1 ? `${next.length} products` : next[0]?.title || prev.title,
+                    id: next[0]?.serviceId || prev.id,
+                    priceType: next[0]?.priceType ?? prev.priceType,
+                  }
+                : prev
+            );
+            const nextKeys = new Set(
+              next.map((line) => {
+                if (line.catalogProductId && line.catalogVariantId) {
+                  return `catalog:${line.catalogProductId}:${line.catalogVariantId}`;
+                }
+                if (line.catalogProductId) return `catalog:${line.catalogProductId}`;
+                if (line.serviceId) return `service:${line.serviceId}`;
+                return "";
+              }).filter(Boolean)
+            );
+            setQuoteCart((cart) => {
+              const kept = cart.filter((line) => {
+                if (nextKeys.has(line.key)) return true;
+                return next.some(
+                  (n) =>
+                    (n.catalogProductId &&
+                      n.catalogProductId === line.catalogProductId &&
+                      (n.catalogVariantId || "") === (line.catalogVariantId || "")) ||
+                    (n.serviceId && n.serviceId === line.serviceId && !n.catalogProductId)
+                );
+              });
+              return saveB2bQuoteCart(kept);
+            });
+            if (next.length === 0) {
+              setQuoteOpen(false);
+              setQuoteService(null);
+            }
+          }}
           onSubmitted={() => setQuoteCart(clearB2bQuoteCart())}
           noCountdown
           source="b2b_services"
