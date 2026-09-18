@@ -109,7 +109,9 @@ export function GetBestQuotesModal({
   const headline = isMulti
     ? `${quoteLines!.length} products`
     : quoteLines?.length === 1
-      ? quoteLines[0].title
+      ? [quoteLines[0].title.split(" · ")[0] || quoteLines[0].title, quoteLines[0].variantLabel]
+          .filter(Boolean)
+          .join(" · ") || quoteLines[0].title
       : serviceTitle;
   const quantityUnit = useMemo(() => getQuantityUnitNoun(priceType), [priceType]);
   const quantityUnitLabel = useMemo(() => getPriceTypeLabel(priceType), [priceType]);
@@ -350,13 +352,13 @@ export function GetBestQuotesModal({
               ) : exclusive ? (
                 <>
                   Share quantity, schedule, and delivery address for{" "}
-                  <span className="font-medium text-foreground">{serviceTitle}</span>. This
+                  <span className="font-medium text-foreground">{headline}</span>. This
                   request goes only to this seller.
                 </>
               ) : (
                 <>
                   Share quantity, schedule, and delivery address for{" "}
-                  <span className="font-medium text-foreground">{serviceTitle}</span>.
+                  <span className="font-medium text-foreground">{headline}</span>.
                   {noCountdown
                     ? " Listed suppliers will send prices."
                     : " Nearby verified suppliers will send prices within 30 minutes."}
