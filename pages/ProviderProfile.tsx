@@ -42,6 +42,7 @@ import {
   type QuoteModalLine,
 } from "@/components/service-details/GetBestQuotesModal";
 import { ProviderQuoteVariantModal } from "@/components/providers/ProviderQuoteVariantModal";
+import { resolveCatalogProductId } from "@/lib/catalogVariants";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -205,7 +206,7 @@ export default function ProviderProfile() {
     (service: ServiceData) => {
       const serviceId = String(service._id || service.id || "").trim();
       if (!serviceId) return;
-      const catalogId = String(service.catalogProductId || "").trim();
+      const catalogId = resolveCatalogProductId(service);
       const selectedCount = countSelectedForService(serviceId);
 
       // Plain services (no catalog): toggle on/off.
@@ -224,7 +225,7 @@ export default function ProviderProfile() {
       }
 
       // Catalog products may have variants — always open picker (can add multiple sizes).
-      setVariantModalService(service);
+      setVariantModalService({ ...service, catalogProductId: catalogId });
     },
     [countSelectedForService, removeQuoteLinesForService, upsertQuoteLine],
   );
