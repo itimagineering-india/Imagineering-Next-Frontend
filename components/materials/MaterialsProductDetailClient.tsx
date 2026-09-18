@@ -179,6 +179,29 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
   }, [catalogVariants, variantSel]);
 
   useEffect(() => {
+    if (!catalogVariants.hasVariants) return;
+    const axes = catalogVariants.variantAxes;
+    const pool = catalogVariants.variants;
+    if (!pool.length) return;
+    if (findCatalogVariant(pool, variantSel, axes)) return;
+    let next = { ...variantSel };
+    for (const axis of axes) {
+      const opts = catalogAxisOptionValues(axis, pool, axes, next);
+      const cur = String(next[axis.key] || "").trim();
+      if (opts.length && !opts.includes(cur)) {
+        next = selectionAfterAxisChange(axes, pool, next, axis.key, opts[0]);
+      }
+    }
+    if (!findCatalogVariant(pool, next, axes)) {
+      next = defaultVariantSelection(axes, pool);
+    }
+    const same = axes.every(
+      (a) => String(next[a.key] || "").trim() === String(variantSel[a.key] || "").trim(),
+    );
+    if (!same) setVariantSel(next);
+  }, [catalogVariants, variantSel]);
+
+  useEffect(() => {
     if (!raw) return;
     const parsed = readCatalogVariants(raw);
     if (parsed.hasVariants) {
@@ -721,13 +744,22 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
                   <div className="space-y-2">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {catalogVariants.variantAxes.map((axis) => {
-                        const values = catalogAxisOptionValues(axis, catalogVariants.variants);
+                        const values = catalogAxisOptionValues(
+                          axis,
+                          catalogVariants.variants,
+                          catalogVariants.variantAxes,
+                          variantSel,
+                        );
+                        if (!values.length) return null;
+                        const selectValue = values.includes(variantSel[axis.key] || "")
+                          ? variantSel[axis.key]
+                          : values[0] || "";
                         return (
                           <label key={axis.key} className="space-y-1 text-sm">
                             <span className="font-medium text-foreground">{axis.label}</span>
                             <select
                               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                              value={variantSel[axis.key] || ""}
+                              value={selectValue}
                               onChange={(e) =>
                                 setVariantSel((prev) =>
                                   selectionAfterAxisChange(
