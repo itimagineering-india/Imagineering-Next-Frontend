@@ -51,8 +51,10 @@ import {
   catalogVariantLabel,
   defaultVariantSelection,
   findCatalogVariant,
+  hasProviderVariantLimits,
   parseProviderVariantPrices,
   readCatalogVariants,
+  resolveCatalogProductId,
   resolveExactPriceForVariant,
   resolveProviderAxisSelection,
   selectionAfterAxisChange,
@@ -542,12 +544,12 @@ export default function ServiceDetails() {
 
   /** Any catalog-linked listing (CM / B2B traders / material suppliers) gets size pickers + hybrid CTAs. */
   const useMaterialsDetailLayout = useMemo(() => {
-    if (service?.catalogProductId) return true;
+    if (resolveCatalogProductId(service)) return true;
     return isConstructionMaterialsCategorySlug(categorySlug);
-  }, [categorySlug, service?.catalogProductId]);
+  }, [categorySlug, service]);
 
   useEffect(() => {
-    const catalogId = String(service?.catalogProductId || "").trim();
+    const catalogId = resolveCatalogProductId(service);
     if (!catalogId) {
       setCatalogProduct(null);
       setVariantSel({});
@@ -560,18 +562,24 @@ export default function ServiceDetails() {
         if (cancelled || !res.success) return;
         const product = ((res.data as { product?: CatalogProductItem })?.product ||
           res.data) as CatalogProductItem;
-        if (!product?._id) return;
+        const productId = String(
+          (product as { _id?: string; id?: string })?._id ||
+            (product as { id?: string })?.id ||
+            "",
+        ).trim();
+        if (!productId) return;
         setCatalogProduct(product);
         const parsed = readCatalogVariants(product as unknown as Record<string, unknown>);
         if (parsed.hasVariants) {
-          const axesSel = resolveProviderAxisSelection(product, service?.metadata || null);
           const defaults = defaultVariantSelection(parsed.variantAxes, parsed.variants);
-          // Prefer a sellable combination when provider limited axes.
           const preferred: Record<string, string> = { ...defaults };
-          for (const axis of parsed.variantAxes) {
-            const allowed = axesSel[axis.key] || [];
-            if (allowed.length && !allowed.includes(preferred[axis.key] || "")) {
-              preferred[axis.key] = allowed[0];
+          if (hasProviderVariantLimits(service?.metadata)) {
+            const axesSel = resolveProviderAxisSelection(product, service?.metadata || null);
+            for (const axis of parsed.variantAxes) {
+              const allowed = axesSel[axis.key] || [];
+              if (allowed.length && !allowed.includes(preferred[axis.key] || "")) {
+                preferred[axis.key] = allowed[0];
+              }
             }
           }
           setVariantSel(preferred);
@@ -585,20 +593,19 @@ export default function ServiceDetails() {
     return () => {
       cancelled = true;
     };
-  }, [service?.catalogProductId, service?.metadata]);
+  }, [service, service?.catalogProductId, service?.metadata]);
 
   const catalogVariants = useMemo(
     () => readCatalogVariants((catalogProduct || undefined) as Record<string, unknown> | undefined),
     [catalogProduct],
   );
 
-  const providerAxisSel = useMemo(
-    () =>
-      catalogProduct
-        ? resolveProviderAxisSelection(catalogProduct, service?.metadata || null)
-        : {},
-    [catalogProduct, service?.metadata],
-  );
+  const applyProviderLimits = Boolean(hasProviderVariantLimits(service?.metadata));
+
+  const providerAxisSel = useMemo(() => {
+    if (!catalogProduct || !applyProviderLimits) return {};
+    return resolveProviderAxisSelection(catalogProduct, service?.metadata || null);
+  }, [catalogProduct, service?.metadata, applyProviderLimits]);
 
   const selectedCatalogVariant = useMemo(() => {
     if (!catalogVariants.hasVariants) return undefined;
@@ -669,10 +676,10 @@ export default function ServiceDetails() {
             catalogVariants.variantAxes,
             variantSel,
           );
-          const allowed = providerAxisSel[axis.key] || [];
-          const values = allowed.length
-            ? allValues.filter((v) => allowed.includes(v))
-            : allValues;
+          const allowed = applyProviderLimits ? providerAxisSel[axis.key] || [] : [];
+          const filtered =
+            allowed.length > 0 ? allValues.filter((v) => allowed.includes(v)) : allValues;
+          const values = filtered.length > 0 ? filtered : allValues;
           if (!values.length) return null;
           const selectValue = values.includes(variantSel[axis.key] || "")
             ? variantSel[axis.key]
@@ -718,6 +725,7 @@ export default function ServiceDetails() {
       </div>
     );
   }, [
+    applyProviderLimits,
     canAddToCart,
     catalogVariants,
     providerAxisSel,
@@ -1077,8 +1085,22 @@ export default function ServiceDetails() {
       });
       return;
     }
+    if (catalogVariants.hasVariants && !selectedCatalogVariant) {
+      toast({
+        title: "Select a variant",
+        description: "Choose size / specification before requesting a quote.",
+        variant: "destructive",
+      });
+      return;
+    }
     setQuotesModalOpen(true);
-  }, [isAuthenticated, redirectToLogin, toast]);
+  }, [
+    isAuthenticated,
+    redirectToLogin,
+    toast,
+    catalogVariants.hasVariants,
+    selectedCatalogVariant,
+  ]);
 
   const handleSubmitRequest = useCallback(async (data: {
     date: Date;
@@ -1704,13 +1726,33 @@ export default function ServiceDetails() {
             open={quotesModalOpen}
             onOpenChange={setQuotesModalOpen}
             serviceId={service.id}
-            serviceTitle={service.title}
-            priceType={service.priceType}
+            serviceTitle={
+              selectedCatalogVariant
+                ? `${service.title} · ${catalogVariantLabel(selectedCatalogVariant, catalogVariants.variantAxes)}`
+                : service.title
+            }
+            priceType={
+              selectedCatalogVariant?.suggestedPriceType || service.priceType
+            }
             noCountdown={isB2bCategorySlug(categorySlug)}
             exclusiveToListing
             targetProviderUserId={
               service.provider?._id ? String(service.provider._id) : undefined
             }
+            items={[
+              {
+                serviceId: service.id,
+                title: service.title,
+                quantity: 1,
+                priceType:
+                  selectedCatalogVariant?.suggestedPriceType || service.priceType,
+                catalogProductId: resolveCatalogProductId(service) || undefined,
+                catalogVariantId: selectedCatalogVariant?.id,
+                variantLabel: selectedCatalogVariant
+                  ? catalogVariantLabel(selectedCatalogVariant, catalogVariants.variantAxes)
+                  : undefined,
+              },
+            ]}
           />
         )}
 
