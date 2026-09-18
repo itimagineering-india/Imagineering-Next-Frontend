@@ -41,6 +41,32 @@ export function activeCatalogVariants(variants: CatalogVariant[]): CatalogVarian
   return variants.filter((v) => v.isActive !== false);
 }
 
+/** Normalize catalog product id from listing / API shapes (string, ObjectId, or nested). */
+export function resolveCatalogProductId(
+  source: { catalogProductId?: unknown; metadata?: unknown } | null | undefined,
+): string {
+  if (!source) return "";
+  const raw = source.catalogProductId;
+  if (raw && typeof raw === "object") {
+    const nested = raw as { _id?: unknown; id?: unknown };
+    const fromObj = String(nested._id || nested.id || "").trim();
+    if (fromObj && fromObj !== "[object Object]") return fromObj;
+  } else {
+    const asStr = String(raw || "").trim();
+    if (asStr && asStr !== "[object Object]") return asStr;
+  }
+  const meta =
+    source.metadata && typeof source.metadata === "object" && !Array.isArray(source.metadata)
+      ? (source.metadata as Record<string, unknown>)
+      : null;
+  if (meta) {
+    const fromMeta = String(meta.catalogProductId || "").trim();
+    if (fromMeta && fromMeta !== "[object Object]") return fromMeta;
+  }
+  return "";
+}
+
+
 export function catalogVariantLabel(
   variant: CatalogVariant | null | undefined,
   axes: CatalogVariantAxis[]
