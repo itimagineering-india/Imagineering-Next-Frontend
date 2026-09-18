@@ -70,13 +70,15 @@ export function catalogVariantPriceBounds(variants: CatalogVariant[]): { min?: n
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
-/** All distinct values for an axis across active variants (and axis.options). */
+/** Distinct values for an axis. When `axes` + `selection` are passed, only values that
+ * exist on active variants compatible with *earlier* selected axes (cascading). */
 export function catalogAxisOptionValues(
   axis: CatalogVariantAxis,
   variants: CatalogVariant[],
-  _axes?: CatalogVariantAxis[],
-  _selection?: Record<string, string>,
+  axes?: CatalogVariantAxis[],
+  selection?: Record<string, string>,
 ): string[] {
+  const active = activeCatalogVariants(variants);
   const seen = new Set<string>();
   const out: string[] = [];
   const push = (raw: string | undefined) => {
@@ -85,10 +87,24 @@ export function catalogAxisOptionValues(
     seen.add(v);
     out.push(v);
   };
-  for (const opt of axis.options || []) push(opt);
-  for (const variant of activeCatalogVariants(variants)) {
-    push(variant.attributes?.[axis.key]);
+
+  if (axes?.length && selection) {
+    const axisIndex = axes.findIndex((a) => a.key === axis.key);
+    const earlierAxes = axisIndex > 0 ? axes.slice(0, axisIndex) : [];
+    const candidates = active.filter((v) =>
+      earlierAxes.every((a) => {
+        const want = String(selection[a.key] || "").trim();
+        if (!want) return true;
+        return String(v.attributes?.[a.key] || "").trim() === want;
+      }),
+    );
+    for (const v of candidates) push(v.attributes?.[axis.key]);
+    if (out.length > 0) return out;
+    // Broken / empty selection — fall back to all active values for this axis.
   }
+
+  for (const opt of axis.options || []) push(opt);
+  for (const variant of active) push(variant.attributes?.[axis.key]);
   return out;
 }
 
@@ -116,7 +132,10 @@ export function selectionAfterAxisChange(
   };
 
   const exact = active.find((v) =>
-    axes.every((axis) => (v.attributes?.[axis.key] || "") === (next[axis.key] || "")),
+    axes.every(
+      (axis) =>
+        String(v.attributes?.[axis.key] || "").trim() === String(next[axis.key] || "").trim(),
+    ),
   );
   if (exact) return toSelection(exact);
 
@@ -124,11 +143,11 @@ export function selectionAfterAxisChange(
 
   // Candidates that honor earlier sticky picks + the new value.
   let candidates = active.filter((v) => {
-    if ((v.attributes?.[axisKey] || "") !== value) return false;
+    if (String(v.attributes?.[axisKey] || "").trim() !== String(value || "").trim()) return false;
     return earlierAxes.every((a) => {
       const want = String(current[a.key] || "").trim();
       if (!want) return true;
-      return (v.attributes?.[a.key] || "") === want;
+      return String(v.attributes?.[a.key] || "").trim() === want;
     });
   });
 
@@ -150,7 +169,7 @@ export function selectionAfterAxisChange(
     const axis = axes[i];
     const preferred = String(result[axis.key] || "").trim();
     const kept = preferred
-      ? candidates.filter((v) => (v.attributes?.[axis.key] || "") === preferred)
+      ? candidates.filter((v) => String(v.attributes?.[axis.key] || "").trim() === preferred)
       : [];
     if (kept.length) {
       candidates = kept;
@@ -158,7 +177,9 @@ export function selectionAfterAxisChange(
     } else {
       const fallback = candidates[0]?.attributes?.[axis.key] || "";
       result[axis.key] = fallback;
-      candidates = candidates.filter((v) => (v.attributes?.[axis.key] || "") === fallback);
+      candidates = candidates.filter(
+        (v) => String(v.attributes?.[axis.key] || "").trim() === String(fallback).trim(),
+      );
     }
   }
 
@@ -171,7 +192,11 @@ export function findCatalogVariant(
   axes: CatalogVariantAxis[],
 ): CatalogVariant | undefined {
   return activeCatalogVariants(variants).find((v) =>
-    axes.every((axis) => !selected[axis.key] || v.attributes?.[axis.key] === selected[axis.key]),
+    axes.every((axis) => {
+      const want = String(selected[axis.key] || "").trim();
+      if (!want) return true;
+      return String(v.attributes?.[axis.key] || "").trim() === want;
+    }),
   );
 }
 
@@ -286,6 +311,12 @@ export function parseProviderVariantAxes(meta: unknown): ProviderAxisSelection |
   return Object.keys(out).length ? out : null;
 }
 
+/** True when listing metadata actually restricts which axis values / SKUs the provider sells. */
+export function hasProviderVariantLimits(meta: unknown): boolean {
+  if (parseProviderVariantAxes(meta)) return true;
+  return parseProviderVariants(meta).some((r) => r.enabled);
+}
+
 /** Prefer axis selection; fall back to deriving options from legacy enabled variant ids. */
 export function resolveProviderAxisSelection(
   product: AxisProductShape,
@@ -352,12 +383,21 @@ export function listProviderSellableVariants(
   const axes = product.variantAxes || [];
   const active = activeCatalogVariants((product.variants || []) as CatalogVariant[]);
   if (!axes.length) return active;
+
+  const isBlankAllowed = (allowed: string[]) =>
+    allowed.some((a) => {
+      const n = a.trim().toLowerCase();
+      return n === "not specified" || n === "n/a" || n === "-" || n === "—";
+    });
+
   return active.filter((variant) =>
     axes.every((axis) => {
       const allowed = selection[axis.key] || [];
-      if (!allowed.length) return false;
+      if (!allowed.length) return true;
       const value = String(variant.attributes?.[axis.key] || "").trim();
-      return Boolean(value) && allowed.includes(value);
+      if (value) return allowed.includes(value);
+      // Blank attribute ≈ "Not Specified" when that option is enabled.
+      return isBlankAllowed(allowed);
     }),
   );
 }
