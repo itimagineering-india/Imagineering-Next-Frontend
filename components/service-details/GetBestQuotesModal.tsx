@@ -129,19 +129,14 @@ export function GetBestQuotesModal({
 
   const removeLine = useCallback(
     (index: number) => {
-      setEditableLines((prev) => {
-        if (!prev) return prev;
-        const next = prev.filter((_, i) => i !== index);
-        onItemsChange?.(next);
-        if (next.length === 0) {
-          onOpenChange(false);
-          return null;
-        }
-        return next;
-      });
+      if (!editableLines) return;
+      const next = editableLines.filter((_, i) => i !== index);
+      setEditableLines(next.length === 0 ? null : next);
       setLineQuantities((prev) => prev.filter((_, i) => i !== index));
+      onItemsChange?.(next);
+      if (next.length === 0) onOpenChange(false);
     },
-    [onItemsChange, onOpenChange]
+    [editableLines, onItemsChange, onOpenChange]
   );
 
   useEffect(() => {
