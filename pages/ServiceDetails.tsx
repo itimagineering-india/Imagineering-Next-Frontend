@@ -663,18 +663,26 @@ export default function ServiceDetails() {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {catalogVariants.variantAxes.map((axis) => {
-          const allValues = catalogAxisOptionValues(axis, catalogVariants.variants);
+          const allValues = catalogAxisOptionValues(
+            axis,
+            catalogVariants.variants,
+            catalogVariants.variantAxes,
+            variantSel,
+          );
           const allowed = providerAxisSel[axis.key] || [];
           const values = allowed.length
             ? allValues.filter((v) => allowed.includes(v))
             : allValues;
           if (!values.length) return null;
+          const selectValue = values.includes(variantSel[axis.key] || "")
+            ? variantSel[axis.key]
+            : values[0] || "";
           return (
             <label key={axis.key} className="space-y-1 text-sm">
               <span className="font-medium text-foreground">{axis.label}</span>
               <select
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                value={variantSel[axis.key] || ""}
+                value={selectValue}
                 onChange={(e) =>
                   setVariantSel((prev) =>
                     selectionAfterAxisChange(
