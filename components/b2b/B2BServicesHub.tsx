@@ -562,9 +562,11 @@ export function B2BServicesHub({
           missing.push({ key: line.key, title: line.title });
           continue;
         }
+        // Keep product name and variantLabel separate — don't bake variant into title
+        // (avoids "Name · Variant · Variant" when opening the quote modal).
         resolved.push({
           serviceId,
-          title: line.variantLabel ? `${line.title} · ${line.variantLabel}` : title,
+          title,
           quantity: line.quantity,
           priceType,
           catalogProductId: line.catalogProductId,
@@ -595,10 +597,12 @@ export function B2BServicesHub({
           variant: "destructive",
         });
       }
+      const singleTitle = resolved[0]
+        ? [resolved[0].title, resolved[0].variantLabel].filter(Boolean).join(" · ")
+        : "";
       setQuoteService({
         id: resolved[0].serviceId,
-        title:
-          resolved.length > 1 ? `${resolved.length} products` : resolved[0].title,
+        title: resolved.length > 1 ? `${resolved.length} products` : singleTitle,
         priceType: resolved[0].priceType ?? undefined,
         items: resolved,
       });
@@ -1114,7 +1118,14 @@ export function B2BServicesHub({
                 ? {
                     ...prev,
                     items: next,
-                    title: next.length > 1 ? `${next.length} products` : next[0]?.title || prev.title,
+                    title:
+                      next.length > 1
+                        ? `${next.length} products`
+                        : next[0]
+                          ? [next[0].title.split(" · ")[0] || next[0].title, next[0].variantLabel]
+                              .filter(Boolean)
+                              .join(" · ") || next[0].title
+                          : prev.title,
                     id: next[0]?.serviceId || prev.id,
                     priceType: next[0]?.priceType ?? prev.priceType,
                   }
