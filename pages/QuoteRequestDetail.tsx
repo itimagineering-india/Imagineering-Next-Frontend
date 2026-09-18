@@ -599,27 +599,32 @@ export default function QuoteRequestPage() {
 
   const startEditQty = () => {
     const next: Record<string, string> = {};
-    for (const item of materials) {
-      const key = quoteLineKey(item);
-      if (!String(item.serviceId || "").trim()) continue;
-      next[key] = String(item.quantity ?? 1);
-    }
+    materials.forEach((item, index) => {
+      if (!String(item.serviceId || "").trim()) return;
+      next[quoteLineKey(item, index)] = String(item.quantity ?? 1);
+    });
     setDraftQty(next);
     setRemovedIds({});
     setEditingQty(true);
   };
 
-  const editableMaterials = useMemo(
+  const editableLines = useMemo(
     () =>
-      materials.filter((item) => {
-        const sid = String(item.serviceId || "").trim();
-        return sid && !removedIds[quoteLineKey(item)];
-      }),
+      materials
+        .map((item, index) => ({
+          item,
+          index,
+          lineKey: quoteLineKey(item, index),
+        }))
+        .filter(({ item, lineKey }) => {
+          const sid = String(item.serviceId || "").trim();
+          return Boolean(sid) && !removedIds[lineKey];
+        }),
     [materials, removedIds]
   );
 
   const removeDraftItem = (lineKey: string) => {
-    if (editableMaterials.length <= 1) {
+    if (editableLines.length <= 1) {
       toast({
         title: "Keep at least one product",
         description: "Cancel the whole request instead if you no longer need quotes.",
@@ -636,12 +641,11 @@ export default function QuoteRequestPage() {
   };
 
   const saveQuantities = async () => {
-    const items = editableMaterials
-      .map((item) => {
+    const items = editableLines
+      .map(({ item, lineKey }) => {
         const serviceId = String(item.serviceId || "").trim();
         if (!serviceId) return null;
-        const key = quoteLineKey(item);
-        const raw = draftQty[key] ?? String(item.quantity ?? 1);
+        const raw = draftQty[lineKey] ?? String(item.quantity ?? 1);
         const quantity = Number(raw);
         if (!Number.isFinite(quantity) || quantity <= 0) return null;
         const catalogVariantId = String(item.catalogVariantId || "").trim();
@@ -662,7 +666,7 @@ export default function QuoteRequestPage() {
       return;
     }
 
-    if (items.length !== editableMaterials.length) {
+    if (items.length !== editableLines.length) {
       toast({
         title: "Invalid quantity",
         description: "Enter a valid quantity for each product.",
@@ -851,18 +855,23 @@ export default function QuoteRequestPage() {
                     </button>
                   ) : null}
                   <span className="text-xs tabular-nums text-stone-500">
-                    {(editingQty ? editableMaterials : materials).length}{" "}
-                    {(editingQty ? editableMaterials : materials).length === 1 ? "item" : "items"}
+                    {(editingQty ? editableLines : materials).length}{" "}
+                    {(editingQty ? editableLines : materials).length === 1 ? "item" : "items"}
                   </span>
                 </div>
               </div>
               <ul className="divide-y divide-stone-200 border-y border-stone-200 bg-white/60">
-                {(editingQty ? editableMaterials : materials).map((item, idx) => {
+                {(editingQty
+                  ? editableLines.map(({ item, lineKey }) => ({ item, lineKey }))
+                  : materials.map((item, idx) => ({
+                      item,
+                      lineKey: quoteLineKey(item, idx),
+                    }))
+                ).map(({ item, lineKey }) => {
                   const sid = String(item.serviceId || "").trim();
-                  const lineKey = quoteLineKey(item, idx);
                   return (
                     <li
-                      key={`${lineKey}-${idx}`}
+                      key={lineKey}
                       className="flex items-start justify-between gap-3 px-1 py-3"
                     >
                       <span className="min-w-0 text-sm font-medium leading-snug text-stone-800">
@@ -884,7 +893,7 @@ export default function QuoteRequestPage() {
                           <button
                             type="button"
                             aria-label={`Remove ${item.title}`}
-                            disabled={editableMaterials.length <= 1 || savingQty}
+                            disabled={editableLines.length <= 1 || savingQty}
                             onClick={() => removeDraftItem(lineKey)}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
                           >
