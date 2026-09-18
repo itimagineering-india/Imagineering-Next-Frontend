@@ -431,9 +431,6 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
       undefined;
     const itemType = normalizeB2bQuoteItemType(mapped.categoryId);
     const displayParts = [variantLabel, shadeLabel].filter(Boolean);
-    const lineTitle = displayParts.length
-      ? `${mapped.name} · ${displayParts.join(" · ")}`
-      : mapped.name;
 
     // Keep current size/shade in the quote list so switching sizes accumulates lines.
     if (usesQuoteCart) {
@@ -487,11 +484,11 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
             ].filter(Boolean);
             return {
               serviceId: l.serviceId || linkedServiceId,
-              title: parts.length ? `${mapped.name} · ${parts.join(" · ")}` : mapped.name,
+              title: mapped.name,
               quantity: l.quantity,
               catalogProductId: mapped.id,
               catalogVariantId: l.catalogVariantId,
-              variantLabel: l.variantLabel,
+              variantLabel: parts.length ? parts.join(" · ") : l.variantLabel,
               shadeCode: l.shadeCode,
               shadeName: l.shadeName,
               priceType: l.priceType || priceType,
@@ -500,10 +497,10 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
         : [
             {
               serviceId: linkedServiceId,
-              title: lineTitle,
+              title: mapped.name,
               catalogProductId: mapped.id,
               catalogVariantId: variantId,
-              variantLabel,
+              variantLabel: displayParts.length ? displayParts.join(" · ") : variantLabel,
               shadeCode: selectedShade.code.trim() || undefined,
               shadeName: selectedShade.name.trim() || undefined,
               priceType,
