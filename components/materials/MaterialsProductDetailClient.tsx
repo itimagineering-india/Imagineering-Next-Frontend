@@ -793,6 +793,29 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
             mapped.unitType
           }
           items={quoteModalItems.length > 0 ? quoteModalItems : undefined}
+          onItemsChange={(next) => {
+            setQuoteModalItems(next);
+            const kept = loadB2bQuoteCart().filter((l) => {
+              if (l.catalogProductId !== mapped.id && !l.key.startsWith(`catalog:${mapped.id}`)) {
+                return true;
+              }
+              return next.some(
+                (n) =>
+                  n.catalogProductId === l.catalogProductId &&
+                  (n.catalogVariantId || "") === (l.catalogVariantId || "")
+              );
+            });
+            saveB2bQuoteCart(kept);
+            setInQuoteList(
+              kept.some(
+                (l) =>
+                  l.catalogProductId === mapped.id ||
+                  l.key === `catalog:${mapped.id}` ||
+                  l.key.startsWith(`catalog:${mapped.id}:`)
+              )
+            );
+            if (next.length === 0) setQuoteOpen(false);
+          }}
           onSubmitted={() => {
             const kept = loadB2bQuoteCart().filter(
               (l) =>
