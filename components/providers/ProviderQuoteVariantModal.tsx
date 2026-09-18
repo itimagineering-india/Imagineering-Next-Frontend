@@ -17,6 +17,7 @@ import {
   catalogVariantLabel,
   defaultVariantSelection,
   findCatalogVariant,
+  hasProviderVariantLimits,
   listProviderSellableVariants,
   readCatalogVariants,
   resolveProviderAxisSelection,
@@ -119,16 +120,18 @@ export function QuoteVariantPickerModal({
           }
           return;
         }
-        const axesSel = resolveProviderAxisSelection(
-          productRow as never,
-          target?.metadata || null,
-        );
         const defaults = defaultVariantSelection(parsed.variantAxes, parsed.variants);
         const preferred: Record<string, string> = { ...defaults };
-        for (const axis of parsed.variantAxes) {
-          const allowed = axesSel[axis.key] || [];
-          if (allowed.length && !allowed.includes(preferred[axis.key] || "")) {
-            preferred[axis.key] = allowed[0];
+        if (hasProviderVariantLimits(target?.metadata)) {
+          const axesSel = resolveProviderAxisSelection(
+            productRow as never,
+            target?.metadata || null,
+          );
+          for (const axis of parsed.variantAxes) {
+            const allowed = axesSel[axis.key] || [];
+            if (allowed.length && !allowed.includes(preferred[axis.key] || "")) {
+              preferred[axis.key] = allowed[0];
+            }
           }
         }
         setVariantSel(preferred);
@@ -152,33 +155,66 @@ export function QuoteVariantPickerModal({
     [product],
   );
 
-  const providerAxisSel = useMemo(
-    () =>
-      product
-        ? resolveProviderAxisSelection(product as never, target?.metadata || null)
-        : {},
-    [product, target?.metadata],
-  );
+  const applyProviderLimits = Boolean(hasProviderVariantLimits(target?.metadata));
+
+  const providerAxisSel = useMemo(() => {
+    if (!product || !applyProviderLimits) return {};
+    return resolveProviderAxisSelection(product as never, target?.metadata || null);
+  }, [product, target?.metadata, applyProviderLimits]);
 
   const sellableVariants = useMemo(() => {
     if (!product || !catalogVariants.hasVariants) return [] as CatalogVariant[];
+    const active = catalogVariants.variants.filter((v) => v.isActive !== false);
+    if (!applyProviderLimits) return active;
     const limited = listProviderSellableVariants(product as never, providerAxisSel);
-    return limited.length ? limited : catalogVariants.variants.filter((v) => v.isActive !== false);
-  }, [product, catalogVariants, providerAxisSel]);
+    return limited.length ? limited : active;
+  }, [product, catalogVariants, providerAxisSel, applyProviderLimits]);
 
   const selectedVariant = useMemo(() => {
     if (!catalogVariants.hasVariants) return undefined;
-    const found = findCatalogVariant(
-      catalogVariants.variants,
-      variantSel,
-      catalogVariants.variantAxes,
-    );
-    if (!found) return undefined;
-    if (sellableVariants.length && !sellableVariants.some((v) => v.id === found.id)) {
-      return undefined;
-    }
-    return found;
+    const pool = sellableVariants.length ? sellableVariants : catalogVariants.variants;
+    return findCatalogVariant(pool, variantSel, catalogVariants.variantAxes);
   }, [catalogVariants, variantSel, sellableVariants]);
+
+  const allAxesFilled = useMemo(
+    () =>
+      catalogVariants.variantAxes.length > 0 &&
+      catalogVariants.variantAxes.every((a) => String(variantSel[a.key] || "").trim()),
+    [catalogVariants.variantAxes, variantSel],
+  );
+
+  // Heal invalid / stale picks so Add to quote stays enabled for real SKUs.
+  useEffect(() => {
+    if (!open || loading || !catalogVariants.hasVariants) return;
+    const axes = catalogVariants.variantAxes;
+    const pool = sellableVariants.length ? sellableVariants : catalogVariants.variants;
+    if (!pool.length) return;
+    if (findCatalogVariant(pool, variantSel, axes)) return;
+
+    let next = { ...variantSel };
+    for (const axis of axes) {
+      const opts = catalogAxisOptionValues(axis, pool, axes, next);
+      const cur = String(next[axis.key] || "").trim();
+      if (opts.length && !opts.includes(cur)) {
+        next = selectionAfterAxisChange(axes, pool, next, axis.key, opts[0]);
+      }
+    }
+    if (!findCatalogVariant(pool, next, axes)) {
+      next = defaultVariantSelection(axes, pool);
+    }
+    const same = axes.every(
+      (a) => String(next[a.key] || "").trim() === String(variantSel[a.key] || "").trim(),
+    );
+    if (!same) setVariantSel(next);
+  }, [
+    open,
+    loading,
+    catalogVariants.hasVariants,
+    catalogVariants.variantAxes,
+    catalogVariants.variants,
+    sellableVariants,
+    variantSel,
+  ]);
 
   const handleConfirm = useCallback(() => {
     if (!catalogId || !selectedVariant) return;
@@ -230,23 +266,32 @@ export function QuoteVariantPickerModal({
         ) : catalogVariants.hasVariants ? (
           <div className="grid gap-3 py-2">
             {catalogVariants.variantAxes.map((axis) => {
-              const allValues = catalogAxisOptionValues(axis, catalogVariants.variants);
+              const pool = sellableVariants.length ? sellableVariants : catalogVariants.variants;
+              const allValues = catalogAxisOptionValues(
+                axis,
+                pool,
+                catalogVariants.variantAxes,
+                variantSel,
+              );
               const allowed = providerAxisSel[axis.key] || [];
               const values = allowed.length
                 ? allValues.filter((v) => allowed.includes(v))
                 : allValues;
               if (!values.length) return null;
+              const selectValue = values.includes(variantSel[axis.key] || "")
+                ? variantSel[axis.key]
+                : values[0] || "";
               return (
                 <label key={axis.key} className="space-y-1 text-sm">
                   <span className="font-medium text-foreground">{axis.label}</span>
                   <select
                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    value={variantSel[axis.key] || ""}
+                    value={selectValue}
                     onChange={(e) =>
                       setVariantSel((prev) =>
                         selectionAfterAxisChange(
                           catalogVariants.variantAxes,
-                          catalogVariants.variants,
+                          pool,
                           prev,
                           axis.key,
                           e.target.value,
@@ -270,7 +315,9 @@ export function QuoteVariantPickerModal({
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Select a full combination to continue.
+                {allAxesFilled
+                  ? "This combination isn’t available. Change one option to continue."
+                  : "Select a full combination to continue."}
               </p>
             )}
           </div>
