@@ -16,6 +16,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle2, ChevronLeft, Loader2, Plus, X } from "lucide-react";
 import { ServiceImageUpload } from "@/components/services/ServiceImageUpload";
+import {
+  ServiceLocationInput,
+  type ProviderBusinessAddressSnapshot,
+} from "@/components/services/ServiceLocationInput";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
@@ -39,6 +43,26 @@ interface Category {
   name: string;
   slug: string;
   subcategories?: unknown;
+}
+
+const EMPTY_LOCATION: ProviderBusinessAddressSnapshot = {
+  address: "",
+  city: "",
+  state: "",
+  zipCode: "",
+};
+
+function toListingLocation(
+  loc?: MachineResaleLocation | null
+): ProviderBusinessAddressSnapshot {
+  if (!loc) return { ...EMPTY_LOCATION };
+  return {
+    address: String(loc.address || "").trim(),
+    city: String(loc.city || "").trim(),
+    state: String(loc.state || "").trim(),
+    zipCode: String(loc.zipCode || "").trim(),
+    coordinates: loc.coordinates,
+  };
 }
 
 async function fetchProviderSnapshot(userId: string): Promise<{
@@ -78,6 +102,7 @@ async function fetchProviderSnapshot(userId: string): Promise<{
         address: addr,
         city,
         state,
+        zipCode: String(ba.zipCode ?? "").trim(),
         coordinates:
           Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
             ? { lat, lng }
@@ -127,7 +152,10 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
   const [yearOfManufacture, setYearOfManufacture] = useState("");
   const [conditionNotes, setConditionNotes] = useState("");
   const [specs, setSpecs] = useState<MachineResaleSpecRow[]>([]);
-  const [businessAddress, setBusinessAddress] = useState<MachineResaleLocation | null>(null);
+  const [providerBusinessAddress, setProviderBusinessAddress] =
+    useState<ProviderBusinessAddressSnapshot | null>(null);
+  const [location, setLocation] = useState<ProviderBusinessAddressSnapshot>(EMPTY_LOCATION);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -148,7 +176,12 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
         ]);
 
         if (cancelled) return;
-        setBusinessAddress(snapshot.businessAddress);
+        setProviderBusinessAddress(
+          snapshot.businessAddress ? toListingLocation(snapshot.businessAddress) : null
+        );
+        if (!serviceId && snapshot.businessAddress) {
+          setLocation(toListingLocation(snapshot.businessAddress));
+        }
 
         const categories =
           catRes.success && catRes.data
@@ -227,7 +260,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
             : [];
           setSpecs(specRows);
           if (svc.location && (svc.location.address || svc.location.city)) {
-            setBusinessAddress(svc.location);
+            setLocation(toListingLocation(svc.location));
           }
           if (sub) setStep(2);
         }
@@ -294,6 +327,9 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
     } else if (units > 99) {
       next.availableUnits = "Maximum 99 units per listing";
     }
+    if (!location.city.trim() && !location.address.trim()) {
+      next.location = "Add the city or address where this machine is";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -336,7 +372,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
         yearOfManufacture,
         conditionNotes,
         specs,
-        location: businessAddress,
+        location,
       });
 
       const response =
@@ -531,6 +567,30 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
             />
           </div>
 
+          <div className={errors.location ? "rounded-lg ring-1 ring-destructive/40" : ""}>
+            <ServiceLocationInput
+              label="Machine location *"
+              location={location}
+              onLocationChange={(next) => {
+                setLocation(next);
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+              onClear={() => {
+                setLocation({ ...EMPTY_LOCATION });
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+              isGettingLocation={isGettingLocation}
+              onGettingLocationChange={setIsGettingLocation}
+              providerBusinessAddress={providerBusinessAddress}
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Buyers need to know where this machine is. City is enough; full address is better.
+            </p>
+            {errors.location ? (
+              <p className="mt-1 text-sm text-destructive">{errors.location}</p>
+            ) : null}
+          </div>
+
           <ServiceImageUpload
             images={images}
             uploadedImages={uploadedImages}
@@ -547,7 +607,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
               id="resale-desc"
               value={shortDescription}
               onChange={(e) => setShortDescription(e.target.value)}
-              placeholder="Condition, hours used, papers, location…"
+              placeholder="Condition, hours used, papers, inspection notes…"
               rows={4}
             />
           </div>
