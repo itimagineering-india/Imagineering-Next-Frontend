@@ -5,7 +5,6 @@
 
 import {
   rentalMarkFromName,
-  resolveRentalCategoryKey,
   slugifyRentalId,
   type RentalMachine,
   type RentalMachineCategory,
@@ -178,7 +177,7 @@ export function formatResalePriceLabel(
 }
 
 export function resolveResaleCategoryKey(name: string): string {
-  return resolveRentalCategoryKey(name);
+  return slugifyResaleId(name);
 }
 
 export function resaleMarkFromName(name: string): string {
