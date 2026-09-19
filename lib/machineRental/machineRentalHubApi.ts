@@ -119,6 +119,9 @@ function mapMachine(raw: RawRow, fallbackCategoryId: string, asService = false):
           slug: String(raw?.slug || "").trim() || undefined,
         }
       : {}),
+    city: String(
+      (raw?.location as Record<string, unknown> | undefined)?.city || raw?.city || ""
+    ).trim() || undefined,
   };
 }
 
