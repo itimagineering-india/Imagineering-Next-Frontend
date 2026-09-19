@@ -210,10 +210,13 @@ export function groupResaleMachinesByCategory(
     .filter((row) => row.items.length > 0);
 }
 
-/** Service detail page — not rental checkout. */
+/** Machine resale PDP — Buy Now checkout, not generic /service cart. */
 export function resaleMachineHref(machine: ResaleMachine): string {
   if (machine.serviceId) {
-    return `/service/${encodeURIComponent(machine.slug || machine.serviceId)}`;
+    return `/machine-resale/listing/${encodeURIComponent(machine.serviceId)}`;
+  }
+  if (machine.slug) {
+    return `/machine-resale/listing/${encodeURIComponent(machine.slug)}`;
   }
   const sp = new URLSearchParams();
   sp.set("category", "machines");
