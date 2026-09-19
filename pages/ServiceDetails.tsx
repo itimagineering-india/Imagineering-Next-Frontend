@@ -65,6 +65,7 @@ import { useTranslation } from "react-i18next";
 import { isConstructionMaterialsCategorySlug, CONSTRUCTION_SELECT_TO_CUSTOM } from "@/lib/constructionMaterials";
 import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { isMachineRentalListing } from "@/lib/machineRental";
+import { isMachineResaleListing } from "@/lib/machineResale";
 import { MachineRentalListingDetailClient } from "@/components/machineRental/MachineRentalListingDetailClient";
 import type { ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
@@ -547,6 +548,11 @@ export default function ServiceDetails() {
     if (resolveCatalogProductId(service)) return true;
     return isConstructionMaterialsCategorySlug(categorySlug);
   }, [categorySlug, service]);
+
+  const isMachineResale = useMemo(
+    () => isMachineResaleListing(service),
+    [service]
+  );
 
   useEffect(() => {
     const catalogId = resolveCatalogProductId(service);
@@ -1531,6 +1537,7 @@ export default function ServiceDetails() {
                 )}
               </section>
 
+              {!isMachineResale && (
               <section className="space-y-3">
                 <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">{t("deliveryInfo")}</h2>
                 <div className="grid gap-3">
@@ -1588,19 +1595,22 @@ export default function ServiceDetails() {
                   />
                 </div>
               </section>
+              )}
 
+              {!isMachineResale && (
               <section className="space-y-3">
                 <h2 className="px-1 text-xl font-bold tracking-[-0.02em] text-foreground">{t("reviews")}</h2>
                 <Reviews serviceId={service.id} averageRating={service.rating} totalReviews={service.reviewCount} reviews={[]} />
               </section>
+              )}
             </div>
 
             <Tabs defaultValue="overview" className="mt-6 hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-white via-slate-50 to-rose-50/50 p-2 shadow-sm sm:mt-8 sm:p-4 md:block">
-              <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white/80 p-1 shadow-inner md:grid-cols-4 lg:w-auto">
+              <TabsList className={`grid h-auto w-full grid-cols-2 rounded-2xl bg-white/80 p-1 shadow-inner lg:w-auto ${isMachineResale ? "" : "md:grid-cols-4"}`}>
                 <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
                 <TabsTrigger value="specifications">{t("specifications")}</TabsTrigger>
-                <TabsTrigger value="delivery">{t("deliveryInfo")}</TabsTrigger>
-                <TabsTrigger value="reviews">{t("reviews")}</TabsTrigger>
+                {!isMachineResale && <TabsTrigger value="delivery">{t("deliveryInfo")}</TabsTrigger>}
+                {!isMachineResale && <TabsTrigger value="reviews">{t("reviews")}</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="overview" className="mt-5">
@@ -1625,6 +1635,7 @@ export default function ServiceDetails() {
                 )}
               </TabsContent>
 
+              {!isMachineResale && (
               <TabsContent value="delivery" className="mt-5">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {[
@@ -1679,10 +1690,13 @@ export default function ServiceDetails() {
                   />
                 </div>
               </TabsContent>
+              )}
 
+              {!isMachineResale && (
               <TabsContent value="reviews" className="mt-5">
                 <Reviews serviceId={service.id} averageRating={service.rating} totalReviews={service.reviewCount} reviews={[]} />
               </TabsContent>
+              )}
             </Tabs>
 
             {similarServices.length > 0 && (
