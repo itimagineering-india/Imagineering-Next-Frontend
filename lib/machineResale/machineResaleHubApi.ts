@@ -11,7 +11,6 @@ import {
   RESALE_FALLBACK_CATEGORIES,
   formatResalePriceLabel,
   isResaleListingRow,
-  resolveResaleCategoryKey,
   resaleMarkFromName,
   slugifyResaleId,
   type ResaleMachine,
@@ -46,7 +45,7 @@ function uniqueById<T extends { id: string }>(items: T[]): T[] {
 }
 
 function mapCategory(name: string, index: number): ResaleMachineCategory {
-  const id = resolveResaleCategoryKey(name) || slugifyResaleId(name) || `cat-${index}`;
+  const id = slugifyResaleId(name) || `cat-${index}`;
   return {
     id,
     name: String(name).trim() || "Machine",
@@ -67,8 +66,7 @@ function mapMachine(raw: RawRow, fallbackCategoryId: string): ResaleMachine | nu
   const sub = String(
     raw?.subcategory || raw?.materialTypeKey || metadata?.machineType || ""
   ).trim();
-  const categoryId =
-    resolveResaleCategoryKey(sub) || slugifyResaleId(sub) || fallbackCategoryId || "general";
+  const categoryId = slugifyResaleId(sub) || fallbackCategoryId || "general";
   const images = Array.isArray(raw?.images) ? raw.images : [];
   const imageUri =
     resolveMachineRentalMediaUrl(String(raw?.image || "")) ||
@@ -190,7 +188,7 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
 
   let categories: ResaleMachineCategory[] = [];
   if (subNames.length > 0) {
-    categories = subNames.map((n, i) => mapCategory(n, i));
+    categories = uniqueById(subNames.map((n, i) => mapCategory(n, i)));
   }
 
   const serviceMachines: ResaleMachine[] = [];
@@ -222,7 +220,7 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
     });
     categories = Array.from(seen.values());
   } else if (categories.length === 0) {
-    categories = RESALE_FALLBACK_CATEGORIES.map((n, i) => mapCategory(n, i));
+    categories = uniqueById(RESALE_FALLBACK_CATEGORIES.map((n, i) => mapCategory(n, i)));
   }
 
   let providers: ResaleTopProvider[] = [];
@@ -258,10 +256,10 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
 }
 
 export async function fetchResaleMachinesByCategory(categoryId: string): Promise<ResaleMachine[]> {
-  const key = resolveResaleCategoryKey(categoryId) || String(categoryId || "").trim();
+  const key = slugifyResaleId(categoryId) || String(categoryId || "").trim();
   if (!key) return [];
   const hub = await fetchResaleHubData();
   return hub.machines.filter(
-    (m) => m.categoryId === key || resolveResaleCategoryKey(m.categoryName || "") === key
+    (m) => m.categoryId === key || slugifyResaleId(m.categoryName || "") === key
   );
 }
