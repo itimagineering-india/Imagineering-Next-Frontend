@@ -304,9 +304,31 @@ export const MACHINE_RENTAL_SPEC_SUGGESTIONS = [
   "Capacity",
   "Fuel type",
   "Year of manufacture",
+  "Hours used",
   "Operating weight",
   "Bucket size",
+  "Span Length",
+  "Lifting Height",
+  "Feeding Options",
+  "Deck width",
 ] as const;
+
+const MACHINE_RENTAL_SPEC_VALUE_EXAMPLES: Record<string, string> = {
+  capacity: "e.g. 20 ton",
+  "fuel type": "e.g. Diesel",
+  "year of manufacture": "e.g. 2019",
+  "hours used": "e.g. 4500 hrs",
+  "operating weight": "e.g. 22 ton",
+  "bucket size": "e.g. 1.2 m³",
+  "span length": "e.g. 50 m",
+  "lifting height": "e.g. 12 m",
+  "feeding options": "e.g. Hopper / conveyor",
+  "deck width": "e.g. 18 m",
+};
+
+export function machineRentalSpecValuePlaceholder(label: string): string {
+  return MACHINE_RENTAL_SPEC_VALUE_EXAMPLES[label.trim().toLowerCase()] || "";
+}
 
 export function createMachineRentalSpecRow(label = ""): MachineRentalSpecRow {
   return {
@@ -320,13 +342,25 @@ export type MachineRentalLocation = {
   address?: string;
   city?: string;
   state?: string;
+  zipCode?: string;
   coordinates?: { lat: number; lng: number };
 };
+
+/** Catalog item type under a subcategory. Ignores the listing-kind flag `"machine"`. */
+export function resolveMachineRentalCatalogItemType(raw: unknown): string {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  const key = value.toLowerCase();
+  if (key === "machine" || key === "equipment") return "";
+  return value;
+}
 
 export function buildMachineRentalServicePayload(opts: {
   categoryId: string;
   categorySlug: string;
   subcategory: string;
+  /** Catalog item type under the subcategory (e.g. Launching Girder). */
+  itemType?: string;
   title: string;
   brandName?: string;
   description: string;
@@ -371,11 +405,14 @@ export function buildMachineRentalServicePayload(opts: {
     throw new Error("Add at least one weight slab for Per km + weight slab pricing");
   }
 
+  const catalogItemType = resolveMachineRentalCatalogItemType(opts.itemType);
+
   const payload: Record<string, unknown> = {
     title: opts.title.trim(),
     description: opts.description.trim(),
     category: opts.categoryId,
     subcategory: opts.subcategory.trim(),
+    ...(catalogItemType ? { itemType: catalogItemType } : {}),
     priceMode: "exact",
     price: primary.price,
     priceType: primary.priceType,
@@ -433,6 +470,7 @@ export function buildMachineRentalServicePayload(opts: {
       address: loc.address || "",
       city: loc.city || "",
       state: loc.state || "",
+      ...(loc.zipCode?.trim() ? { zipCode: loc.zipCode.trim() } : {}),
       ...(loc.coordinates ? { coordinates: loc.coordinates } : {}),
     };
   }
