@@ -50,6 +50,7 @@ export type MachineResaleLocation = {
   address?: string;
   city?: string;
   state?: string;
+  zipCode?: string;
   coordinates?: { lat: number; lng: number };
 };
 
@@ -190,6 +191,7 @@ export function buildMachineResaleServicePayload(opts: {
       address: loc.address || "",
       city: loc.city || "",
       state: loc.state || "",
+      ...(loc.zipCode?.trim() ? { zipCode: loc.zipCode.trim() } : {}),
       ...(loc.coordinates ? { coordinates: loc.coordinates } : {}),
     };
   }
