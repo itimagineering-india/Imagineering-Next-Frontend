@@ -101,6 +101,11 @@ function MachineCard({ machine }: { machine: RentalMachine }) {
             {machine.priceLabel}
           </p>
         ) : null}
+        {machine.city ? (
+          <p className="truncate text-[11px] text-slate-500" title={machine.city}>
+            {machine.city}
+          </p>
+        ) : null}
       </div>
     </Link>
   );
