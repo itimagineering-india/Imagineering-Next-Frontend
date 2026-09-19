@@ -684,7 +684,7 @@ export function CatalogProductsPage({
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {needsCmTypePicker && !materialType
-                  ? "Construction materials from the shared catalog."
+                  ? "Next: choose Cement, Steel, Tiles, etc. from the shared catalog."
                   : `${needsCmTypePicker && materialType ? materialType : subcategory}${
                       !isEdit ? " — tap all products you sell" : ""
                     }`}
@@ -717,7 +717,11 @@ export function CatalogProductsPage({
           </div>
 
           {needsCmTypePicker && !materialType ? (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Pick a material type from the shared Construction Materials catalog.
+              </p>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
               {cmMaterialTypes.map((type) => {
                 const img = getSubcategoryImageUrl(CONSTRUCTION_MATERIALS_CATALOG_SLUG, type);
                 return (
@@ -752,6 +756,7 @@ export function CatalogProductsPage({
                   </button>
                 );
               })}
+              </div>
             </div>
           ) : (
             <ProductCatalogPicker
