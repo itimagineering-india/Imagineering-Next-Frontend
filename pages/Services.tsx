@@ -25,6 +25,7 @@ import {
   toSubcategorySlug,
 } from "@/lib/categorySubcategories";
 import { isB2bServicesHubSlug } from "@/lib/b2b/b2bCategories";
+import { isMachineResaleCategorySlug } from "@/lib/machineResale";
 import {
   Dialog,
   DialogContent,
@@ -352,8 +353,17 @@ export default function Services(props: ServicesProps = {}) {
 
   const servicesParams = useMemo(() => {
     const isKeywordSearch = Boolean(queryParam.trim());
+    const browseCategorySlug =
+      (filters.category.length > 0 ? filters.category[0] : "") || categoryParam || "";
+    /** Machine resale browse is nationwide — do not send lat/lng/radius. */
+    const skipGeoForResale =
+      isMachineResaleCategorySlug(browseCategorySlug) &&
+      String(browseCategorySlug).toLowerCase().replace(/_/g, "-") !== "machines";
     /** Browse uses GPS tile; keyword search uses geo only when URL has lat/lng (near-me intent). */
-    const usePreciseGeo = hasCoordsForTileForMap && (!isKeywordSearch || hasSearchGeoIntent);
+    const usePreciseGeo =
+      hasCoordsForTileForMap &&
+      (!isKeywordSearch || hasSearchGeoIntent) &&
+      !skipGeoForResale;
     const params: any = {
       page: viewMode === "map" ? 1 : currentPage,
       ...(viewMode !== "map" ? { limit: BROWSE_PAGE_SIZE } : {}),
@@ -437,7 +447,7 @@ export default function Services(props: ServicesProps = {}) {
     }
 
     // City label for non-geo queries only — omit when precise=1 so cache keys match geo intent.
-    if (effectiveLocationText && !locationParam && !usePreciseGeo) {
+    if (effectiveLocationText && !locationParam && !usePreciseGeo && !skipGeoForResale) {
       params.location = effectiveLocationText;
     }
     
@@ -537,6 +547,10 @@ export default function Services(props: ServicesProps = {}) {
       const hasLocation =
         shouldUseProviderGeo && Number.isFinite(locationLat) && Number.isFinite(locationLng);
       const skipGeoForB2bHub = isB2bServicesHubSlug(categorySlug);
+      const skipGeoForResale =
+        isMachineResaleCategorySlug(categorySlug) &&
+        String(categorySlug || "").toLowerCase().replace(/_/g, "-") !== "machines";
+      const skipGeoForNationwide = skipGeoForB2bHub || skipGeoForResale;
 
       const resp = await api.providers.getAll({
         categorySlug,
@@ -547,7 +561,7 @@ export default function Services(props: ServicesProps = {}) {
         q: queryParam || undefined,
         page,
         limit: BROWSE_PAGE_SIZE,
-        ...(hasLocation && !skipGeoForB2bHub
+        ...(hasLocation && !skipGeoForNationwide
           ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm }
           : {}),
       });
@@ -630,6 +644,10 @@ export default function Services(props: ServicesProps = {}) {
           shouldUseProviderGeo && Number.isFinite(locationLat) && Number.isFinite(locationLng);
         const isMap = viewMode === "map";
         const skipGeoForB2bHub = isB2bServicesHubSlug(categorySlug);
+        const skipGeoForResale =
+          isMachineResaleCategorySlug(categorySlug) &&
+          String(categorySlug || "").toLowerCase().replace(/_/g, "-") !== "machines";
+        const skipGeoForNationwide = skipGeoForB2bHub || skipGeoForResale;
 
         const resp = await api.providers.getAll({
           categorySlug,
@@ -639,7 +657,7 @@ export default function Services(props: ServicesProps = {}) {
             undefined,
           q: queryParam || undefined,
           ...(!isMap ? { page: 1, limit: BROWSE_PAGE_SIZE } : {}),
-          ...(hasLocation && !skipGeoForB2bHub
+          ...(hasLocation && !skipGeoForNationwide
             ? { lat: locationLat, lng: locationLng, radiusKm: searchRadiusKm }
             : {}),
           ...(isMap ? { mapMarkers: 1 as const } : {}),
