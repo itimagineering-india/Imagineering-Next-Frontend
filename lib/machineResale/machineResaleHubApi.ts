@@ -24,12 +24,6 @@ export type ResaleHubData = {
   providers: ResaleTopProvider[];
 };
 
-export type ResaleHubFetchOpts = {
-  lat?: number;
-  lng?: number;
-  radiusKm?: number;
-};
-
 function pickTint(index: number): string {
   return RESALE_CATEGORY_TINTS[index % RESALE_CATEGORY_TINTS.length];
 }
@@ -89,6 +83,18 @@ function mapMachine(raw: RawRow, fallbackCategoryId: string): ResaleMachine | nu
   const priceMinRaw = Number(raw?.priceMin ?? raw?.price);
   const priceMin = Number.isFinite(priceMinRaw) && priceMinRaw > 0 ? priceMinRaw : undefined;
 
+  const soldStatus = String(metadata?.soldStatus || "").toLowerCase().trim();
+  const rawUnits = metadata?.availableUnits;
+  const units =
+    rawUnits !== undefined && rawUnits !== null && rawUnits !== ""
+      ? Number(rawUnits)
+      : NaN;
+  const soldOut =
+    soldStatus === "sold" ||
+    soldStatus === "reserved" ||
+    Boolean(metadata?.soldBookingId) ||
+    (Number.isFinite(units) && units <= 0);
+
   return {
     id,
     categoryId,
@@ -97,9 +103,12 @@ function mapMachine(raw: RawRow, fallbackCategoryId: string): ResaleMachine | nu
     priceLabel,
     priceMin,
     imageUri,
-    available: raw?.isActive !== false && raw?.available !== false,
+    available: raw?.isActive !== false && raw?.available !== false && !soldOut,
     serviceId: id,
     slug: String(raw?.slug || "").trim() || undefined,
+    city: String(
+      (raw?.location as Record<string, unknown> | undefined)?.city || raw?.city || ""
+    ).trim() || undefined,
   };
 }
 
@@ -155,13 +164,7 @@ async function fetchSubcategories(): Promise<string[]> {
   return [];
 }
 
-export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<ResaleHubData> {
-  const lat = opts?.lat;
-  const lng = opts?.lng;
-  const radiusKm = opts?.radiusKm ?? 50;
-  const locParams =
-    lat != null && lng != null ? { lat, lng, radiusKm } : {};
-
+export async function fetchResaleHubData(): Promise<ResaleHubData> {
   const [subNames, providersRes, ...serviceResults] = await Promise.all([
     fetchSubcategories(),
     api.providers
@@ -169,8 +172,7 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
         categorySlug: RESALE_CATEGORY_SLUG_ALIASES[0],
         limit: 12,
         page: 1,
-        sort: lat != null && lng != null ? "distance" : "rating",
-        ...locParams,
+        sort: "rating",
       })
       .catch(() => null),
     ...RESALE_CATEGORY_SLUG_ALIASES.map((slug) =>
@@ -179,8 +181,7 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
           category: slug,
           limit: 80,
           page: 1,
-          sort: lat != null && lng != null ? "distance" : "-rating",
-          ...locParams,
+          sort: "-rating",
         })
         .catch(() => null)
     ),
@@ -199,7 +200,7 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
     for (const row of list) {
       if (!isResaleListingRow(row as RawRow)) continue;
       const mapped = mapMachine(row as RawRow, categories[0]?.id || "general");
-      if (mapped) serviceMachines.push(mapped);
+      if (mapped && mapped.available !== false) serviceMachines.push(mapped);
     }
   }
 
@@ -237,8 +238,7 @@ export async function fetchResaleHubData(opts?: ResaleHubFetchOpts): Promise<Res
           categorySlug: slug,
           limit: 12,
           page: 1,
-          sort: lat != null && lng != null ? "distance" : "rating",
-          ...locParams,
+          sort: "rating",
         });
         if (!alt.success) continue;
         const raw = (alt.data as { providers?: unknown } | undefined)?.providers;
@@ -260,6 +260,8 @@ export async function fetchResaleMachinesByCategory(categoryId: string): Promise
   if (!key) return [];
   const hub = await fetchResaleHubData();
   return hub.machines.filter(
-    (m) => m.categoryId === key || slugifyResaleId(m.categoryName || "") === key
+    (m) =>
+      m.available !== false &&
+      (m.categoryId === key || slugifyResaleId(m.categoryName || "") === key)
   );
 }
