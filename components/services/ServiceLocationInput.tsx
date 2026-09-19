@@ -1,15 +1,16 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MapPin, Clock, X } from "lucide-react";
-import { usePlacesAutocomplete } from "@/hooks/usePlacesAutocomplete";
+import { usePlacesAutocomplete, type PlaceDetails } from "@/hooks/usePlacesAutocomplete";
 
 interface Location {
   address: string;
   city: string;
   state: string;
+  zipCode?: string;
   coordinates?: {
     lat: number;
     lng: number;
@@ -20,8 +21,23 @@ export type ProviderBusinessAddressSnapshot = {
   address: string;
   city: string;
   state: string;
+  zipCode?: string;
   coordinates?: { lat: number; lng: number };
 };
+
+function postalFromGoogleComponents(place: PlaceDetails): string {
+  const comps = place.address_components;
+  if (!comps) return "";
+  const pc = comps.find((c) => c.types.includes("postal_code"));
+  return (pc?.long_name || "").trim();
+}
+
+function coordsMeaningful(c?: { lat?: number; lng?: number } | null): boolean {
+  if (!c) return false;
+  const lat = Number(c.lat);
+  const lng = Number(c.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+}
 
 function normLocPart(s: string | undefined) {
   return String(s ?? "").trim().toLowerCase();
@@ -37,7 +53,8 @@ function locationMatchesBusiness(loc: Location, biz: ProviderBusinessAddressSnap
   return (
     normLocPart(loc.address) === normLocPart(biz.address) &&
     normLocPart(loc.city) === normLocPart(biz.city) &&
-    normLocPart(loc.state) === normLocPart(biz.state)
+    normLocPart(loc.state) === normLocPart(biz.state) &&
+    normLocPart(loc.zipCode) === normLocPart(biz.zipCode)
   );
 }
 
@@ -48,6 +65,7 @@ interface ServiceLocationInputProps {
   isGettingLocation: boolean;
   onGettingLocationChange: (value: boolean) => void;
   providerBusinessAddress?: ProviderBusinessAddressSnapshot | null | undefined;
+  label?: string;
 }
 
 export function ServiceLocationInput({
@@ -57,7 +75,35 @@ export function ServiceLocationInput({
   isGettingLocation,
   onGettingLocationChange,
   providerBusinessAddress,
+  label = "Service Location (Optional)",
 }: ServiceLocationInputProps) {
+  const [coordLat, setCoordLat] = useState("");
+  const [coordLng, setCoordLng] = useState("");
+
+  useEffect(() => {
+    if (coordsMeaningful(location.coordinates)) {
+      setCoordLat(String(location.coordinates!.lat));
+      setCoordLng(String(location.coordinates!.lng));
+    } else {
+      setCoordLat("");
+      setCoordLng("");
+    }
+  }, [location.coordinates?.lat, location.coordinates?.lng]);
+
+  const commitCoordinates = () => {
+    const lt = coordLat.trim();
+    const lg = coordLng.trim();
+    if (lt === "" && lg === "") {
+      onLocationChange({ ...location, coordinates: undefined });
+      return;
+    }
+    const lat = Number(lt);
+    const lng = Number(lg);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      onLocationChange({ ...location, coordinates: { lat, lng } });
+    }
+  };
+
   const matchesBusiness = useMemo(
     () =>
       !!providerBusinessAddress && locationMatchesBusiness(location, providerBusinessAddress),
@@ -72,6 +118,7 @@ export function ServiceLocationInput({
       address: String(providerBusinessAddress.address || "").trim(),
       city: String(providerBusinessAddress.city || "").trim(),
       state: String(providerBusinessAddress.state || "").trim(),
+      zipCode: String(providerBusinessAddress.zipCode || "").trim(),
       coordinates:
         Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
           ? { lat, lng }
@@ -82,26 +129,27 @@ export function ServiceLocationInput({
 
   const { inputRef, isLoaded: isLocationLoaded, getCurrentLocation } = usePlacesAutocomplete({
     onPlaceSelect: (place) => {
-      let city = '';
-      let state = '';
-      
-      const addressParts = place.formatted_address.split(',');
+      let city = "";
+      let state = "";
+
+      const addressParts = place.formatted_address.split(",");
       if (addressParts.length >= 2) {
-        city = addressParts[addressParts.length - 3]?.trim() || '';
-        state = addressParts[addressParts.length - 2]?.trim() || '';
+        city = addressParts[addressParts.length - 3]?.trim() || "";
+        state = addressParts[addressParts.length - 2]?.trim() || "";
       }
-      
+
       let lat = 0;
       let lng = 0;
       if (place.geometry?.location) {
         lat = place.geometry.location.lat();
         lng = place.geometry.location.lng();
       }
-      
+
       onLocationChange({
         address: place.formatted_address,
         city: city,
         state: state,
+        zipCode: postalFromGoogleComponents(place),
         coordinates: {
           lat: lat,
           lng: lng,
@@ -121,11 +169,9 @@ export function ServiceLocationInput({
   };
 
   const handleClear = () => {
-    // Clear the input field value
     if (inputRef.current) {
       inputRef.current.value = "";
     }
-    // Call the onClear callback to clear location state
     onClear();
   };
 
@@ -134,7 +180,7 @@ export function ServiceLocationInput({
 
   return (
     <div className="space-y-4">
-      <Label>Service Location (Optional)</Label>
+      <Label>{label}</Label>
 
       {businessAddressReady && showBusinessAddressOption && (
         <div className="flex items-start gap-3 rounded-lg border bg-muted/25 p-3">
@@ -164,9 +210,10 @@ export function ServiceLocationInput({
         </p>
       )}
 
-      {/* Address Search with Autocomplete */}
       <div className="space-y-2">
-        <Label htmlFor="location-search" className="text-sm">Search Address</Label>
+        <Label htmlFor="location-search" className="text-sm">
+          Search Address
+        </Label>
         <div className="relative">
           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
           <Input
@@ -174,13 +221,11 @@ export function ServiceLocationInput({
             ref={inputRef}
             type="text"
             placeholder="Enter address or location..."
-            className="pl-10"
+            className="pl-12"
             disabled={!isLocationLoaded}
           />
           {!isLocationLoaded && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Loading location services...
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Loading location services...</p>
           )}
         </div>
         <div className="flex gap-2">
@@ -206,9 +251,8 @@ export function ServiceLocationInput({
         </div>
       </div>
 
-      {/* Location Details */}
-      {(location.address || location.city || location.state) && (
-        <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+      {(location.address || location.city || location.state || location.zipCode?.trim()) && (
+        <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
           <Label className="text-sm">Selected Location</Label>
           <div className="space-y-1 text-sm">
             {location.address && (
@@ -217,33 +261,76 @@ export function ServiceLocationInput({
                 <span className="text-foreground">{location.address}</span>
               </div>
             )}
-            {(location.city || location.state) && (
+            {(location.city || location.state || location.zipCode?.trim()) && (
               <div className="text-muted-foreground">
                 {location.city && `${location.city}`}
                 {location.city && location.state && ", "}
                 {location.state && `${location.state}`}
+                {(location.city || location.state) && location.zipCode?.trim() && " · "}
+                {location.zipCode?.trim() && `PIN/ZIP ${location.zipCode.trim()}`}
               </div>
             )}
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="mt-2"
-          >
+
+          <div className="space-y-2 pt-1 border-t border-border/60">
+            <Label className="text-sm">Coordinates (latitude / longitude)</Label>
+            <p className="text-xs text-muted-foreground">
+              These are saved with your listing for map search. Edit if the pin needs a small adjustment.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="loc-lat" className="text-xs text-muted-foreground">
+                  Latitude
+                </Label>
+                <Input
+                  id="loc-lat"
+                  inputMode="decimal"
+                  placeholder="e.g. 28.6139"
+                  value={coordLat}
+                  onChange={(e) => setCoordLat(e.target.value)}
+                  onBlur={commitCoordinates}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="loc-lng" className="text-xs text-muted-foreground">
+                  Longitude
+                </Label>
+                <Input
+                  id="loc-lng"
+                  inputMode="decimal"
+                  placeholder="e.g. 77.2090"
+                  value={coordLng}
+                  onChange={(e) => setCoordLng(e.target.value)}
+                  onBlur={commitCoordinates}
+                />
+              </div>
+            </div>
+            {!coordsMeaningful(location.coordinates) && (
+              <p className="text-xs text-amber-700 dark:text-amber-500">
+                No coordinates saved yet — pick a search result above or enter latitude and longitude here.
+              </p>
+            )}
+            {coordsMeaningful(location.coordinates) && (
+              <p className="text-xs text-muted-foreground font-mono">
+                Stored: {Number(location.coordinates!.lat).toFixed(6)},{" "}
+                {Number(location.coordinates!.lng).toFixed(6)}
+              </p>
+            )}
+          </div>
+
+          <Button type="button" variant="ghost" size="sm" onClick={handleClear} className="mt-1">
             <X className="h-3 w-3 mr-2" />
             Clear Location
           </Button>
         </div>
       )}
 
-      {/* Manual Entry (Optional) */}
-      <div className="space-y-2">
-        <Label className="text-sm text-muted-foreground">Or Enter Manually</Label>
-        <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="city" className="text-sm">City</Label>
+            <Label htmlFor="city" className="text-sm">
+              City
+            </Label>
             <Input
               id="city"
               placeholder="City"
@@ -252,7 +339,9 @@ export function ServiceLocationInput({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="state" className="text-sm">State</Label>
+            <Label htmlFor="state" className="text-sm">
+              State
+            </Label>
             <Input
               id="state"
               placeholder="State"
@@ -260,9 +349,19 @@ export function ServiceLocationInput({
               onChange={(e) => onLocationChange({ ...location, state: e.target.value })}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="zipCode" className="text-sm">
+              ZIP / PIN code
+            </Label>
+            <Input
+              id="zipCode"
+              placeholder="PIN or ZIP code"
+              value={location.zipCode ?? ""}
+              onChange={(e) => onLocationChange({ ...location, zipCode: e.target.value })}
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
