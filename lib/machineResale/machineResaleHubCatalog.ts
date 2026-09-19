@@ -23,7 +23,7 @@ export const RESALE_CATEGORY_SLUG_ALIASES = [
 ] as const;
 
 export type ResaleMachineCategory = RentalMachineCategory;
-export type ResaleMachine = RentalMachine;
+export type ResaleMachine = RentalMachine & { city?: string };
 export type ResaleTopProvider = RentalTopProvider;
 
 export const RESALE_FALLBACK_CATEGORIES: readonly string[] = MACHINE_RESALE_FALLBACK_TYPES;
@@ -205,7 +205,9 @@ export function groupResaleMachinesByCategory(
   return categories
     .map((category) => ({
       category,
-      items: machines.filter((m) => machineMatchesResaleCategory(m, category)).slice(0, 8),
+      items: machines
+        .filter((m) => m.available !== false && machineMatchesResaleCategory(m, category))
+        .slice(0, 8),
     }))
     .filter((row) => row.items.length > 0);
 }
