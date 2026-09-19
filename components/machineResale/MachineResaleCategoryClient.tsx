@@ -57,9 +57,10 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
   }, [key, t, toast]);
 
   const filtered = useMemo(() => {
+    const pool = machines.filter((m) => m.available !== false);
     const q = query.trim().toLowerCase();
-    if (!q) return machines;
-    return machines.filter(
+    if (!q) return pool;
+    return pool.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
         (m.categoryName || "").toLowerCase().includes(q)
@@ -69,7 +70,7 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
   const submitSearch = useCallback(() => {
     const q = query.trim();
     const sp = new URLSearchParams();
-    sp.set("category", "machines");
+    sp.set("category", "machine-resale");
     sp.set("subcategory", key);
     if (q) sp.set("q", q);
     router.push(`/services?${sp.toString()}`);
@@ -159,6 +160,9 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
                     <p className="line-clamp-2 text-sm font-semibold text-slate-900">{machine.name}</p>
                     {machine.priceLabel ? (
                       <p className="mt-auto text-xs font-semibold text-teal-900">{machine.priceLabel}</p>
+                    ) : null}
+                    {machine.city ? (
+                      <p className="truncate text-xs text-slate-500">{machine.city}</p>
                     ) : null}
                   </div>
                 </Link>
