@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock3,
   Loader2,
+  MapPin,
   Minus,
   Plus,
   ShieldCheck,
@@ -36,6 +37,7 @@ import {
   parseRentalRates,
   parseWeightPricing,
   resolveAvailableMachinesFromService,
+  resolveMachineRentalCatalogItemType,
 } from "@/lib/machineRental";
 import { RENTAL_AMBER } from "@/components/machineRental/MachineRentalHub";
 import { CustomFields } from "@/components/service-details/CustomFields";
@@ -65,6 +67,7 @@ type ServiceDoc = {
   images?: string[];
   image?: string;
   subcategory?: string;
+  itemType?: string;
   customFields?: SpecField[];
   metadata?: Record<string, unknown>;
   provider?: {
@@ -74,7 +77,7 @@ type ServiceDoc = {
     verified?: boolean;
   } | string;
   category?: { name?: string; slug?: string };
-  location?: { city?: string; address?: string };
+  location?: { city?: string; state?: string; address?: string };
   rating?: number;
   reviewCount?: number;
 };
@@ -351,9 +354,20 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
     setMachineCount((n) => clampInt(n, 1, availableMachines));
   }, [availableMachines]);
 
+  const locationLine = useMemo(() => {
+    const city = String(service?.location?.city || "").trim();
+    const state = String(service?.location?.state || "").trim();
+    const address = String(service?.location?.address || "").trim();
+    const cityState = [city, state].filter(Boolean).join(", ");
+    return cityState || address;
+  }, [service]);
+
+  const catalogItemType = resolveMachineRentalCatalogItemType(service?.itemType);
+
   const detailRows = useMemo(() => {
     const rows: Array<{ label: string; value: string }> = [];
     if (categoryName) rows.push({ label: t("detailCategory"), value: categoryName });
+    if (catalogItemType) rows.push({ label: t("detailItemType"), value: catalogItemType });
     if (availableMachines > 0) {
       rows.push({
         label: t("detailAvailableMachines"),
@@ -363,8 +377,8 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
     if (priceLabel && priceLabel !== "Contact for pricing") {
       rows.push({ label: t("detailRate"), value: priceLabel });
     }
-    if (service?.location?.city) {
-      rows.push({ label: t("detailCity"), value: String(service.location.city) });
+    if (locationLine) {
+      rows.push({ label: t("detailLocation"), value: locationLine });
     }
     if (providerName) rows.push({ label: t("detailProvider"), value: providerName });
     if (service?.rating != null && Number(service.rating) > 0) {
@@ -374,7 +388,16 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
       });
     }
     return rows;
-  }, [availableMachines, categoryName, priceLabel, providerName, service, t]);
+  }, [
+    availableMachines,
+    catalogItemType,
+    categoryName,
+    locationLine,
+    priceLabel,
+    providerName,
+    service,
+    t,
+  ]);
 
   const similarMapped = useMemo(
     () =>
@@ -700,6 +723,12 @@ export function MachineRentalListingDetailClient({ serviceId }: Props) {
                       {t("verifiedBadge")}
                     </span>
                   ) : null}
+                </p>
+              ) : null}
+              {locationLine ? (
+                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-orange-700" />
+                  {locationLine}
                 </p>
               ) : null}
               {priceLabel && priceLabel !== "Contact for pricing" ? (
