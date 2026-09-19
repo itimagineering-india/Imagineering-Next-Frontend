@@ -1,20 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle2, ChevronLeft, Loader2, Plus, X } from "lucide-react";
 import { ServiceImageUpload } from "@/components/services/ServiceImageUpload";
+import {
+  ServiceLocationInput,
+  type ProviderBusinessAddressSnapshot,
+} from "@/components/services/ServiceLocationInput";
 import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { useToast } from "@/hooks/use-toast";
-import { getSubcategoryNames } from "@/lib/categorySubcategories";
+import { getItemTypesForSubcategory, getSubcategoryNames } from "@/lib/categorySubcategories";
 import { cn } from "@/lib/utils";
 import {
   MACHINE_RENTAL_FALLBACK_TYPES,
@@ -24,14 +35,36 @@ import {
   createMachineRentalSpecRow,
   createWeightPricingDraftSlab,
   isMachineRentalCategorySlug,
+  machineRentalSpecValuePlaceholder,
   parseRentalRates,
   parseWeightPricing,
+  resolveMachineRentalCatalogItemType,
   type MachineRentalLocation,
   type MachineRentalPriceType,
   type MachineRentalSpecRow,
   type WeightPricingDraftSlab,
 } from "@/lib/machineRental";
 import { getPriceTypeLabel } from "@/lib/priceTypeDisplay";
+
+const EMPTY_LOCATION: ProviderBusinessAddressSnapshot = {
+  address: "",
+  city: "",
+  state: "",
+  zipCode: "",
+};
+
+function toListingLocation(
+  loc?: MachineRentalLocation | null
+): ProviderBusinessAddressSnapshot {
+  if (!loc) return { ...EMPTY_LOCATION };
+  return {
+    address: String(loc.address || "").trim(),
+    city: String(loc.city || "").trim(),
+    state: String(loc.state || "").trim(),
+    zipCode: String(loc.zipCode || "").trim(),
+    coordinates: loc.coordinates,
+  };
+}
 
 type RateDraft = Record<MachineRentalPriceType, { enabled: boolean; price: string }>;
 
@@ -106,6 +139,7 @@ async function fetchProviderSnapshot(userId: string): Promise<{
         address: addr,
         city,
         state,
+        zipCode: String(ba.zipCode ?? "").trim(),
         coordinates:
           Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)
             ? { lat, lng }
@@ -144,6 +178,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
   const [category, setCategory] = useState<Category | null>(null);
   const [machineTypes, setMachineTypes] = useState<string[]>([]);
   const [subcategory, setSubcategory] = useState("");
+  const [itemType, setItemType] = useState("");
   const [title, setTitle] = useState("");
   const [brandName, setBrandName] = useState("");
   const [shortDescription, setShortDescription] = useState("");
@@ -159,7 +194,10 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
   const [securityDeposit, setSecurityDeposit] = useState("");
   const [operatorIncluded, setOperatorIncluded] = useState(false);
   const [specs, setSpecs] = useState<MachineRentalSpecRow[]>([]);
-  const [businessAddress, setBusinessAddress] = useState<MachineRentalLocation | null>(null);
+  const [providerBusinessAddress, setProviderBusinessAddress] =
+    useState<ProviderBusinessAddressSnapshot | null>(null);
+  const [location, setLocation] = useState<ProviderBusinessAddressSnapshot>(EMPTY_LOCATION);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -180,7 +218,9 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
         ]);
 
         if (cancelled) return;
-        setBusinessAddress(snapshot.businessAddress);
+        setProviderBusinessAddress(
+          snapshot.businessAddress ? toListingLocation(snapshot.businessAddress) : null
+        );
 
         const categories =
           catRes.success && catRes.data
@@ -219,6 +259,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
             description?: string;
             brandName?: string;
             subcategory?: string;
+            itemType?: string;
             images?: string[];
             image?: string;
             price?: number;
@@ -240,6 +281,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
           if (sub) {
             setMachineTypes((prev) => (prev.includes(sub) ? prev : [...prev, sub]));
           }
+          setItemType(resolveMachineRentalCatalogItemType(svc.itemType));
           const imgs = Array.isArray(svc.images)
             ? svc.images.filter(Boolean).map(String)
             : svc.image
@@ -272,7 +314,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
             : [];
           setSpecs(specRows);
           if (svc.location && (svc.location.address || svc.location.city)) {
-            setBusinessAddress(svc.location);
+            setLocation(toListingLocation(svc.location));
           }
           if (sub) setStep(2);
         }
@@ -285,11 +327,30 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
     };
   }, [user?.id, serviceId, router, toast]);
 
-  const goToDetails = useCallback((type: string) => {
-    setSubcategory(type);
-    setErrors({});
-    setStep(2);
-  }, []);
+  const itemTypes = useMemo(() => {
+    const fromCategory = getItemTypesForSubcategory(category?.subcategories, subcategory);
+    if (itemType && !fromCategory.some((t) => t.toLowerCase() === itemType.toLowerCase())) {
+      return [...fromCategory, itemType];
+    }
+    return fromCategory;
+  }, [category?.subcategories, subcategory, itemType]);
+  const requiresItemType = itemTypes.length > 0;
+
+  const goToDetails = useCallback(
+    (type: string) => {
+      const types = getItemTypesForSubcategory(category?.subcategories, type);
+      setSubcategory(type);
+      setItemType((prev) => {
+        if (types.length === 1) return types[0];
+        if (type !== subcategory) return "";
+        if (prev && types.some((t) => t.toLowerCase() === prev.toLowerCase())) return prev;
+        return "";
+      });
+      setErrors({});
+      setStep(2);
+    },
+    [category?.subcategories, subcategory],
+  );
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -343,6 +404,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
 
   const validateDetails = () => {
     const next: Record<string, string> = {};
+    if (requiresItemType && !itemType.trim()) next.itemType = "Select an item type";
     if (!title.trim()) next.title = "Enter a listing title";
     const rates = collectRates();
     if (rates.length === 0) {
@@ -371,6 +433,9 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
       next.availableMachines = "Enter how many machines you can rent (at least 1)";
     } else if (units > 99) {
       next.availableMachines = "Maximum 99 machines per listing";
+    }
+    if (!location.city.trim() && !location.address.trim()) {
+      next.location = "Add the city or address where this machine is";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -404,6 +469,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
         categoryId: category._id,
         categorySlug: category.slug,
         subcategory,
+        itemType,
         title,
         brandName,
         description,
@@ -413,7 +479,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
         securityDeposit,
         operatorIncluded,
         specs,
-        location: businessAddress,
+        location,
         weightPricing: {
           weightUnit: "ton",
           distanceUnit: "km",
@@ -546,7 +612,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
             <div>
               <h2 className="text-base font-medium">Listing details</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {subcategory} — price and photos only. No weekly availability needed.
+                {itemType ? `${subcategory} · ${itemType}` : subcategory} — price and photos only. No weekly availability needed.
               </p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setStep(1)}>
@@ -554,6 +620,38 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
               Change type
             </Button>
           </div>
+
+          {requiresItemType ? (
+            <div className="space-y-2">
+              <Label htmlFor="rental-item-type">
+                Item type <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={itemType || undefined}
+                onValueChange={(value) => {
+                  setItemType(value);
+                  setErrors((prev) => ({ ...prev, itemType: "" }));
+                }}
+              >
+                <SelectTrigger
+                  id="rental-item-type"
+                  className={errors.itemType ? "border-destructive" : ""}
+                >
+                  <SelectValue placeholder="Select item type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.itemType ? (
+                <p className="text-sm text-destructive">{errors.itemType}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="rental-title">
@@ -566,7 +664,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
                 setTitle(e.target.value);
                 setErrors((prev) => ({ ...prev, title: "" }));
               }}
-              placeholder={`e.g. ${subcategory} with operator`}
+              placeholder={`e.g. ${itemType || subcategory} with operator`}
               className={errors.title ? "border-destructive" : ""}
             />
             {errors.title ? <p className="text-sm text-destructive">{errors.title}</p> : null}
@@ -580,6 +678,30 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
               onChange={(e) => setBrandName(e.target.value)}
               placeholder="e.g. JCB 3DX, CAT 320D"
             />
+          </div>
+
+          <div className={errors.location ? "rounded-lg ring-1 ring-destructive/40" : ""}>
+            <ServiceLocationInput
+              label="Machine location *"
+              location={location}
+              onLocationChange={(next) => {
+                setLocation(next);
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+              onClear={() => {
+                setLocation({ ...EMPTY_LOCATION });
+                setErrors((prev) => ({ ...prev, location: "" }));
+              }}
+              isGettingLocation={isGettingLocation}
+              onGettingLocationChange={setIsGettingLocation}
+              providerBusinessAddress={providerBusinessAddress}
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Buyers need to know where this machine is. City is enough; full address is better.
+            </p>
+            {errors.location ? (
+              <p className="mt-1 text-sm text-destructive">{errors.location}</p>
+            ) : null}
           </div>
 
           <ServiceImageUpload
@@ -800,7 +922,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
               <div>
                 <Label>Technical specifications</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Add Capacity, fuel type, year, or any other spec buyers should see.
+                  Add capacity, span length, lifting height, or any other spec buyers should see.
                 </p>
               </div>
               <Button
@@ -852,7 +974,7 @@ export function MachineRentalFormPage({ serviceId }: { serviceId?: string } = {}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Value</Label>
                       <Input
-                        placeholder="e.g. 20 ton, Diesel"
+                        placeholder={machineRentalSpecValuePlaceholder(row.label) || undefined}
                         value={row.value}
                         onChange={(e) =>
                           setSpecs((prev) =>
