@@ -1,198 +1,223 @@
-import { normalizeCategorySlugLikeApp } from "@/lib/constructionMaterials";
+/**
+ * Machine Resale hub — types + filters (buyer browse of used machines for sale).
+ * Keep separate from provider form helpers in `lib/machineResale.ts`.
+ */
 
-export const MACHINE_RESALE_CATEGORY_SLUGS = [
-  "machines",
+import {
+  rentalMarkFromName,
+  slugifyRentalId,
+  type RentalMachine,
+  type RentalMachineCategory,
+  type RentalTopProvider,
+} from "@/lib/machineRental/machineRentalHubCatalog";
+import { MACHINE_RESALE_FALLBACK_TYPES } from "@/lib/machineResale";
+
+export const RESALE_TEAL = "#0F766E";
+export const RESALE_CANVAS = "#F0FDFA";
+
+export const RESALE_CATEGORY_SLUG = "machines";
+export const RESALE_CATEGORY_SLUG_ALIASES = [
   "machine-resale",
   "machine_resale",
+  "machines",
 ] as const;
 
-export const MACHINE_RESALE_FALLBACK_TYPES = [
-  "Excavators",
-  "Cranes",
-  "Bulldozers",
-  "Loaders",
-  "Compactors",
-  "Concrete Mixers",
-  "Drilling Equipment",
-  "Heavy Machinery",
-  "JCB",
-  "Generator",
+export type ResaleMachineCategory = RentalMachineCategory;
+export type ResaleMachine = RentalMachine;
+export type ResaleTopProvider = RentalTopProvider;
+
+export const RESALE_FALLBACK_CATEGORIES: readonly string[] = MACHINE_RESALE_FALLBACK_TYPES;
+
+export const RESALE_SEARCH_PLACEHOLDERS = [
+  "Search excavators for sale…",
+  "Search used JCBs…",
+  "Search cranes…",
+  "Search generators…",
 ] as const;
 
-export function isMachineResaleCategorySlug(slug: string | undefined): boolean {
-  const s = normalizeCategorySlugLikeApp(slug || "");
-  return (MACHINE_RESALE_CATEGORY_SLUGS as readonly string[]).includes(s);
+export const RESALE_CATEGORY_TINTS = [
+  "#CCFBF1",
+  "#E0F2FE",
+  "#E0E7FF",
+  "#FEF3C7",
+  "#FFE4E6",
+  "#DCFCE7",
+] as const;
+
+const RESALE_SLUG_SET = new Set<string>([
+  ...RESALE_CATEGORY_SLUG_ALIASES,
+  "machine-sale",
+  "used-machines",
+]);
+
+const EXCLUDE_SLUG_SET = new Set([
+  "construction-materials",
+  "construction_materials",
+  "materials",
+  "b2b",
+  "manpower",
+  "rental-services",
+  "machine-rental",
+  "rental",
+  "equipment-rental",
+  "machine_rental",
+]);
+
+const RENTAL_PRICE_TYPES = new Set([
+  "hourly",
+  "daily",
+  "monthly",
+  "per_km",
+  "per_km_weight",
+  "per_km_weight_slab",
+  "per_trip",
+]);
+
+function listingSlugCandidates(raw: Record<string, unknown>): string[] {
+  return [
+    raw.categorySlug,
+    (raw.metadata as Record<string, unknown> | undefined)?.categorySlug,
+    (raw.category as Record<string, unknown> | undefined)?.slug,
+    (raw.category as Record<string, unknown> | undefined)?.categorySlug,
+  ]
+    .map((s) => String(s || "").trim().toLowerCase().replace(/_/g, "-"))
+    .filter(Boolean);
 }
 
-/** True when a provider listing belongs to the machine resale form. */
-export function isMachineResaleListing(service: {
-  category?: { slug?: string } | string | null;
-  metadata?: Record<string, unknown> | null;
-  formVariant?: string | null;
-} | null | undefined): boolean {
-  if (!service) return false;
-  const cat = service.category;
-  const catSlug =
-    cat && typeof cat === "object" && cat !== null
-      ? String((cat as { slug?: string }).slug || "")
-      : "";
-  if (isMachineResaleCategorySlug(catSlug)) return true;
-  const formVariant = String(
-    service.metadata?.formVariant || service.formVariant || ""
+function listingFormVariant(raw: Record<string, unknown>): string {
+  return String(
+    (raw.metadata as Record<string, unknown> | undefined)?.formVariant || raw.formVariant || ""
   )
-    .toLowerCase()
     .trim()
+    .toLowerCase()
     .replace(/-/g, "_");
-  return formVariant === "machine_resale" || formVariant === "machines";
 }
 
-export type MachineResaleLocation = {
-  address?: string;
-  city?: string;
-  state?: string;
-  coordinates?: { lat: number; lng: number };
-};
+/** Rental booking signals — never show these on Machine Resale. */
+export function hasMachineRentalSignals(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  const formVariant = listingFormVariant(raw);
+  if (formVariant.includes("rental")) return true;
 
-export type MachineResaleSpecRow = {
-  id: string;
-  label: string;
-  value: string;
-};
+  const slugs = listingSlugCandidates(raw);
+  if (slugs.some((s) => EXCLUDE_SLUG_SET.has(s))) return true;
 
-export const MACHINE_RESALE_SPEC_SUGGESTIONS = [
-  "Capacity",
-  "Fuel type",
-  "Hours used",
-  "Operating weight",
-  "Bucket size",
-  "Span Length",
-  "Lifting Height",
-  "Feeding Options",
-  "Deck width",
-  "RC / papers",
-] as const;
+  const rates = (raw.metadata as Record<string, unknown> | undefined)?.rentalRates;
+  if (Array.isArray(rates) && rates.length > 0) return true;
 
-const MACHINE_RESALE_SPEC_VALUE_EXAMPLES: Record<string, string> = {
-  capacity: "e.g. 600 MT",
-  "fuel type": "e.g. Diesel",
-  "hours used": "e.g. 4500 hrs",
-  "operating weight": "e.g. 22 ton",
-  "bucket size": "e.g. 1.2 m³",
-  "span length": "e.g. 40 m",
-  "lifting height": "e.g. 12 m",
-  "feeding options": "e.g. Rear + Bottom",
-  "deck width": "e.g. 18 m",
-  "rc / papers": "e.g. Available",
-};
+  const listingType = String(
+    (raw.metadata as Record<string, unknown> | undefined)?.listingType || ""
+  )
+    .trim()
+    .toLowerCase();
+  if (listingType === "rental" || listingType === "hire") return true;
 
-export function machineResaleSpecValuePlaceholder(label: string): string {
-  return MACHINE_RESALE_SPEC_VALUE_EXAMPLES[label.trim().toLowerCase()] || "";
+  const priceType = String(
+    raw.priceType || (raw.metadata as Record<string, unknown> | undefined)?.priceType || ""
+  )
+    .trim()
+    .toLowerCase();
+  if (RENTAL_PRICE_TYPES.has(priceType)) {
+    if (listingType === "resale" || listingType === "sale") return false;
+    if (formVariant === "machine_resale" || formVariant === "machines") return false;
+    return true;
+  }
+
+  return false;
 }
 
-export function createMachineResaleSpecRow(label = ""): MachineResaleSpecRow {
-  return {
-    id: `spec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    label,
-    value: "",
-  };
+export function isResaleListingRow(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  if (hasMachineRentalSignals(raw)) return false;
+
+  const slugCandidates = listingSlugCandidates(raw);
+  if (slugCandidates.some((s) => EXCLUDE_SLUG_SET.has(s))) return false;
+  if (slugCandidates.some((s) => RESALE_SLUG_SET.has(s))) return true;
+
+  const formVariant = listingFormVariant(raw);
+  if (formVariant === "machine_resale" || formVariant === "machines") return true;
+
+  const listingType = String(
+    (raw.metadata as Record<string, unknown> | undefined)?.listingType || ""
+  )
+    .trim()
+    .toLowerCase();
+  if (listingType === "resale" || listingType === "sale") return true;
+
+  return false;
 }
 
-/** Catalog item type under a subcategory. Ignores the listing-kind flag `"machine"`. */
-export function resolveMachineResaleCatalogItemType(raw: unknown): string {
-  const value = String(raw || "").trim();
-  if (!value) return "";
-  const key = value.toLowerCase();
-  if (key === "machine" || key === "equipment") return "";
-  return value;
+export function formatResalePriceLabel(
+  raw:
+    | {
+        price?: number | string | null;
+        priceMode?: string | null;
+        priceMin?: number | string | null;
+        priceMax?: number | string | null;
+      }
+    | null
+    | undefined
+): string {
+  if (!raw) return "";
+  if (String(raw.priceMode || "").toLowerCase() === "range") {
+    const lo = Number(raw.priceMin);
+    const hi = Number(raw.priceMax);
+    if (Number.isFinite(lo) && lo > 0 && Number.isFinite(hi) && hi > lo) {
+      return `₹${Math.round(lo).toLocaleString("en-IN")} – ₹${Math.round(hi).toLocaleString("en-IN")}`;
+    }
+    if (Number.isFinite(lo) && lo > 0) {
+      return `₹${Math.round(lo).toLocaleString("en-IN")}`;
+    }
+  }
+  const exact = Number(raw.price);
+  if (Number.isFinite(exact) && exact > 0) {
+    return `₹${Math.round(exact).toLocaleString("en-IN")}`;
+  }
+  return "";
 }
 
-export function buildMachineResaleServicePayload(opts: {
-  categoryId: string;
-  categorySlug: string;
-  subcategory: string;
-  /** Catalog item type under the subcategory (e.g. Launching Girder). */
-  itemType?: string;
-  title: string;
-  brandName?: string;
-  description: string;
-  images: string[];
-  /** Selling price — always fixed. */
-  price: number;
-  /** How many identical units available for sale. */
-  availableUnits: number;
-  yearOfManufacture?: string;
-  conditionNotes?: string;
-  specs?: MachineResaleSpecRow[];
-  location?: MachineResaleLocation | null;
-}): Record<string, unknown> {
-  const customFields = (opts.specs || [])
-    .filter((row) => row.label.trim() && row.value.trim())
-    .map((row) => ({
-      label: row.label.trim(),
-      value: row.value.trim(),
-      type: "text" as const,
-    }));
+export function resolveResaleCategoryKey(name: string): string {
+  return slugifyResaleId(name);
+}
 
-  const availableUnits = Math.min(
-    99,
-    Math.max(1, Math.floor(Number(opts.availableUnits) || 1))
+export function resaleMarkFromName(name: string): string {
+  return rentalMarkFromName(name);
+}
+
+export function slugifyResaleId(name: string): string {
+  return slugifyRentalId(name);
+}
+
+export function machineMatchesResaleCategory(
+  machine: ResaleMachine,
+  category: ResaleMachineCategory
+): boolean {
+  return (
+    machine.categoryId === category.id ||
+    resolveResaleCategoryKey(machine.categoryName || "") === category.id
   );
-  const price = Number(opts.price);
-  if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("Enter a valid selling price");
-  }
+}
 
-  const catalogItemType = resolveMachineResaleCatalogItemType(opts.itemType);
+export function groupResaleMachinesByCategory(
+  categories: readonly ResaleMachineCategory[],
+  machines: readonly ResaleMachine[]
+): Array<{ category: ResaleMachineCategory; items: ResaleMachine[] }> {
+  return categories
+    .map((category) => ({
+      category,
+      items: machines.filter((m) => machineMatchesResaleCategory(m, category)).slice(0, 8),
+    }))
+    .filter((row) => row.items.length > 0);
+}
 
-  const payload: Record<string, unknown> = {
-    title: opts.title.trim(),
-    description: opts.description.trim(),
-    category: opts.categoryId,
-    subcategory: opts.subcategory.trim(),
-    ...(catalogItemType ? { itemType: catalogItemType } : {}),
-    priceMode: "exact",
-    price,
-    priceType: "fixed",
-    deliveryTime: "1-2 days",
-    featured: false,
-    contactMode: "platform",
-    visibility: "normal",
-    metadata: {
-      formVariant: "machine_resale",
-      categorySlug: normalizeCategorySlugLikeApp(opts.categorySlug),
-      itemType: "machine",
-      listingType: "resale",
-      availableUnits: String(availableUnits),
-      ...(opts.yearOfManufacture?.trim()
-        ? { yearOfManufacture: opts.yearOfManufacture.trim() }
-        : {}),
-      ...(opts.conditionNotes?.trim()
-        ? { conditionNotes: opts.conditionNotes.trim() }
-        : {}),
-      ...(opts.brandName?.trim() ? { machineModel: opts.brandName.trim() } : {}),
-    },
-  };
-
-  if (opts.brandName?.trim()) {
-    payload.brandName = opts.brandName.trim();
+/** Service detail page — not rental checkout. */
+export function resaleMachineHref(machine: ResaleMachine): string {
+  if (machine.serviceId) {
+    return `/service/${encodeURIComponent(machine.slug || machine.serviceId)}`;
   }
-  if (opts.images.length > 0) {
-    payload.image = opts.images[0];
-    payload.images = opts.images;
-  }
-  if (customFields.length > 0) {
-    payload.customFields = customFields;
-  }
-
-  const loc = opts.location;
-  if (loc && (loc.address || loc.city)) {
-    payload.location = {
-      address: loc.address || "",
-      city: loc.city || "",
-      state: loc.state || "",
-      ...(loc.coordinates ? { coordinates: loc.coordinates } : {}),
-    };
-  }
-
-  return payload;
+  const sp = new URLSearchParams();
+  sp.set("category", "machines");
+  sp.set("q", machine.name);
+  if (machine.categoryId) sp.set("subcategory", machine.categoryId);
+  return `/services?${sp.toString()}`;
 }
