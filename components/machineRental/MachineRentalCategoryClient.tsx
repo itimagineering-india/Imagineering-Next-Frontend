@@ -221,6 +221,9 @@ export function MachineRentalCategoryClient({ typeKey }: Props) {
                         {machine.priceLabel ? (
                           <p className="mt-auto text-xs font-semibold text-orange-800">{machine.priceLabel}</p>
                         ) : null}
+                        {machine.city ? (
+                          <p className="truncate text-xs text-slate-500">{machine.city}</p>
+                        ) : null}
                       </div>
                     </Link>
                   );
