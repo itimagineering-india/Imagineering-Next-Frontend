@@ -1746,6 +1746,50 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    previewMachineResale: (payload: { serviceId: string }) =>
+      apiRequest<{
+        subtotal: number;
+        platformFee: number;
+        platformFeeGst: number;
+        gst: number;
+        total: number;
+        unitPrice: number;
+        priceType: string;
+        productName: string;
+      }>("/api/bookings/machine-resale/preview", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    createMachineResale: (payload: {
+      serviceId: string;
+      paymentMethod: string;
+      receiptUrl?: string;
+      couponUsageId?: string;
+      creditsToApply?: number;
+      partialAmount?: number;
+      partialPaymentMethod?: string;
+      location: {
+        address: string;
+        city: string;
+        state: string;
+        zipCode?: string;
+        coordinates?: { lat: number; lng: number };
+      };
+      notes?: string;
+    }) =>
+      apiRequest<{
+        bookingId: string;
+        status: string;
+        requiresPayment: boolean;
+        total: number;
+        partialAmount?: number;
+        balanceDue?: number;
+        couponDiscount?: number;
+        couponCode?: string;
+      }>("/api/bookings/machine-resale", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
     cancelByBuyer: (id: string, reason?: string) =>
       apiRequest(`/api/bookings/${id}/cancel`, {
         method: 'POST',
