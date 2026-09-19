@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ProviderMismatchDialog } from "@/components/cart/ProviderMismatchDialog";
 import { useToast } from "@/hooks/use-toast";
 import { isMachineRentalCategorySlug } from "@/lib/machineRental";
+import { isMachineResaleCategorySlug } from "@/lib/machineResale";
 import { formatServicePrice } from "@/lib/formatServicePrice";
 import {
   formatDurationQtyLabel,
@@ -75,6 +76,7 @@ export const AddToCartButton = ({
 
   const isRentalDuration =
     isMachineRentalCategorySlug(categorySlug || undefined) && isDurationPriceType(priceType);
+  const skipQuantityModal = isMachineResaleCategorySlug(categorySlug || undefined);
 
   const minQty = isRentalDuration ? 1 : 0.1;
   const qtyStep = isRentalDuration ? (String(priceType).toLowerCase() === "hourly" ? 0.5 : 1) : 0.1;
@@ -125,6 +127,15 @@ export const AddToCartButton = ({
     const pendingId = searchParams?.get(OPEN_CART_PARAM);
     if (pendingId !== serviceId) return;
 
+    if (skipQuantityModal) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.delete(OPEN_CART_PARAM);
+      const next = params.toString();
+      router.replace(`${pathname || "/"}${next ? `?${next}` : ""}`);
+      void performAdd(1);
+      return;
+    }
+
     setQuantity(clamp(Number(initialQuantity) || minQty));
     setShowQuantityModal(true);
 
@@ -132,12 +143,16 @@ export const AddToCartButton = ({
     params.delete(OPEN_CART_PARAM);
     const next = params.toString();
     router.replace(`${pathname || "/"}${next ? `?${next}` : ""}`);
-  }, [isAuthenticated, isAuthLoading, searchParams, serviceId, pathname, router, clamp, initialQuantity, minQty]);
+  }, [isAuthenticated, isAuthLoading, searchParams, serviceId, pathname, router, clamp, initialQuantity, minQty, skipQuantityModal]);
 
   const handleOpenAdd = () => {
     if (isAuthLoading) return;
     if (!isAuthenticated) {
       redirectToLogin();
+      return;
+    }
+    if (skipQuantityModal) {
+      void performAdd(1);
       return;
     }
     setQuantity(clamp(Number(initialQuantity) || minQty));
@@ -180,7 +195,7 @@ export const AddToCartButton = ({
   };
 
   const handleClearAndAdd = async () => {
-    const qty = clamp(quantity);
+    const qty = skipQuantityModal ? 1 : clamp(quantity);
     try {
       await clearCart();
       await addToCart(serviceId, qty, {
@@ -230,7 +245,7 @@ export const AddToCartButton = ({
         {label}
       </Button>
 
-      <Dialog open={showQuantityModal} onOpenChange={setShowQuantityModal}>
+      <Dialog open={!skipQuantityModal && showQuantityModal} onOpenChange={setShowQuantityModal}>
         <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle>Add to Cart</DialogTitle>
