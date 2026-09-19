@@ -57,13 +57,18 @@ export function isMaterialSupplierSubcategory(subcategory: string): boolean {
   );
 }
 
+/** B2B / traders channel labels that mean "import from shared Construction Materials catalog". */
 export function isB2bMaterialSuppliersSubcategory(subcategory: string): boolean {
   const n = String(subcategory || "")
     .toLowerCase()
     .trim()
     .replace(/\s+/g, " ");
   if (!n) return false;
-  return n.includes("material supplier");
+  if (n.includes("material supplier")) return true;
+  // Profile often stores the buyer-hub name, not "Material Suppliers".
+  if (n === "construction materials" || n === "construction material") return true;
+  if (n.includes("construction material")) return true;
+  return false;
 }
 
 export function shouldShowConstructionMaterialFields(
@@ -95,15 +100,15 @@ export function resolveMaterialTypeKeyForServiceForm(
 }
 
 /**
- * B2B Material Suppliers share the Construction Materials catalog (same SKUs).
- * Do not query traders / "Material Suppliers" as if it were a product subcategory.
+ * B2B Material Suppliers / "Construction Materials" share the Construction Materials catalog (same SKUs).
+ * Do not query traders / channel names as if they were product subcategories.
  */
 export function usesSharedConstructionMaterialsCatalog(
   categorySlug: string | undefined,
   subcategory: string,
 ): boolean {
   if (isB2bMaterialSuppliersSubcategory(subcategory)) return true;
-  return isTradersCategorySlug(categorySlug) && isB2bMaterialSuppliersSubcategory(subcategory);
+  return isTradersCategorySlug(categorySlug) && isMaterialSupplierSubcategory(subcategory);
 }
 
 export function resolveProductCatalogListParams(
