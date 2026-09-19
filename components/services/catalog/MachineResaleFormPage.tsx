@@ -1,10 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle2, ChevronLeft, Loader2, Plus, X } from "lucide-react";
@@ -13,7 +20,7 @@ import api from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProviderKycStatus } from "@/hooks/useProviderKycStatus";
 import { useToast } from "@/hooks/use-toast";
-import { getSubcategoryNames } from "@/lib/categorySubcategories";
+import { getItemTypesForSubcategory, getSubcategoryNames } from "@/lib/categorySubcategories";
 import { cn } from "@/lib/utils";
 import {
   MACHINE_RESALE_FALLBACK_TYPES,
@@ -21,6 +28,8 @@ import {
   buildMachineResaleServicePayload,
   createMachineResaleSpecRow,
   isMachineResaleCategorySlug,
+  machineResaleSpecValuePlaceholder,
+  resolveMachineResaleCatalogItemType,
   type MachineResaleLocation,
   type MachineResaleSpecRow,
 } from "@/lib/machineResale";
@@ -107,6 +116,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
   const [category, setCategory] = useState<Category | null>(null);
   const [machineTypes, setMachineTypes] = useState<string[]>([]);
   const [subcategory, setSubcategory] = useState("");
+  const [itemType, setItemType] = useState("");
   const [title, setTitle] = useState("");
   const [brandName, setBrandName] = useState("");
   const [shortDescription, setShortDescription] = useState("");
@@ -177,6 +187,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
             description?: string;
             brandName?: string;
             subcategory?: string;
+            itemType?: string;
             images?: string[];
             image?: string;
             price?: number;
@@ -193,6 +204,8 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
           if (sub) {
             setMachineTypes((prev) => (prev.includes(sub) ? prev : [...prev, sub]));
           }
+          const savedItemType = resolveMachineResaleCatalogItemType(svc.itemType);
+          setItemType(savedItemType);
           const imgs = Array.isArray(svc.images)
             ? svc.images.filter(Boolean).map(String)
             : svc.image
@@ -227,11 +240,30 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
     };
   }, [user?.id, serviceId, router, toast]);
 
-  const goToDetails = useCallback((type: string) => {
-    setSubcategory(type);
-    setErrors({});
-    setStep(2);
-  }, []);
+  const itemTypes = useMemo(() => {
+    const fromCategory = getItemTypesForSubcategory(category?.subcategories, subcategory);
+    if (itemType && !fromCategory.some((t) => t.toLowerCase() === itemType.toLowerCase())) {
+      return [...fromCategory, itemType];
+    }
+    return fromCategory;
+  }, [category?.subcategories, subcategory, itemType]);
+  const requiresItemType = itemTypes.length > 0;
+
+  const goToDetails = useCallback(
+    (type: string) => {
+      const types = getItemTypesForSubcategory(category?.subcategories, type);
+      setSubcategory(type);
+      setItemType((prev) => {
+        if (types.length === 1) return types[0];
+        if (type !== subcategory) return "";
+        if (prev && types.some((t) => t.toLowerCase() === prev.toLowerCase())) return prev;
+        return "";
+      });
+      setErrors({});
+      setStep(2);
+    },
+    [category?.subcategories, subcategory],
+  );
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -250,6 +282,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
 
   const validateDetails = () => {
     const next: Record<string, string> = {};
+    if (requiresItemType && !itemType.trim()) next.itemType = "Select an item type";
     if (!title.trim()) next.title = "Enter a listing title";
     const amount = parseFloat(price);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -293,6 +326,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
         categoryId: category._id,
         categorySlug: category.slug,
         subcategory,
+        itemType,
         title,
         brandName,
         description,
@@ -429,7 +463,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
             <div>
               <h2 className="text-base font-medium">Listing details</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                {subcategory} — fixed selling price and photos.
+                {itemType ? `${subcategory} · ${itemType}` : subcategory} — fixed selling price and photos.
               </p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setStep(1)}>
@@ -437,6 +471,38 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
               Change type
             </Button>
           </div>
+
+          {requiresItemType ? (
+            <div className="space-y-2">
+              <Label htmlFor="resale-item-type">
+                Item type <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={itemType || undefined}
+                onValueChange={(value) => {
+                  setItemType(value);
+                  setErrors((prev) => ({ ...prev, itemType: "" }));
+                }}
+              >
+                <SelectTrigger
+                  id="resale-item-type"
+                  className={errors.itemType ? "border-destructive" : ""}
+                >
+                  <SelectValue placeholder="Select item type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.itemType ? (
+                <p className="text-sm text-destructive">{errors.itemType}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="resale-title">
@@ -449,7 +515,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
                 setTitle(e.target.value);
                 setErrors((prev) => ({ ...prev, title: "" }));
               }}
-              placeholder={`e.g. ${subcategory} for sale`}
+              placeholder={`e.g. ${itemType || subcategory} for sale`}
               className={errors.title ? "border-destructive" : ""}
             />
             {errors.title ? <p className="text-sm text-destructive">{errors.title}</p> : null}
@@ -607,7 +673,7 @@ export function MachineResaleFormPage({ serviceId }: { serviceId?: string } = {}
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Value</Label>
                       <Input
-                        placeholder="e.g. 20 ton, Diesel"
+                        placeholder={machineResaleSpecValuePlaceholder(row.label) || undefined}
                         value={row.value}
                         onChange={(e) =>
                           setSpecs((prev) =>
