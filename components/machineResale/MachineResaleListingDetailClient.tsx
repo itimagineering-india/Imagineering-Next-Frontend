@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, ChevronRight, Loader2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, ChevronRight, Loader2, MapPin, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +48,7 @@ type ServiceDoc = {
     verified?: boolean;
   } | string;
   category?: { name?: string; slug?: string };
-  location?: { city?: string; address?: string };
+  location?: { city?: string; address?: string; state?: string };
   rating?: number;
   reviewCount?: number;
 };
@@ -233,6 +233,14 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
     return metadataToCustomFields(service.metadata);
   }, [service]);
 
+  const locationLine = useMemo(() => {
+    const city = String(service?.location?.city || "").trim();
+    const state = String(service?.location?.state || "").trim();
+    const address = String(service?.location?.address || "").trim();
+    const cityState = [city, state].filter(Boolean).join(", ");
+    return cityState || address;
+  }, [service]);
+
   const detailRows = useMemo(() => {
     const rows: Array<{ label: string; value: string }> = [];
     if (categoryName) rows.push({ label: t("detailCategory"), value: categoryName });
@@ -243,12 +251,12 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
     if (year) rows.push({ label: t("detailYear"), value: year });
     const model = String(service?.metadata?.machineModel || "").trim();
     if (model) rows.push({ label: t("detailModel"), value: model });
-    if (service?.location?.city) {
-      rows.push({ label: t("detailCity"), value: String(service.location.city) });
+    if (locationLine) {
+      rows.push({ label: t("detailLocation"), value: locationLine });
     }
     if (providerName) rows.push({ label: t("detailProvider"), value: providerName });
     return rows;
-  }, [categoryName, priceLabel, providerName, service, t]);
+  }, [categoryName, locationLine, priceLabel, providerName, service, t]);
 
   const similarMapped = useMemo(
     () =>
@@ -379,6 +387,12 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
                       {t("verifiedBadge")}
                     </span>
                   ) : null}
+                </p>
+              ) : null}
+              {locationLine ? (
+                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-700" />
+                  {locationLine}
                 </p>
               ) : null}
               {priceLabel && priceLabel !== "Contact for pricing" ? (
