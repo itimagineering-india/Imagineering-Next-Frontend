@@ -80,6 +80,7 @@ export type RentalMachine = {
   available: boolean;
   serviceId?: string;
   slug?: string;
+  city?: string;
 };
 
 export type RentalTopProvider = {
