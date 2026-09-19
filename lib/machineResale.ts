@@ -65,8 +65,29 @@ export const MACHINE_RESALE_SPEC_SUGGESTIONS = [
   "Hours used",
   "Operating weight",
   "Bucket size",
+  "Span Length",
+  "Lifting Height",
+  "Feeding Options",
+  "Deck width",
   "RC / papers",
 ] as const;
+
+const MACHINE_RESALE_SPEC_VALUE_EXAMPLES: Record<string, string> = {
+  capacity: "e.g. 600 MT",
+  "fuel type": "e.g. Diesel",
+  "hours used": "e.g. 4500 hrs",
+  "operating weight": "e.g. 22 ton",
+  "bucket size": "e.g. 1.2 m³",
+  "span length": "e.g. 40 m",
+  "lifting height": "e.g. 12 m",
+  "feeding options": "e.g. Rear + Bottom",
+  "deck width": "e.g. 18 m",
+  "rc / papers": "e.g. Available",
+};
+
+export function machineResaleSpecValuePlaceholder(label: string): string {
+  return MACHINE_RESALE_SPEC_VALUE_EXAMPLES[label.trim().toLowerCase()] || "";
+}
 
 export function createMachineResaleSpecRow(label = ""): MachineResaleSpecRow {
   return {
@@ -76,10 +97,21 @@ export function createMachineResaleSpecRow(label = ""): MachineResaleSpecRow {
   };
 }
 
+/** Catalog item type under a subcategory. Ignores the listing-kind flag `"machine"`. */
+export function resolveMachineResaleCatalogItemType(raw: unknown): string {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  const key = value.toLowerCase();
+  if (key === "machine" || key === "equipment") return "";
+  return value;
+}
+
 export function buildMachineResaleServicePayload(opts: {
   categoryId: string;
   categorySlug: string;
   subcategory: string;
+  /** Catalog item type under the subcategory (e.g. Launching Girder). */
+  itemType?: string;
   title: string;
   brandName?: string;
   description: string;
@@ -110,11 +142,14 @@ export function buildMachineResaleServicePayload(opts: {
     throw new Error("Enter a valid selling price");
   }
 
+  const catalogItemType = resolveMachineResaleCatalogItemType(opts.itemType);
+
   const payload: Record<string, unknown> = {
     title: opts.title.trim(),
     description: opts.description.trim(),
     category: opts.categoryId,
     subcategory: opts.subcategory.trim(),
+    ...(catalogItemType ? { itemType: catalogItemType } : {}),
     priceMode: "exact",
     price,
     priceType: "fixed",
