@@ -67,6 +67,7 @@ import { isB2bCategorySlug } from "@/lib/b2b/b2bCategories";
 import { isMachineRentalListing } from "@/lib/machineRental";
 import { isMachineResaleListing } from "@/lib/machineResale";
 import { MachineRentalListingDetailClient } from "@/components/machineRental/MachineRentalListingDetailClient";
+import { MachineResaleListingDetailClient } from "@/components/machineResale/MachineResaleListingDetailClient";
 import type { ImagineScoreData } from "@/components/trust/ImagineScorePanel";
 
 export async function getServerSideProps() { return { props: {} }; }
@@ -469,6 +470,17 @@ export default function ServiceDetails() {
             })
           ) {
             router.replace(`/machine-rental/listing/${serviceIdVal}`, { scroll: false });
+            return;
+          }
+
+          if (
+            serviceIdVal &&
+            isMachineResaleListing({
+              category: serviceData.category,
+              metadata: serviceData.metadata,
+            })
+          ) {
+            router.replace(`/machine-resale/listing/${serviceIdVal}`, { scroll: false });
             return;
           }
 
@@ -1332,6 +1344,10 @@ export default function ServiceDetails() {
 
   if (isMachineRentalListing(service)) {
     return <MachineRentalListingDetailClient serviceId={service.id} />;
+  }
+
+  if (isMachineResaleListing(service)) {
+    return <MachineResaleListingDetailClient serviceId={service.id} />;
   }
 
   return (
