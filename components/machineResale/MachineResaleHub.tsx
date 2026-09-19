@@ -18,7 +18,6 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useUserLocation } from "@/contexts/UserLocationContext";
 import {
   RESALE_CANVAS,
   RESALE_SEARCH_PLACEHOLDERS,
@@ -85,6 +84,11 @@ function MachineCard({ machine }: { machine: ResaleMachine }) {
             {machine.priceLabel}
           </p>
         ) : null}
+        {machine.city ? (
+          <p className="truncate text-[11px] text-slate-500" title={machine.city}>
+            {machine.city}
+          </p>
+        ) : null}
       </div>
     </Link>
   );
@@ -94,8 +98,6 @@ export function MachineResaleHub() {
   const { t } = useTranslation("machineResale");
   const router = useRouter();
   const { toast } = useToast();
-  const { userLocation, radiusKm } = useUserLocation();
-  const pricingCity = userLocation?.city?.trim() || "";
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ResaleHubData>(EMPTY);
   const [search, setSearch] = useState("");
@@ -115,11 +117,7 @@ export function MachineResaleHub() {
     (async () => {
       setLoading(true);
       try {
-        const hub = await fetchResaleHubData({
-          lat: userLocation?.lat,
-          lng: userLocation?.lng,
-          radiusKm,
-        });
+        const hub = await fetchResaleHubData();
         if (!cancelled) setData(hub);
       } catch {
         if (!cancelled) {
@@ -136,7 +134,7 @@ export function MachineResaleHub() {
     return () => {
       cancelled = true;
     };
-  }, [radiusKm, t, toast, userLocation?.lat, userLocation?.lng]);
+  }, [t, toast]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -164,7 +162,7 @@ export function MachineResaleHub() {
   const submitSearch = useCallback(() => {
     const q = search.trim();
     const sp = new URLSearchParams();
-    sp.set("category", "machines");
+    sp.set("category", "machine-resale");
     if (q) sp.set("q", q);
     router.push(`/services?${sp.toString()}`);
   }, [router, search]);
@@ -194,11 +192,6 @@ export function MachineResaleHub() {
               <p className="mt-2 max-w-lg text-sm leading-relaxed text-teal-50/90 sm:text-base">
                 {t("heroSubtitle")}
               </p>
-              {pricingCity ? (
-                <p className="mt-1.5 text-xs font-medium text-teal-100/90">
-                  {t("pricesForCity", { city: pricingCity })}
-                </p>
-              ) : null}
               <form
                 className="mt-4 flex max-w-xl flex-col gap-2 sm:flex-row"
                 onSubmit={(e) => {
@@ -301,7 +294,7 @@ export function MachineResaleHub() {
                 <p className="mt-1 text-sm text-slate-500">{t("featuredListingsSub")}</p>
               </div>
               <Link
-                href="/services?category=machines"
+                href="/services?category=machine-resale"
                 className="inline-flex items-center gap-1 text-sm font-semibold text-teal-800 hover:underline"
               >
                 {t("viewAllListings")}
@@ -344,13 +337,11 @@ export function MachineResaleHub() {
           <div className="flex items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900">{t("topProviders")}</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {pricingCity ? t("topProvidersSubCity", { city: pricingCity }) : t("topProvidersSub")}
-              </p>
+              <p className="mt-1 text-sm text-slate-500">{t("topProvidersSub")}</p>
             </div>
             {!loading && data.providers.length > 0 ? (
               <Link
-                href="/services?category=machines&view=providers"
+                href="/services?category=machine-resale&view=providers"
                 className="text-sm font-semibold text-teal-800 hover:underline"
               >
                 {t("viewAllProviders")}
@@ -399,12 +390,10 @@ export function MachineResaleHub() {
                   <MapPin className="h-6 w-6" />
                 </span>
                 <h3 className="mt-4 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                  {pricingCity
-                    ? t("comingSoonTitle", { city: pricingCity })
-                    : t("comingSoonTitleGeneric")}
+                  {t("comingSoonTitleGeneric")}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600 sm:text-[15px]">
-                  {pricingCity ? t("comingSoonBody", { city: pricingCity }) : t("comingSoonBodyGeneric")}
+                  {t("comingSoonBodyGeneric")}
                 </p>
                 <Button
                   asChild
