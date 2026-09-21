@@ -60,6 +60,7 @@ type Preview = {
   total: number;
   productName?: string;
   unitPrice?: number;
+  listedPrice?: number;
   priceType?: string;
 };
 
@@ -81,6 +82,7 @@ export function MachineResaleCheckoutClient() {
   const sp = searchParams ?? new URLSearchParams();
   const serviceId = String(sp.get("serviceId") || "").trim();
   const listingName = String(sp.get("name") || "").trim() || t("title");
+  const offerId = String(sp.get("offerId") || "").trim();
 
   const [notes, setNotes] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -141,7 +143,7 @@ export function MachineResaleCheckoutClient() {
     let cancelled = false;
     setLoadingPreview(true);
     api.bookings
-      .previewMachineResale({ serviceId })
+      .previewMachineResale({ serviceId, ...(offerId ? { offerId } : {}) })
       .then((res) => {
         if (cancelled) return;
         if (res.success && res.data) {
@@ -154,6 +156,7 @@ export function MachineResaleCheckoutClient() {
             total: Number(d.total) || 0,
             productName: d.productName,
             unitPrice: Number(d.unitPrice) || 0,
+            listedPrice: Number(d.listedPrice) || undefined,
             priceType: d.priceType,
           });
         } else {
@@ -180,7 +183,7 @@ export function MachineResaleCheckoutClient() {
     return () => {
       cancelled = true;
     };
-  }, [serviceId, isAuthenticated, toast]);
+  }, [serviceId, offerId, isAuthenticated, toast]);
 
   const skipCouponResetOnMount = useRef(true);
   useEffect(() => {
@@ -351,6 +354,7 @@ export function MachineResaleCheckoutClient() {
 
     const res = await api.bookings.createMachineResale({
       serviceId,
+      ...(offerId ? { offerId } : {}),
       paymentMethod,
       receiptUrl: receiptUrl || undefined,
       couponUsageId: appliedCoupon?.usageId,
@@ -388,6 +392,7 @@ export function MachineResaleCheckoutClient() {
     paymentMethod,
     selectedAddress,
     serviceId,
+    offerId,
     t,
     toast,
   ]);
@@ -615,7 +620,10 @@ export function MachineResaleCheckoutClient() {
         {preview?.unitPrice ? (
           <div className="mt-2">
             <Badge className="bg-teal-50 text-teal-900 hover:bg-teal-50">
-              {t("sellingPrice")} · ₹{Number(preview.unitPrice).toLocaleString("en-IN")}
+              {offerId && preview.listedPrice && preview.listedPrice > Number(preview.unitPrice || 0)
+                ? t("checkoutAgreedPrice")
+                : t("sellingPrice")}{" "}
+              · ₹{Number(preview.unitPrice).toLocaleString("en-IN")}
             </Badge>
           </div>
         ) : null}
