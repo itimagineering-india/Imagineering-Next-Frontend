@@ -61,7 +61,7 @@
   "makeOfferSending": "भेजा जा रहा है…",
   "makeOfferLogin": "ऑफ़र करने के लिए साइन इन करें",
   "makeOfferSent": "ऑफ़र भेज दिया गया",
-  "makeOfferSentBody": "सेलर अपनी बुकिंग से स्वीकार या अस्वीकार कर सकते हैं। लिस्टेड कीमत पर अभी भी खरीद सकते हैं।",
+  "makeOfferSentBody": "सेलर Requests पेज से स्वीकार या अस्वीकार कर सकते हैं। लिस्टेड कीमत पर अभी भी खरीद सकते हैं।",
   "makeOfferPending": "ऑफ़र भेजा · ₹{{price}}",
   "makeOfferAccepted": "ऑफ़र स्वीकार · ₹{{price}} दें",
   "makeOfferInvalid": "लिस्टेड कीमत से कम ऑफ़र डालें",
