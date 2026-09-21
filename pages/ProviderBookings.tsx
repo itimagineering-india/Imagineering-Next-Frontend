@@ -1915,7 +1915,12 @@ function BookingsTable({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     {/* Show Accept/Reject buttons for PENDING_PROVIDER status */}
-                    {(booking.status === "PENDING_PROVIDER" || booking.status === "new") && onAccept && onReject ? (
+                    {(booking.status === "PENDING_PROVIDER" || booking.status === "new") &&
+                    booking.metadata?.resaleOfferStatus === "accepted" ? (
+                      <span className="text-xs font-medium text-emerald-700">
+                        Offer accepted — waiting for buyer to pay
+                      </span>
+                    ) : (booking.status === "PENDING_PROVIDER" || booking.status === "new") && onAccept && onReject ? (
                       <>
                         <Button
                           variant="outline"
@@ -1923,14 +1928,16 @@ function BookingsTable({
                           onClick={() => onAccept(booking.id)}
                           disabled={actionLoading === booking.id}
                           className="h-8 gap-2 text-green-600 border-green-200 hover:text-green-700 hover:bg-green-50"
-                          title="Accept Booking"
+                          title={booking.metadata?.source === "resale_offer" ? "Accept offer" : "Accept Booking"}
                         >
                           {actionLoading === booking.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <Check className="h-3.5 w-3.5" />
                           )}
-                          <span className="hidden sm:inline text-xs">Accept</span>
+                          <span className="hidden sm:inline text-xs">
+                            {booking.metadata?.source === "resale_offer" ? "Accept offer" : "Accept"}
+                          </span>
                         </Button>
                         <Button
                           variant="outline"
