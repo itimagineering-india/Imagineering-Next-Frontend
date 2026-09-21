@@ -61,7 +61,7 @@
   "makeOfferSending": "Sending…",
   "makeOfferLogin": "Sign in to make an offer",
   "makeOfferSent": "Offer sent",
-  "makeOfferSentBody": "The seller can accept or reject from their bookings. You can still buy at the listed price.",
+  "makeOfferSentBody": "The seller can accept or reject from Requests. You can still buy at the listed price.",
   "makeOfferPending": "Offer sent · ₹{{price}}",
   "makeOfferAccepted": "Offer accepted · Pay ₹{{price}}",
   "makeOfferInvalid": "Enter an offer lower than the listed price",
