@@ -6,6 +6,17 @@ import { useRouter } from "next/navigation";
 import { BadgeCheck, ChevronRight, Loader2, MapPin, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/lib/api-client";
@@ -137,6 +148,15 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
   const [service, setService] = useState<ServiceDoc | null>(null);
   const [similar, setSimilar] = useState<SimilarRow[]>([]);
   const [activeImage, setActiveImage] = useState(0);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offerAmount, setOfferAmount] = useState("");
+  const [offerNote, setOfferNote] = useState("");
+  const [offerSubmitting, setOfferSubmitting] = useState(false);
+  const [myOffer, setMyOffer] = useState<{
+    offerId: string;
+    status: string;
+    offerPrice: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +211,35 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
     const mrp = Number(service.mrp);
     return Number.isFinite(mrp) && mrp > 0 ? mrp : 0;
   }, [service]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !listingId) {
+      setMyOffer(null);
+      return;
+    }
+    let cancelled = false;
+    api.bookings
+      .getMyMachineResaleOffer(listingId)
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.success ? (res.data as { offerId?: string; status?: string; offerPrice?: number } | null) : null;
+        if (data?.offerId) {
+          setMyOffer({
+            offerId: String(data.offerId),
+            status: String(data.status || "pending").toLowerCase(),
+            offerPrice: Number(data.offerPrice) || 0,
+          });
+        } else {
+          setMyOffer(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMyOffer(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, listingId]);
 
   const priceLabel = useMemo(() => {
     if (!service) return "";
@@ -268,8 +317,32 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
     [similar]
   );
 
-  const goCheckout = useCallback(() => {
-    if (!listingId) return;
+  const goCheckout = useCallback(
+    (acceptedOfferId?: string) => {
+      if (!listingId) return;
+      if (unitPrice <= 0) {
+        toast({
+          title: t("noPriceTitle"),
+          description: t("noPriceHint"),
+          variant: "destructive",
+        });
+        return;
+      }
+      const qs = new URLSearchParams();
+      qs.set("serviceId", listingId);
+      qs.set("name", title);
+      if (acceptedOfferId) qs.set("offerId", acceptedOfferId);
+      const href = `/machine-resale/checkout?${qs.toString()}`;
+      if (!isAuthenticated) {
+        router.push(`/login?redirect=${encodeURIComponent(href)}`);
+        return;
+      }
+      router.push(href);
+    },
+    [isAuthenticated, listingId, router, t, title, toast, unitPrice]
+  );
+
+  const openOfferModal = useCallback(() => {
     if (unitPrice <= 0) {
       toast({
         title: t("noPriceTitle"),
@@ -278,16 +351,107 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
       });
       return;
     }
-    const qs = new URLSearchParams();
-    qs.set("serviceId", listingId);
-    qs.set("name", title);
-    const href = `/machine-resale/checkout?${qs.toString()}`;
     if (!isAuthenticated) {
-      router.push(`/login?redirect=${encodeURIComponent(href)}`);
+      const qs = new URLSearchParams();
+      qs.set("serviceId", listingId);
+      qs.set("name", title);
+      router.push(
+        `/login?redirect=${encodeURIComponent(`/machine-resale/listing/${listingId}`)}`
+      );
+      toast({ title: t("makeOfferLogin") });
       return;
     }
-    router.push(href);
-  }, [isAuthenticated, listingId, router, t, title, toast, unitPrice]);
+    setOfferAmount(myOffer?.offerPrice ? String(Math.round(myOffer.offerPrice)) : "");
+    setOfferNote("");
+    setOfferOpen(true);
+  }, [isAuthenticated, listingId, myOffer?.offerPrice, router, t, title, toast, unitPrice]);
+
+  const submitOffer = useCallback(async () => {
+    const amount = Math.round(Number(offerAmount));
+    if (!Number.isFinite(amount) || amount <= 0 || amount >= unitPrice) {
+      toast({ title: t("makeOfferInvalid"), variant: "destructive" });
+      return;
+    }
+    setOfferSubmitting(true);
+    try {
+      const res = await api.bookings.createMachineResaleOffer({
+        serviceId: listingId,
+        offerPrice: amount,
+        note: offerNote.trim() || undefined,
+      });
+      const data = res.data as
+        | { offerId?: string; offerPrice?: number; providerUserId?: string }
+        | undefined;
+      if (!res.success || !data?.offerId) {
+        throw new Error(res.error?.message || t("checkoutError"));
+      }
+      setMyOffer({
+        offerId: String(data.offerId),
+        status: "pending",
+        offerPrice: Number(data.offerPrice) || amount,
+      });
+      setOfferOpen(false);
+      toast({
+        title: t("makeOfferSent"),
+        description: t("makeOfferSentBody"),
+      });
+      const providerUserId =
+        (typeof service?.provider === "object" && service.provider?._id
+          ? String(service.provider._id)
+          : "") || String(data.providerUserId || "");
+      const providerName =
+        typeof service?.provider === "object"
+          ? String(service.provider.businessName || service.provider.name || "").trim()
+          : "";
+      const message = [
+        `Hi, I'd like to offer ₹${amount.toLocaleString("en-IN")} for ${title}.`,
+        `Listed price: ₹${unitPrice.toLocaleString("en-IN")}.`,
+        offerNote.trim() ? `Note: ${offerNote.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      if (providerUserId) {
+        const params = new URLSearchParams({
+          providerId: providerUserId,
+          serviceId: listingId,
+          ...(providerName ? { name: providerName } : {}),
+          message,
+        });
+        try {
+          sessionStorage.setItem(
+            "ii_pending_chat_intent",
+            JSON.stringify({
+              providerId: providerUserId,
+              serviceId: listingId,
+              name: providerName,
+              message,
+              createdAt: Date.now(),
+            })
+          );
+        } catch {
+          /* chat URL params still work */
+        }
+        router.push(`/chat?${params.toString()}`);
+      }
+    } catch (e: unknown) {
+      toast({
+        title: e instanceof Error ? e.message : t("checkoutError"),
+        variant: "destructive",
+      });
+    } finally {
+      setOfferSubmitting(false);
+    }
+  }, [
+    listingId,
+    offerAmount,
+    offerNote,
+    router,
+    service?.provider,
+    t,
+    title,
+    toast,
+    unitPrice,
+  ]);
 
   if (loading) {
     return (
@@ -407,15 +571,46 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
               <p className="mt-1 text-2xl font-bold text-slate-900">
                 {unitPrice > 0 ? `₹${formatInr(unitPrice)}` : "—"}
               </p>
-              <Button
-                type="button"
-                className="mt-5 hidden h-11 w-full rounded-xl font-semibold text-white lg:inline-flex"
-                style={{ backgroundColor: RESALE_TEAL }}
-                disabled={unitPrice <= 0}
-                onClick={goCheckout}
-              >
-                {t("buyNow")}
-              </Button>
+              {myOffer?.status === "accepted" && myOffer.offerPrice > 0 ? (
+                <p className="mt-1 text-sm font-medium text-teal-800">
+                  {t("makeOfferAccepted", { price: formatInr(myOffer.offerPrice) })}
+                </p>
+              ) : myOffer?.status === "pending" && myOffer.offerPrice > 0 ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  {t("makeOfferPending", { price: formatInr(myOffer.offerPrice) })}
+                </p>
+              ) : null}
+              {myOffer?.status === "accepted" && myOffer.offerId ? (
+                <Button
+                  type="button"
+                  className="mt-5 hidden h-11 w-full rounded-xl font-semibold text-white lg:inline-flex"
+                  style={{ backgroundColor: RESALE_TEAL }}
+                  onClick={() => goCheckout(myOffer.offerId)}
+                >
+                  {t("makeOfferAccepted", { price: formatInr(myOffer.offerPrice) })}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className="mt-5 hidden h-11 w-full rounded-xl font-semibold text-white lg:inline-flex"
+                  style={{ backgroundColor: RESALE_TEAL }}
+                  disabled={unitPrice <= 0}
+                  onClick={() => goCheckout()}
+                >
+                  {t("buyNow")}
+                </Button>
+              )}
+              {myOffer?.status === "accepted" ? null : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2 hidden h-11 w-full rounded-xl font-semibold lg:inline-flex"
+                  disabled={unitPrice <= 0}
+                  onClick={openOfferModal}
+                >
+                  {t("makeOffer")}
+                </Button>
+              )}
               <ul className="mt-5 hidden space-y-2.5 border-t border-slate-100 pt-4 text-sm text-slate-600 lg:block">
                 <li className="flex gap-2">
                   <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
@@ -489,24 +684,89 @@ export function MachineResaleListingDetailClient({ serviceId }: Props) {
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white p-3 shadow-lg lg:hidden">
-        <div className="mx-auto flex max-w-lg items-center gap-3">
+        <div className="mx-auto flex max-w-lg items-center gap-2">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-slate-500">{t("sellingPrice")}</p>
             <p className="truncate text-lg font-bold text-slate-900">
               {unitPrice > 0 ? `₹${formatInr(unitPrice)}` : "—"}
             </p>
           </div>
+          {myOffer?.status === "accepted" ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 shrink-0 rounded-xl px-3 font-semibold"
+              disabled={unitPrice <= 0}
+              onClick={openOfferModal}
+            >
+              {t("makeOffer")}
+            </Button>
+          )}
           <Button
             type="button"
-            className="h-11 shrink-0 rounded-xl px-5 font-semibold text-white"
+            className="h-11 shrink-0 rounded-xl px-4 font-semibold text-white"
             style={{ backgroundColor: RESALE_TEAL }}
-            disabled={unitPrice <= 0}
-            onClick={goCheckout}
+            disabled={unitPrice <= 0 && myOffer?.status !== "accepted"}
+            onClick={() =>
+              myOffer?.status === "accepted" ? goCheckout(myOffer.offerId) : goCheckout()
+            }
           >
-            {t("buyNow")}
+            {myOffer?.status === "accepted" ? t("checkoutPay") : t("buyNow")}
           </Button>
         </div>
       </div>
+
+      <Dialog open={offerOpen} onOpenChange={setOfferOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("makeOfferTitle")}</DialogTitle>
+            <DialogDescription>{t("makeOfferHint")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="resale-offer-amount">{t("makeOfferAmount")}</Label>
+              <Input
+                id="resale-offer-amount"
+                type="number"
+                min={1}
+                step={1}
+                value={offerAmount}
+                onChange={(e) => setOfferAmount(e.target.value)}
+                placeholder={unitPrice > 0 ? String(Math.max(1, Math.round(unitPrice * 0.9))) : ""}
+              />
+              {unitPrice > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("makeOfferAmountHint", { price: formatInr(unitPrice) })}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="resale-offer-note">{t("makeOfferNote")}</Label>
+              <Textarea
+                id="resale-offer-note"
+                rows={3}
+                value={offerNote}
+                onChange={(e) => setOfferNote(e.target.value)}
+                placeholder={t("makeOfferNotePlaceholder")}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOfferOpen(false)}>
+              {t("makeOfferCancel")}
+            </Button>
+            <Button
+              type="button"
+              style={{ backgroundColor: RESALE_TEAL }}
+              className="text-white"
+              disabled={offerSubmitting}
+              onClick={() => void submitOffer()}
+            >
+              {offerSubmitting ? t("makeOfferSending") : t("makeOfferSubmit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
