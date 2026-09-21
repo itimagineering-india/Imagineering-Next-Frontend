@@ -14,6 +14,7 @@ export type QuoteUpdatePayload = {
   reason: "offer" | "cancelled" | "ordered" | "expired" | "created" | "quantities_updated";
   data?: any;
   at?: string;
+  isUpdate?: boolean;
 };
 
 let socket: Socket | null = null;
