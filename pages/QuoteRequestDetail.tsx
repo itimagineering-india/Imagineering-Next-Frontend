@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow, type QuoteRequestItemLike } from "@/lib/b2b/quoteRequestDisplay";
+import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferIsRevised, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow, type QuoteRequestItemLike } from "@/lib/b2b/quoteRequestDisplay";
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
 
@@ -113,6 +113,7 @@ function printLiveQuotesSummary(opts: {
       const badges = [
         offer.isRecommended ? "Recommended" : "",
         offer.isPartial ? offer.coverageLabel || "Partial quote" : "",
+        quoteOfferIsRevised(offer) ? "Revised quote" : "",
         offer.verified ? "Verified" : "",
         offer.gstLabel ? String(offer.gstLabel) : "",
       ]
@@ -122,7 +123,7 @@ function printLiveQuotesSummary(opts: {
       return `<section class="offer">
         <h3>${escapeHtml(provider)}${offer.isRecommended ? ' <span class="badge">Recommended</span>' : ""}${
           offer.isPartial ? ' <span class="badge partial">Partial</span>' : ""
-        }</h3>
+        }${quoteOfferIsRevised(offer) ? ' <span class="badge revised">Revised</span>' : ""}</h3>
         ${badges ? `<p class="meta">${escapeHtml(badges)}</p>` : ""}
         <p class="total">${escapeHtml(formatINR(total))}</p>
         <table class="summary">
@@ -158,6 +159,7 @@ function printLiveQuotesSummary(opts: {
     .total { font-size: 22px; font-weight: 800; margin: 6px 0 8px; }
     .badge { display: inline-block; font-size: 10px; font-weight: 700; background: #fef3c7; color: #78350f; padding: 2px 6px; border-radius: 999px; }
     .badge.partial { background: #ffedd5; color: #9a3412; }
+    .badge.revised { background: #ccfbf1; color: #0f766e; }
     .meta, .notes { color: #57534e; margin: 4px 0 0; }
     .summary { margin-bottom: 8px; }
     .lines { margin-top: 6px; }
@@ -281,6 +283,7 @@ function OfferCard({
   const score = Number(offer.offerScore || 0);
   const recommended = Boolean(offer.isRecommended);
   const isPartial = Boolean(offer.isPartial);
+  const isRevised = quoteOfferIsRevised(offer);
   const coverageLabel = String(offer.coverageLabel || "").trim();
   const lineItems = quoteOfferItems(offer);
   const totalQty = quoteOfferTotalQuantity(offer);
@@ -305,6 +308,11 @@ function OfferCard({
           {isPartial ? (
             <span className="inline-flex rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-900">
               {coverageLabel || "Partial quote"}
+            </span>
+          ) : null}
+          {isRevised ? (
+            <span className="inline-flex rounded-full bg-teal-100 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
+              Revised quote
             </span>
           ) : null}
         </div>
@@ -562,13 +570,23 @@ export default function QuoteRequestPage() {
 
   useEffect(() => {
     if (!id || !isAuthenticated) return;
-    return subscribeToQuoteRequest(id, (payload) => {
+    let bannerTimer: number | undefined;
+    const unsub = subscribeToQuoteRequest(id, (payload) => {
       if (payload?.data) {
         applyRow(payload.data);
-        return;
+      } else {
+        void fetchDetail({ silent: true });
       }
-      void fetchDetail({ silent: true });
+      if (payload?.reason === "offer" && payload?.isUpdate) {
+        setLiveBanner("Revised quote received");
+        window.clearTimeout(bannerTimer);
+        bannerTimer = window.setTimeout(() => setLiveBanner(null), 2800);
+      }
     });
+    return () => {
+      window.clearTimeout(bannerTimer);
+      unsub();
+    };
   }, [id, isAuthenticated, applyRow, fetchDetail]);
 
   const serviceTitle = useMemo(() => quoteRequestHeadline(data), [data]);
