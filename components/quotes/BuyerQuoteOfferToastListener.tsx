@@ -39,9 +39,10 @@ export function BuyerQuoteOfferToastListener() {
         : Number(payload.data?.offersReceived) || 0;
 
       toast({
-        title: "Quote offer received",
-        description:
-          offerCount > 1
+        title: payload.isUpdate ? "Quote offer updated" : "Quote offer received",
+        description: payload.isUpdate
+          ? "A supplier revised their quote. Open to review the new price."
+          : offerCount > 1
             ? `You now have ${offerCount} offers on your quote request. Open to compare.`
             : "A supplier sent you a price quote. Open it to review and order.",
         action: (
