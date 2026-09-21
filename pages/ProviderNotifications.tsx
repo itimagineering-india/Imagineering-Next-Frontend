@@ -94,7 +94,10 @@ export default function ProviderNotifications() {
           
           if (notif.metadata?.type) {
             const t = notif.metadata.type === "lead" ? "request" : notif.metadata.type;
-            frontendType = t;
+            frontendType =
+              t === "QUOTE_OFFER" || t === "QUOTE_REQUEST" || t === "QUOTE_NOT_SELECTED"
+                ? "request"
+                : t;
           } else if (notif.link) {
             if (notif.link.includes('/leads') || notif.link.includes('/quote-requests')) frontendType = "request";
             else if (notif.link.includes('/bookings')) frontendType = "job";
