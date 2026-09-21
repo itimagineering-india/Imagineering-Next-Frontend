@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { MapPin, Calendar, Clock, Package, Loader2, ImagePlus, X, Navigation, ChevronDown } from "lucide-react";
+import { MapPin, Calendar, Clock, Package, Loader2, ImagePlus, X, Navigation, ChevronDown, Check, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +146,21 @@ export default function ProviderLeads() {
   const [quoteSecondsLeft, setQuoteSecondsLeft] = useState(0);
   const [quoteSummaryExpanded, setQuoteSummaryExpanded] = useState(false);
 
+  type ResaleOfferRow = {
+    id: string;
+    serviceId: string;
+    serviceTitle: string;
+    buyerId: string;
+    buyerName: string;
+    offerPrice: number;
+    listedPrice: number;
+    note?: string;
+    status: string;
+  };
+  const [resaleOffers, setResaleOffers] = useState<ResaleOfferRow[]>([]);
+  const [resaleOffersLoading, setResaleOffersLoading] = useState(true);
+  const [resaleOfferAction, setResaleOfferAction] = useState<string | null>(null);
+
   const fetchQuoteRequests = useCallback(async () => {
     setQuotesLoading(true);
     try {
@@ -159,6 +174,22 @@ export default function ProviderLeads() {
       setQuoteRequests([]);
     } finally {
       setQuotesLoading(false);
+    }
+  }, []);
+
+  const fetchResaleOffers = useCallback(async () => {
+    setResaleOffersLoading(true);
+    try {
+      const res = await api.bookings.listProviderMachineResaleOffers();
+      if (res.success) {
+        setResaleOffers((res.data as { offers?: ResaleOfferRow[] })?.offers || []);
+      } else {
+        setResaleOffers([]);
+      }
+    } catch {
+      setResaleOffers([]);
+    } finally {
+      setResaleOffersLoading(false);
     }
   }, []);
 
@@ -202,6 +233,7 @@ export default function ProviderLeads() {
   useEffect(() => {
     fetchManpowerInvites();
     fetchQuoteRequests();
+    fetchResaleOffers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -404,6 +436,52 @@ export default function ProviderLeads() {
     }
   };
 
+  const handleResaleOfferAction = async (offerId: string, action: "accept" | "reject") => {
+    setResaleOfferAction(offerId);
+    try {
+      const response =
+        action === "accept"
+          ? await api.bookings.acceptMachineResaleOffer(offerId)
+          : await api.bookings.rejectMachineResaleOffer(offerId);
+      if (response.success) {
+        toast({
+          title: action === "accept" ? "Offer accepted" : "Offer declined",
+          description:
+            action === "accept" ? "The buyer can now pay the agreed price." : undefined,
+        });
+        await fetchResaleOffers();
+      } else {
+        throw new Error(response.error?.message || "Failed to update offer");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to update offer",
+        variant: "destructive",
+      });
+    } finally {
+      setResaleOfferAction(null);
+    }
+  };
+
+  const openResaleOfferChat = (offer: ResaleOfferRow) => {
+    if (!offer.buyerId) {
+      toast({
+        title: "Chat unavailable",
+        description: "Buyer details are missing for this offer.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const params = new URLSearchParams({
+      providerId: String(offer.buyerId),
+      name: String(offer.buyerName || "Buyer"),
+      ...(offer.serviceId ? { serviceId: String(offer.serviceId) } : {}),
+      message: `Hi, regarding your offer of ${formatINR(offer.offerPrice)} for ${offer.serviceTitle}.`,
+    });
+    router.push(`/chat?${params.toString()}`);
+  };
+
   const respondManpowerInvite = async (inviteId: string, action: "accept" | "decline") => {
     try {
       const response = await api.manpowerCrew.respondInvite(inviteId, action);
@@ -440,7 +518,7 @@ export default function ProviderLeads() {
               Requests
             </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">
-              Manage quote requests and labour hire invites in one place
+              Manage quote requests, machine price offers, and labour hire invites in one place
             </p>
           </div>
         </div>
@@ -536,6 +614,112 @@ export default function ProviderLeads() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base md:text-lg">Machine resale offers</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
+                  Buyers negotiating on your used-machine listings. A booking is created only after they pay.
+                </CardDescription>
+              </div>
+              {!resaleOffersLoading ? (
+                <Badge variant="secondary">{resaleOffers.length}</Badge>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            {resaleOffersLoading ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading price offers…
+              </div>
+            ) : resaleOffers.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground">No price offers right now</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {resaleOffers.map((offer) => (
+                  <div
+                    key={offer.id}
+                    className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate font-semibold text-sm md:text-base">
+                          {offer.serviceTitle}
+                        </h3>
+                        {offer.status === "accepted" ? (
+                          <Badge className="bg-emerald-600">Accepted · waiting for pay</Badge>
+                        ) : (
+                          <Badge className="bg-blue-500">Needs response</Badge>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-col gap-1.5 text-[11px] text-muted-foreground md:text-xs">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                            {offer.buyerName} offered {formatINR(offer.offerPrice)}
+                          </span>
+                          {offer.listedPrice > 0 ? (
+                            <span>Listed {formatINR(offer.listedPrice)}</span>
+                          ) : null}
+                        </div>
+                        {offer.note ? (
+                          <span className="line-clamp-2">{offer.note}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openResaleOfferChat(offer)}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Chat
+                      </Button>
+                      {offer.status === "pending" ? (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={resaleOfferAction === offer.id}
+                            onClick={() => void handleResaleOfferAction(offer.id, "accept")}
+                          >
+                            {resaleOfferAction === offer.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={resaleOfferAction === offer.id}
+                            onClick={() => void handleResaleOfferAction(offer.id, "reject")}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Decline
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resaleOfferAction === offer.id}
+                          onClick={() => void handleResaleOfferAction(offer.id, "reject")}
+                        >
+                          Withdraw
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
