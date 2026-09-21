@@ -28,6 +28,19 @@ export function quoteOfferItems(offer: { items?: QuoteOfferItemLike[] | null } |
   return offer.items.filter((row) => row && String(row.title || "").trim());
 }
 
+export function quoteOfferIsRevised(
+  offer:
+    | { isRevised?: boolean; createdAt?: string | Date; updatedAt?: string | Date }
+    | null
+    | undefined
+): boolean {
+  if (!offer) return false;
+  if (offer.isRevised === true) return true;
+  const created = offer.createdAt ? new Date(offer.createdAt).getTime() : 0;
+  const updated = offer.updatedAt ? new Date(offer.updatedAt).getTime() : 0;
+  return Number.isFinite(created) && Number.isFinite(updated) && updated > created + 2000;
+}
+
 /** Sum of line quantities on an offer (falls back to single `quantity` when no lines). */
 export function quoteOfferTotalQuantity(
   offer: { items?: QuoteOfferItemLike[] | null; quantity?: number } | null | undefined
