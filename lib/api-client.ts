@@ -1746,7 +1746,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       }),
-    previewMachineResale: (payload: { serviceId: string }) =>
+    previewMachineResale: (payload: { serviceId: string; offerId?: string }) =>
       apiRequest<{
         subtotal: number;
         platformFee: number;
@@ -1754,14 +1754,40 @@ export const api = {
         gst: number;
         total: number;
         unitPrice: number;
+        listedPrice?: number;
+        offerId?: string;
         priceType: string;
         productName: string;
       }>("/api/bookings/machine-resale/preview", {
         method: "POST",
         body: JSON.stringify(payload),
       }),
+    createMachineResaleOffer: (payload: {
+      serviceId: string;
+      offerPrice: number;
+      note?: string;
+    }) =>
+      apiRequest<{
+        offerId: string;
+        status: string;
+        offerPrice: number;
+        listedPrice: number;
+        providerUserId: string;
+      }>("/api/bookings/machine-resale/offer", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    getMyMachineResaleOffer: (serviceId: string) =>
+      apiRequest<{
+        offerId: string;
+        status: string;
+        offerPrice: number;
+        listedPrice: number;
+        bookingStatus?: string;
+      }>(`/api/bookings/machine-resale/offer?serviceId=${encodeURIComponent(serviceId)}`),
     createMachineResale: (payload: {
       serviceId: string;
+      offerId?: string;
       paymentMethod: string;
       receiptUrl?: string;
       couponUsageId?: string;
