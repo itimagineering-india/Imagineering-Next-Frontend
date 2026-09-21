@@ -1785,6 +1785,33 @@ export const api = {
         listedPrice: number;
         bookingStatus?: string;
       }>(`/api/bookings/machine-resale/offer?serviceId=${encodeURIComponent(serviceId)}`),
+    listProviderMachineResaleOffers: () =>
+      apiRequest<{
+        offers: Array<{
+          id: string;
+          serviceId: string;
+          serviceTitle: string;
+          buyerId: string;
+          buyerName: string;
+          buyerAvatar?: string;
+          offerPrice: number;
+          listedPrice: number;
+          note?: string;
+          status: string;
+          createdAt?: string;
+          updatedAt?: string;
+        }>;
+      }>("/api/bookings/machine-resale/offers"),
+    acceptMachineResaleOffer: (offerId: string) =>
+      apiRequest<{ offerId: string; status: string }>(
+        `/api/bookings/machine-resale/offers/${encodeURIComponent(offerId)}/accept`,
+        { method: "POST" }
+      ),
+    rejectMachineResaleOffer: (offerId: string) =>
+      apiRequest<{ offerId: string; status: string }>(
+        `/api/bookings/machine-resale/offers/${encodeURIComponent(offerId)}/reject`,
+        { method: "POST" }
+      ),
     createMachineResale: (payload: {
       serviceId: string;
       offerId?: string;
