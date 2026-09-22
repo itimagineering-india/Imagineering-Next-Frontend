@@ -24,12 +24,8 @@ export function ServicesSection() {
   );
 
   return (
-    <section className="relative overflow-hidden py-10 md:py-12 lg:py-16">
-      <div className="absolute inset-0 bg-gradient-to-b from-[hsl(40_25%_98%)] via-background to-background" />
-      <div className="absolute top-1/4 left-0 w-64 h-64 bg-[hsl(var(--red-accent))]/[0.06] rounded-full blur-3xl -translate-x-1/2 pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-primary/[0.04] rounded-full blur-3xl translate-x-1/3 translate-y-1/3 pointer-events-none" />
-
-      <div className="relative home-shell">
+    <section>
+      <div className="home-shell">
         <div
           ref={ref}
           className={`transition-all duration-700 ${
