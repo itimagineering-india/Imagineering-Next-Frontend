@@ -25,6 +25,10 @@ import {
   PaintingIcon,
   MaintenanceIcon,
 } from "./CategoryIcons";
+import toolsCategoryImg from "@/assets/services/tools.png";
+
+const toolsCategorySrc =
+  typeof toolsCategoryImg === "string" ? toolsCategoryImg : toolsCategoryImg.src;
 
 // Category images mapping - using Unsplash placeholder images
 const categoryImages: Record<string, string> = {
@@ -32,7 +36,7 @@ const categoryImages: Record<string, string> = {
   "machines": "/category%20images/machines%20resale%20image.png",
   "consultants": "https://img.icons8.com/external-flaticons-flat-flat-icons/64/external-consultant-gig-economy-flaticons-flat-flat-icons-2.png",
   "real-estate": "https://img.icons8.com/color/96/mansion.png",
-  "tools": "https://img.icons8.com/color/96/maintenance.png",
+  "tools": toolsCategorySrc,
   "manufacturer": "https://img.icons8.com/color/96/factory.png",
   "logistics": "https://img.icons8.com/color/96/delivery--v1.png",
   "traders": "https://img.icons8.com/color/96/supplier.png",
@@ -57,7 +61,7 @@ const IMAGE_ONLY_TILES: Record<string, string> = {
   machines: "https://dwkazjggpovin.cloudfront.net/category%20images/machine%20resale%20image.png",
   "consultants": "https://dwkazjggpovin.cloudfront.net/category%20images/consultants%20image.png",
   "real-estate": "https://dwkazjggpovin.cloudfront.net/category%20images/real%20estate%20image.png",
-  "tools": "https://dwkazjggpovin.cloudfront.net/category%20images/tools%20image.png",
+  "tools": toolsCategorySrc,
   "manufacturer": "https://dwkazjggpovin.cloudfront.net/category%20images/Manufacturer%20image.png",
   "logistics": "https://dwkazjggpovin.cloudfront.net/category%20images/logistics%20image.png",
   "traders": "https://dwkazjggpovin.cloudfront.net/category%20images/traders%20image.png",
