@@ -26,9 +26,12 @@ import {
   MaintenanceIcon,
 } from "./CategoryIcons";
 import toolsCategoryImg from "@/assets/services/tools.png";
+import tradersCategoryImg from "@/assets/services/b2b Traders.png";
 
 const toolsCategorySrc =
   typeof toolsCategoryImg === "string" ? toolsCategoryImg : toolsCategoryImg.src;
+const tradersCategorySrc =
+  typeof tradersCategoryImg === "string" ? tradersCategoryImg : tradersCategoryImg.src;
 
 // Category images mapping - using Unsplash placeholder images
 const categoryImages: Record<string, string> = {
@@ -39,7 +42,7 @@ const categoryImages: Record<string, string> = {
   "tools": toolsCategorySrc,
   "manufacturer": "https://img.icons8.com/color/96/factory.png",
   "logistics": "https://img.icons8.com/color/96/delivery--v1.png",
-  "traders": "https://img.icons8.com/color/96/supplier.png",
+  "traders": tradersCategorySrc,
   "rental-services": "/category%20images/machine%20rental%20image.png",
   "machine-rental": "/category%20images/machine%20rental%20image.png",
   "furniture": "https://img.icons8.com/color/96/furniture.png",
@@ -64,7 +67,7 @@ const IMAGE_ONLY_TILES: Record<string, string> = {
   "tools": toolsCategorySrc,
   "manufacturer": "https://dwkazjggpovin.cloudfront.net/category%20images/Manufacturer%20image.png",
   "logistics": "https://dwkazjggpovin.cloudfront.net/category%20images/logistics%20image.png",
-  "traders": "https://dwkazjggpovin.cloudfront.net/category%20images/traders%20image.png",
+  "traders": tradersCategorySrc,
   finance: "https://dwkazjggpovin.cloudfront.net/category%20images/finance%20%26%20Insurance%20image.png",
   "construction-companies": "https://dwkazjggpovin.cloudfront.net/category%20images/construction%20comapnies%20image.png",
   contractors: "https://dwkazjggpovin.cloudfront.net/category%20images/contractors%20image.png",
