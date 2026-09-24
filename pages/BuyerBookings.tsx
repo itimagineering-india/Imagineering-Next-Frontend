@@ -168,8 +168,8 @@ export default function BuyerBookings() {
   ];
 
   const [loadingPaymentHistoryId, setLoadingPaymentHistoryId] = useState<string | null>(null);
-  const [reviewedServiceIds, setReviewedServiceIds] = useState<Set<string>>(new Set());
-  const [reviewingServiceId, setReviewingServiceId] = useState<string | null>(null);
+  const [hasReviewedProvider, setHasReviewedProvider] = useState(false);
+  const [isWritingProviderReview, setIsWritingProviderReview] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -499,34 +499,64 @@ export default function BuyerBookings() {
     return [];
   };
 
+  const getBookingProviderId = (booking: Booking) =>
+    String(booking.provider?._id || booking.service?.provider?._id || "").trim();
+
+  const getBookingProviderName = (booking: Booking) =>
+    String(
+      booking.provider?.name || booking.service?.provider?.name || "Provider"
+    ).trim() || "Provider";
+
+  const getPrimaryServiceIdForReview = (booking: Booking) => {
+    const items = getServiceItems(booking);
+    return String(items[0]?._id || booking.service?._id || "").trim();
+  };
+
   useEffect(() => {
     if (!selectedBooking || !buyerUserId) {
-      setReviewingServiceId(null);
+      setIsWritingProviderReview(false);
       setReviewRating(0);
       setReviewComment("");
-      setReviewedServiceIds(new Set());
+      setHasReviewedProvider(false);
       return;
     }
-    setReviewingServiceId(null);
+    setIsWritingProviderReview(false);
     setReviewRating(0);
     setReviewComment("");
-    const items = getServiceItems(selectedBooking);
 
     const checkReviewed = async () => {
-      const reviewed = new Set<string>();
-      const uniqueServiceIds = Array.from(new Set(items.map((item) => item._id).filter(Boolean)));
-      if (uniqueServiceIds.length === 0) {
-        setReviewedServiceIds(reviewed);
-        return;
+      const providerId = getBookingProviderId(selectedBooking);
+      if (providerId) {
+        try {
+          const res = await api.reviews.getByProvider(providerId);
+          const list =
+            (res.data as { reviews?: Array<{ buyer?: { _id?: string; id?: string } | string }> })
+              ?.reviews || [];
+          const hasReviewed = list.some((r) => {
+            const buyer = r.buyer;
+            const bid =
+              typeof buyer === "object" && buyer !== null
+                ? buyer._id || buyer.id
+                : buyer;
+            return bid && String(bid) === String(buyerUserId);
+          });
+          setHasReviewedProvider(hasReviewed);
+          return;
+        } catch {
+          /* fall through to service check */
+        }
       }
 
-      const results = await Promise.allSettled(
-        uniqueServiceIds.map((serviceId) => api.reviews.getByService(serviceId))
-      );
-
-      results.forEach((result, index) => {
-        if (result.status !== "fulfilled") return;
-        const list = (result.value.data as { reviews?: Array<{ buyer?: { _id?: string; id?: string } | string }> })?.reviews || [];
+      const serviceId = getPrimaryServiceIdForReview(selectedBooking);
+      if (!serviceId) {
+        setHasReviewedProvider(false);
+        return;
+      }
+      try {
+        const res = await api.reviews.getByService(serviceId);
+        const list =
+          (res.data as { reviews?: Array<{ buyer?: { _id?: string; id?: string } | string }> })
+            ?.reviews || [];
         const hasReviewed = list.some((r) => {
           const buyer = r.buyer;
           const bid =
@@ -535,22 +565,30 @@ export default function BuyerBookings() {
               : buyer;
           return bid && String(bid) === String(buyerUserId);
         });
-        if (hasReviewed) {
-          reviewed.add(uniqueServiceIds[index]);
-        }
-      });
-
-      setReviewedServiceIds(reviewed);
+        setHasReviewedProvider(hasReviewed);
+      } catch {
+        setHasReviewedProvider(false);
+      }
     };
 
     void checkReviewed();
   }, [selectedBooking?._id, buyerUserId]);
 
-  const handleSubmitReview = async (serviceId: string) => {
+  const handleSubmitReview = async () => {
     if (reviewRating === 0 || !reviewComment.trim()) {
       toast({
         title: "Required",
         description: "Please select a rating and write your review.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!selectedBooking) return;
+    const serviceId = getPrimaryServiceIdForReview(selectedBooking);
+    if (!serviceId) {
+      toast({
+        title: "Error",
+        description: "Could not submit review for this order.",
         variant: "destructive",
       });
       return;
@@ -565,10 +603,10 @@ export default function BuyerBookings() {
       if (res.success) {
         toast({
           title: "Thank you!",
-          description: "Your review has been submitted and also counted in the provider's overall rating.",
+          description: "Your review has been submitted for this provider.",
         });
-        setReviewedServiceIds((prev) => new Set(prev).add(serviceId));
-        setReviewingServiceId(null);
+        setHasReviewedProvider(true);
+        setIsWritingProviderReview(false);
         setReviewRating(0);
         setReviewComment("");
       } else {
@@ -2113,99 +2151,92 @@ export default function BuyerBookings() {
                     <div>
                       <h3 className="font-semibold mb-3">Leave a Review</h3>
                       <p className="text-sm text-muted-foreground mb-3">
-                        Share your experience with the services you purchased. Each service review also updates the provider rating.
+                        Share your experience with this provider. Your review updates their rating.
                       </p>
-                      <div className="space-y-4">
-                        {getServiceItems(selectedBooking).map((item) => {
-                          const sid = item._id;
-                          const hasReviewed = reviewedServiceIds.has(sid);
-                          const isEditing = reviewingServiceId === sid;
-                          return (
-                            <div key={sid} className="border rounded-lg p-4 space-y-3">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">{item.title || "Service"}</span>
-                                {hasReviewed ? (
-                                  <span className="text-sm text-green-600 flex items-center gap-1 shrink-0">
-                                    <CheckCircle2 className="h-4 w-4" /> Reviewed
-                                  </span>
-                                ) : !isEditing ? (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => setReviewingServiceId(sid)}
-                                  >
-                                    Write Review
-                                  </Button>
-                                ) : null}
-                              </div>
-                              {isEditing && (
-                                <div className="space-y-3 pt-2 border-t">
-                                  <div>
-                                    <label className="text-sm font-medium mb-1 block">Rating</label>
-                                    <div className="flex gap-1">
-                                      {[1, 2, 3, 4, 5].map((s) => {
-                                        const selected = s <= reviewRating;
-                                        return (
-                                          <button
-                                            key={s}
-                                            type="button"
-                                            aria-label={`Rate ${s} star${s === 1 ? "" : "s"}`}
-                                            aria-pressed={selected}
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              setReviewRating(s);
-                                            }}
-                                            className="rounded p-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                                          >
-                                            <Star
-                                              className={`h-7 w-7 pointer-events-none ${
-                                                selected ? "text-amber-500" : "text-slate-300"
-                                              }`}
-                                              fill={selected ? "currentColor" : "none"}
-                                              stroke="currentColor"
-                                            />
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label className="text-sm font-medium mb-1 block">Your Review</label>
-                                    <Textarea
-                                      placeholder="Share your experience..."
-                                      value={reviewComment}
-                                      onChange={(e) => setReviewComment(e.target.value)}
-                                      className="min-h-[80px]"
-                                      rows={3}
-                                    />
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => void handleSubmitReview(sid)}
-                                      disabled={submittingReview || reviewRating === 0 || !reviewComment.trim()}
-                                    >
-                                      {submittingReview ? "Submitting..." : "Submit Review"}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        setReviewingServiceId(null);
-                                        setReviewRating(0);
-                                        setReviewComment("");
+                      <div className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">
+                            {getBookingProviderName(selectedBooking)}
+                          </span>
+                          {hasReviewedProvider ? (
+                            <span className="text-sm text-green-600 flex items-center gap-1 shrink-0">
+                              <CheckCircle2 className="h-4 w-4" /> Reviewed
+                            </span>
+                          ) : !isWritingProviderReview ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setIsWritingProviderReview(true)}
+                            >
+                              Write Review
+                            </Button>
+                          ) : null}
+                        </div>
+                        {isWritingProviderReview && (
+                          <div className="space-y-3 pt-2 border-t">
+                            <div>
+                              <label className="text-sm font-medium mb-1 block">Rating</label>
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map((s) => {
+                                  const selected = s <= reviewRating;
+                                  return (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      aria-label={`Rate ${s} star${s === 1 ? "" : "s"}`}
+                                      aria-pressed={selected}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setReviewRating(s);
                                       }}
-                                      disabled={submittingReview}
+                                      className="rounded p-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                                     >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
+                                      <Star
+                                        className={`h-7 w-7 pointer-events-none ${
+                                          selected ? "text-amber-500" : "text-slate-300"
+                                        }`}
+                                        fill={selected ? "currentColor" : "none"}
+                                        stroke="currentColor"
+                                      />
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             </div>
-                          );
-                        })}
+                            <div>
+                              <label className="text-sm font-medium mb-1 block">Your Review</label>
+                              <Textarea
+                                placeholder="Share your experience with this provider..."
+                                value={reviewComment}
+                                onChange={(e) => setReviewComment(e.target.value)}
+                                className="min-h-[80px]"
+                                rows={3}
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => void handleSubmitReview()}
+                                disabled={submittingReview || reviewRating === 0 || !reviewComment.trim()}
+                              >
+                                {submittingReview ? "Submitting..." : "Submit Review"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setIsWritingProviderReview(false);
+                                  setReviewRating(0);
+                                  setReviewComment("");
+                                }}
+                                disabled={submittingReview}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
