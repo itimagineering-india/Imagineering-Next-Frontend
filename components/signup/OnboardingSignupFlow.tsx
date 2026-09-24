@@ -68,7 +68,7 @@ export function OnboardingSignupFlow() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { refresh } = useAuth();
+  const { refresh, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const typeParam = searchParams?.get("type");
   const initialRole: UserRole | null =
@@ -94,12 +94,22 @@ export function OnboardingSignupFlow() {
   };
 
   const goHome = () => {
-    if (redirectAfterAuth && redirectAfterAuth !== "/") {
-      router.push(redirectAfterAuth);
-    } else {
-      router.push("/");
-    }
+    const next =
+      redirectAfterAuth.startsWith("/") &&
+      !redirectAfterAuth.startsWith("//") &&
+      redirectAfterAuth !== "/login" &&
+      !redirectAfterAuth.startsWith("/login?") &&
+      redirectAfterAuth !== "/signup" &&
+      !redirectAfterAuth.startsWith("/signup")
+        ? redirectAfterAuth
+        : "/";
+    router.replace(next);
   };
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    goHome();
+  }, [authLoading, isAuthenticated, redirectAfterAuth, router]);
 
   const [hydrated, setHydrated] = useState(false);
   const [mainStep, setMainStep] = useState<1 | 2 | 3 | 4>(1);
@@ -580,7 +590,7 @@ export function OnboardingSignupFlow() {
         type="button"
         onClick={() => setUserType(role)}
         className={cn(
-          "relative w-full text-left rounded-2xl border-2 p-5 sm:p-6 transition-all duration-300",
+          "relative w-full text-left rounded-2xl border-2 p-6 sm:p-6 transition-all duration-300",
           "hover:scale-[1.02] hover:shadow-lg",
           selected
             ? "border-[color:var(--primary)] shadow-md ring-2 ring-red-500/20"
@@ -618,7 +628,7 @@ export function OnboardingSignupFlow() {
         type="button"
         onClick={() => setAuthMethod(method)}
         className={cn(
-          "relative w-full rounded-2xl border-2 p-4 sm:p-5 text-left transition-all duration-300",
+          "relative w-full rounded-2xl border-2 p-4 sm:p-6 text-left transition-all duration-300",
           "hover:scale-[1.01] hover:shadow-md",
           selected
             ? "border-red-500 bg-red-50/80 shadow-md ring-1 ring-red-500/20"
@@ -637,7 +647,7 @@ export function OnboardingSignupFlow() {
     );
   };
 
-  if (!hydrated) {
+  if (!hydrated || authLoading || isAuthenticated) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <Header />
@@ -652,8 +662,8 @@ export function OnboardingSignupFlow() {
     <div className="flex min-h-0 flex-1 flex-col">
       <Header />
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row" style={{ backgroundColor: BG }}>
-      <div className="hidden lg:flex lg:w-[46%] max-w-xl flex-col justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-red-950/45 px-10 py-14 text-white xl:px-14">
-        <Link href="/" className="mb-10 inline-flex items-center gap-4 opacity-95 hover:opacity-100">
+      <div className="hidden lg:flex lg:w-[46%] max-w-xl flex-col justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-red-950/45 px-12 py-16 text-white xl:px-16">
+        <Link href="/" className="mb-12 inline-flex items-center gap-4 opacity-95 hover:opacity-100">
           <img src={LOGO_URL} alt="" className="h-16 w-16 shrink-0 object-contain" />
           <span className="text-2xl font-bold">Imagineering India</span>
         </Link>
@@ -672,7 +682,7 @@ export function OnboardingSignupFlow() {
             </p>
           </>
         )}
-        <div className="mt-12 grid max-w-sm grid-cols-3 gap-6 border-t border-white/10 pt-10">
+        <div className="mt-12 grid max-w-sm grid-cols-3 gap-6 border-t border-white/10 pt-12">
           {[
             ["Free", "to start"],
             ["Secure", "payments"],
@@ -686,13 +696,13 @@ export function OnboardingSignupFlow() {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8 lg:py-14">
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-12 sm:px-8 lg:py-16">
         <div className="w-full max-w-lg">
           <div className="mb-6 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={goBack}
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -759,7 +769,7 @@ export function OnboardingSignupFlow() {
                     type="button"
                     onClick={() => setAuthMethod("google")}
                     className={cn(
-                      "relative w-full rounded-2xl border-2 p-4 sm:p-5 text-left transition-all duration-300 hover:scale-[1.01] hover:shadow-md",
+                      "relative w-full rounded-2xl border-2 p-4 sm:p-6 text-left transition-all duration-300 hover:scale-[1.01] hover:shadow-md",
                       authMethod === "google"
                         ? "border-red-500 bg-red-50/80 shadow-md ring-1 ring-red-500/20"
                         : "border-gray-200 bg-white hover:border-red-100"
@@ -845,7 +855,7 @@ export function OnboardingSignupFlow() {
                             setPhoneAlreadyRegistered(false);
                             setError("");
                           }}
-                          className="h-12 rounded-xl pl-10"
+                          className="h-12 rounded-xl pl-12"
                           disabled={isSendingOTP}
                           maxLength={14}
                         />
@@ -946,7 +956,7 @@ export function OnboardingSignupFlow() {
                           placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="h-12 rounded-xl pl-10"
+                          className="h-12 rounded-xl pl-12"
                           disabled={isSendingOTP}
                         />
                       </div>
@@ -1047,7 +1057,7 @@ export function OnboardingSignupFlow() {
                       id="name"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="h-12 rounded-xl pl-10"
+                      className="h-12 rounded-xl pl-12"
                       placeholder="Your name"
                       required
                     />
@@ -1064,7 +1074,7 @@ export function OnboardingSignupFlow() {
                         type="tel"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        className="h-12 rounded-xl pl-10"
+                        className="h-12 rounded-xl pl-12"
                         placeholder="10-digit number"
                         required
                       />
@@ -1082,7 +1092,7 @@ export function OnboardingSignupFlow() {
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="h-12 rounded-xl pl-10"
+                        className="h-12 rounded-xl pl-12"
                         placeholder="you@example.com"
                         required
                       />
@@ -1112,7 +1122,7 @@ export function OnboardingSignupFlow() {
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="h-12 rounded-xl pl-10 pr-10"
+                      className="h-12 rounded-xl pl-12 pr-12"
                       required={authMethod === "email"}
                       minLength={authMethod === "email" ? 6 : undefined}
                     />
@@ -1135,7 +1145,7 @@ export function OnboardingSignupFlow() {
                       type={showConfirmPassword ? "text" : "password"}
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                      className="h-12 rounded-xl pl-10 pr-10"
+                      className="h-12 rounded-xl pl-12 pr-12"
                       required={authMethod === "email"}
                     />
                     <button
@@ -1180,7 +1190,7 @@ export function OnboardingSignupFlow() {
             )}
           </div>
 
-          <p className="mt-10 text-center text-sm text-gray-500">
+          <p className="mt-12 text-center text-sm text-gray-500">
             Already have an account?{" "}
             <Link href={loginHref} className="font-semibold text-red-600 hover:underline">
               Sign in
