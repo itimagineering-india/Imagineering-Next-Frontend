@@ -268,41 +268,62 @@ export default function ProviderBookings() {
     }
   };
 
-  const fetchBookingInvoices = async (bookingId: string) => {
+  const fetchBookingInvoices = async (
+    bookingId: string,
+    bookingMeta?: Record<string, unknown> | null
+  ) => {
     setIsLoadingInvoices(true);
     try {
-      // Fetch all invoice documents for this booking (TAX, PLATFORM_FEE, COMMISSION, etc.)
-      const response = await api.invoices.getAll({ bookingId });
-      // Backend returns { success, data: invoices[], pagination }; some wrappers may use data.data
-      const raw =
-        response && (response as any).success
-          ? (response as any).data
-          : undefined;
-      const invoicesArray = Array.isArray(raw)
-        ? raw
-        : Array.isArray((raw as any)?.data)
-          ? (raw as any).data
-          : [];
-      const providerVisibleInvoices = invoicesArray.filter((invoice: any) => invoice.invoiceType === 'COMMISSION');
+      const rows: any[] = [];
 
-      // Also fetch booking details to check for provider-uploaded invoice
-      const bookingRes = await api.bookings.getById(bookingId);
-      const extraInvoices: any[] = [];
-      if (bookingRes.success && bookingRes.data) {
-        const bookingData = (bookingRes.data as any).booking || (bookingRes.data as any).data?.booking || (bookingRes.data as any);
-        const meta = bookingData?.metadata || {};
-        if (meta.providerInvoiceFileUrl) {
-          extraInvoices.push({
-            _id: `provider-upload-${bookingId}`,
-            invoiceType: 'PROVIDER_UPLOAD',
-            invoiceNumber: meta.providerInvoiceFileName || 'Provider Uploaded Invoice',
-            totalAmount: bookingData.totalAmount || bookingData.amount || 0,
-            providerInvoiceFileUrl: meta.providerInvoiceFileUrl,
-          });
+      try {
+        const res = await api.invoices.getProviderInvoices(1, 200);
+        const raw = (res as any)?.data;
+        const list = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+            ? raw
+            : [];
+        for (const inv of list) {
+          const bid = inv.bookingId?._id
+            ? String(inv.bookingId._id)
+            : String(inv.bookingId || "");
+          if (
+            bid === String(bookingId) &&
+            String(inv.invoiceType || "").toUpperCase() === "COMMISSION"
+          ) {
+            rows.push(inv);
+          }
         }
+      } catch {
+        /* commission list is optional */
       }
 
-      setBookingInvoices([...providerVisibleInvoices, ...extraInvoices]);
+      let meta: Record<string, any> = { ...(bookingMeta || {}) };
+      try {
+        const bookingRes = await api.bookings.getById(bookingId);
+        if (bookingRes.success && bookingRes.data) {
+          const bookingData =
+            (bookingRes.data as any).booking ||
+            (bookingRes.data as any).data?.booking ||
+            (bookingRes.data as any);
+          meta = { ...meta, ...(bookingData?.metadata || {}) };
+        }
+      } catch {
+        /* fall back to list metadata */
+      }
+
+      if (meta.providerInvoiceFileUrl) {
+        rows.push({
+          _id: `provider-upload-${bookingId}`,
+          invoiceType: "PROVIDER_UPLOAD",
+          invoiceNumber: meta.providerInvoiceFileName || "Provider Uploaded Invoice",
+          totalAmount: 0,
+          providerInvoiceFileUrl: meta.providerInvoiceFileUrl,
+        });
+      }
+
+      setBookingInvoices(rows);
     } catch (error) {
       console.error("Failed to fetch booking invoices:", error);
     } finally {
@@ -762,7 +783,7 @@ export default function ProviderBookings() {
   const handleViewDetails = (booking: Booking) => {
     setSelectedBooking(booking);
     setDetailsDialogOpen(true);
-    fetchBookingInvoices(booking.id);
+    fetchBookingInvoices(booking.id, booking.metadata);
   };
 
   const openChatWithBuyer = (booking: Booking) => {
@@ -914,14 +935,11 @@ export default function ProviderBookings() {
                                 ? 'Tax Invoice'
                                 : 'Invoice';
 
+                        const fileUrl = api.invoices.resolveOpenUrl(invoice);
+
                         const handleOpenInvoice = async () => {
-                          if (isProviderUpload && invoice.providerInvoiceFileUrl) {
-                            // Open provider-uploaded invoice directly from its URL (S3)
-                            window.open(invoice.providerInvoiceFileUrl, '_blank');
-                            return;
-                          }
                           try {
-                            await api.invoices.viewPdf({ _id: invoice._id, pdfUrl: invoice.pdfUrl });
+                            await api.invoices.viewPdf(invoice);
                           } catch (error: any) {
                             toast({
                               title: "Error",
@@ -933,21 +951,45 @@ export default function ProviderBookings() {
 
                         return (
                           <Card key={invoice._id} className="border-muted shadow-none">
-                            <CardContent className="p-3 flex items-center justify-between">
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium truncate">{label}</p>
-                                <p className="text-[10px] text-muted-foreground truncate">{invoice.invoiceNumber}</p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0"
-                                onClick={handleOpenInvoice}
-                                title="Open invoice in new tab"
-                                aria-label="Open invoice in new tab"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
+                            <CardContent className="p-3 flex items-center justify-between gap-2">
+                              {fileUrl ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="min-w-0 flex-1 hover:opacity-80"
+                                >
+                                  <p className="text-xs font-medium truncate text-primary hover:underline">{label}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{invoice.invoiceNumber}</p>
+                                </a>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleOpenInvoice}
+                                  className="min-w-0 flex-1 text-left hover:opacity-80"
+                                >
+                                  <p className="text-xs font-medium truncate text-primary hover:underline">{label}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{invoice.invoiceNumber}</p>
+                                </button>
+                              )}
+                              {fileUrl ? (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild title="Open invoice in new tab">
+                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" aria-label="Open invoice in new tab">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={handleOpenInvoice}
+                                  title="Open invoice in new tab"
+                                  aria-label="Open invoice in new tab"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              )}
                             </CardContent>
                           </Card>
                         );
