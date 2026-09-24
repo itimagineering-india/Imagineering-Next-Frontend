@@ -69,42 +69,44 @@ export function PaintShadePicker({ value, onChange, brand }: Props) {
         </div>
       ) : null}
 
-      <div className="space-y-1">
-        <Label htmlFor="paint-shade-code" className="text-sm font-medium">
-          Shade code <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="paint-shade-code"
-          value={value.code}
-          placeholder="e.g. 8234"
-          className="h-10"
-          autoComplete="off"
-          onChange={(e) =>
-            onChange({
-              ...value,
-              code: e.target.value.slice(0, 40),
-            })
-          }
-        />
-      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,9rem)_1fr]">
+        <div className="space-y-1">
+          <Label htmlFor="paint-shade-code" className="text-sm font-medium">
+            Shade code <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="paint-shade-code"
+            value={value.code}
+            placeholder="e.g. 8234"
+            className="h-10"
+            autoComplete="off"
+            onChange={(e) =>
+              onChange({
+                ...value,
+                code: e.target.value.slice(0, 40),
+              })
+            }
+          />
+        </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="paint-shade-name" className="text-sm font-medium">
-          Shade name
-        </Label>
-        <Input
-          id="paint-shade-name"
-          value={value.name}
-          placeholder="e.g. Morning Mist"
-          className="h-10"
-          autoComplete="off"
-          onChange={(e) =>
-            onChange({
-              ...value,
-              name: e.target.value.slice(0, 120),
-            })
-          }
-        />
+        <div className="space-y-1">
+          <Label htmlFor="paint-shade-name" className="text-sm font-medium">
+            Shade name
+          </Label>
+          <Input
+            id="paint-shade-name"
+            value={value.name}
+            placeholder="e.g. Morning Mist"
+            className="h-10"
+            autoComplete="off"
+            onChange={(e) =>
+              onChange({
+                ...value,
+                name: e.target.value.slice(0, 120),
+              })
+            }
+          />
+        </div>
       </div>
 
       <PaintShadeBrowseModal
