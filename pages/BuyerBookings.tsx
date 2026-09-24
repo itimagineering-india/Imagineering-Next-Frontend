@@ -305,10 +305,6 @@ export default function BuyerBookings() {
   };
 
   const handleViewInvoice = async (inv: any) => {
-    if (inv.invoiceType === 'PROVIDER_UPLOAD' && inv.providerInvoiceFileUrl) {
-      window.open(inv.providerInvoiceFileUrl, '_blank');
-      return;
-    }
     setViewingInvoice(inv._id);
     try {
       await api.invoices.viewPdf(inv);
@@ -1945,12 +1941,14 @@ export default function BuyerBookings() {
                           const amount =
                             inv.totalAmount ?? inv.amount ?? inv.metadata?.totalAmountWithGst ?? 0;
 
+                          const fileUrl = api.invoices.resolveOpenUrl(inv);
+
                           const handleDownload = () => {
-                            if (isProviderUpload && inv.providerInvoiceFileUrl) {
-                              window.open(inv.providerInvoiceFileUrl, "_blank");
+                            if (fileUrl) {
+                              window.open(fileUrl, "_blank", "noopener,noreferrer");
                               return;
                             }
-                            handleDownloadInvoiceById(inv._id, inv.invoiceNumber);
+                            handleViewInvoice(inv);
                           };
 
                           return (
@@ -1958,6 +1956,21 @@ export default function BuyerBookings() {
                               key={inv._id}
                               className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
                             >
+                              {fileUrl ? (
+                                <a
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                                >
+                                  <p className="text-sm font-medium text-primary hover:underline">{label}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {(inv.invoiceNumber || "N/A") +
+                                      " · ₹" +
+                                      Number(amount).toLocaleString()}
+                                  </p>
+                                </a>
+                              ) : (
                               <button
                                 type="button"
                                 onClick={() => handleViewInvoice(inv)}
@@ -1971,21 +1984,30 @@ export default function BuyerBookings() {
                                     Number(amount).toLocaleString()}
                                 </p>
                               </button>
+                              )}
                               <div className="flex items-center gap-1 shrink-0">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 px-2"
-                                  onClick={() => handleViewInvoice(inv)}
-                                  disabled={viewingInvoice === inv._id}
-                                  title="Open in new tab"
-                                >
-                                  {viewingInvoice === inv._id ? (
-                                    <Clock className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <ExternalLink className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                {fileUrl ? (
+                                  <Button size="sm" variant="ghost" className="h-8 px-2" asChild title="Open in new tab">
+                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2"
+                                    onClick={() => handleViewInvoice(inv)}
+                                    disabled={viewingInvoice === inv._id}
+                                    title="Open in new tab"
+                                  >
+                                    {viewingInvoice === inv._id ? (
+                                      <Clock className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <ExternalLink className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
