@@ -141,7 +141,7 @@ export default function BuyerBookings() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -325,13 +325,21 @@ export default function BuyerBookings() {
 
   useEffect(() => {
     const invoiceId = String(searchParams?.get("invoiceId") || "").trim();
-    if (!invoiceId || !user) return;
+    if (!invoiceId || authLoading) return;
+    if (!isAuthenticated || !user) {
+      const next = `/buyer/orders?invoiceId=${encodeURIComponent(invoiceId)}`;
+      router.replace(`/login?redirect=${encodeURIComponent(next)}`);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
         const res = await api.invoices.getById(invoiceId);
-        const inv = (res as { data?: unknown })?.data ?? res;
-        if (cancelled || !inv || typeof inv !== "object") return;
+        const payload = (res as { data?: { invoice?: unknown } })?.data;
+        const inv = (payload as { invoice?: unknown } | undefined)?.invoice ?? payload;
+        if (!res.success || cancelled || !inv || typeof inv !== "object" || !(inv as { _id?: string })._id) {
+          throw new Error((res as { error?: { message?: string } })?.error?.message || "Invoice not found");
+        }
         await handleViewInvoice(inv);
         router.replace("/buyer/orders", { scroll: false });
       } catch {
@@ -347,7 +355,7 @@ export default function BuyerBookings() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, user]);
+  }, [searchParams, user, authLoading, isAuthenticated, router, toast]);
 
   // Buyers can download individual invoices from the booking details (eye) modal
   const handleDownloadInvoiceById = async (invoiceId: string, invoiceNumber?: string) => {
