@@ -10,12 +10,10 @@ import {
   Home,
   MapPin,
   Phone,
-  ReceiptText,
   Share2,
   ShieldCheck,
   Star,
   TrendingUp,
-  Truck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -163,13 +161,6 @@ export function ConstructionMaterialProductLayout({
       ? `${service.description.slice(0, 320).trim()}…`
       : service.description;
 
-  const quickInfo = [
-    { icon: Truck, label: "Same Day Delivery", sub: "In select areas" },
-    { icon: ReceiptText, label: "GST Invoice", sub: "Available" },
-    { icon: BadgeCheck, label: "Min Order", sub: "Ask supplier" },
-    { icon: ShieldCheck, label: "Easy Returns", sub: "As per policy" },
-  ];
-
   const similarPath = (slugOrId: string) =>
     `${similarHrefBase.replace(/\/$/, "")}/${encodeURIComponent(slugOrId)}`;
 
@@ -250,19 +241,6 @@ export function ConstructionMaterialProductLayout({
                     </Badge>
                   )}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {quickInfo.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={item.label} className="rounded-lg border bg-slate-50/80 px-2 py-2 text-center">
-                      <Icon className="mx-auto h-4 w-4 text-primary" />
-                      <p className="mt-1 text-[11px] font-semibold leading-tight">{item.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{item.sub}</p>
-                    </div>
-                  );
-                })}
               </div>
 
               {onAddToQuote ? (
