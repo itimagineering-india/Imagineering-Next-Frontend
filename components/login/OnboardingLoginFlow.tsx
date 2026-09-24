@@ -45,7 +45,7 @@ export function OnboardingLoginFlow() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { refresh } = useAuth();
+  const { refresh, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const redirectUrl = searchParams?.get("redirect") || "/";
   const signupHref =
@@ -65,12 +65,20 @@ export function OnboardingLoginFlow() {
   };
 
   const handleRedirect = () => {
-    if (redirectUrl && redirectUrl !== "/") {
-      router.push(redirectUrl);
-    } else {
-      router.push("/");
-    }
+    const next =
+      redirectUrl.startsWith("/") &&
+      !redirectUrl.startsWith("//") &&
+      redirectUrl !== "/login" &&
+      !redirectUrl.startsWith("/login?")
+        ? redirectUrl
+        : "/";
+    router.replace(next);
   };
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    handleRedirect();
+  }, [authLoading, isAuthenticated, redirectUrl, router]);
 
   const [hydrated, setHydrated] = useState(false);
   const [mainStep, setMainStep] = useState<1 | 2>(1);
@@ -389,7 +397,7 @@ export function OnboardingLoginFlow() {
     );
   };
 
-  if (!hydrated) {
+  if (!hydrated || authLoading || isAuthenticated) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <Header />
