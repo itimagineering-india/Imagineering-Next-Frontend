@@ -3511,35 +3511,34 @@ export const api = {
       a.click();
       URL.revokeObjectURL(url);
     },
-    /** Open invoice PDF in new tab for viewing. Uses pdfUrl if available (S3 or backend static), else fetches from API. */
-    viewPdf: async (invoice: { _id: string; pdfUrl?: string }): Promise<void> => {
-      const raw = invoice.pdfUrl?.trim();
-      if (raw) {
-        const url = /^https?:\/\//i.test(raw)
-          ? raw
-          : raw.startsWith('/')
-            ? `${API_BASE_URL.replace(/\/$/, '')}${raw}`
-            : null;
-        if (url) {
-          window.open(url, '_blank', 'noopener,noreferrer');
-          return;
-        }
+    resolveOpenUrl: (invoice?: {
+      pdfUrl?: string;
+      providerInvoiceFileUrl?: string;
+    } | null): string | null => {
+      if (!invoice) return null;
+      const raw = String(invoice.providerInvoiceFileUrl || invoice.pdfUrl || "").trim();
+      if (!raw || /^blob:/i.test(raw)) return null;
+      if (/^https?:\/\//i.test(raw)) return raw;
+      if (raw.startsWith("/")) return `${API_BASE_URL.replace(/\/$/, "")}${raw}`;
+      return null;
+    },
+    /** Open invoice file in a new tab using the stored S3/CloudFront URL (never blob:). */
+    viewPdf: async (invoice: {
+      _id?: string;
+      pdfUrl?: string;
+      providerInvoiceFileUrl?: string;
+    }): Promise<void> => {
+      let url = api.invoices.resolveOpenUrl(invoice);
+      if (!url && invoice._id && !String(invoice._id).startsWith("provider-upload")) {
+        const res = await apiRequest<{ invoice?: { pdfUrl?: string } }>(
+          `/api/invoices/${invoice._id}`
+        );
+        const payload = (res as { data?: { invoice?: { pdfUrl?: string } } })?.data;
+        const fetched = payload?.invoice ?? payload;
+        url = api.invoices.resolveOpenUrl(fetched as { pdfUrl?: string });
       }
-      const token = getAuthToken();
-      const headers: HeadersInit = { ...bearerAuthHeaders(token) };
-      const response = await fetch(`${API_BASE_URL}/api/invoices/${invoice._id}/download`, {
-        headers,
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error('Failed to load invoice');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const w = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!w) {
-        URL.revokeObjectURL(url);
-        throw new Error('Please allow popups to view the invoice');
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      if (!url) throw new Error("Invoice file URL is not available");
+      window.open(url, "_blank", "noopener,noreferrer");
     },
   },
 
