@@ -15,6 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api-client";
 import { Upload, FileText, X, Eye } from "lucide-react";
+import Link from "next/link";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -195,6 +196,17 @@ export default function ProviderPayouts() {
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-xl font-bold md:text-2xl">Payouts</h1>
+            <p className="text-sm text-muted-foreground">
+              Bank KYC and payout history. COD dues live on the settlement ledger.
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard/provider/settlement">Settlement ledger →</Link>
+          </Button>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Payout KYC</CardTitle>
