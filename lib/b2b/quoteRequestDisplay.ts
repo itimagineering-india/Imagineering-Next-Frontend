@@ -41,6 +41,32 @@ export function quoteOfferIsRevised(
   return Number.isFinite(created) && Number.isFinite(updated) && updated > created + 2000;
 }
 
+/** How many times the supplier revised after first submit (legacy revised offers → at least 1). */
+export function quoteOfferRevisionCount(
+  offer: { revisionCount?: number; isRevised?: boolean; createdAt?: string | Date; updatedAt?: string | Date } | null | undefined
+): number {
+  const n = Number(offer?.revisionCount);
+  if (Number.isFinite(n) && n > 0) return Math.floor(n);
+  return quoteOfferIsRevised(offer) ? 1 : 0;
+}
+
+export function formatRevisedOfferTooltip(
+  offer: { revisionCount?: number; isRevised?: boolean; createdAt?: string | Date; updatedAt?: string | Date } | null | undefined
+): string {
+  const count = quoteOfferRevisionCount(offer);
+  if (count <= 0) return "";
+  const times = count === 1 ? "1 time" : `${count} times`;
+  const updated = offer?.updatedAt ? new Date(offer.updatedAt) : null;
+  if (!updated || Number.isNaN(updated.getTime())) return `Revised ${times}`;
+  const when = updated.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `Revised ${times} · Last revised ${when}`;
+}
+
 /** Sum of line quantities on an offer (falls back to single `quantity` when no lines). */
 export function quoteOfferTotalQuantity(
   offer: { items?: QuoteOfferItemLike[] | null; quantity?: number } | null | undefined
