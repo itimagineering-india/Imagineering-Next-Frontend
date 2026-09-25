@@ -26,6 +26,7 @@ import {
   Bell,
   HelpCircle,
   Store,
+  Scale,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +50,7 @@ const providerNavItems = [
   { label: "Notifications", href: "/dashboard/provider/notifications", icon: Bell },
   { label: "Support", href: "/dashboard/provider/support", icon: HelpCircle },
   { label: "Earnings", href: "/dashboard/provider/earnings", icon: CreditCard },
+  { label: "Settlement", href: "/dashboard/provider/settlement", icon: Scale },
   { label: "Payouts", href: "/dashboard/provider/payouts", icon: Store },
   { label: "Subscription", href: "/dashboard/provider/subscription", icon: Crown },
   { label: "Settings", href: "/dashboard/provider/settings", icon: Settings },
