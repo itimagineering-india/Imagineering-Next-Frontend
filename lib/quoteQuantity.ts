@@ -1,7 +1,7 @@
 /** Quote / RFQ line quantity — B2B materials may be fractional (e.g. 2.5 tonnes). */
 
 export const QUOTE_QTY_MIN = 0.01;
-export const QUOTE_QTY_MAX = 999999;
+export const QUOTE_QTY_MAX = 999999999;
 const QUOTE_QTY_DECIMALS = 3;
 /** Per-unit offer rates — up to 3 decimal places (e.g. ₹50.125). */
 const QUOTE_UNIT_PRICE_DECIMALS = 3;
@@ -23,7 +23,7 @@ export function clampQuoteQuantity(n: number): number {
 
 /** Keep in-progress typing like "2." or "0.5" (max 3 decimal places). */
 export function sanitizeQuoteQuantityInput(txt: string): string {
-  return sanitizeQuoteDecimalInput(txt, QUOTE_QTY_DECIMALS, 7);
+  return sanitizeQuoteDecimalInput(txt, QUOTE_QTY_DECIMALS, 9);
 }
 
 /** Keep in-progress unit-price typing like "50." or "12.125" (max 3 decimals). */
