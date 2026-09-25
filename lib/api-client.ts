@@ -617,6 +617,30 @@ export const api = {
         });
       },
       getPayouts: () => apiRequest('/api/provider/payouts'),
+      getSettlement: () => apiRequest('/api/provider/settlement/me'),
+      getSettlementEntries: (params?: { page?: number; limit?: number; status?: string }) => {
+        const q = new URLSearchParams();
+        if (params?.page != null) q.set('page', String(params.page));
+        if (params?.limit != null) q.set('limit', String(params.limit));
+        if (params?.status) q.set('status', params.status);
+        const qs = q.toString() ? `?${q}` : '';
+        return apiRequest(`/api/provider/settlement/me/entries${qs}`);
+      },
+      createSettlementPayOrder: (payload?: { amount?: number }) =>
+        apiRequest('/api/provider/settlement/pay', {
+          method: 'POST',
+          body: JSON.stringify(payload || {}),
+        }),
+      verifySettlementPayment: (payload: {
+        razorpayOrderId: string;
+        razorpayPaymentId: string;
+        razorpaySignature: string;
+        paymentId: string;
+      }) =>
+        apiRequest('/api/provider/settlement/verify', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }),
     },
     admin: {
       getKyc: () => apiRequest('/api/admin/kyc/payouts'),
