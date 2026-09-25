@@ -339,6 +339,7 @@ export default function ProviderDashboard() {
             { label: "Notifications", href: "/dashboard/provider/notifications", icon: DASHBOARD_ICONS.notifications },
             { label: "Support", href: "/dashboard/provider/support", icon: DASHBOARD_ICONS.support },
             { label: "Earnings", href: "/dashboard/provider/earnings", icon: DASHBOARD_ICONS.earnings },
+            { label: "Settlement", href: "/dashboard/provider/settlement", icon: DASHBOARD_ICONS.earnings },
             { label: "Payouts", href: "/dashboard/provider/payouts", icon: DASHBOARD_ICONS.payouts },
             { label: "Subscription", href: "/dashboard/provider/subscription", icon: DASHBOARD_ICONS.subscription },
             { label: "Settings", href: "/dashboard/provider/settings", icon: DASHBOARD_ICONS.settings },
