@@ -171,6 +171,9 @@ export default function ProviderEarnings() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button asChild variant="outline" size="sm" className="text-xs md:text-sm">
+              <Link href="/dashboard/provider/settlement">Settlement</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="text-xs md:text-sm">
               <Link href="/dashboard/provider/payouts">Payouts</Link>
             </Button>
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
