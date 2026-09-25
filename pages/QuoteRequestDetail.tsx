@@ -11,9 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { clearActiveQuoteRequest, setActiveQuoteRequest } from "@/lib/activeQuoteRequest";
 import { subscribeToQuoteRequest } from "@/lib/quoteRealtime";
-import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferIsRevised, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow, type QuoteRequestItemLike } from "@/lib/b2b/quoteRequestDisplay";
+import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferIsRevised, formatRevisedOfferTooltip, quoteOfferTotalQuantity, quoteRequestHeadline, quoteRequestItems, isTimedQuoteWindow, type QuoteRequestItemLike } from "@/lib/b2b/quoteRequestDisplay";
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -65,7 +66,8 @@ function printLiveQuotesSummary(opts: {
     .map((item) => {
       const qty = Number(item.quantity || 1);
       const qtyLabel = formatQuoteQtyLabel(qty, item.priceType);
-      return `<tr><td>${escapeHtml(item.title)}</td><td class="num">${escapeHtml(qtyLabel)}</td></tr>`;
+      const name = [item.title, item.variantLabel].filter(Boolean).join(" · ");
+      return `<tr><td>${escapeHtml(name)}</td><td class="num">${escapeHtml(qtyLabel)}</td></tr>`;
     })
     .join("");
 
@@ -77,18 +79,34 @@ function printLiveQuotesSummary(opts: {
       const material = Number(offer.materialAmount ?? (offer.amount || 0));
       const delivery = Number(offer.deliveryCharge || 0);
       const gst = Number(offer.gstAmount || 0);
+      const score = Number(offer.offerScore || 0);
       const provider =
         offer.providerName || offer.provider?.businessName || offer.provider?.name || `Offer ${index + 1}`;
       const lineItems = quoteOfferItems(offer);
+      const totalQty = quoteOfferTotalQuantity(offer);
+      const totalQtyLabel = formatOfferTotalQtyLabel(totalQty);
+      const totalQtyValue = totalQtyLabel.replace(/^Total qty /, "");
+      const totalSub = [
+        offer.isPartial
+          ? "Total for available items only · material + GST + delivery"
+          : gst > 0
+            ? "Total · material + GST + delivery"
+            : "Total · material + delivery",
+        totalQtyLabel || "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
       const linesHtml =
         lineItems.length > 0
           ? `<table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Line total</th></tr></thead><tbody>${lineItems
               .map((item) => {
                 const qty = Number(item.quantity || 1);
+                const qtyLabel = formatQuoteQtyLabel(qty, (item as any).priceType);
                 if (item.unavailable) {
                   return `<tr>
                   <td>${escapeHtml(item.title)} <em>(not available)</em></td>
-                  <td class="num">${escapeHtml(qty)}</td>
+                  <td class="num">${escapeHtml(qtyLabel)}</td>
                   <td class="num">—</td>
                   <td class="num">—</td>
                 </tr>`;
@@ -97,25 +115,42 @@ function printLiveQuotesSummary(opts: {
                 const lineTotal = Number(item.lineTotal || unit * qty);
                 return `<tr>
                   <td>${escapeHtml(item.title)}</td>
-                  <td class="num">${escapeHtml(qty)}</td>
+                  <td class="num">${escapeHtml(qtyLabel)}</td>
                   <td class="num">${escapeHtml(formatINR(unit))}</td>
                   <td class="num">${escapeHtml(formatINR(lineTotal))}</td>
                 </tr>`;
               })
-              .join("")}</tbody></table>`
-          : "";
+              .join("")}${
+              totalQty > 0
+                ? `<tr class="total-qty-row"><td colspan="3">Total quantity</td><td class="num">${escapeHtml(totalQtyValue)}</td></tr>`
+                : ""
+            }</tbody></table>`
+          : totalQty > 0
+            ? `<table class="summary"><tr><td>Total quantity</td><td class="num">${escapeHtml(totalQtyValue)}</td></tr></table>`
+            : "";
+
       const deliveryLabel =
         offer.deliveryOption === "not_available"
           ? "Not available"
           : delivery > 0
             ? formatINR(delivery)
             : "Free";
+
+      const trustBits = [
+        offer.verified ? "Verified" : "",
+        offer.rating != null ? `★ ${Number(offer.rating).toFixed(1)}` : "",
+        offer.successfulDeliveries != null ? `${offer.successfulDeliveries} deliveries` : "",
+        offer.onTimePercent != null ? `${offer.onTimePercent}% on-time` : "",
+        offer.gstLabel ? String(offer.gstLabel) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
       const badges = [
         offer.isRecommended ? "Recommended" : "",
         offer.isPartial ? offer.coverageLabel || "Partial quote" : "",
         quoteOfferIsRevised(offer) ? "Revised quote" : "",
-        offer.verified ? "Verified" : "",
-        offer.gstLabel ? String(offer.gstLabel) : "",
+        offer.status === "selected" ? "Selected" : "",
       ]
         .filter(Boolean)
         .join(" · ");
@@ -123,14 +158,22 @@ function printLiveQuotesSummary(opts: {
       return `<section class="offer">
         <h3>${escapeHtml(provider)}${offer.isRecommended ? ' <span class="badge">Recommended</span>' : ""}${
           offer.isPartial ? ' <span class="badge partial">Partial</span>' : ""
-        }${quoteOfferIsRevised(offer) ? ' <span class="badge revised">Revised</span>' : ""}</h3>
+        }${quoteOfferIsRevised(offer) ? ' <span class="badge revised">Revised</span>' : ""}${
+          offer.status === "selected" ? ' <span class="badge selected">Selected</span>' : ""
+        }</h3>
         ${badges ? `<p class="meta">${escapeHtml(badges)}</p>` : ""}
         <p class="total">${escapeHtml(formatINR(total))}</p>
+        <p class="sub-total">${escapeHtml(totalSub)}</p>
+        ${score > 0 ? `<p class="score">Offer score: <strong>${escapeHtml(score)}</strong></p>` : ""}
+        ${trustBits ? `<p class="meta">${escapeHtml(trustBits)}</p>` : ""}
         <table class="summary">
           <tr><td>Material</td><td class="num">${escapeHtml(formatINR(material))}</td></tr>
           <tr><td>Delivery</td><td class="num">${escapeHtml(deliveryLabel)}</td></tr>
-          <tr><td>GST${offer.gstPercent != null && Number(offer.gstPercent) > 0 ? ` (${escapeHtml(offer.gstPercent)}%)` : ""}</td><td class="num">${escapeHtml(gst > 0 ? formatINR(gst) : "—")}</td></tr>
-          <tr><td>ETA</td><td class="num">${escapeHtml(offer.estimatedDelivery || "—")}</td></tr>
+          <tr><td>GST${offer.gstPercent != null && Number(offer.gstPercent) > 0 ? ` (${escapeHtml(offer.gstPercent)}%)` : ""}</td><td class="num">${escapeHtml(
+            gst > 0 ? formatINR(gst) : offer.gstLabel || "—"
+          )}</td></tr>
+          <tr><td>Transport</td><td class="num">${escapeHtml(offer.transportLabel || "Supplier transport")}</td></tr>
+          <tr><td>ETA</td><td class="num">${escapeHtml(offer.estimatedDelivery || "Confirm on select")}</td></tr>
         </table>
         ${linesHtml}
         ${offer.notes ? `<p class="notes">${escapeHtml(offer.notes)}</p>` : ""}
@@ -151,18 +194,22 @@ function printLiveQuotesSummary(opts: {
     h3 { font-size: 14px; margin: 0 0 4px; }
     .brand { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #78716c; font-weight: 700; }
     .sub { color: #57534e; margin: 6px 0 0; }
+    .sub-total { color: #57534e; margin: 0 0 6px; font-size: 11px; }
+    .score { margin: 0 0 6px; color: #44403c; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 6px 4px; vertical-align: top; border-bottom: 1px solid #e7e5e4; }
     th { font-size: 11px; color: #78716c; font-weight: 600; }
     .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .offer { break-inside: avoid; border: 1px solid #d6d3d1; border-radius: 10px; padding: 12px; margin: 12px 0; }
-    .total { font-size: 22px; font-weight: 800; margin: 6px 0 8px; }
+    .total { font-size: 22px; font-weight: 800; margin: 6px 0 2px; }
     .badge { display: inline-block; font-size: 10px; font-weight: 700; background: #fef3c7; color: #78350f; padding: 2px 6px; border-radius: 999px; }
     .badge.partial { background: #ffedd5; color: #9a3412; }
     .badge.revised { background: #ccfbf1; color: #0f766e; }
+    .badge.selected { background: #dcfce7; color: #166534; }
     .meta, .notes { color: #57534e; margin: 4px 0 0; }
     .summary { margin-bottom: 8px; }
     .lines { margin-top: 6px; }
+    .total-qty-row td { font-weight: 700; border-bottom: none; padding-top: 10px; }
     .footer { margin-top: 24px; color: #a8a29e; font-size: 10px; }
     @media print {
       body { margin: 12mm; }
@@ -284,6 +331,7 @@ function OfferCard({
   const recommended = Boolean(offer.isRecommended);
   const isPartial = Boolean(offer.isPartial);
   const isRevised = quoteOfferIsRevised(offer);
+  const revisedTooltip = formatRevisedOfferTooltip(offer);
   const coverageLabel = String(offer.coverageLabel || "").trim();
   const lineItems = quoteOfferItems(offer);
   const totalQty = quoteOfferTotalQuantity(offer);
@@ -311,9 +359,21 @@ function OfferCard({
             </span>
           ) : null}
           {isRevised ? (
-            <span className="inline-flex rounded-full bg-teal-100 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
-              Revised quote
-            </span>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className="inline-flex cursor-help rounded-full bg-teal-100 px-2.5 py-1 text-[11px] font-semibold text-teal-800"
+                    title={revisedTooltip}
+                  >
+                    Revised quote
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  {revisedTooltip}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           ) : null}
         </div>
         {(offer.providerName || offer.provider?.name || offer.provider?.businessName) ? (
