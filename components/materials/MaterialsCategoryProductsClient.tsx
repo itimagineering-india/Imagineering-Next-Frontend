@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Filter, Loader2, Search, SlidersHorizontal } from "lucide-react";
@@ -29,7 +29,8 @@ import {
   type MaterialsProductSort,
 } from "@/lib/materials/constructionMaterialsCatalog";
 import {
-  fetchCatalogProductsByCategory,
+  CATALOG_CATEGORY_PAGE_SIZE,
+  fetchCatalogProductsPage,
   findServiceIdForCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
 
@@ -48,8 +49,13 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
   const title = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [products, setProducts] = useState<MaterialsProduct[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sort, setSort] = useState<MaterialsProductSort>("relevance");
   const [filters, setFilters] = useState<MaterialsProductFilters>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -60,16 +66,41 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
     title: string;
     priceType?: string;
   } | null>(null);
+  const requestSeqRef = useRef(0);
+  const loadMoreLockRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreRef = useRef<() => void>(() => {});
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
+  const load = useCallback(
+    async (opts?: { page?: number; append?: boolean }) => {
+      const nextPage = Math.max(1, opts?.page ?? 1);
+      const append = Boolean(opts?.append) && nextPage > 1;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      const seq = ++requestSeqRef.current;
       try {
-        const list = await fetchCatalogProductsByCategory(key);
-        if (!cancelled) setProducts(list);
+        const result = await fetchCatalogProductsPage({
+          categoryId: key,
+          page: nextPage,
+          limit: CATALOG_CATEGORY_PAGE_SIZE,
+          search: debouncedQuery,
+        });
+        if (seq !== requestSeqRef.current) return;
+        setPage(result.page);
+        setTotal(result.total);
+        setHasMore(result.page < result.pages && result.products.length > 0);
+        setProducts((prev) => {
+          if (!append) return result.products;
+          const seen = new Set(prev.map((p) => p.id));
+          const extra = result.products.filter((p) => p.id && !seen.has(p.id));
+          return extra.length ? [...prev, ...extra] : prev;
+        });
       } catch {
-        if (!cancelled) {
+        if (seq !== requestSeqRef.current) return;
+        if (!append) {
+          setProducts([]);
+          setTotal(0);
+          setHasMore(false);
           toast({
             title: t("loadErrorTitle"),
             description: t("loadErrorBody"),
@@ -77,13 +108,25 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
           });
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (seq === requestSeqRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [key, t, toast]);
+    },
+    [debouncedQuery, key, t, toast]
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    void load({ page: 1 });
+  }, [load]);
 
   const brands = useMemo(() => {
     const set = new Set(products.map((p) => p.brand).filter(Boolean));
@@ -95,6 +138,41 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
     const filtered = applyMaterialsProductFilters(searched, filters);
     return sortMaterialsProducts(filtered, sort);
   }, [filters, products, query, sort]);
+
+  const filterActive = Boolean(
+    (filters.brands?.length ?? 0) > 0 ||
+      filters.minRating != null ||
+      filters.priceMode != null
+  );
+  const displayedCount = filterActive ? visible.length : total > 0 ? total : visible.length;
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    if (query.trim() !== debouncedQuery) return;
+    if (loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    void load({ page: page + 1, append: true }).finally(() => {
+      window.setTimeout(() => {
+        loadMoreLockRef.current = false;
+      }, 300);
+    });
+  }, [debouncedQuery, hasMore, load, loading, loadingMore, page, query]);
+
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreRef.current();
+      },
+      { rootMargin: "240px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, visible.length]);
 
   const handleProductCta = useCallback(
     async (product: MaterialsProduct) => {
@@ -169,7 +247,9 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
                     {title}
                   </h1>
                   <span className="text-xs font-medium text-slate-400">
-                    {loading ? t("loading") : t("productsCount", { count: visible.length })}
+                    {loading && products.length === 0
+                      ? t("loading")
+                      : t("productsCount", { count: displayedCount })}
                   </span>
                 </div>
               </div>
@@ -306,7 +386,7 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
       </div>
 
       <div className="home-shell py-4 md:py-6">
-        {loading ? (
+        {loading && products.length === 0 ? (
           <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin" />
             {t("loading")}
@@ -316,16 +396,24 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
             {t("emptyProducts")}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {visible.map((product) => (
-              <MaterialsProductCard
-                key={product.id}
-                product={product}
-                onCta={handleProductCta}
-                ctaLoading={ctaLoadingId === product.id}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visible.map((product) => (
+                <MaterialsProductCard
+                  key={product.id}
+                  product={product}
+                  onCta={handleProductCta}
+                  ctaLoading={ctaLoadingId === product.id}
+                />
+              ))}
+            </div>
+            <div ref={sentinelRef} className="h-8" />
+            {loadingMore ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 
