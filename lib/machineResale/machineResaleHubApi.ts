@@ -255,13 +255,53 @@ export async function fetchResaleHubData(): Promise<ResaleHubData> {
   return { categories, machines, providers };
 }
 
+export async function fetchResaleMachinesPage(params: {
+  categoryId: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ machines: ResaleMachine[]; page: number; pages: number; total: number }> {
+  const key = slugifyResaleId(params.categoryId) || String(params.categoryId || "").trim();
+  const page = Math.max(1, params.page || 1);
+  const limit = Math.min(100, Math.max(1, params.limit || 20));
+  const empty = { machines: [] as ResaleMachine[], page, pages: 1, total: 0 };
+  if (!key) return empty;
+  try {
+    for (const slug of RESALE_CATEGORY_SLUG_ALIASES) {
+      const res = await api.services.getAll({
+        category: slug,
+        subcategory: key,
+        limit,
+        page,
+        sort: "-rating",
+      });
+      if (!res?.success) continue;
+      const list = (res.data as { services?: unknown } | undefined)?.services;
+      if (!Array.isArray(list) || list.length === 0) continue;
+      const mapped = uniqueById(
+        list
+          .filter((row) => isResaleListingRow(row as RawRow))
+          .map((row) => mapMachine(row as RawRow, key))
+          .filter(Boolean) as ResaleMachine[]
+      ).filter((m) => m.available !== false);
+      const pag =
+        (res as { pagination?: { page?: number; pages?: number; total?: number } }).pagination ||
+        (res.data as { pagination?: { page?: number; pages?: number; total?: number } } | undefined)?.pagination;
+      if (mapped.length > 0 || Number(pag?.total) > 0) {
+        return {
+          machines: mapped,
+          page: Number(pag?.page) || page,
+          pages: Math.max(1, Number(pag?.pages) || 1),
+          total: Number(pag?.total) || mapped.length,
+        };
+      }
+    }
+  } catch {
+    return empty;
+  }
+  return empty;
+}
+
 export async function fetchResaleMachinesByCategory(categoryId: string): Promise<ResaleMachine[]> {
-  const key = slugifyResaleId(categoryId) || String(categoryId || "").trim();
-  if (!key) return [];
-  const hub = await fetchResaleHubData();
-  return hub.machines.filter(
-    (m) =>
-      m.available !== false &&
-      (m.categoryId === key || slugifyResaleId(m.categoryName || "") === key)
-  );
+  const result = await fetchResaleMachinesPage({ categoryId, page: 1, limit: 100 });
+  return result.machines;
 }
