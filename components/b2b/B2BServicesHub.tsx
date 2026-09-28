@@ -29,14 +29,14 @@ import {
   type B2bCategoryLike,
 } from "@/lib/b2b/b2bCategories";
 import {
+  CATALOG_CATEGORY_PAGE_SIZE,
   fetchCatalogProductPriceType,
-  fetchMaterialsHubData,
+  fetchCatalogProductsPage,
   findServiceIdForCatalogProduct,
-  listAllCatalogProducts,
-  mapCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
 import {
-  slugifyMaterialsId,
+  MATERIALS_CATEGORY_SLUG,
+  resolveMaterialsMaterialTypeKey,
   type MaterialsProduct,
 } from "@/lib/materials/constructionMaterialsCatalog";
 import {
@@ -93,69 +93,6 @@ function listingImage(row: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function productMatchesQuery(product: MaterialsProduct, q: string): boolean {
-  const n = q.toLowerCase();
-  return [product.name, product.brand, product.grade, product.shortDescription, product.categoryId].some((v) =>
-    String(v || "")
-      .toLowerCase()
-      .includes(n)
-  );
-}
-
-function listingMatchesQuery(item: ListingCard, q: string): boolean {
-  const n = q.toLowerCase();
-  return [item.title, item.subcategory].some((v) =>
-    String(v || "")
-      .toLowerCase()
-      .includes(n)
-  );
-}
-
-/** Normalize subcategory keys so hand_tools / hand-tools / "Hand Tools" all match. */
-function normalizeB2bSubKey(raw: string): string {
-  return String(raw || "")
-    .toLowerCase()
-    .trim()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
-}
-
-function filterCatalogBySubcategory(
-  products: MaterialsProduct[],
-  activeSub: string | null,
-  hubCategories: { id: string; name: string }[]
-): MaterialsProduct[] {
-  if (!activeSub) return products;
-  const want = normalizeB2bSubKey(activeSub);
-  if (!want) return products;
-  const slug = slugifyMaterialsId(activeSub);
-  const matchingCatIds = new Set(
-    hubCategories
-      .filter(
-        (c) =>
-          normalizeB2bSubKey(c.name) === want ||
-          normalizeB2bSubKey(c.id) === want
-      )
-      .map((c) => c.id)
-  );
-  const subLabel = activeSub.toLowerCase().trim();
-  return products.filter((p) => {
-    const cid = normalizeB2bSubKey(p.categoryId);
-    const subKey = normalizeB2bSubKey(p.subcategory || "");
-    return (
-      matchingCatIds.has(p.categoryId) ||
-      cid === want ||
-      subKey === want ||
-      p.categoryId === slug ||
-      normalizeB2bSubKey(p.categoryId) === normalizeB2bSubKey(slug) ||
-      (subLabel.length >= 3 && p.name.toLowerCase().includes(subLabel)) ||
-      (subLabel.length >= 3 && String(p.subcategory || "").toLowerCase().includes(subLabel))
-    );
-  });
-}
-
 function mapServiceRowsToListings(rows: unknown[]): ListingCard[] {
   return rows
     .map((row): ListingCard | null => {
@@ -179,31 +116,37 @@ function mapServiceRowsToListings(rows: unknown[]): ListingCard[] {
     .filter((x): x is ListingCard => x !== null);
 }
 
-async function listAllCategoryServices(category: string, subcategory: string | null): Promise<ListingCard[]> {
-  const pageSize = 200;
-  const collected: ListingCard[] = [];
-  const seen = new Set<string>();
-  for (let page = 1; page <= 20; page++) {
+async function listCategoryServicesPage(params: {
+  category: string;
+  subcategory: string | null;
+  page?: number;
+  search?: string;
+}): Promise<{ items: ListingCard[]; page: number; pages: number; total: number }> {
+  const page = Math.max(1, params.page || 1);
+  const empty = { items: [] as ListingCard[], page, pages: 1, total: 0 };
+  try {
+    const search = String(params.search || "").trim();
     const res = await api.services.getAll({
-      category,
-      subcategory: subcategory || undefined,
-      limit: pageSize,
+      category: params.category,
+      subcategory: params.subcategory || undefined,
+      ...(search ? { q: search } : {}),
+      limit: CATALOG_CATEGORY_PAGE_SIZE,
       page,
     });
     const rows = (res.data as { services?: unknown[] } | undefined)?.services;
-    const mapped = Array.isArray(rows) ? mapServiceRowsToListings(rows) : [];
-    for (const item of mapped) {
-      if (seen.has(item.id)) continue;
-      seen.add(item.id);
-      collected.push(item);
-    }
+    const items = Array.isArray(rows) ? mapServiceRowsToListings(rows) : [];
     const pag =
-      (res as { pagination?: { pages?: number } }).pagination ||
-      (res.data as { pagination?: { pages?: number } } | undefined)?.pagination;
-    const pages = Number(pag?.pages) || 1;
-    if (page >= pages || mapped.length < pageSize) break;
+      (res as { pagination?: { page?: number; pages?: number; total?: number } }).pagination ||
+      (res.data as { pagination?: { page?: number; pages?: number; total?: number } } | undefined)?.pagination;
+    return {
+      items,
+      page: Number(pag?.page) || page,
+      pages: Math.max(1, Number(pag?.pages) || 1),
+      total: Number(pag?.total) || items.length,
+    };
+  } catch {
+    return empty;
   }
-  return collected;
 }
 
 export function B2BServicesHub({
@@ -232,16 +175,18 @@ export function B2BServicesHub({
   const [listings, setListings] = useState<ListingCard[]>([]);
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [sort, setSort] = useState<B2bHubSort>("relevance");
-  const [searchIndex, setSearchIndex] = useState<{
-    materials: MaterialsProduct[];
-    listings: ListingCard[];
-  } | null>(null);
-  const [searchIndexLoading, setSearchIndexLoading] = useState(false);
-  const searchIndexRef = useRef<{
-    materials: MaterialsProduct[];
-    listings: ListingCard[];
-  } | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [itemSource, setItemSource] = useState<"catalog" | "listings" | null>(null);
+  const itemSourceRef = useRef<"catalog" | "listings" | null>(null);
+  const requestSeqRef = useRef(0);
+  const loadMoreLockRef = useRef(false);
+  const loadMoreRef = useRef<() => void>(() => {});
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [quoteCart, setQuoteCart] = useState<B2bQuoteCartLine[]>([]);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [variantPickerTarget, setVariantPickerTarget] = useState<QuoteVariantPickerTarget | null>(
@@ -282,8 +227,6 @@ export function B2BServicesHub({
           ? filtered.filter((c) => isToolsCategorySlug(c.slug) || c.slug === lockedCategorySlug)
           : filtered;
         setCategories(scoped);
-        searchIndexRef.current = null;
-        setSearchIndex(null);
         const fromUrl = scoped.find((c) => c.slug === urlCategory);
         const first = fromUrl || scoped[0];
         setActiveSlug(first?.slug || "");
@@ -344,70 +287,90 @@ export function B2BServicesHub({
     [activeSlug, replaceQuery]
   );
 
-  useEffect(() => {
-    if (!activeSlug) return;
-    let cancelled = false;
-    setLoadingItems(true);
-    setListings([]);
-    setMaterialsProducts([]);
+  const catalogQuery = useMemo(() => {
+    const searchTerm = debouncedQuery;
+    if (isConstructionMaterialsB2bSlug(activeSlug)) {
+      const materialTypeKey = activeSub ? resolveMaterialsMaterialTypeKey(activeSub) : "";
+      return {
+        categorySlug: MATERIALS_CATEGORY_SLUG,
+        materialTypeKey: materialTypeKey || undefined,
+        search: searchTerm,
+      };
+    }
+    return {
+      categorySlug: activeSlug,
+      subcategory: activeSub || undefined,
+      search: searchTerm,
+    };
+  }, [activeSlug, activeSub, debouncedQuery]);
 
-    (async () => {
+  const loadItems = useCallback(
+    async (opts?: { page?: number; append?: boolean }) => {
+      if (!activeSlug) return;
+      const nextPage = Math.max(1, opts?.page ?? 1);
+      const append = Boolean(opts?.append) && nextPage > 1;
+      if (append) setLoadingMore(true);
+      else setLoadingItems(true);
+      const seq = ++requestSeqRef.current;
       try {
-        if (isConstructionMaterialsB2bSlug(activeSlug)) {
-          const hub = await fetchMaterialsHubData();
-          if (cancelled) return;
-          const products = filterCatalogBySubcategory(
-            hub.products.filter((p) => p.available),
-            activeSub,
-            hub.categories
-          );
-          setMaterialsProducts(products);
-          return;
+        const preferListings = append && itemSourceRef.current === "listings";
+        if (!preferListings) {
+          const catalog = await fetchCatalogProductsPage({
+            ...catalogQuery,
+            page: nextPage,
+            limit: CATALOG_CATEGORY_PAGE_SIZE,
+          });
+          if (seq !== requestSeqRef.current) return;
+          const available = catalog.products.filter((p) => p.available !== false);
+          if (available.length > 0 || catalog.total > 0) {
+            itemSourceRef.current = "catalog";
+            setItemSource("catalog");
+            setPage(catalog.page);
+            setTotal(catalog.total);
+            setHasMore(catalog.page < catalog.pages && available.length > 0);
+            setListings([]);
+            setMaterialsProducts((prev) => {
+              if (!append) return available;
+              const seen = new Set(prev.map((p) => p.id));
+              const extra = available.filter((p) => p.id && !seen.has(p.id));
+              return extra.length ? [...prev, ...extra] : prev;
+            });
+            return;
+          }
+          if (append) {
+            setHasMore(false);
+            return;
+          }
         }
 
-        const rawCatalog = await listAllCatalogProducts({
-          categorySlug: activeSlug,
-          ...(activeSub ? { subcategory: activeSub } : {}),
+        const listingsPage = await listCategoryServicesPage({
+          category: activeSlug,
+          subcategory: activeSub,
+          page: nextPage,
+          search: debouncedQuery,
         });
-        if (cancelled) return;
-        let mappedCatalog = rawCatalog
-          .map((row) => mapCatalogProduct(row, slugifyMaterialsId(activeSlug) || "general"))
-          .filter(Boolean) as MaterialsProduct[];
-
-        // Exact subcategory query can miss when catalog rows use a different spelling;
-        // fall back to full category list + normalized client filter.
-        if (activeSub && mappedCatalog.length === 0) {
-          const allForCategory = await listAllCatalogProducts({ categorySlug: activeSlug });
-          if (cancelled) return;
-          mappedCatalog = allForCategory
-            .map((row) => mapCatalogProduct(row, slugifyMaterialsId(activeSlug) || "general"))
-            .filter(Boolean) as MaterialsProduct[];
-        }
-
-        const catalogProducts = filterCatalogBySubcategory(
-          mappedCatalog.filter((p) => p.available),
-          activeSub,
-          []
-        );
-        if (catalogProducts.length > 0) {
-          setMaterialsProducts(catalogProducts);
-          return;
-        }
-
-        // Catalog empty for this slice — show live supplier listings if any.
-        if (mappedCatalog.length === 0) {
-          const listings = await listAllCategoryServices(activeSlug, activeSub);
-          if (cancelled) return;
-          setListings(listings);
-          return;
-        }
-
-        // Catalog exists but subcategory filter matched nothing — show empty for that sub,
-        // not an unrelated service fallback.
+        if (seq !== requestSeqRef.current) return;
+        itemSourceRef.current = "listings";
+        setItemSource("listings");
+        setPage(listingsPage.page);
+        setTotal(listingsPage.total);
+        setHasMore(listingsPage.page < listingsPage.pages && listingsPage.items.length > 0);
         setMaterialsProducts([]);
-        setListings([]);
+        setListings((prev) => {
+          if (!append) return listingsPage.items;
+          const seen = new Set(prev.map((p) => p.id));
+          const extra = listingsPage.items.filter((p) => p.id && !seen.has(p.id));
+          return extra.length ? [...prev, ...extra] : prev;
+        });
       } catch {
-        if (!cancelled) {
+        if (seq !== requestSeqRef.current) return;
+        if (!append) {
+          setMaterialsProducts([]);
+          setListings([]);
+          setTotal(0);
+          setHasMore(false);
+          itemSourceRef.current = null;
+          setItemSource(null);
           toast({
             title: "Could not load products",
             description: "Please try again in a moment.",
@@ -415,81 +378,31 @@ export function B2BServicesHub({
           });
         }
       } finally {
-        if (!cancelled) setLoadingItems(false);
+        if (seq === requestSeqRef.current) {
+          setLoadingItems(false);
+          setLoadingMore(false);
+        }
       }
-    })();
+    },
+    [activeSlug, activeSub, catalogQuery, debouncedQuery, toast]
+  );
 
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSlug, activeSub, toast]);
-
-  // Cross-category search index — category/sub filters must not hide query matches.
   useEffect(() => {
-    const q = search.trim();
-    if (!q || categories.length === 0) return;
-    if (searchIndexRef.current) {
-      setSearchIndex(searchIndexRef.current);
-      return;
-    }
-    let cancelled = false;
-    setSearchIndexLoading(true);
-    (async () => {
-      try {
-        const parts = await Promise.all(
-          categories.map(async (cat) => {
-            if (isConstructionMaterialsB2bSlug(cat.slug)) {
-              const hub = await fetchMaterialsHubData();
-              return {
-                materials: hub.products.filter((p) => p.available),
-                listings: [] as ListingCard[],
-              };
-            }
-            const rawCatalog = await listAllCatalogProducts({ categorySlug: cat.slug });
-            const mapped = rawCatalog
-              .map((row) => mapCatalogProduct(row, slugifyMaterialsId(cat.slug) || "general"))
-              .filter(Boolean) as MaterialsProduct[];
-            const available = mapped.filter((p) => p.available);
-            if (available.length > 0) {
-              return { materials: available, listings: [] as ListingCard[] };
-            }
-            const serviceListings = await listAllCategoryServices(cat.slug, null);
-            return { materials: [] as MaterialsProduct[], listings: serviceListings };
-          })
-        );
-        if (cancelled) return;
-        const materials: MaterialsProduct[] = [];
-        const listings: ListingCard[] = [];
-        const seenMat = new Set<string>();
-        const seenList = new Set<string>();
-        for (const part of parts) {
-          for (const p of part.materials) {
-            if (seenMat.has(p.id)) continue;
-            seenMat.add(p.id);
-            materials.push(p);
-          }
-          for (const item of part.listings) {
-            if (seenList.has(item.id)) continue;
-            seenList.add(item.id);
-            listings.push(item);
-          }
-        }
-        const idx = { materials, listings };
-        searchIndexRef.current = idx;
-        setSearchIndex(idx);
-      } catch {
-        if (!cancelled) {
-          searchIndexRef.current = null;
-          setSearchIndex({ materials: [], listings: [] });
-        }
-      } finally {
-        if (!cancelled) setSearchIndexLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [search, categories]);
+    const timer = window.setTimeout(() => setDebouncedQuery(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    if (!activeSlug) return;
+    setPage(1);
+    setHasMore(true);
+    itemSourceRef.current = null;
+    setItemSource(null);
+    setListings([]);
+    setMaterialsProducts([]);
+    setTotal(0);
+    void loadItems({ page: 1 });
+  }, [activeSlug, activeSub, debouncedQuery, loadItems]);
 
   const addToQuote = useCallback(
     (line: Omit<B2bQuoteCartLine, "quantity"> & { quantity?: number }) => {
@@ -651,53 +564,61 @@ export function B2BServicesHub({
   const query = search.trim();
   const isSearching = query.length > 0;
   const visibleMaterials = useMemo(() => {
-    const source =
-      isSearching && searchIndex ? searchIndex.materials : materialsProducts;
-    const matched = !query
-      ? source
-      : source.filter((p) => productMatchesQuery(p, query));
+    const matched = materialsProducts;
     if (sort === "relevance") return matched;
     const next = [...matched];
     next.sort((a, b) =>
       sort === "name_asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)
     );
     return next;
-  }, [isSearching, materialsProducts, query, searchIndex, sort]);
+  }, [materialsProducts, sort]);
   const visibleListings = useMemo(() => {
-    const source = isSearching && searchIndex ? searchIndex.listings : listings;
-    const matched = !query ? source : source.filter((item) => listingMatchesQuery(item, query));
+    const matched = listings;
     if (sort === "relevance") return matched;
     const next = [...matched];
     next.sort((a, b) =>
       sort === "name_asc" ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title)
     );
     return next;
-  }, [isSearching, listings, query, searchIndex, sort]);
+  }, [listings, sort]);
 
-  const itemsLoading = isSearching ? searchIndexLoading : loadingItems;
-  const browseUsesCatalog = isMaterials || materialsProducts.length > 0;
-  const showingCatalog = isSearching ? visibleMaterials.length > 0 : browseUsesCatalog;
+  const itemsLoading = loadingItems && materialsProducts.length === 0 && listings.length === 0;
+  const browseUsesCatalog = itemSource === "catalog" || (itemSource == null && (isMaterials || materialsProducts.length > 0));
+  const showingCatalog = browseUsesCatalog || visibleMaterials.length > 0;
   const catalogEmpty =
-    !itemsLoading &&
-    !isSearching &&
-    (browseUsesCatalog ? materialsProducts.length === 0 : listings.length === 0);
-  const browseFilteredEmpty =
-    !isSearching &&
-    !itemsLoading &&
-    !catalogEmpty &&
-    (browseUsesCatalog ? visibleMaterials.length === 0 : visibleListings.length === 0);
-  const searchEmpty =
-    isSearching &&
-    !searchIndexLoading &&
-    !!searchIndex &&
-    visibleMaterials.length === 0 &&
-    visibleListings.length === 0;
-  const displayEmpty = isSearching ? searchEmpty : browseFilteredEmpty;
-  const resultCount = isSearching
-    ? visibleMaterials.length + visibleListings.length
-    : showingCatalog
-      ? visibleMaterials.length
-      : visibleListings.length;
+    !itemsLoading && total === 0 && materialsProducts.length === 0 && listings.length === 0 && !isSearching;
+  const displayEmpty =
+    !itemsLoading && isSearching && materialsProducts.length === 0 && listings.length === 0;
+  const resultCount = total > 0 ? total : showingCatalog ? visibleMaterials.length : visibleListings.length;
+
+  const loadMore = useCallback(() => {
+    if (itemsLoading || loadingMore || !hasMore) return;
+    if (query !== debouncedQuery) return;
+    if (loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    void loadItems({ page: page + 1, append: true }).finally(() => {
+      window.setTimeout(() => {
+        loadMoreLockRef.current = false;
+      }, 300);
+    });
+  }, [debouncedQuery, hasMore, itemsLoading, loadItems, loadingMore, page, query]);
+
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreRef.current();
+      },
+      { rootMargin: "240px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, showingCatalog, visibleMaterials.length, visibleListings.length]);
+
   const quoteCartItemType = getB2bQuoteCartItemType(quoteCart);
 
   return (
@@ -813,7 +734,6 @@ export function B2BServicesHub({
                 <Select
                   value={activeSlug || undefined}
                   onValueChange={selectCategory}
-                  disabled={isSearching}
                 >
                   <SelectTrigger
                     aria-label="Category"
@@ -835,7 +755,6 @@ export function B2BServicesHub({
                 <Select
                   value={activeSub || SUBCATEGORY_ALL}
                   onValueChange={(v) => selectSub(v === SUBCATEGORY_ALL ? null : v)}
-                  disabled={isSearching}
                 >
                   <SelectTrigger
                     aria-label="Subcategory"
@@ -872,7 +791,13 @@ export function B2BServicesHub({
 
             {isSearching ? (
               <p className="text-xs text-slate-500 sm:text-sm">
-                Searching all B2B categories — category filters are paused until you clear search.
+                {itemsLoading
+                  ? "Searching products…"
+                  : `${resultCount} result${resultCount === 1 ? "" : "s"} for “${query}”`}
+              </p>
+            ) : resultCount > 0 ? (
+              <p className="text-xs text-slate-500 sm:text-sm">
+                {resultCount} item{resultCount === 1 ? "" : "s"}
               </p>
             ) : null}
 
@@ -1059,6 +984,13 @@ export function B2BServicesHub({
               </div>
               </>
             )}
+
+            <div ref={sentinelRef} className="h-8" />
+            {loadingMore ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            ) : null}
 
             {isMaterials && !isToolsSurface ? (
               <p className="text-center text-sm text-slate-500">
