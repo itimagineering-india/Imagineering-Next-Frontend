@@ -250,48 +250,50 @@ export function MachineRentalCategoryClient({ typeKey }: Props) {
                 </Button>
               </div>
             ) : (
-              <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {filtered.map((machine) => {
-                  const href = rentalMachineHref(machine);
-                  return (
-                    <Link
-                      key={machine.serviceId || machine.id}
-                      href={href}
-                      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-orange-700/30 hover:shadow-md"
-                    >
-                      <div className="relative aspect-square w-full overflow-hidden bg-orange-50">
-                        {machine.imageUri ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={machine.imageUri}
-                            alt={machine.name}
-                            className="absolute inset-0 h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-lg font-bold text-orange-700/70">
-                            {machine.name.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-1 flex-col gap-1 p-3">
-                        <p className="line-clamp-2 text-sm font-semibold text-slate-900">{machine.name}</p>
-                        {machine.priceLabel ? (
-                          <p className="mt-auto text-xs font-semibold text-orange-800">{machine.priceLabel}</p>
-                        ) : null}
-                        {machine.city ? (
-                          <p className="truncate text-xs text-slate-500">{machine.city}</p>
-                        ) : null}
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-              <div ref={sentinelRef} className="h-8" />
-              {loadingMore ? (
-                <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+              <>
+                <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  {filtered.map((machine) => {
+                    const href = rentalMachineHref(machine);
+                    return (
+                      <Link
+                        key={machine.serviceId || machine.id}
+                        href={href}
+                        className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-orange-700/30 hover:shadow-md"
+                      >
+                        <div className="relative aspect-square w-full overflow-hidden bg-orange-50">
+                          {machine.imageUri ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={machine.imageUri}
+                              alt={machine.name}
+                              className="absolute inset-0 h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-lg font-bold text-orange-700/70">
+                              {machine.name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-1 flex-col gap-1 p-3">
+                          <p className="line-clamp-2 text-sm font-semibold text-slate-900">{machine.name}</p>
+                          {machine.priceLabel ? (
+                            <p className="mt-auto text-xs font-semibold text-orange-800">{machine.priceLabel}</p>
+                          ) : null}
+                          {machine.city ? (
+                            <p className="truncate text-xs text-slate-500">{machine.city}</p>
+                          ) : null}
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
-              ) : null}
+                <div ref={sentinelRef} className="h-8" />
+                {loadingMore ? (
+                  <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : null}
+              </>
             )}
           </>
         )}
