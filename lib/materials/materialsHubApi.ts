@@ -120,6 +120,21 @@ function mapCategory(name: string, index: number): MaterialsCategory {
   };
 }
 
+/** Prefer custom label when admin stored type as `custom`. */
+function pickCatalogMetaType(
+  meta: Record<string, unknown>,
+  key: string,
+  customKey?: string
+): string {
+  const raw = String(meta[key] || "").trim();
+  if (!raw) return "";
+  if (customKey && raw.toLowerCase() === "custom") {
+    const custom = String(meta[customKey] || "").trim();
+    if (custom) return custom;
+  }
+  return raw;
+}
+
 export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategoryId: string): MaterialsProduct | null {
   const id = String(raw?._id || raw?.id || "").trim();
   if (!id) return null;
@@ -221,11 +236,27 @@ export function mapCatalogProduct(raw: Record<string, unknown>, fallbackCategory
   const priceMin = Number.isFinite(priceMinRaw) && priceMinRaw > 0 ? priceMinRaw : undefined;
   const priceMax = Number.isFinite(priceMaxRaw) && priceMaxRaw > 0 ? priceMaxRaw : undefined;
   const unitType = String(raw?.suggestedPriceType || "").trim() || undefined;
+  const itemType =
+    pickCatalogMetaType(meta, "itemType") ||
+    pickCatalogMetaType(meta, "steelType", "steelTypeCustom") ||
+    pickCatalogMetaType(meta, "cementType") ||
+    pickCatalogMetaType(meta, "sandType", "sandTypeCustom") ||
+    pickCatalogMetaType(meta, "brickBlockType", "brickBlockTypeCustom") ||
+    pickCatalogMetaType(meta, "aggregateType", "aggregateTypeCustom") ||
+    pickCatalogMetaType(meta, "sanitaryProductSubcategory") ||
+    undefined;
+  const productType =
+    pickCatalogMetaType(meta, "productType") ||
+    pickCatalogMetaType(meta, "productCategory") ||
+    pickCatalogMetaType(meta, "sanitaryProductCategory") ||
+    undefined;
 
   return {
     id,
     categoryId: materialKey,
     ...(rawSubcategory ? { subcategory: rawSubcategory } : {}),
+    ...(itemType ? { itemType } : {}),
+    ...(productType ? { productType } : {}),
     brand,
     name,
     grade,
@@ -318,6 +349,8 @@ export async function fetchCatalogProductsPage(params: {
   categorySlug?: string;
   materialTypeKey?: string;
   subcategory?: string;
+  itemType?: string;
+  productType?: string;
   page?: number;
   limit?: number;
   search?: string;
@@ -335,10 +368,14 @@ export async function fetchCatalogProductsPage(params: {
   try {
     const search = String(params.search || "").trim();
     const subcategory = String(params.subcategory || "").trim();
+    const itemType = String(params.itemType || "").trim();
+    const productType = String(params.productType || "").trim();
     const res = await api.productCatalog.list({
       categorySlug,
       ...(materialTypeKey ? { materialTypeKey } : {}),
       ...(subcategory ? { subcategory } : {}),
+      ...(itemType ? { itemType } : {}),
+      ...(productType ? { productType } : {}),
       ...(search ? { search } : {}),
       limit,
       page,
