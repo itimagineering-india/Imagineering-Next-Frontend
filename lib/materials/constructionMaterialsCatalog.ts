@@ -31,6 +31,10 @@ export type MaterialsProduct = {
   categoryId: MaterialsCategoryId;
   /** Catalog subcategory label (e.g. "Hand Tools") — used for B2B/Tools filters. */
   subcategory?: string;
+  /** Admin catalog item type within the subcategory (e.g. Hardware → Fasteners). */
+  itemType?: string;
+  /** Admin catalog product type / product category when present (e.g. sanitary tree). */
+  productType?: string;
   brand: string;
   name: string;
   grade?: string;
@@ -329,6 +333,8 @@ export type MaterialsProductFilters = {
   priceMode?: 'fixed' | 'quote' | null;
   minPrice?: number | null;
   maxPrice?: number | null;
+  itemType?: string | null;
+  productType?: string | null;
 };
 
 function productSortPrice(p: MaterialsProduct): number {
@@ -348,9 +354,13 @@ export function applyMaterialsProductFilters(
   const priceMode = filters.priceMode ?? null;
   const minPrice = filters.minPrice ?? null;
   const maxPrice = filters.maxPrice ?? null;
+  const itemType = String(filters.itemType || "").trim().toLowerCase();
+  const productType = String(filters.productType || "").trim().toLowerCase();
 
   return products.filter((p) => {
     if (brands.length > 0 && !brands.includes(p.brand.toLowerCase())) return false;
+    if (itemType && String(p.itemType || "").trim().toLowerCase() !== itemType) return false;
+    if (productType && String(p.productType || "").trim().toLowerCase() !== productType) return false;
     if (minRating != null) {
       const r = p.rating ?? 0;
       if (r < minRating) return false;
