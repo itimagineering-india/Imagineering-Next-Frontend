@@ -297,29 +297,31 @@ export async function fetchRentalHubData(opts?: RentalHubFetchOpts): Promise<Ren
   return { categories, machines, providers };
 }
 
-export async function fetchRentalMachinesByCategory(
-  categoryId: string,
-  opts?: RentalHubFetchOpts
-): Promise<RentalMachine[]> {
-  const key = resolveRentalCategoryKey(categoryId) || String(categoryId || "").trim();
-  if (!key) return [];
-
-  const lat = opts?.lat;
-  const lng = opts?.lng;
-  if (!hasValidCoords(lat, lng)) return [];
-
-  const radiusKm = opts?.radiusKm ?? RENTAL_NEARBY_RADIUS_KM;
+export async function fetchRentalMachinesPage(params: {
+  categoryId: string;
+  page?: number;
+  limit?: number;
+  lat: number;
+  lng: number;
+  radiusKm?: number;
+}): Promise<{ machines: RentalMachine[]; page: number; pages: number; total: number }> {
+  const key = resolveRentalCategoryKey(params.categoryId) || String(params.categoryId || "").trim();
+  const page = Math.max(1, params.page || 1);
+  const limit = Math.min(100, Math.max(1, params.limit || 20));
+  const empty = { machines: [] as RentalMachine[], page, pages: 1, total: 0 };
+  if (!key || !hasValidCoords(params.lat, params.lng)) return empty;
+  const radiusKm = params.radiusKm ?? RENTAL_NEARBY_RADIUS_KM;
 
   try {
     for (const slug of RENTAL_CATEGORY_SLUG_ALIASES) {
       const res = await api.services.getAll({
         category: slug,
         subcategory: key,
-        limit: 100,
-        page: 1,
+        limit,
+        page,
         sort: "distance",
-        lat: lat!,
-        lng: lng!,
+        lat: params.lat,
+        lng: params.lng,
         radiusKm,
         precise: 1,
       });
@@ -336,15 +338,39 @@ export async function fetchRentalMachinesByCategory(
       const filtered = mapped.filter(
         (m) => m.categoryId === key || resolveRentalCategoryKey(m.categoryName || "") === key
       );
-      if (filtered.length > 0) return filtered;
-      if (mapped.length > 0) return mapped;
+      const machines = filtered.length > 0 ? filtered : mapped;
+      const pag =
+        (res as { pagination?: { page?: number; pages?: number; total?: number } }).pagination ||
+        (res.data as { pagination?: { page?: number; pages?: number; total?: number } } | undefined)?.pagination;
+      if (machines.length > 0 || Number(pag?.total) > 0) {
+        return {
+          machines,
+          page: Number(pag?.page) || page,
+          pages: Math.max(1, Number(pag?.pages) || 1),
+          total: Number(pag?.total) || machines.length,
+        };
+      }
     }
-
-    const hub = await fetchRentalHubData({ lat, lng, radiusKm });
-    return hub.machines.filter(
-      (m) => m.categoryId === key || resolveRentalCategoryKey(m.categoryName || "") === key
-    );
   } catch {
-    return [];
+    return empty;
   }
+  return empty;
+}
+
+export async function fetchRentalMachinesByCategory(
+  categoryId: string,
+  opts?: RentalHubFetchOpts
+): Promise<RentalMachine[]> {
+  const lat = opts?.lat;
+  const lng = opts?.lng;
+  if (!hasValidCoords(lat, lng)) return [];
+  const result = await fetchRentalMachinesPage({
+    categoryId,
+    page: 1,
+    limit: 100,
+    lat: lat!,
+    lng: lng!,
+    radiusKm: opts?.radiusKm ?? RENTAL_NEARBY_RADIUS_KM,
+  });
+  return result.machines;
 }
