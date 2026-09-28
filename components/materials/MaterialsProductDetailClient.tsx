@@ -18,7 +18,7 @@ import {
 } from "@/lib/materials/constructionMaterialsCatalog";
 import {
   fetchCatalogProductById,
-  fetchCatalogProductsByCategory,
+  fetchCatalogProductsPage,
   findServiceIdForCatalogProduct,
   mapCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
@@ -261,9 +261,13 @@ export function MaterialsProductDetailClient({ productId, surface = "materials" 
           String(product?.materialTypeKey || product?.subcategory || "")
         );
         if (typeKey) {
-          const list = await fetchCatalogProductsByCategory(typeKey);
+          const page = await fetchCatalogProductsPage({
+            categoryId: typeKey,
+            page: 1,
+            limit: 12,
+          });
           if (!cancelled) {
-            setSimilar(list.filter((p) => p.id !== productId).slice(0, 10));
+            setSimilar(page.products.filter((p) => p.id !== productId).slice(0, 10));
           }
         }
       } catch {
