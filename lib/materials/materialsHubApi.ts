@@ -304,6 +304,66 @@ export async function listAllCatalogProducts(params: {
   return collected;
 }
 
+export const CATALOG_CATEGORY_PAGE_SIZE = 20;
+
+export type CatalogProductsPage = {
+  products: MaterialsProduct[];
+  page: number;
+  pages: number;
+  total: number;
+};
+
+export async function fetchCatalogProductsPage(params: {
+  categoryId?: string;
+  categorySlug?: string;
+  materialTypeKey?: string;
+  subcategory?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<CatalogProductsPage> {
+  const fromId =
+    resolveMaterialsMaterialTypeKey(params.categoryId || "") || String(params.categoryId || "").trim();
+  const categorySlug =
+    String(params.categorySlug || "").trim() || (fromId ? MATERIALS_CATEGORY_SLUG : "");
+  const materialTypeKey =
+    String(params.materialTypeKey || "").trim() || (params.categorySlug ? "" : fromId);
+  const page = Math.max(1, params.page || 1);
+  const limit = Math.min(100, Math.max(1, params.limit || CATALOG_CATEGORY_PAGE_SIZE));
+  const empty: CatalogProductsPage = { products: [], page, pages: 1, total: 0 };
+  if (!categorySlug) return empty;
+  try {
+    const search = String(params.search || "").trim();
+    const subcategory = String(params.subcategory || "").trim();
+    const res = await api.productCatalog.list({
+      categorySlug,
+      ...(materialTypeKey ? { materialTypeKey } : {}),
+      ...(subcategory ? { subcategory } : {}),
+      ...(search ? { search } : {}),
+      limit,
+      page,
+    });
+    if (!res.success) return empty;
+    const data = res.data as
+      | { products?: unknown[]; pagination?: { page?: number; pages?: number; total?: number } }
+      | undefined;
+    const rawProducts = Array.isArray(data?.products) ? data.products : [];
+    const fallback = materialTypeKey || slugifyMaterialsId(categorySlug) || "general";
+    const mapped = rawProducts
+      .map((row) => mapCatalogProduct(row as Record<string, unknown>, fallback))
+      .filter(Boolean) as MaterialsProduct[];
+    const pagination = data?.pagination;
+    return {
+      products: mapped,
+      page: Number(pagination?.page) || page,
+      pages: Math.max(1, Number(pagination?.pages) || 1),
+      total: Number(pagination?.total) || mapped.length,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export async function fetchCatalogProductsByCategory(categoryId: string): Promise<MaterialsProduct[]> {
   const key = resolveMaterialsMaterialTypeKey(categoryId) || String(categoryId || "").trim();
   if (!key) return [];
@@ -397,9 +457,8 @@ export async function fetchMaterialsHubData(opts?: {
   const lat = opts?.lat;
   const lng = opts?.lng;
 
-  const [subRes, catalogRows, providersRes] = await Promise.allSettled([
+  const [subRes, providersRes] = await Promise.allSettled([
     api.categories.getSubcategories(MATERIALS_CATEGORY_SLUG),
-    listAllCatalogProducts({ categorySlug: MATERIALS_CATEGORY_SLUG }),
     api.providers.getAll({
       categorySlug: MATERIALS_CATEGORY_SLUG,
       limit: 12,
@@ -418,19 +477,40 @@ export async function fetchMaterialsHubData(opts?: {
     }
   }
 
-  let products: MaterialsProduct[] = [];
-  if (catalogRows.status === "fulfilled") {
-    products = catalogRows.value
-      .map((row) => mapCatalogProduct(row, categories[0]?.id || "general"))
-      .filter(Boolean) as MaterialsProduct[];
-  }
-
   if (categories.length > 0) {
     const seen = new Map<string, MaterialsCategory>();
     categories.forEach((c) => {
       if (!seen.has(c.id)) seen.set(c.id, c);
     });
     categories = Array.from(seen.values());
+  }
+
+  const railPages = await Promise.all(
+    categories.map((c) =>
+      fetchCatalogProductsPage({
+        categoryId: c.id,
+        page: 1,
+        limit: 8,
+      })
+    )
+  );
+  let products: MaterialsProduct[] = [];
+  const seenProduct = new Set<string>();
+  for (const page of railPages) {
+    for (const p of page.products) {
+      if (!p.id || seenProduct.has(p.id)) continue;
+      seenProduct.add(p.id);
+      products.push(p);
+    }
+  }
+
+  if (categories.length === 0) {
+    const fallback = await fetchCatalogProductsPage({
+      categorySlug: MATERIALS_CATEGORY_SLUG,
+      page: 1,
+      limit: 40,
+    });
+    products = fallback.products;
   }
 
   if (categories.length === 0 && products.length > 0) {
