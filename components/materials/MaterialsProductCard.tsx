@@ -20,7 +20,6 @@ type Props = {
 export function MaterialsProductCard({
   product,
   onCta,
-  ctaLabel,
   ctaLoading,
   hidePrice,
   onAddToQuote,
@@ -28,11 +27,17 @@ export function MaterialsProductCard({
   detailHref,
 }: Props) {
   const href = detailHref || `/construction-materials/product/${product.id}`;
-  const label =
-    ctaLabel || (product.isPriceRange ? "Get Best Quote" : "Add to Cart");
-  // Variant products still show Add to quote when the parent opens a picker modal.
-  const quickAddToQuote = onAddToQuote;
-  const quickCta = product.hasVariants ? undefined : onCta;
+  const plusHandler = onAddToQuote || onCta;
+  const plusActive = Boolean(onAddToQuote && inQuoteList);
+  const plusLabel = onAddToQuote
+    ? inQuoteList
+      ? "Added to quote"
+      : "Add to quote"
+    : product.hasVariants
+      ? "Choose options"
+      : product.isPriceRange
+        ? "Get Best Quote"
+        : "Add to Cart";
 
   return (
     <article className="flex h-full min-w-0 w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md">
@@ -73,49 +78,44 @@ export function MaterialsProductCard({
           )}
         </div>
       </Link>
-      <div className="mt-auto space-y-1 px-2.5 pb-2.5 sm:px-2 sm:pb-2">
-        {quickAddToQuote ? (
-          <div className="flex w-full gap-1.5">
+      <div className="mt-auto px-2.5 pb-2.5 sm:px-2 sm:pb-2">
+        <div className="flex w-full gap-1.5">
+          <Button
+            size="sm"
+            asChild
+            variant="outline"
+            className="h-7 min-w-0 flex-1 px-2 text-[10px] sm:text-[11px]"
+          >
+            <Link href={href}>View</Link>
+          </Button>
+          {plusHandler ? (
+            <Button
+              type="button"
+              size="sm"
+              variant={plusActive ? "default" : "outline"}
+              className="h-7 w-7 shrink-0 px-0"
+              aria-label={plusLabel}
+              title={plusLabel}
+              disabled={ctaLoading}
+              onClick={() => plusHandler(product)}
+            >
+              {ctaLoading ? "…" : <Plus className="h-3.5 w-3.5" />}
+            </Button>
+          ) : (
             <Button
               size="sm"
               asChild
               variant="outline"
-              className="h-7 min-w-0 flex-1 px-2 text-[10px] sm:text-[11px]"
+              className="h-7 w-7 shrink-0 px-0"
+              aria-label="View product"
+              title="View product"
             >
-              <Link href={href} target="_blank" rel="noopener noreferrer">
-                View
+              <Link href={href}>
+                <Plus className="h-3.5 w-3.5" />
               </Link>
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={inQuoteList ? "default" : "outline"}
-              className="h-7 w-7 shrink-0 px-0"
-              aria-label={inQuoteList ? "Added to quote" : "Add to quote"}
-              title={inQuoteList ? "Added to quote" : "Add to quote"}
-              onClick={() => quickAddToQuote(product)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        ) : null}
-        {quickCta ? (
-          <button
-            type="button"
-            disabled={ctaLoading}
-            onClick={() => quickCta(product)}
-            className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[hsl(var(--red-accent))] px-2 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60 sm:h-7 sm:text-[10px]"
-          >
-            {ctaLoading ? "…" : label}
-          </button>
-        ) : quickAddToQuote ? null : (
-          <Link
-            href={href}
-            className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-[hsl(var(--red-accent))] px-2 text-[11px] font-semibold text-white transition hover:brightness-110 sm:h-7 sm:text-[10px]"
-          >
-            View details
-          </Link>
-        )}
+          )}
+        </div>
       </div>
     </article>
   );
