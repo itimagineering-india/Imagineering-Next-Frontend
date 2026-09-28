@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { MANPOWER_CANVAS, MANPOWER_TEAL } from "@/components/manpower/ManpowerHireModeTabs";
-import { fetchManpowerSpecificWorksForTrade } from "@/lib/manpower/manpowerHubApi";
+import { fetchManpowerSpecificWorksPage } from "@/lib/manpower/manpowerHubApi";
 import type { ManpowerSpecificWorkItem } from "@/lib/manpower/manpowerHubCatalog";
 import { getManpowerTradeArt } from "@/lib/manpower/manpowerTradeArt";
 import { resolveManpowerTradeKey } from "@/lib/manpower/manpowerHubCatalog";
@@ -21,35 +21,101 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
   const { userLocation } = useUserLocation();
   const pricingCity = userLocation?.city?.trim() || "";
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [tasks, setTasks] = useState<ManpowerSpecificWorkItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [total, setTotal] = useState(0);
+  const requestSeqRef = useRef(0);
+  const loadMoreLockRef = useRef(false);
+  const loadMoreRef = useRef<() => void>(() => {});
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const key = useMemo(
     () => resolveManpowerTradeKey(tradeKey) || tradeKey,
     [tradeKey]
   );
-  const displayName = useMemo(() => {
-    const fromTask = tasks[0]?.tradeLabel;
-    if (fromTask) return fromTask;
-    return key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  }, [key, tasks]);
+  const titleFromKey = useMemo(
+    () => key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    [key]
+  );
+  const displayName = tasks[0]?.tradeLabel || titleFromKey;
+
+  const load = useCallback(
+    async (opts?: { page?: number; append?: boolean }) => {
+      const nextPage = Math.max(1, opts?.page ?? 1);
+      const append = Boolean(opts?.append) && nextPage > 1;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      const seq = ++requestSeqRef.current;
+      try {
+        const result = await fetchManpowerSpecificWorksPage({
+          tradeId: key,
+          tradeName: titleFromKey,
+          city: pricingCity || undefined,
+          page: nextPage,
+          limit: 20,
+        });
+        if (seq !== requestSeqRef.current) return;
+        setPage(result.page);
+        setTotal(result.total);
+        setHasMore(result.page < result.pages && result.items.length > 0);
+        setTasks((prev) => {
+          if (!append) return result.items;
+          const seen = new Set(prev.map((t) => t.catalogProductId || t.id));
+          const extra = result.items.filter((t) => {
+            const id = t.catalogProductId || t.id;
+            return id && !seen.has(id);
+          });
+          return extra.length ? [...prev, ...extra] : prev;
+        });
+      } catch {
+        if (seq !== requestSeqRef.current) return;
+        if (!append) {
+          setTasks([]);
+          setHasMore(false);
+          setTotal(0);
+        }
+      } finally {
+        if (seq === requestSeqRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [key, pricingCity, titleFromKey]
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const list = await fetchManpowerSpecificWorksForTrade(key, displayName, pricingCity || undefined);
-        if (!cancelled) setTasks(list);
-      } catch {
-        if (!cancelled) setTasks([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [displayName, key, pricingCity]);
+    void load({ page: 1 });
+  }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    if (loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    void load({ page: page + 1, append: true }).finally(() => {
+      window.setTimeout(() => {
+        loadMoreLockRef.current = false;
+      }, 300);
+    });
+  }, [hasMore, load, loading, loadingMore, page]);
+
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreRef.current();
+      },
+      { rootMargin: "240px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, tasks.length]);
 
   const art = getManpowerTradeArt(key) || getManpowerTradeArt(displayName);
 
@@ -77,7 +143,7 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
             <h1 className="text-2xl font-bold text-slate-900">
               {t("tasksFor", { name: displayName })}
             </h1>
-            <p className="text-sm text-slate-500">{t("tasksCount", { count: tasks.length })}</p>
+            <p className="text-sm text-slate-500">{t("tasksCount", { count: total > 0 ? total : tasks.length })}</p>
             {pricingCity ? (
               <p className="text-xs font-medium text-teal-800">{t("pricesForCity", { city: pricingCity })}</p>
             ) : null}
@@ -92,6 +158,7 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
         ) : tasks.length === 0 ? (
           <p className="py-16 text-sm text-slate-500">{t("emptyTasks")}</p>
         ) : (
+          <>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {tasks.map((item) => {
               const href = item.catalogProductId
@@ -137,6 +204,13 @@ export function ManpowerTradeTasksClient({ tradeKey }: Props) {
               );
             })}
           </div>
+          <div ref={sentinelRef} className="h-8" />
+          {loadingMore ? (
+            <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : null}
+          </>
         )}
       </div>
     </div>
