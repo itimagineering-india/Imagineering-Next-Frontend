@@ -506,14 +506,61 @@ export async function fetchManpowerCatalogByHireMode(
   }
 }
 
+export async function fetchManpowerSpecificWorksPage(params: {
+  tradeId: string;
+  tradeName?: string;
+  city?: string | null;
+  page?: number;
+  limit?: number;
+}): Promise<{ items: ManpowerSpecificWorkItem[]; page: number; pages: number; total: number }> {
+  const page = Math.max(1, params.page || 1);
+  const limit = Math.min(100, Math.max(1, params.limit || 20));
+  const empty = { items: [] as ManpowerSpecificWorkItem[], page, pages: 1, total: 0 };
+  const materialTypeKey = resolveManpowerTradeKey(params.tradeId) || String(params.tradeId || "").trim();
+  const subcategory = String(params.tradeName || params.tradeId || "").trim();
+  try {
+    const res = await api.productCatalog.list({
+      categorySlug: MANPOWER_CATEGORY_SLUG,
+      hireMode: "specific_work",
+      ...(materialTypeKey ? { materialTypeKey } : {}),
+      ...(subcategory ? { subcategory } : {}),
+      page,
+      limit,
+      city: cityForManpowerPricing(params.city),
+    });
+    if (!res.success) return empty;
+    const list = (res.data as { products?: CatalogProductRaw[] } | undefined)?.products;
+    const products = Array.isArray(list) ? list : [];
+    const items = filterManpowerSpecificWorks(mapSpecificWorksFromCatalog(products), {
+      tradeId: params.tradeId,
+      tradeName: params.tradeName,
+    });
+    const pag = (res.data as { pagination?: { page?: number; pages?: number; total?: number } } | undefined)
+      ?.pagination;
+    return {
+      items,
+      page: Number(pag?.page) || page,
+      pages: Math.max(1, Number(pag?.pages) || 1),
+      total: Number(pag?.total) || items.length,
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export async function fetchManpowerSpecificWorksForTrade(
   tradeId: string,
   tradeName?: string,
   city?: string | null
 ): Promise<ManpowerSpecificWorkItem[]> {
-  const products = await fetchManpowerCatalogByHireMode("specific_work", city);
-  const works = mapSpecificWorksFromCatalog(products);
-  return filterManpowerSpecificWorks(works, { tradeId, tradeName });
+  const result = await fetchManpowerSpecificWorksPage({
+    tradeId,
+    tradeName,
+    city,
+    page: 1,
+    limit: 100,
+  });
+  return result.items;
 }
 
 export async function fetchManpowerCatalogProductById(
