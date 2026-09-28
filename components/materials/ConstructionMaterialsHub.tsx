@@ -25,12 +25,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import {
+  MATERIALS_CATEGORY_SLUG,
   MATERIALS_TRENDING_BRANDS,
-  filterMaterialsProducts,
   getMaterialsCategoryProductSections,
   type MaterialsProduct,
 } from "@/lib/materials/constructionMaterialsCatalog";
 import {
+  CATALOG_CATEGORY_PAGE_SIZE,
+  fetchCatalogProductsPage,
   fetchMaterialsHubData,
   findServiceIdForCatalogProduct,
   type MaterialsHubData,
@@ -57,6 +59,16 @@ export function ConstructionMaterialsHub() {
   const [data, setData] = useState<MaterialsHubData>(EMPTY_HUB);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState<string | null>(null);
+  const [searchProducts, setSearchProducts] = useState<MaterialsProduct[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchLoadingMore, setSearchLoadingMore] = useState(false);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchHasMore, setSearchHasMore] = useState(true);
+  const [searchTotal, setSearchTotal] = useState(0);
+  const searchSeqRef = useRef(0);
+  const searchMoreLockRef = useRef(false);
+  const searchMoreRef = useRef<() => void>(() => {});
+  const searchSentinelRef = useRef<HTMLDivElement | null>(null);
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteService, setQuoteService] = useState<{
@@ -128,10 +140,85 @@ export function ConstructionMaterialsHub() {
     [search]
   );
 
-  const searchProducts = useMemo(() => {
-    if (!appliedSearch) return [];
-    return filterMaterialsProducts(data.products, { query: appliedSearch });
-  }, [appliedSearch, data.products]);
+  const loadSearch = useCallback(
+    async (opts?: { page?: number; append?: boolean }) => {
+      const q = appliedSearch?.trim();
+      if (!q) {
+        setSearchProducts([]);
+        setSearchPage(1);
+        setSearchHasMore(false);
+        setSearchTotal(0);
+        return;
+      }
+      const nextPage = Math.max(1, opts?.page ?? 1);
+      const append = Boolean(opts?.append) && nextPage > 1;
+      if (append) setSearchLoadingMore(true);
+      else setSearchLoading(true);
+      const seq = ++searchSeqRef.current;
+      try {
+        const result = await fetchCatalogProductsPage({
+          categorySlug: MATERIALS_CATEGORY_SLUG,
+          search: q,
+          page: nextPage,
+          limit: CATALOG_CATEGORY_PAGE_SIZE,
+        });
+        if (seq !== searchSeqRef.current) return;
+        setSearchPage(result.page);
+        setSearchTotal(result.total);
+        setSearchHasMore(result.page < result.pages && result.products.length > 0);
+        setSearchProducts((prev) => {
+          if (!append) return result.products;
+          const seen = new Set(prev.map((p) => p.id));
+          const extra = result.products.filter((p) => p.id && !seen.has(p.id));
+          return extra.length ? [...prev, ...extra] : prev;
+        });
+      } catch {
+        if (seq !== searchSeqRef.current) return;
+        if (!append) {
+          setSearchProducts([]);
+          setSearchHasMore(false);
+          setSearchTotal(0);
+        }
+      } finally {
+        if (seq === searchSeqRef.current) {
+          setSearchLoading(false);
+          setSearchLoadingMore(false);
+        }
+      }
+    },
+    [appliedSearch]
+  );
+
+  useEffect(() => {
+    void loadSearch({ page: 1 });
+  }, [loadSearch]);
+
+  const loadMoreSearch = useCallback(() => {
+    if (!appliedSearch || searchLoading || searchLoadingMore || !searchHasMore) return;
+    if (searchMoreLockRef.current) return;
+    searchMoreLockRef.current = true;
+    void loadSearch({ page: searchPage + 1, append: true }).finally(() => {
+      window.setTimeout(() => {
+        searchMoreLockRef.current = false;
+      }, 300);
+    });
+  }, [appliedSearch, loadSearch, searchHasMore, searchLoading, searchLoadingMore, searchPage]);
+
+  searchMoreRef.current = loadMoreSearch;
+
+  useEffect(() => {
+    const sentinel = searchSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        searchMoreRef.current();
+      },
+      { rootMargin: "240px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [searchHasMore, searchProducts.length]);
 
   const searchProviders = useMemo(() => {
     if (!appliedSearch) return [];
@@ -222,9 +309,11 @@ export function ConstructionMaterialsHub() {
                     <p className="mt-1 text-sm text-slate-500">
                       {searchProducts.length + searchProviders.length > 0
                         ? t("hubSearchResultsSub", {
-                            count: searchProducts.length,
+                            count: searchTotal > 0 ? searchTotal : searchProducts.length,
                           })
-                        : t("emptyProducts")}
+                        : searchLoading
+                          ? t("loading")
+                          : t("emptyProducts")}
                     </p>
                   </div>
                   <Button
@@ -237,17 +326,30 @@ export function ConstructionMaterialsHub() {
                   </Button>
                 </div>
 
-                {searchProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {searchProducts.map((product) => (
-                      <MaterialsProductCard
-                        key={product.id}
-                        product={product}
-                        onCta={handleProductCta}
-                        ctaLoading={ctaLoadingId === product.id}
-                      />
-                    ))}
+                {searchLoading && searchProducts.length === 0 ? (
+                  <div className="flex items-center justify-center gap-2 py-14 text-slate-500">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    {t("loading")}
                   </div>
+                ) : searchProducts.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {searchProducts.map((product) => (
+                        <MaterialsProductCard
+                          key={product.id}
+                          product={product}
+                          onCta={handleProductCta}
+                          ctaLoading={ctaLoadingId === product.id}
+                        />
+                      ))}
+                    </div>
+                    <div ref={searchSentinelRef} className="h-8" />
+                    {searchLoadingMore ? (
+                      <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    ) : null}
+                  </>
                 ) : searchProviders.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-slate-500">
                     {t("emptyProducts")}
