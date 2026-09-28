@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Search } from "lucide-react";
@@ -15,7 +15,7 @@ import {
   resolveResaleCategoryKey,
   type ResaleMachine,
 } from "@/lib/machineResale/machineResaleHubCatalog";
-import { fetchResaleMachinesByCategory } from "@/lib/machineResale/machineResaleHubApi";
+import { fetchResaleMachinesPage } from "@/lib/machineResale/machineResaleHubApi";
 
 type Props = {
   typeKey: string;
@@ -29,18 +29,46 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
   const title = key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [machines, setMachines] = useState<ResaleMachine[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [query, setQuery] = useState("");
+  const requestSeqRef = useRef(0);
+  const loadMoreLockRef = useRef(false);
+  const loadMoreRef = useRef<() => void>(() => {});
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
+  const load = useCallback(
+    async (opts?: { page?: number; append?: boolean }) => {
+      const nextPage = Math.max(1, opts?.page ?? 1);
+      const append = Boolean(opts?.append) && nextPage > 1;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      const seq = ++requestSeqRef.current;
       try {
-        const rows = await fetchResaleMachinesByCategory(key);
-        if (!cancelled) setMachines(rows);
+        const result = await fetchResaleMachinesPage({
+          categoryId: key,
+          page: nextPage,
+          limit: 20,
+        });
+        if (seq !== requestSeqRef.current) return;
+        setPage(result.page);
+        setHasMore(result.page < result.pages && result.machines.length > 0);
+        setMachines((prev) => {
+          if (!append) return result.machines;
+          const seen = new Set(prev.map((m) => m.serviceId || m.id));
+          const extra = result.machines.filter((m) => {
+            const id = m.serviceId || m.id;
+            return id && !seen.has(id);
+          });
+          return extra.length ? [...prev, ...extra] : prev;
+        });
       } catch {
-        if (!cancelled) {
+        if (seq !== requestSeqRef.current) return;
+        if (!append) {
+          setMachines([]);
+          setHasMore(false);
           toast({
             title: t("loadErrorTitle"),
             description: t("loadErrorBody"),
@@ -48,13 +76,45 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
           });
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (seq === requestSeqRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [key, t, toast]);
+    },
+    [key, t, toast]
+  );
+
+  useEffect(() => {
+    void load({ page: 1 });
+  }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    if (loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    void load({ page: page + 1, append: true }).finally(() => {
+      window.setTimeout(() => {
+        loadMoreLockRef.current = false;
+      }, 300);
+    });
+  }, [hasMore, load, loading, loadingMore, page]);
+
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreRef.current();
+      },
+      { rootMargin: "240px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, machines.length]);
 
   const filtered = useMemo(() => {
     const pool = machines.filter((m) => m.available !== false);
@@ -133,6 +193,7 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
             </Button>
           </div>
         ) : (
+          <>
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {filtered.map((machine) => {
               const href = resaleMachineHref(machine);
@@ -169,6 +230,13 @@ export function MachineResaleCategoryClient({ typeKey }: Props) {
               );
             })}
           </div>
+          <div ref={sentinelRef} className="h-8" />
+          {loadingMore ? (
+            <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          ) : null}
+          </>
         )}
       </div>
     </div>
