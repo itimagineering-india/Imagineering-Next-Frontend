@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, MapPin, Search } from "lucide-react";
@@ -15,7 +15,7 @@ import {
   type RentalMachine,
 } from "@/lib/machineRental/machineRentalHubCatalog";
 import {
-  fetchRentalMachinesByCategory,
+  fetchRentalMachinesPage,
   RENTAL_NEARBY_RADIUS_KM,
 } from "@/lib/machineRental/machineRentalHubApi";
 
@@ -38,35 +38,60 @@ export function MachineRentalCategoryClient({ typeKey }: Props) {
   const title = key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [locationGateReady, setLocationGateReady] = useState(false);
   const [machines, setMachines] = useState<RentalMachine[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [query, setQuery] = useState("");
+  const requestSeqRef = useRef(0);
+  const loadMoreLockRef = useRef(false);
+  const loadMoreRef = useRef<() => void>(() => {});
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => setLocationGateReady(true), 120);
     return () => window.clearTimeout(id);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!hasLocation) {
-      setMachines([]);
-      setLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-    (async () => {
-      setLoading(true);
+  const load = useCallback(
+    async (opts?: { page?: number; append?: boolean }) => {
+      if (!hasLocation) {
+        setMachines([]);
+        setLoading(false);
+        return;
+      }
+      const nextPage = Math.max(1, opts?.page ?? 1);
+      const append = Boolean(opts?.append) && nextPage > 1;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      const seq = ++requestSeqRef.current;
       try {
-        const rows = await fetchRentalMachinesByCategory(key, {
+        const result = await fetchRentalMachinesPage({
+          categoryId: key,
+          page: nextPage,
+          limit: 20,
           lat: userLocation!.lat,
           lng: userLocation!.lng,
           radiusKm: RENTAL_NEARBY_RADIUS_KM,
         });
-        if (!cancelled) setMachines(rows);
+        if (seq !== requestSeqRef.current) return;
+        setPage(result.page);
+        setHasMore(result.page < result.pages && result.machines.length > 0);
+        setMachines((prev) => {
+          if (!append) return result.machines;
+          const seen = new Set(prev.map((m) => m.serviceId || m.id));
+          const extra = result.machines.filter((m) => {
+            const id = m.serviceId || m.id;
+            return id && !seen.has(id);
+          });
+          return extra.length ? [...prev, ...extra] : prev;
+        });
       } catch {
-        if (!cancelled) {
+        if (seq !== requestSeqRef.current) return;
+        if (!append) {
+          setMachines([]);
+          setHasMore(false);
           toast({
             title: t("loadErrorTitle"),
             description: t("loadErrorBody"),
@@ -74,13 +99,45 @@ export function MachineRentalCategoryClient({ typeKey }: Props) {
           });
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (seq === requestSeqRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hasLocation, key, t, toast, userLocation]);
+    },
+    [hasLocation, key, t, toast, userLocation]
+  );
+
+  useEffect(() => {
+    void load({ page: 1 });
+  }, [load]);
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore || !hasLocation) return;
+    if (loadMoreLockRef.current) return;
+    loadMoreLockRef.current = true;
+    void load({ page: page + 1, append: true }).finally(() => {
+      window.setTimeout(() => {
+        loadMoreLockRef.current = false;
+      }, 300);
+    });
+  }, [hasLocation, hasMore, load, loading, loadingMore, page]);
+
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreRef.current();
+      },
+      { rootMargin: "240px", threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, machines.length]);
 
   const awaitingLocation = !locationGateReady || locLoading;
   const showLocationPrompt = locationGateReady && !locLoading && !hasLocation;
@@ -229,6 +286,12 @@ export function MachineRentalCategoryClient({ typeKey }: Props) {
                   );
                 })}
               </div>
+              <div ref={sentinelRef} className="h-8" />
+              {loadingMore ? (
+                <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : null}
             )}
           </>
         )}
