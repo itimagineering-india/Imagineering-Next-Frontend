@@ -709,6 +709,10 @@ export const api = {
     getBySlug: (slug: string) => apiRequest(`/api/categories/slug/${slug}`),
     getSubcategories: (categorySlug: string) =>
       apiRequest(`/api/categories/subcategories/${categorySlug}`),
+    getItemTypes: (categorySlug: string, subcategoryName: string) =>
+      apiRequest(
+        `/api/categories/item-types/${encodeURIComponent(categorySlug)}/${encodeURIComponent(subcategoryName)}`
+      ),
   },
 
   // Services
@@ -935,6 +939,8 @@ export const api = {
       categorySlug?: string;
       subcategory?: string;
       materialTypeKey?: string;
+      itemType?: string;
+      productType?: string;
       hireMode?: string;
       search?: string;
       city?: string;
