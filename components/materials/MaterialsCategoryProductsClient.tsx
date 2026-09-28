@@ -22,6 +22,7 @@ import { useCart } from "@/contexts/CartContext";
 import {
   applyMaterialsProductFilters,
   filterMaterialsProducts,
+  MATERIALS_CATEGORY_SLUG,
   resolveMaterialsMaterialTypeKey,
   sortMaterialsProducts,
   type MaterialsProduct,
@@ -33,6 +34,14 @@ import {
   fetchCatalogProductsPage,
   findServiceIdForCatalogProduct,
 } from "@/lib/materials/materialsHubApi";
+import api from "@/lib/api-client";
+
+function formatCatalogTypeLabel(value: string): string {
+  const v = String(value || "").trim();
+  if (!v) return v;
+  if (/[\s/&-]/.test(v) || /[A-Z]/.test(v)) return v;
+  return v.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 type Props = {
   materialTypeKey: string;
@@ -46,7 +55,9 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
   const { addToCart } = useCart();
 
   const key = resolveMaterialsMaterialTypeKey(materialTypeKey) || materialTypeKey;
-  const title = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const [title, setTitle] = useState(() =>
+    key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -59,6 +70,9 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
   const [sort, setSort] = useState<MaterialsProductSort>("relevance");
   const [filters, setFilters] = useState<MaterialsProductFilters>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [categoryItemTypes, setCategoryItemTypes] = useState<string[]>([]);
+  const [facetItemTypes, setFacetItemTypes] = useState<string[]>([]);
+  const [facetProductTypes, setFacetProductTypes] = useState<string[]>([]);
   const [ctaLoadingId, setCtaLoadingId] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [quoteService, setQuoteService] = useState<{
@@ -84,6 +98,8 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
           page: nextPage,
           limit: CATALOG_CATEGORY_PAGE_SIZE,
           search: debouncedQuery,
+          ...(filters.itemType ? { itemType: filters.itemType } : {}),
+          ...(filters.productType ? { productType: filters.productType } : {}),
         });
         if (seq !== requestSeqRef.current) return;
         setPage(result.page);
@@ -114,13 +130,77 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
         }
       }
     },
-    [debouncedQuery, key, t, toast]
+    [debouncedQuery, filters.itemType, filters.productType, key, t, toast]
   );
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => {
+    setFilters({});
+    setFiltersOpen(false);
+    setCategoryItemTypes([]);
+    setFacetItemTypes([]);
+    setFacetProductTypes([]);
+    setTitle(key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+  }, [key]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [subRes, facetPage] = await Promise.all([
+          api.categories.getSubcategories(MATERIALS_CATEGORY_SLUG),
+          fetchCatalogProductsPage({
+            categoryId: key,
+            page: 1,
+            limit: 100,
+          }),
+        ]);
+        if (cancelled) return;
+
+        const payload = (subRes as { data?: unknown })?.data;
+        const detailsRaw =
+          payload && typeof payload === "object" && "subcategoryDetails" in payload
+            ? (payload as { subcategoryDetails?: unknown }).subcategoryDetails
+            : undefined;
+        const details = Array.isArray(detailsRaw) ? detailsRaw : [];
+        const matched = details.find((row) => {
+          if (!row || typeof row !== "object") return false;
+          const name = String((row as { name?: unknown }).name || "").trim();
+          if (!name) return false;
+          return resolveMaterialsMaterialTypeKey(name) === key;
+        }) as { name?: string; itemTypes?: unknown } | undefined;
+        if (matched?.name) setTitle(String(matched.name).trim());
+        const configured = Array.isArray(matched?.itemTypes)
+          ? matched.itemTypes.map(String).filter(Boolean)
+          : [];
+        setCategoryItemTypes(configured);
+
+        const itemSet = new Set<string>();
+        const productSet = new Set<string>();
+        for (const p of facetPage.products) {
+          const it = String(p.itemType || "").trim();
+          const pt = String(p.productType || "").trim();
+          if (it) itemSet.add(it);
+          if (pt) productSet.add(pt);
+        }
+        setFacetItemTypes(Array.from(itemSet));
+        setFacetProductTypes(Array.from(productSet));
+      } catch {
+        if (!cancelled) {
+          setCategoryItemTypes([]);
+          setFacetItemTypes([]);
+          setFacetProductTypes([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
 
   useEffect(() => {
     setPage(1);
@@ -133,6 +213,24 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [products]);
 
+  const itemTypeOptions = useMemo(() => {
+    const set = new Set<string>([...categoryItemTypes, ...facetItemTypes]);
+    products.forEach((p) => {
+      const v = String(p.itemType || "").trim();
+      if (v) set.add(v);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [categoryItemTypes, facetItemTypes, products]);
+
+  const productTypeOptions = useMemo(() => {
+    const set = new Set<string>(facetProductTypes);
+    products.forEach((p) => {
+      const v = String(p.productType || "").trim();
+      if (v) set.add(v);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [facetProductTypes, products]);
+
   const visible = useMemo(() => {
     const searched = filterMaterialsProducts(products, { query, categoryId: null });
     const filtered = applyMaterialsProductFilters(searched, filters);
@@ -142,9 +240,16 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
   const filterActive = Boolean(
     (filters.brands?.length ?? 0) > 0 ||
       filters.minRating != null ||
-      filters.priceMode != null
+      filters.priceMode != null ||
+      Boolean(filters.itemType) ||
+      Boolean(filters.productType)
   );
-  const displayedCount = filterActive ? visible.length : total > 0 ? total : visible.length;
+  const displayedCount =
+    filterActive && !filters.itemType && !filters.productType
+      ? visible.length
+      : total > 0
+        ? total
+        : visible.length;
 
   const loadMore = useCallback(() => {
     if (loading || loadingMore || !hasMore) return;
@@ -284,7 +389,9 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
                 variant="outline"
                 size="sm"
                 className={`h-8 shrink-0 rounded-full px-2.5 sm:px-3 ${
-                  filtersOpen ? "border-orange-300 bg-orange-50 text-orange-700" : "border-slate-200/90"
+                  filtersOpen || filterActive
+                    ? "border-orange-300 bg-orange-50 text-orange-700"
+                    : "border-slate-200/90"
                 }`}
                 onClick={() => setFiltersOpen((v) => !v)}
               >
@@ -296,6 +403,62 @@ export function MaterialsCategoryProductsClient({ materialTypeKey }: Props) {
 
           {filtersOpen ? (
             <div className="mt-3 grid gap-2.5 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              {itemTypeOptions.length > 0 ? (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {t("filterItemType")}
+                  </p>
+                  <Select
+                    value={filters.itemType || "__all__"}
+                    onValueChange={(v) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        itemType: v === "__all__" ? null : v,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 rounded-lg bg-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{t("allItemTypes")}</SelectItem>
+                      {itemTypeOptions.map((itemType) => (
+                        <SelectItem key={itemType} value={itemType}>
+                          {formatCatalogTypeLabel(itemType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              {productTypeOptions.length > 0 ? (
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {t("filterProductType")}
+                  </p>
+                  <Select
+                    value={filters.productType || "__all__"}
+                    onValueChange={(v) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        productType: v === "__all__" ? null : v,
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-9 rounded-lg bg-white text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{t("allProductTypes")}</SelectItem>
+                      {productTypeOptions.map((productType) => (
+                        <SelectItem key={productType} value={productType}>
+                          {formatCatalogTypeLabel(productType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               <div>
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   {t("filterBrand")}
