@@ -1,5 +1,3 @@
-"use client";
-
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import visionImage from "@/assets/vision-image.png";
 
@@ -45,7 +43,7 @@ const VisionSection = () => {
             <div className="w-full max-w-md overflow-hidden rounded-xl sm:rounded-2xl shadow-lg group-hover:shadow-2xl transition-all duration-500 group-hover:scale-105 relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10" />
               <img 
-                src={typeof visionImage === "string" ? visionImage : visionImage.src} 
+                src={visionImage} 
                 alt="Our vision - connecting people with trusted services" 
                 className="w-full h-auto object-cover group-hover:scale-110 transition-transform duration-700"
               />
