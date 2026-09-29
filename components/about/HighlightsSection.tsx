@@ -1,100 +1,63 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, MapPin, Clock3, Headphones, ClipboardCheck, Lightbulb } from "lucide-react";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 
 const highlights = [
   {
-    title: "Verified Network, Not a Directory",
-    description: "Every provider is vetted for documentation, licenses, responsiveness, and customer feedback before onboarding.",
-    icon: ShieldCheck,
-    badge: "Quality First",
+    title: "Verified providers, not a random listing",
+    description:
+      "We check documents, licenses, and past work before a provider goes live — so you’re not starting from scratch on trust.",
   },
   {
-    title: "Location-First Matching",
-    description: "Identify who can serve you fastest with map-based discovery, proximity matching, and indicative ETAs.",
-    icon: MapPin,
-    badge: "Speed",
+    title: "Nearby first",
+    description:
+      "Search is built around your location. You see who can actually reach the site — materials, manpower, machines, or contractors.",
   },
   {
-    title: "Transparent Engagement",
-    description: "Clear scope, indicative pricing, and verified reviews — so you decide with confidence.",
-    icon: ClipboardCheck,
-    badge: "Clarity",
+    title: "Quotes and bookings in one place",
+    description:
+      "Request a quote, compare offers, or book directly. Payments, status, and invoices stay on the platform instead of scattered chats.",
   },
   {
-    title: "Human Help + Automation",
-    description: "Concierge support for complex requirements, automated coordination for routine workflows.",
-    icon: Headphones,
-    badge: "Support",
+    title: "Support when the job gets messy",
+    description:
+      "Routine flows are automated. For complex requirements, our team helps coordinate so the work doesn’t stall.",
   },
-  {
-    title: "Built for On-Time Delivery",
-    description: "Milestones, reminders, and real-time status visibility help keep projects and rentals on track.",
-    icon: Clock3,
-    badge: "Reliability",
-  },
-  {
-    title: "Built with User Feedback",
-    description: "We roll out continuous improvements based on real feedback from buyers and providers.",
-    icon: Lightbulb,
-    badge: "Iteration",
-  },
-];
+] as const;
 
 const HighlightsSection = () => {
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.2 });
 
   return (
-    <section id="why" className="py-12 sm:py-16 md:py-20 bg-background">
-      <div className="container px-4 sm:px-6">
-        <div 
-          ref={ref}
-          className={`text-center max-w-3xl mx-auto mb-8 sm:mb-12 md:mb-12 transition-all duration-700 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
-        >
-          <Badge variant="outline" className="px-3 sm:px-3 py-1 text-[10px] sm:text-xs uppercase tracking-wide">
-          Why Teams Choose Imagineering India
-          </Badge>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mt-3 sm:mt-4">
-          A Professional, Trustworthy Way to Get Services Done
+    <section id="why" className="border-b border-border/60 bg-background py-12 sm:py-16 md:py-20">
+      <div
+        ref={ref}
+        className={`container mx-auto px-4 sm:px-6 transition-all duration-700 ${
+          isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+        }`}
+      >
+        <div className="max-w-2xl">
+          <h2 className="text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">
+            Why people use Imagineering India
           </h2>
-          <p className="text-muted-foreground text-sm sm:text-base md:text-lg mt-2 sm:mt-3">
-          From heavy machinery to logistics and real estate, we bring structure, transparency, and speed to every engagement.
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base md:text-lg">
+            Construction work needs the right people and materials near the site. That’s what this platform is built for.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {highlights.map((item, index) => (
-            <Card 
-              key={item.title}
-              className={`border-0 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-500 group overflow-hidden ${
-                isVisible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-6 scale-95"
-              }`}
-              style={{ transitionDelay: `${index * 60}ms` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-[hsl(var(--red-accent))]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-              <CardHeader className="space-y-2 sm:space-y-3 p-4 sm:p-6 relative z-10">
-                <div className="inline-flex items-center gap-2 sm:gap-2 rounded-full bg-primary/10 text-primary text-[10px] sm:text-xs font-semibold px-3 sm:px-3 py-1 group-hover:bg-primary/20 group-hover:scale-105 transition-all duration-300">
-                  <item.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 group-hover:rotate-12 transition-transform duration-300" />
-                  {item.badge}
-                </div>
-                <CardTitle className="text-base sm:text-lg group-hover:text-primary transition-colors duration-300">{item.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-xs sm:text-sm text-muted-foreground leading-relaxed p-4 sm:p-6 pt-0 relative z-10 group-hover:text-foreground transition-colors duration-300">
+        <ul className="mt-10 grid gap-8 sm:mt-12 md:grid-cols-2 md:gap-x-12 md:gap-y-10">
+          {highlights.map((item) => (
+            <li key={item.title} className="border-t border-border pt-5">
+              <h3 className="text-base font-semibold text-foreground sm:text-lg">{item.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
                 {item.description}
-              </CardContent>
-            </Card>
+              </p>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );
 };
 
 export default HighlightsSection;
-
