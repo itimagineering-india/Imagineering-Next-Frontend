@@ -1721,7 +1721,7 @@ export default function BuyerBookings() {
                               );
                               return (
                                 <details
-                                  key={`${item._id || index}`}
+                                  key={`${item._id || "item"}-${index}`}
                                   className="group px-3 py-2 text-sm"
                                 >
                                   <summary className="grid cursor-pointer list-none grid-cols-12 gap-2 [&::-webkit-details-marker]:hidden">
