@@ -1,7 +1,7 @@
 "use client";
 
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import visionImage from "@/assets/vision-image.jpg";
+import visionImage from "@/assets/vision-image.png";
 
 const VisionSection = () => {
   const { ref: textRef, isVisible: textVisible } = useScrollAnimation({ threshold: 0.2 });
