@@ -3552,7 +3552,7 @@ export const api = {
       if (raw.startsWith("/")) return `${API_BASE_URL.replace(/\/$/, "")}${raw}`;
       return null;
     },
-    /** Open invoice file in a new tab using the stored S3/CloudFront URL (never blob:). */
+    /** Open invoice file in a new tab (S3 URL, or generate via download when pdfUrl missing). */
     viewPdf: async (invoice: {
       _id?: string;
       pdfUrl?: string;
@@ -3566,6 +3566,19 @@ export const api = {
         const payload = (res as { data?: { invoice?: { pdfUrl?: string } } })?.data;
         const fetched = payload?.invoice ?? payload;
         url = api.invoices.resolveOpenUrl(fetched as { pdfUrl?: string });
+      }
+      if (!url && invoice._id && !String(invoice._id).startsWith("provider-upload")) {
+        const token = getAuthToken();
+        const response = await fetch(`${API_BASE_URL}/api/invoices/${invoice._id}/download`, {
+          headers: { ...bearerAuthHeaders(token) },
+          credentials: "include",
+        });
+        if (!response.ok) {
+          throw new Error(`Invoice file URL is not available (${response.status})`);
+        }
+        const blob = await response.blob();
+        window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
+        return;
       }
       if (!url) throw new Error("Invoice file URL is not available");
       window.open(url, "_blank", "noopener,noreferrer");
