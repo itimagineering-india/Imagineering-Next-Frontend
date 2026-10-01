@@ -9,7 +9,7 @@ const StorySection = () => {
   const { ref: textRef, isVisible: textVisible } = useScrollAnimation({ threshold: 0.2 });
 
   return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background">
+    <section className="py-12 sm:py-16 md:py-20 lg:py-16 bg-background">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="grid md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-center">
           <div
@@ -19,7 +19,7 @@ const StorySection = () => {
           >
             <div className="w-full max-w-md aspect-[4/3] bg-gradient-to-br from-[hsl(var(--red-accent))]/10 via-muted/50 to-[hsl(var(--red-accent))]/5 rounded-xl sm:rounded-2xl flex items-center justify-center relative overflow-hidden shadow-lg group-hover:shadow-2xl transition-all duration-500">
               <img
-                src={typeof awardImage === "string" ? awardImage : awardImage.src}
+                src={awardImage.src}
                 alt="Award"
                 className="w-full h-full object-cover rounded-xl sm:rounded-2xl relative z-10 group-hover:scale-105 transition-transform duration-500"
               />
