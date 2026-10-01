@@ -174,11 +174,31 @@ export function resolveMaterialsMaterialTypeKey(raw: string): string {
   if (n.includes('tile') || n.includes('flooring') || n === 'tiles_flooring') return 'tiles_flooring';
   if (n.includes('sanitary') || n === 'sanitary_bathroom') return 'sanitary';
   if (n.includes('paint')) return 'paint';
+  if (n.includes('concrete')) return 'concrete';
+  if (n.includes('admixture')) return 'admixture';
+  if (n.includes('gsb') || n.includes('copra')) return 'gsb';
+  if (n.includes('hardware')) return 'hardware';
+  if (n.includes('fencing') || n.includes('fencing_pole')) return 'fencing_poles';
   // Word-boundary: avoid false positives like "standard_tools" → sand
   if (n === 'sand' || /(^|_)sand($|_)/.test(n)) return 'sand';
   if (n === 'other') return 'other';
   if (
-    ['cement', 'sand', 'steel', 'aggregate', 'bricks', 'tiles_flooring', 'sanitary', 'paint', 'other'].includes(n)
+    [
+      'cement',
+      'sand',
+      'steel',
+      'aggregate',
+      'bricks',
+      'tiles_flooring',
+      'sanitary',
+      'paint',
+      'concrete',
+      'admixture',
+      'gsb',
+      'hardware',
+      'fencing_poles',
+      'other',
+    ].includes(n)
   ) {
     return n;
   }
