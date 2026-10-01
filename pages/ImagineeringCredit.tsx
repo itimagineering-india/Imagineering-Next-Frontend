@@ -298,24 +298,32 @@ function ImagineeringCreditPublicPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-1 page-shell space-y-8 pb-12 sm:space-y-10 sm:pb-14">
         <div className="mx-auto max-w-4xl space-y-8 sm:space-y-10">
-          <div className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 px-5 py-8 text-white shadow-lg sm:px-8 sm:py-10">
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-zinc-900/15 bg-[#141816] px-5 py-8 text-white shadow-[0_24px_60px_-28px_rgba(20,24,22,0.7)] sm:px-8 sm:py-10">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.12]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(rgba(255,255,255,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.09) 1px, transparent 1px)",
+                backgroundSize: "28px 28px",
+              }}
+            />
+            <div className="pointer-events-none absolute -right-16 top-0 h-48 w-48 rounded-full bg-[#D97706]/20 blur-3xl" />
             <div className="relative z-10">
-              <div className="flex items-center gap-2 text-white/90">
-                <CreditCard className="h-5 w-5" />
-                <span className="text-sm font-medium">Imagineering India</span>
-              </div>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-4xl">{IMAGINEERING_CREDIT.name}</h1>
-              <p className="mt-2 text-base text-white/90 sm:text-lg">{IMAGINEERING_CREDIT.tagline}</p>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/80">{IMAGINEERING_CREDIT.oneLiner}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#FBBF24]">
+                Imagineering India
+              </p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">{IMAGINEERING_CREDIT.name}</h1>
+              <p className="mt-2 text-base text-white/75 sm:text-lg">{IMAGINEERING_CREDIT.tagline}</p>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/55">{IMAGINEERING_CREDIT.oneLiner}</p>
               <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                <Button asChild size="lg" className="bg-white text-indigo-700 hover:bg-white/90">
+                <Button asChild size="lg" className="bg-[#D97706] text-white hover:bg-[#B45309]">
                   <Link href="/login?redirect=/imagineering-credit">Sign in to apply</Link>
                 </Button>
                 <Button
                   asChild
                   size="lg"
                   variant="secondary"
-                  className="border-0 bg-white/15 text-white hover:bg-white/25"
+                  className="border-0 bg-white/10 text-white hover:bg-white/15"
                 >
                   <Link href="/signup">Create free account</Link>
                 </Button>
@@ -855,36 +863,105 @@ export default function ImagineeringCreditPage() {
     return <ImagineeringCreditPublicPage />;
   }
 
+  const isActiveAccount = Boolean(account && account.status === "active");
+  const usagePct =
+    account && account.creditLimit > 0
+      ? Math.min(100, Math.round((account.creditUsed / account.creditLimit) * 100))
+      : 0;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <main className="flex-1 page-shell space-y-6 sm:space-y-8 pb-10">
-        <div className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 px-5 py-8 text-white shadow-lg sm:px-8 sm:py-10">
-          <div className="relative z-10 mx-auto max-w-4xl">
-            <Button
-              asChild
-              variant="secondary"
-              size="sm"
-              className="mb-5 bg-white/15 text-white hover:bg-white/25 border-0"
-            >
-              <Link href="/profile">
-                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                Back to profile
-              </Link>
-            </Button>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 text-white/90">
-                  <CreditCard className="h-5 w-5" />
-                  <span className="text-sm font-medium">Imagineering India</span>
-                </div>
-                <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{IMAGINEERING_CREDIT.name}</h1>
-                <p className="mt-1 text-base text-white/90 sm:text-lg">{tagline}</p>
-                <p className="mt-1 text-sm text-white/75">Not {IMAGINEERING_WALLET.name.toLowerCase()} — a repayable credit line for full orders</p>
+        <header className="relative overflow-hidden rounded-[1.75rem] border border-zinc-900/15 bg-[#141816] text-white shadow-[0_24px_60px_-28px_rgba(20,24,22,0.7)]">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.12]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.09) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+            }}
+          />
+          <div className="pointer-events-none absolute -right-20 top-0 h-56 w-56 rounded-full bg-[#D97706]/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-16 bottom-0 h-40 w-40 rounded-full bg-teal-600/15 blur-3xl" />
+
+          <div className="relative z-10 px-5 py-7 sm:px-8 sm:py-9">
+            <div className="mx-auto max-w-4xl">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-white/70 hover:bg-white/10 hover:text-white"
+                >
+                  <Link href="/profile">
+                    <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                    Profile
+                  </Link>
+                </Button>
+                {account ? (
+                  <Badge className="border-0 bg-[#D97706] text-white hover:bg-[#D97706]">
+                    {account.status === "active" ? "Active line" : account.status}
+                  </Badge>
+                ) : null}
               </div>
+
+              <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#FBBF24]">
+                Imagineering India
+              </p>
+              <h1 className="mt-2 max-w-xl text-3xl font-semibold tracking-tight sm:text-5xl">
+                {IMAGINEERING_CREDIT.name}
+              </h1>
+              <p className="mt-2 max-w-lg text-base text-white/75 sm:text-lg">
+                {tagline}
+              </p>
+              <p className="mt-2 max-w-md text-sm text-white/50">
+                Separate from {IMAGINEERING_WALLET.name} — repayable credit for full orders.
+              </p>
+
+              {isActiveAccount && account ? (
+                <div className="mt-8 grid gap-5 border-t border-white/10 pt-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-white/45">
+                      Available to spend
+                    </p>
+                    <p className="mt-1 text-4xl font-semibold tracking-tight sm:text-5xl">
+                      {formatInr(account.availableCredit)}
+                    </p>
+                    <p className="mt-2 text-sm text-white/50">
+                      of {formatInr(account.creditLimit)} total limit
+                    </p>
+                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-[#FBBF24] transition-all"
+                        style={{ width: `${usagePct}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-white/40">{usagePct}% of limit in use</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">
+                    {[
+                      { label: "Used", value: formatInr(account.creditUsed) },
+                      { label: "Outstanding", value: formatInr(account.outstanding) },
+                      {
+                        label: "Next due",
+                        value: account.nextDueDate ? formatDate(account.nextDueDate) : "—",
+                      },
+                    ].map((m) => (
+                      <div
+                        key={m.label}
+                        className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 backdrop-blur-sm"
+                      >
+                        <p className="text-[11px] uppercase tracking-wide text-white/45">{m.label}</p>
+                        <p className="mt-1 text-lg font-semibold tabular-nums">{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-        </div>
+        </header>
 
         <div className="mx-auto max-w-4xl space-y-6 sm:space-y-8">
           {!loading && !account && (
@@ -1137,69 +1214,50 @@ export default function ImagineeringCreditPage() {
             </CardContent>
           </Card>
         ) : account.status === "invited" ? (
-          <Card className="overflow-hidden border-indigo-200 dark:border-indigo-900/50">
-            <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 p-6 text-white sm:p-8">
-              <div className="flex items-center gap-2 text-white/90">
-                <CreditCard className="h-5 w-5" />
-                <span className="text-sm font-medium">Congratulations!</span>
+          <Card className="overflow-hidden border-zinc-900/15 bg-[#141816] text-white shadow-[0_20px_50px_-24px_rgba(20,24,22,0.55)]">
+            <div className="relative p-6 sm:p-8">
+              <div
+                className="pointer-events-none absolute inset-0 opacity-[0.1]"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                }}
+              />
+              <div className="relative z-10">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#FBBF24]">
+                  Ready to activate
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                  Your line is approved
+                </h2>
+                <p className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
+                  {formatInr(account.creditLimit)}
+                </p>
+                <p className="mt-2 text-sm text-white/60">
+                  {IMAGINEERING_CREDIT.name} ·{" "}
+                  {account.validityType === "lifetime" ? "Lifetime validity" : "Limited validity"}
+                </p>
+                <Button
+                  onClick={handleActivate}
+                  disabled={activating}
+                  className="mt-6 bg-[#D97706] text-white hover:bg-[#B45309]"
+                  size="lg"
+                >
+                  {activating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Activating…
+                    </>
+                  ) : (
+                    "Activate Now"
+                  )}
+                </Button>
               </div>
-              <h2 className="mt-2 text-2xl font-bold sm:text-3xl">You&apos;ve unlocked</h2>
-              <p className="mt-1 text-3xl font-bold sm:text-4xl">{formatInr(account.creditLimit)}</p>
-              <p className="mt-1 text-lg font-medium">{IMAGINEERING_CREDIT.name}</p>
-              <div className="mt-4 space-y-1 text-sm text-white/85">
-                <p>Available Limit: {formatInr(account.creditLimit)}</p>
-                <p>Validity: {account.validityType === "lifetime" ? "Lifetime" : "Limited"}</p>
-              </div>
-              <Button
-                onClick={handleActivate}
-                disabled={activating}
-                className="mt-6 bg-white text-indigo-700 hover:bg-white/90"
-                size="lg"
-              >
-                {activating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Activating…
-                  </>
-                ) : (
-                  "Activate Now"
-                )}
-              </Button>
             </div>
           </Card>
         ) : (
           <>
-            <Card className="overflow-hidden">
-              <div className="bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 p-6 text-white">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-white/80">Credit Limit</p>
-                    <p className="text-3xl font-bold">{formatInr(account.creditLimit)}</p>
-                  </div>
-                </div>
-                <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-white/70">Available</p>
-                    <p className="text-xl font-semibold">{formatInr(account.availableCredit)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-white/70">Used</p>
-                    <p className="text-xl font-semibold">{formatInr(account.creditUsed)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-white/70">Outstanding</p>
-                    <p className="text-xl font-semibold">{formatInr(account.outstanding)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-white/70">Next Due</p>
-                    <p className="text-xl font-semibold">
-                      {account.nextDueDate ? formatDate(account.nextDueDate) : "—"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
             {account.status !== "active" && (
               <Card className="border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20">
                 <CardContent className="pt-6 text-sm text-amber-900 dark:text-amber-200">
@@ -1208,24 +1266,31 @@ export default function ImagineeringCreditPage() {
               </Card>
             )}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4" />
-                  Pay on time — earn rewards
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>+ Imagineering Points on timely repayment</p>
-                <p>+ Automatic credit limit increases</p>
-                <p>+ Lower processing fees</p>
-                <p>+ Priority support</p>
-                <p className="pt-2 text-xs">
-                  Submit a repayment request below after transferring to Imagineering India. Our team verifies and
-                  updates your balance.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="grid gap-4 sm:grid-cols-[1.1fr_0.9fr]">
+              <Card className="border-zinc-900/10 shadow-none">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-[#D97706]" />
+                    Pay on time — earn rewards
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>+ Imagineering Points on timely repayment</p>
+                  <p>+ Automatic credit limit increases</p>
+                  <p>+ Lower processing fees</p>
+                  <p>+ Priority support</p>
+                </CardContent>
+              </Card>
+              <Card className="border-zinc-900/10 bg-muted/40 shadow-none">
+                <CardContent className="space-y-2 pt-6 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">How repayments work</p>
+                  <p>
+                    After transferring to Imagineering India, submit a repayment request below with your
+                    UTR/reference. Our team verifies and updates your balance.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
             {account.outstanding > 0 && account.status === "active" && (
               <Card>
