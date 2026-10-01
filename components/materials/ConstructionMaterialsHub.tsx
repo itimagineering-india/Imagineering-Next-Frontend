@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Loader2,
   Star,
-  Truck,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { MaterialsProductRail } from "@/components/materials/MaterialsProductRail";
@@ -617,24 +616,6 @@ export function ConstructionMaterialsHub() {
                     </div>
                   );
                 })}
-              </div>
-            </section>
-
-            <section className="sticky bottom-4 z-20">
-              <div className="flex flex-col gap-3 border border-slate-800 bg-slate-950 p-4 text-white shadow-2xl sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
-                <div className="flex items-start gap-3">
-                  <Truck className="mt-0.5 h-5 w-5 shrink-0 text-orange-400" />
-                  <div>
-                    <p className="font-bold">{t("bulkBannerTitle")}</p>
-                    <p className="mt-0.5 text-sm text-slate-400">{t("bulkBannerBody")}</p>
-                  </div>
-                </div>
-                <Link
-                  href="/requirement/submit"
-                  className="inline-flex h-11 shrink-0 items-center justify-center bg-[hsl(var(--red-accent))] px-5 text-sm font-semibold text-white transition hover:brightness-110"
-                >
-                  {t("bulkBannerCta")}
-                </Link>
               </div>
             </section>
             </>
