@@ -12,6 +12,10 @@ import aggregate from "@/assets/services/constructionMaterial/aggregate.png";
 import paint from "@/assets/services/constructionMaterial/paint.png";
 import tiles from "@/assets/services/constructionMaterial/tiles.png";
 import rccPipe from "@/assets/services/constructionMaterial/rccPipe.webp";
+import concrete from "@/assets/services/constructionMaterial/concrete.png";
+import hardware from "@/assets/services/constructionMaterial/hardware.png";
+import gsb from "@/assets/services/constructionMaterial/gsb.png";
+import fencingPoles from "@/assets/services/constructionMaterial/fencingPoles.png";
 import materialsFallback from "@/assets/services/materials.png";
 
 const CATEGORY_ART: Record<string, StaticImageData> = {
@@ -30,8 +34,20 @@ const CATEGORY_ART: Record<string, StaticImageData> = {
   rcc: rccPipe,
   "rcc-pipe": rccPipe,
   rcc_pipe: rccPipe,
-  concrete: cementBag,
-  admixture: cementBag,
+  concrete,
+  admixture: paint,
+  gsb,
+  "gsb-copra": gsb,
+  gsb_copra: gsb,
+  copra: gsb,
+  sanitary: tiles,
+  sanitary_bathroom: tiles,
+  "sanitary-bathroom": tiles,
+  hardware,
+  fencing: fencingPoles,
+  "fencing-poles": fencingPoles,
+  fencing_poles: fencingPoles,
+  fencingpoles: fencingPoles,
 };
 
 export function getMaterialsCategoryArt(id: MaterialsCategoryId): StaticImageData {
