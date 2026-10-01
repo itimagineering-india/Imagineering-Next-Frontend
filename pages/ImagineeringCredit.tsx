@@ -30,7 +30,6 @@ import {
   Circle,
   Clock,
   CreditCard,
-  Crown,
   HelpCircle,
   Loader2,
   ShieldCheck,
@@ -93,14 +92,6 @@ type CreditTxn = {
   occurredAt: string;
 };
 
-const TIER_LABELS: Record<string, { label: string; color: string }> = {
-  bronze: { label: "Bronze", color: "bg-amber-700/10 text-amber-800" },
-  silver: { label: "Silver", color: "bg-slate-500/10 text-slate-700" },
-  gold: { label: "Gold", color: "bg-yellow-500/10 text-yellow-800" },
-  platinum: { label: "Platinum", color: "bg-indigo-500/10 text-indigo-800" },
-  diamond: { label: "Diamond", color: "bg-violet-500/10 text-violet-800" },
-};
-
 const LEDGER_LABELS: Record<string, string> = {
   credit_granted: "Credit granted",
   credit_used: "Purchase",
@@ -135,12 +126,12 @@ const IMAGINEERING_CREDIT_FAQ = [
   {
     id: "repay",
     q: "How do repayments work?",
-    a: "After you use credit, the amount is added to your outstanding balance with a due date (typically 30 days). Repay via bank transfer to Imagineering India and submit a repayment request on this page with your UTR/reference. Our team verifies and updates your balance.",
+    a: "Use credit anytime in the month. When you repay, choose a 1, 2, or 3 month EMI plan. Flat interest (set by Imagineering India) is added, then pay each EMI online via Razorpay/Cashfree. Missed EMIs may attract a fixed late fee.",
   },
   {
     id: "limits",
     q: "What credit limits are available?",
-    a: "Limits start from ₹5,000 (Bronze) and can go up to ₹5,00,000 (Diamond) based on your trust score and profile. Pay on time to unlock higher tiers over time.",
+    a: "Your credit limit is set after KYC approval based on your trust score and profile (typically ₹5,000–₹5,00,000). Pay on time to keep your line healthy and grow your limit over time.",
   },
   {
     id: "vs-rewards",
@@ -175,18 +166,10 @@ const HOW_IT_WORKS = [
   },
   {
     step: 4,
-    title: "Repay on time",
-    description: "Repay within the due date (typically 30 days) to keep your limit active and unlock higher tiers.",
+    title: "Choose EMI & repay online",
+    description: "Pick 1/2/3 months for your outstanding, then pay EMIs via Razorpay or Cashfree.",
     icon: Clock,
   },
-] as const;
-
-const CREDIT_TIERS = [
-  { tier: "Bronze", limit: "₹5,000" },
-  { tier: "Silver", limit: "₹25,000" },
-  { tier: "Gold", limit: "₹50,000" },
-  { tier: "Platinum", limit: "₹1,00,000" },
-  { tier: "Diamond", limit: "₹5,00,000" },
 ] as const;
 
 const USE_CASES = [
@@ -390,44 +373,24 @@ function ImagineeringCreditPublicPage() {
             <JourneySteps currentStep={0} />
           </section>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Credit limit tiers</CardTitle>
-                <CardDescription>Based on trust score & profile after KYC approval</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                {CREDIT_TIERS.map((t) => (
-                  <div key={t.tier} className="flex justify-between rounded-lg bg-muted/40 px-3 py-2">
-                    <span className="flex items-center gap-1.5">
-                      <Crown className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t.tier}
-                    </span>
-                    <span className="font-medium">{t.limit}</span>
-                  </div>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Use across Imagineering India</CardTitle>
+              <CardDescription>Wherever {IMAGINEERING_CREDIT.name} appears at checkout</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {USE_CASES.map((item) => (
+                  <Badge key={item} variant="secondary">
+                    {item}
+                  </Badge>
                 ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Use across Imagineering India</CardTitle>
-                <CardDescription>Wherever {IMAGINEERING_CREDIT.name} appears at checkout</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {USE_CASES.map((item) => (
-                    <Badge key={item} variant="secondary">
-                      {item}
-                    </Badge>
-                  ))}
-                </div>
-                <Button asChild variant="outline" className="mt-4 w-full sm:w-auto">
-                  <Link href="/services">Browse services</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+              <Button asChild variant="outline" className="mt-4 w-full sm:w-auto">
+                <Link href="/services">Browse services</Link>
+              </Button>
+            </CardContent>
+          </Card>
 
           <Card className="border-indigo-100/80 dark:border-indigo-900/40">
             <CardHeader>
@@ -443,7 +406,7 @@ function ImagineeringCreditPublicPage() {
                   "Full order payment from your credit line",
                   "Higher limits as you build trust on the platform",
                   "Works on cart, manpower, quotes & dynamic booking",
-                  "Timely repayment unlocks tier upgrades",
+                  "Timely repayment keeps your credit line healthy",
                   "Separate from wallet rewards — clear at checkout",
                 ].map((point) => (
                   <li key={point} className="flex items-start gap-2">
@@ -541,17 +504,43 @@ export default function ImagineeringCreditPage() {
   const [repayNotes, setRepayNotes] = useState("");
   const [submittingRepay, setSubmittingRepay] = useState(false);
   const [repaymentRequests, setRepaymentRequests] = useState<RepaymentRequestRow[]>([]);
+  const [planPreview, setPlanPreview] = useState<{
+    unplannedPrincipalInr: number;
+    settings: { interestPercentPerMonth: number; lateFeeInr: number };
+    options: Array<{
+      tenureMonths: number;
+      totalInterestInr: number;
+      totalPayableInr: number;
+      emiAmountInr: number;
+    }>;
+  } | null>(null);
+  const [nextPayable, setNextPayable] = useState<{
+    plan: { id: string };
+    installment: {
+      id: string;
+      sequence: number;
+      dueDate: string;
+      amountDueInr: number;
+      lateFeeInr: number;
+      status: string;
+    };
+  } | null>(null);
+  const [payingEmi, setPayingEmi] = useState(false);
+  const [creatingPlan, setCreatingPlan] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [meRes, txnRes, stmtRes, eligibilityRes, repayRes] = await Promise.all([
-        api.imagineeringCredit.getMe(),
-        api.imagineeringCredit.getTransactions({ limit: 10 }),
-        api.imagineeringCredit.getStatement(),
-        api.imagineeringCredit.getEligibility(),
-        api.imagineeringCredit.getRepaymentRequests(),
-      ]);
+      const [meRes, txnRes, stmtRes, eligibilityRes, repayRes, previewRes, plansRes] =
+        await Promise.all([
+          api.imagineeringCredit.getMe(),
+          api.imagineeringCredit.getTransactions({ limit: 10 }),
+          api.imagineeringCredit.getStatement(),
+          api.imagineeringCredit.getEligibility(),
+          api.imagineeringCredit.getRepaymentRequests(),
+          api.imagineeringCredit.previewRepaymentPlans(),
+          api.imagineeringCredit.getRepaymentPlans(),
+        ]);
       if (meRes.success && meRes.data) {
         const d = meRes.data as { account?: CreditAccount; tagline?: string };
         setAccount(d.account ?? null);
@@ -587,6 +576,12 @@ export default function ImagineeringCreditPage() {
       }
       if (repayRes.success && repayRes.data) {
         setRepaymentRequests((repayRes.data as { requests: RepaymentRequestRow[] }).requests ?? []);
+      }
+      if (previewRes.success && previewRes.data) {
+        setPlanPreview(previewRes.data as typeof planPreview);
+      }
+      if (plansRes.success && plansRes.data) {
+        setNextPayable((plansRes.data as { nextPayable: typeof nextPayable }).nextPayable ?? null);
       }
     } finally {
       setLoading(false);
@@ -735,7 +730,101 @@ export default function ImagineeringCreditPage() {
     }
   };
 
-  const tierInfo = account ? TIER_LABELS[account.tier] ?? TIER_LABELS.bronze : null;
+  const handleCreatePlan = async (tenureMonths: number) => {
+    setCreatingPlan(true);
+    try {
+      const res = await api.imagineeringCredit.createRepaymentPlan({ tenureMonths });
+      if (!res.success) throw new Error(res.error?.message || "Could not create plan");
+      toast({ title: `${tenureMonths}-month EMI plan created` });
+      await loadData();
+    } catch (err: unknown) {
+      toast({
+        title: "Plan failed",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingPlan(false);
+    }
+  };
+
+  const handlePayEmiRazorpay = async () => {
+    if (!nextPayable) return;
+    setPayingEmi(true);
+    try {
+      const orderRes = await api.imagineeringCredit.createEmiOrder({
+        planId: String(nextPayable.plan.id),
+        installmentId: nextPayable.installment.id,
+        gateway: "razorpay",
+      });
+      if (!orderRes.success || !orderRes.data) {
+        throw new Error(orderRes.error?.message || "Could not create payment");
+      }
+      const od = orderRes.data as {
+        paymentId: string;
+        orderId: string;
+        amount: number;
+        currency: string;
+        key?: string;
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+        if (existing && (window as any).Razorpay) {
+          resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Failed to load Razorpay"));
+        document.body.appendChild(script);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const rzp = new (window as any).Razorpay({
+          key: od.key,
+          amount: od.amount,
+          currency: od.currency || "INR",
+          name: "Imagineering India",
+          description: `Credit EMI #${nextPayable.installment.sequence}`,
+          order_id: od.orderId,
+          handler: async (response: {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }) => {
+            try {
+              const verifyRes = await api.imagineeringCredit.verifyEmiRazorpay({
+                paymentId: od.paymentId,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              });
+              if (!verifyRes.success) {
+                throw new Error(verifyRes.error?.message || "Verification failed");
+              }
+              toast({ title: "EMI paid successfully" });
+              await loadData();
+              resolve();
+            } catch (e) {
+              reject(e);
+            }
+          },
+          modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
+        });
+        rzp.open();
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Payment failed";
+      if (msg !== "Payment cancelled") {
+        toast({ title: "EMI payment failed", description: msg, variant: "destructive" });
+      }
+    } finally {
+      setPayingEmi(false);
+    }
+  };
+
   const orderProgress = Math.min(100, Math.round((completedOrders / minOrdersRequired) * 100));
   const currentJourneyStep = journeyStepIndex({
     completedOrders,
@@ -792,12 +881,6 @@ export default function ImagineeringCreditPage() {
                 <p className="mt-1 text-base text-white/90 sm:text-lg">{tagline}</p>
                 <p className="mt-1 text-sm text-white/75">Not {IMAGINEERING_WALLET.name.toLowerCase()} — a repayable credit line for full orders</p>
               </div>
-              {account && tierInfo && (
-                <Badge className={`${tierInfo.color} border-0 shrink-0`}>
-                  <Crown className="mr-1 h-3 w-3" />
-                  {tierInfo.label} tier
-                </Badge>
-              )}
             </div>
           </div>
           <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
@@ -1048,7 +1131,7 @@ export default function ImagineeringCreditPage() {
                   <Link href="/services">Browse services</Link>
                 </Button>
                 <Button asChild variant="ghost">
-                  <Link href="/dashboard/buyer/orders">View my orders</Link>
+                  <Link href="/buyer/orders">View my orders</Link>
                 </Button>
               </div>
             </CardContent>
@@ -1093,12 +1176,6 @@ export default function ImagineeringCreditPage() {
                     <p className="text-sm text-white/80">Credit Limit</p>
                     <p className="text-3xl font-bold">{formatInr(account.creditLimit)}</p>
                   </div>
-                  {tierInfo && (
-                    <Badge className={`${tierInfo.color} border-0`}>
-                      <Crown className="mr-1 h-3 w-3" />
-                      {tierInfo.label}
-                    </Badge>
-                  )}
                 </div>
                 <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <div>
@@ -1131,108 +1208,124 @@ export default function ImagineeringCreditPage() {
               </Card>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Credit Score Tiers</CardTitle>
-                  <CardDescription>Unlock higher limits based on trust</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {[
-                    { tier: "Bronze", limit: "₹5,000" },
-                    { tier: "Silver", limit: "₹25,000" },
-                    { tier: "Gold", limit: "₹50,000" },
-                    { tier: "Platinum", limit: "₹1,00,000" },
-                    { tier: "Diamond", limit: "₹5,00,000" },
-                  ].map((t) => (
-                    <div
-                      key={t.tier}
-                      className={`flex justify-between rounded-lg px-3 py-2 ${
-                        tierInfo?.label === t.tier ? "bg-indigo-50 font-medium dark:bg-indigo-950/30" : "bg-muted/40"
-                      }`}
-                    >
-                      <span>{t.tier}</span>
-                      <span>{t.limit}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Pay on time — earn rewards
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm text-muted-foreground">
-                  <p>+ Imagineering Points on timely repayment</p>
-                  <p>+ Automatic credit limit increases</p>
-                  <p>+ Lower processing fees</p>
-                  <p>+ Priority support</p>
-                  <p className="pt-2 text-xs">
-                    Submit a repayment request below after transferring to Imagineering India. Our team verifies and
-                    updates your balance.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Pay on time — earn rewards
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>+ Imagineering Points on timely repayment</p>
+                <p>+ Automatic credit limit increases</p>
+                <p>+ Lower processing fees</p>
+                <p>+ Priority support</p>
+                <p className="pt-2 text-xs">
+                  Submit a repayment request below after transferring to Imagineering India. Our team verifies and
+                  updates your balance.
+                </p>
+              </CardContent>
+            </Card>
 
             {account.outstanding > 0 && account.status === "active" && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Submit repayment</CardTitle>
+                  <CardTitle className="text-base">Repay with EMI</CardTitle>
                   <CardDescription>
-                    Outstanding: {formatInr(account.outstanding)} — include UTR/reference for faster verification
+                    Outstanding principal: {formatInr(account.outstanding)}. Choose 1 / 2 / 3 months
+                    {planPreview?.settings
+                      ? ` · interest ${planPreview.settings.interestPercentPerMonth}%/mo · late fee ${formatInr(planPreview.settings.lateFeeInr)}`
+                      : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="repay-amount">Amount (₹)</Label>
-                      <Input
-                        id="repay-amount"
-                        type="number"
-                        value={repayAmount}
-                        onChange={(e) => setRepayAmount(e.target.value)}
-                        placeholder={String(account.outstanding)}
-                      />
+                  {nextPayable ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
+                      <p className="text-sm font-medium text-emerald-900">
+                        Next EMI #{nextPayable.installment.sequence}:{" "}
+                        {formatInr(nextPayable.installment.amountDueInr)}
+                        {nextPayable.installment.lateFeeInr > 0
+                          ? ` (includes late fee ${formatInr(nextPayable.installment.lateFeeInr)})`
+                          : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Due {new Date(nextPayable.installment.dueDate).toLocaleDateString("en-IN")} ·{" "}
+                        {nextPayable.installment.status}
+                      </p>
+                      <Button onClick={() => void handlePayEmiRazorpay()} disabled={payingEmi}>
+                        {payingEmi ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Pay EMI with Razorpay
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="repay-ref">Payment reference / UTR</Label>
-                      <Input
-                        id="repay-ref"
-                        value={repayReference}
-                        onChange={(e) => setRepayReference(e.target.value)}
-                        placeholder="NEFT/IMPS UTR"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="repay-notes">Notes (optional)</Label>
-                    <Input
-                      id="repay-notes"
-                      value={repayNotes}
-                      onChange={(e) => setRepayNotes(e.target.value)}
-                    />
-                  </div>
-                  <Button onClick={() => void handleRepaymentRequest()} disabled={submittingRepay}>
-                    {submittingRepay ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Submit repayment request
-                  </Button>
-                  {repaymentRequests.length > 0 && (
-                    <ul className="divide-y text-sm">
-                      {repaymentRequests.map((req) => (
-                        <li key={req._id} className="flex justify-between py-2">
-                          <span>
-                            {formatInr(req.amount)}
-                            {req.paymentReference ? ` · ${req.paymentReference}` : ""}
-                          </span>
-                          <Badge variant="secondary">{req.status}</Badge>
-                        </li>
+                  ) : planPreview && planPreview.unplannedPrincipalInr > 0 ? (
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {planPreview.options.map((opt) => (
+                        <button
+                          key={opt.tenureMonths}
+                          type="button"
+                          disabled={creatingPlan}
+                          onClick={() => void handleCreatePlan(opt.tenureMonths)}
+                          className="rounded-lg border border-slate-200 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                        >
+                          <p className="font-semibold">{opt.tenureMonths} month{opt.tenureMonths > 1 ? "s" : ""}</p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            EMI ~ {formatInr(opt.emiAmountInr)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Interest {formatInr(opt.totalInterestInr)} · Total {formatInr(opt.totalPayableInr)}
+                          </p>
+                        </button>
                       ))}
-                    </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No EMI due right now.</p>
                   )}
+
+                  <details className="rounded-lg border border-dashed p-3">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      Alternate: bank transfer + UTR (manual verify)
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="repay-amount">Amount (₹)</Label>
+                          <Input
+                            id="repay-amount"
+                            type="number"
+                            value={repayAmount}
+                            onChange={(e) => setRepayAmount(e.target.value)}
+                            placeholder={String(account.outstanding)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="repay-ref">Payment reference / UTR</Label>
+                          <Input
+                            id="repay-ref"
+                            value={repayReference}
+                            onChange={(e) => setRepayReference(e.target.value)}
+                            placeholder="NEFT/IMPS UTR"
+                          />
+                        </div>
+                      </div>
+                      <Button onClick={() => void handleRepaymentRequest()} disabled={submittingRepay} variant="outline">
+                        {submittingRepay ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Submit repayment request
+                      </Button>
+                      {repaymentRequests.length > 0 && (
+                        <ul className="divide-y text-sm">
+                          {repaymentRequests.map((req) => (
+                            <li key={req._id} className="flex justify-between py-2">
+                              <span>
+                                {formatInr(req.amount)}
+                                {req.paymentReference ? ` · ${req.paymentReference}` : ""}
+                              </span>
+                              <Badge variant="secondary">{req.status}</Badge>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </details>
                 </CardContent>
               </Card>
             )}
