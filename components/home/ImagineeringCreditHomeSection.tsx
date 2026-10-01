@@ -18,19 +18,12 @@ const HIGHLIGHTS = [
   { icon: ShieldCheck, text: "Unlock after orders + KYC verification" },
 ] as const;
 
-const TIERS = [
-  { label: "Bronze", limit: "₹5K" },
-  { label: "Gold", limit: "₹50K" },
-  { label: "Diamond", limit: "₹5L" },
-] as const;
-
 export function ImagineeringCreditHomeSection() {
   return (
     <section className="py-8 md:py-12" aria-label={IMAGINEERING_CREDIT.name}>
       <div className="home-shell">
         <div className="overflow-hidden rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 shadow-lg dark:border-indigo-500/30">
           <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
-            {/* Copy */}
             <div className="relative p-6 text-white sm:p-8 lg:p-10">
               <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
               <div className="relative z-10">
@@ -77,25 +70,17 @@ export function ImagineeringCreditHomeSection() {
               </div>
             </div>
 
-            {/* Visual panel */}
             <div className="flex flex-col justify-center border-t border-white/10 bg-white/10 p-6 backdrop-blur-sm sm:p-8 lg:border-l lg:border-t-0">
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/75">Credit limits</p>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                {TIERS.map((tier) => (
-                  <div
-                    key={tier.label}
-                    className="rounded-xl border border-white/20 bg-white/10 px-3 py-4 text-center"
-                  >
-                    <p className="text-xs text-white/80">{tier.label}</p>
-                    <p className="mt-1 text-lg font-bold text-white">{tier.limit}</p>
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/75">Your credit line</p>
+              <p className="mt-3 text-3xl font-bold text-white">₹5K – ₹5L</p>
+              <p className="mt-2 text-sm text-white/85">
+                Limit set after KYC based on your trust score and profile.
+              </p>
               <ul className="mt-6 space-y-2.5 text-sm text-white/90">
                 {[
                   "Use at cart, manpower & quote checkout",
                   "Separate from Imagineering Wallet rewards",
-                  "Pay on time to unlock higher tiers",
+                  "Pay on time to grow your limit",
                 ].map((point) => (
                   <li key={point} className="flex items-start gap-2">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
