@@ -1401,6 +1401,78 @@ export const api = {
         body: JSON.stringify(payload),
       }),
     getRepaymentRequests: () => apiRequest('/api/imagineering-credit/me/repayment-requests'),
+    previewRepaymentPlans: () =>
+      apiRequest<{
+        unplannedPrincipalInr: number;
+        settings: {
+          interestPercentPerMonth: number;
+          lateFeeInr: number;
+          overdueGraceDays: number;
+          planChoiceDeadlineDays: number;
+          allowedTenuresMonths: number[];
+        };
+        options: Array<{
+          tenureMonths: number;
+          principalInr: number;
+          interestPercentPerMonth: number;
+          totalInterestInr: number;
+          totalPayableInr: number;
+          emiAmountInr: number;
+          installments: Array<{
+            sequence: number;
+            dueDate: string;
+            principalInr: number;
+            interestInr: number;
+            amountDueInr: number;
+          }>;
+        }>;
+      }>('/api/imagineering-credit/me/repayment-plans/preview'),
+    createRepaymentPlan: (payload: { tenureMonths: number }) =>
+      apiRequest('/api/imagineering-credit/me/repayment-plans', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    getRepaymentPlans: () =>
+      apiRequest<{
+        plans: Array<Record<string, unknown>>;
+        nextPayable: {
+          plan: Record<string, unknown>;
+          installment: {
+            id: string;
+            sequence: number;
+            dueDate: string;
+            amountDueInr: number;
+            principalInr: number;
+            interestInr: number;
+            lateFeeInr: number;
+            status: string;
+          };
+        } | null;
+      }>('/api/imagineering-credit/me/repayment-plans'),
+    createEmiOrder: (payload: {
+      planId: string;
+      installmentId: string;
+      gateway?: 'razorpay' | 'cashfree';
+    }) =>
+      apiRequest('/api/imagineering-credit/me/emi/create-order', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    verifyEmiRazorpay: (payload: {
+      paymentId: string;
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+    }) =>
+      apiRequest('/api/imagineering-credit/me/emi/verify', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    verifyEmiCashfree: (payload: { paymentId: string; orderId: string }) =>
+      apiRequest('/api/imagineering-credit/me/emi/cashfree/verify', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
   },
 
   finance: {
