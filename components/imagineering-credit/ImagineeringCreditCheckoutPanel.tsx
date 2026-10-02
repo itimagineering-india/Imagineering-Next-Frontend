@@ -29,7 +29,6 @@ type CreditPreview = {
   blockReason?: string;
   tenureOptions?: TenureOption[];
   processingFeeInr?: number;
-  chequeOnFile?: boolean;
 };
 
 export type CreditSplitGateway = "razorpay" | "cashfree";
@@ -41,8 +40,9 @@ interface ImagineeringCreditCheckoutPanelProps {
   onSplitGatewayChange?: (gateway: CreditSplitGateway) => void;
   creditTenureMonths?: number;
   onCreditTenureChange?: (months: number) => void;
-  /** Called after cheque is saved so checkout can re-enable pay. */
-  onChequeSaved?: () => void;
+  /** Session cheque for this order (not reused from prior purchases). */
+  creditChequeUrl?: string | null;
+  onCreditChequeUrlChange?: (url: string | null) => void;
   termsAccepted?: boolean;
   onTermsAcceptedChange?: (accepted: boolean) => void;
 }
@@ -67,13 +67,13 @@ export function ImagineeringCreditCheckoutPanel({
   onSplitGatewayChange,
   creditTenureMonths,
   onCreditTenureChange,
-  onChequeSaved,
+  creditChequeUrl,
+  onCreditChequeUrlChange,
   termsAccepted = false,
   onTermsAcceptedChange,
 }: ImagineeringCreditCheckoutPanelProps) {
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<CreditPreview | null>(null);
-  const [chequeUrl, setChequeUrl] = useState<string | null>(null);
   const [chequeFilename, setChequeFilename] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,9 +85,6 @@ export function ImagineeringCreditCheckoutPanel({
         if (cancelled || !res.success) return;
         const data = res.data as CreditPreview;
         setPreview(data);
-        if (data.chequeOnFile) {
-          setChequeUrl((prev) => prev || "on-file");
-        }
         const options = data.tenureOptions || [];
         if (options.length > 0 && onCreditTenureChange) {
           const current = creditTenureMonths;
@@ -123,7 +120,7 @@ export function ImagineeringCreditCheckoutPanel({
   const tenureOptions = preview?.tenureOptions || [];
   const selectedTenure =
     tenureOptions.find((o) => o.tenureMonths === creditTenureMonths) || tenureOptions[0];
-  const chequeOnFile = Boolean(preview?.chequeOnFile || (chequeUrl && chequeUrl !== "on-file") || chequeUrl === "on-file");
+  const hasCheque = Boolean(creditChequeUrl);
 
   if (blocked) {
     return (
@@ -171,47 +168,37 @@ export function ImagineeringCreditCheckoutPanel({
 
       <div className="rounded-md border border-indigo-200/70 bg-white/60 p-2 dark:border-indigo-900/40 dark:bg-slate-900/30">
         <CreditKycDocumentUpload
-          label="Cheque"
+          label="Cheque for this order"
           required
           documentType="cheque"
-          url={chequeOnFile ? chequeUrl || "on-file" : null}
-          filename={
-            chequeFilename ||
-            (preview?.chequeOnFile
-              ? "Cheque on file (saved earlier)"
-              : chequeOnFile
-                ? "Cheque uploaded"
-                : null)
-          }
+          url={creditChequeUrl || null}
+          filename={chequeFilename || (hasCheque ? "Cheque uploaded" : null)}
           allowReplace
           onUploaded={async (url, filename) => {
             try {
               await api.imagineeringCredit.saveCheckoutCheque({ url });
-              setChequeUrl(url);
               setChequeFilename(filename);
-              setPreview((prev) => (prev ? { ...prev, chequeOnFile: true } : prev));
-              onChequeSaved?.();
+              onCreditChequeUrlChange?.(url);
             } catch (err) {
-              setChequeUrl(null);
               setChequeFilename(null);
+              onCreditChequeUrlChange?.(null);
               throw err;
             }
           }}
           onClear={() => {
-            setChequeUrl(null);
             setChequeFilename(null);
+            onCreditChequeUrlChange?.(null);
           }}
         />
-        {preview?.chequeOnFile ? (
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Already saved on your credit account from an earlier checkout. Use Replace only if you
-            need a different cheque.
-          </p>
-        ) : !chequeOnFile ? (
+        {!hasCheque ? (
           <p className="mt-1.5 text-[11px] text-amber-800 dark:text-amber-200">
-            Upload a cheque to pay with {IMAGINEERING_CREDIT.name}.
+            Upload a fresh cheque for this purchase. Each credit order needs its own cheque.
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            This cheque is for this order only. A new upload is required for every credit purchase.
+          </p>
+        )}
       </div>
 
       {tenureOptions.length > 0 && onCreditTenureChange ? (
@@ -309,7 +296,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
   const [gatewayRemaining, setGatewayRemaining] = useState(0);
   const [creditTenureMonths, setCreditTenureMonths] = useState(1);
   const [tenureOptions, setTenureOptions] = useState<TenureOption[]>([]);
-  const [chequeOnFile, setChequeOnFile] = useState(false);
+  const [creditChequeUrl, setCreditChequeUrl] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -328,7 +315,6 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
           setCreditToApply(0);
           setGatewayRemaining(0);
           setTenureOptions([]);
-          setChequeOnFile(false);
           return;
         }
         const data = res.data as CreditPreview & { account?: { status?: string } | null };
@@ -338,10 +324,8 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
           Number(data?.gatewayRemaining ?? Math.max(0, orderTotal - amountToUse))
         );
         const options = Array.isArray(data?.tenureOptions) ? data.tenureOptions : [];
-        const hasCheque = Boolean(data?.chequeOnFile);
         setShow(Boolean(active));
         setCanPayFull(Boolean(data?.canPayFull));
-        setChequeOnFile(hasCheque);
         setCanUse(Boolean(active && amountToUse > 0 && !data?.blockReason));
         setCreditToApply(amountToUse);
         setGatewayRemaining(remaining);
@@ -358,7 +342,6 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
         setCreditToApply(0);
         setGatewayRemaining(0);
         setTenureOptions([]);
-        setChequeOnFile(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -378,7 +361,11 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
     creditTenureMonths,
     setCreditTenureMonths,
     tenureOptions,
-    chequeOnFile,
+    /** Session cheque for this checkout — required before pay. */
+    creditChequeUrl,
+    setCreditChequeUrl,
+    /** @deprecated use creditChequeUrl — kept for gradual call-site updates */
+    chequeOnFile: Boolean(creditChequeUrl),
     termsAccepted,
     setTermsAccepted,
     refresh,
