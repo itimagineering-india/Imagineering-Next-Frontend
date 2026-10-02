@@ -113,7 +113,7 @@ const IMAGINEERING_CREDIT_FAQ = [
   {
     id: "how-apply",
     q: "How do I apply?",
-    a: "Complete at least 3 successful orders. Our team reviews your history and enables your application. Once approved, fill in your details, upload PAN (required) and Aadhaar (optional), and submit KYC for verification.",
+    a: "Complete at least 3 successful orders. Our team reviews your history and enables your application. Once approved, fill in your details, upload PAN, Aadhaar (front and back), and a cheque, then submit KYC for verification.",
   },
   {
     id: "trust-score",
@@ -128,7 +128,7 @@ const IMAGINEERING_CREDIT_FAQ = [
   {
     id: "repay",
     q: "How do repayments work?",
-    a: "Use credit anytime during the month. On the 1st of the next month we generate your bill for that month’s usage. Pay in full or convert to a 1/2/3 month EMI by the 5th. After that, unpaid bills block new credit use.",
+    a: "At checkout, choose 1, 2, or 3 months to repay. Each credit order gets its own bill with flat interest for that tenure. Pay the full amount (principal + interest) in one payment by the due date, plus a small processing fee. Overdue bills block new credit use.",
   },
   {
     id: "limits",
@@ -168,8 +168,8 @@ const HOW_IT_WORKS = [
   },
   {
     step: 4,
-    title: "Monthly bill, then EMI if you need it",
-    description: "Bill generates on the 1st for last month’s usage. Pay or convert to EMI by the 5th.",
+    title: "Pick tenure & repay once",
+    description: "Choose 1/2/3 months at checkout. Pay principal + interest in one payment by the due date.",
     icon: Clock,
   },
 ] as const;
@@ -503,11 +503,19 @@ export default function ImagineeringCreditPage() {
     panCardFilename: string | null;
     aadhaarUrl: string | null;
     aadhaarFilename: string | null;
+    aadhaarBackUrl: string | null;
+    aadhaarBackFilename: string | null;
+    chequeUrl: string | null;
+    chequeFilename: string | null;
   }>({
     panCardUrl: null,
     panCardFilename: null,
     aadhaarUrl: null,
     aadhaarFilename: null,
+    aadhaarBackUrl: null,
+    aadhaarBackFilename: null,
+    chequeUrl: null,
+    chequeFilename: null,
   });
   const [repayAmount, setRepayAmount] = useState("");
   const [repayReference, setRepayReference] = useState("");
@@ -526,7 +534,24 @@ export default function ImagineeringCreditPage() {
       status: string;
       canPayOrConvert: boolean;
     } | null;
-    settings: { interestPercentPerMonth: number; lateFeeInr: number; processingFeeInr?: number };
+    purchaseBills?: Array<{
+      id: string;
+      bookingId: string;
+      principalInr: number;
+      tenureMonths: number;
+      interestPercent: number;
+      interestInr: number;
+      lateFeeInr: number;
+      amountDueInr: number;
+      dueDate?: string;
+      status: string;
+    }>;
+    settings: {
+      interestPercentPerMonth: number;
+      lateFeeInr: number;
+      processingFeeInr?: number;
+      interestPercentByTenure?: Record<string, number>;
+    };
     options: Array<{
       tenureMonths: number;
       totalInterestInr: number;
@@ -549,7 +574,6 @@ export default function ImagineeringCreditPage() {
   } | null>(null);
   const [payingEmi, setPayingEmi] = useState(false);
   const [payingBill, setPayingBill] = useState(false);
-  const [creatingPlan, setCreatingPlan] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -704,6 +728,30 @@ export default function ImagineeringCreditPage() {
       toast({ title: "Upload your PAN card", description: "PAN document is required for KYC.", variant: "destructive" });
       return;
     }
+    if (!kycDocuments.aadhaarUrl) {
+      toast({
+        title: "Upload Aadhaar (front)",
+        description: "Aadhaar front is required for KYC.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!kycDocuments.aadhaarBackUrl) {
+      toast({
+        title: "Upload Aadhaar (back)",
+        description: "Aadhaar back is required for KYC.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!kycDocuments.chequeUrl) {
+      toast({
+        title: "Upload cheque",
+        description: "Cheque is required for KYC.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSubmittingKyc(true);
     try {
@@ -718,7 +766,9 @@ export default function ImagineeringCreditPage() {
         gstNumber: kycForm.gstNumber.trim().toUpperCase() || undefined,
         documents: {
           panCard: { url: kycDocuments.panCardUrl },
-          ...(kycDocuments.aadhaarUrl ? { aadhaar: { url: kycDocuments.aadhaarUrl } } : {}),
+          aadhaar: { url: kycDocuments.aadhaarUrl },
+          aadhaarBack: { url: kycDocuments.aadhaarBackUrl },
+          cheque: { url: kycDocuments.chequeUrl },
         },
       });
       if (!res.success) throw new Error(res.error?.message || "KYC submission failed");
@@ -731,6 +781,10 @@ export default function ImagineeringCreditPage() {
         panCardFilename: null,
         aadhaarUrl: null,
         aadhaarFilename: null,
+        aadhaarBackUrl: null,
+        aadhaarBackFilename: null,
+        chequeUrl: null,
+        chequeFilename: null,
       });
       await loadData();
     } catch (err: unknown) {
@@ -775,24 +829,6 @@ export default function ImagineeringCreditPage() {
       });
     } finally {
       setSubmittingRepay(false);
-    }
-  };
-
-  const handleCreatePlan = async (tenureMonths: number) => {
-    setCreatingPlan(true);
-    try {
-      const res = await api.imagineeringCredit.createRepaymentPlan({ tenureMonths });
-      if (!res.success) throw new Error(res.error?.message || "Could not create plan");
-      toast({ title: `${tenureMonths}-month EMI plan created` });
-      await loadData();
-    } catch (err: unknown) {
-      toast({
-        title: "Plan failed",
-        description: err instanceof Error ? err.message : "Please try again",
-        variant: "destructive",
-      });
-    } finally {
-      setCreatingPlan(false);
     }
   };
 
@@ -902,10 +938,12 @@ export default function ImagineeringCreditPage() {
     });
   };
 
-  const handlePayFullBillRazorpay = async () => {
+  const handlePayFullBillRazorpay = async (purchaseBillId?: string) => {
     setPayingBill(true);
     try {
-      const orderRes = await api.imagineeringCredit.createBillOrder();
+      const orderRes = await api.imagineeringCredit.createBillOrder(
+        purchaseBillId ? { purchaseBillId } : undefined
+      );
       if (!orderRes.success || !orderRes.data) {
         throw new Error(orderRes.error?.message || "Could not create payment");
       }
@@ -1178,7 +1216,8 @@ export default function ImagineeringCreditPage() {
                   <div>
                     <p className="font-semibold">Application & KYC</p>
                     <p className="text-sm text-muted-foreground">
-                      Details must match your PAN. Upload clear photos or PDFs of your documents.
+                      Details must match your PAN. Upload clear photos or PDFs — PAN, Aadhaar
+                      (front & back), and cheque are all required.
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1262,6 +1301,7 @@ export default function ImagineeringCreditPage() {
                     <div className="sm:col-span-2">
                       <CreditKycDocumentUpload
                         label="Aadhaar (front)"
+                        required
                         documentType="aadhaar"
                         url={kycDocuments.aadhaarUrl}
                         filename={kycDocuments.aadhaarFilename}
@@ -1271,6 +1311,46 @@ export default function ImagineeringCreditPage() {
                         }
                         onClear={() =>
                           setKycDocuments((prev) => ({ ...prev, aadhaarUrl: null, aadhaarFilename: null }))
+                        }
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <CreditKycDocumentUpload
+                        label="Aadhaar (back)"
+                        required
+                        documentType="aadhaarBack"
+                        url={kycDocuments.aadhaarBackUrl}
+                        filename={kycDocuments.aadhaarBackFilename}
+                        disabled={isSubmittingApplication}
+                        onUploaded={(url, name) =>
+                          setKycDocuments((prev) => ({
+                            ...prev,
+                            aadhaarBackUrl: url,
+                            aadhaarBackFilename: name,
+                          }))
+                        }
+                        onClear={() =>
+                          setKycDocuments((prev) => ({
+                            ...prev,
+                            aadhaarBackUrl: null,
+                            aadhaarBackFilename: null,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <CreditKycDocumentUpload
+                        label="Cheque"
+                        required
+                        documentType="cheque"
+                        url={kycDocuments.chequeUrl}
+                        filename={kycDocuments.chequeFilename}
+                        disabled={isSubmittingApplication}
+                        onUploaded={(url, name) =>
+                          setKycDocuments((prev) => ({ ...prev, chequeUrl: url, chequeFilename: name }))
+                        }
+                        onClear={() =>
+                          setKycDocuments((prev) => ({ ...prev, chequeUrl: null, chequeFilename: null }))
                         }
                       />
                     </div>
@@ -1434,21 +1514,25 @@ export default function ImagineeringCreditPage() {
                 <CardHeader>
                   <CardTitle className="text-base">Repayment</CardTitle>
                   <CardDescription>
-                    {planPreview?.openBill?.canPayOrConvert
-                      ? `${planPreview.openBill.periodLabel} bill: ${formatInr(planPreview.openBill.amountDueInr)}. Pay or convert to EMI by ${
-                          planPreview.openBill.dueDate
-                            ? new Date(planPreview.openBill.dueDate).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                              })
-                            : "the 5th"
-                        }.`
-                      : planPreview?.openBill?.status === "overdue"
-                        ? `${planPreview.openBill.periodLabel} bill of ${formatInr(planPreview.openBill.amountDueInr)} is overdue. Pay via bank transfer to unblock credit.`
-                        : `Outstanding: ${formatInr(account.outstanding)}. Usage this month is billed on the 1st of next month — pay or convert to EMI by the 5th.`}
-                    {planPreview?.settings
-                      ? ` · EMI interest ${planPreview.settings.interestPercentPerMonth}%/mo`
-                      : ""}
+                    {(() => {
+                      const openPurchase = (planPreview?.purchaseBills || []).filter(
+                        (b) => b.status === "open" || b.status === "overdue"
+                      );
+                      if (openPurchase.length > 0) {
+                        return `${openPurchase.length} open credit bill(s). Pay each in one payment by its due date (tenure chosen at checkout).`;
+                      }
+                      if (planPreview?.openBill?.status === "overdue") {
+                        return `Legacy ${planPreview.openBill.periodLabel} bill of ${formatInr(planPreview.openBill.amountDueInr)} is overdue.`;
+                      }
+                      return `Outstanding: ${formatInr(account.outstanding)}. Choose 1/2/3 month repayment when you use credit at checkout — each order gets its own bill.`;
+                    })()}
+                    {planPreview?.settings?.interestPercentByTenure
+                      ? ` · Interest ${Object.entries(planPreview.settings.interestPercentByTenure)
+                          .map(([m, p]) => `${m}mo ${p}%`)
+                          .join(", ")}`
+                      : planPreview?.settings
+                        ? ` · Interest ${planPreview.settings.interestPercentPerMonth}%/mo (legacy)`
+                        : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1457,18 +1541,56 @@ export default function ImagineeringCreditPage() {
                       0,
                       Math.round(Number(planPreview?.settings?.processingFeeInr) || 0)
                     );
+                    const purchaseBills = (planPreview?.purchaseBills || []).filter(
+                      (b) => b.status === "open" || b.status === "overdue"
+                    );
                     const openBill = planPreview?.openBill;
-                    const showPayFullBill =
+                    const showLegacyMonthly =
                       Boolean(openBill) &&
                       (openBill?.status === "open" || openBill?.status === "overdue") &&
                       Number(openBill?.amountDueInr) > 0 &&
+                      purchaseBills.length === 0 &&
                       !nextPayable;
                     return (
                       <>
-                  {showPayFullBill && openBill ? (
+                  {purchaseBills.map((bill) => (
+                    <div
+                      key={bill.id}
+                      className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 space-y-2"
+                    >
+                      <p className="text-sm font-medium text-indigo-950">
+                        {bill.tenureMonths}-month bill · {formatInr(bill.amountDueInr)}
+                        {bill.status === "overdue" ? " · Overdue" : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Principal {formatInr(bill.principalInr)} + interest {bill.interestPercent}% (
+                        {formatInr(bill.interestInr)})
+                        {bill.lateFeeInr > 0 ? ` + late fee ${formatInr(bill.lateFeeInr)}` : ""}
+                        {processingFee > 0
+                          ? ` · + processing fee ${formatInr(processingFee)} → pay ${formatInr(
+                              bill.amountDueInr + processingFee
+                            )}`
+                          : ""}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Due{" "}
+                        {bill.dueDate
+                          ? new Date(bill.dueDate).toLocaleDateString("en-IN")
+                          : "—"}
+                      </p>
+                      <Button
+                        onClick={() => void handlePayFullBillRazorpay(bill.id)}
+                        disabled={payingBill}
+                      >
+                        {payingBill ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Pay bill with Razorpay
+                      </Button>
+                    </div>
+                  ))}
+                  {showLegacyMonthly && openBill ? (
                     <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
                       <p className="text-sm font-medium text-indigo-950">
-                        Pay full bill: {formatInr(openBill.amountDueInr)}
+                        Legacy monthly bill: {formatInr(openBill.amountDueInr)}
                         {processingFee > 0
                           ? ` + processing fee ${formatInr(processingFee)} = ${formatInr(
                               openBill.amountDueInr + processingFee
@@ -1484,7 +1606,7 @@ export default function ImagineeringCreditPage() {
                   {nextPayable ? (
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
                       <p className="text-sm font-medium text-emerald-900">
-                        Next EMI #{nextPayable.installment.sequence}:{" "}
+                        Legacy EMI #{nextPayable.installment.sequence}:{" "}
                         {formatInr(nextPayable.installment.amountDueInr)}
                         {nextPayable.installment.lateFeeInr > 0
                           ? ` (includes late fee ${formatInr(nextPayable.installment.lateFeeInr)})`
@@ -1509,39 +1631,9 @@ export default function ImagineeringCreditPage() {
                         Pay EMI with Razorpay
                       </Button>
                     </div>
-                  ) : planPreview?.canConvertToEmi && planPreview.options.length > 0 ? (
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        Or convert this month’s bill to EMI (not mid-month purchases — those wait for the next bill).
-                      </p>
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        {planPreview.options.map((opt) => (
-                          <button
-                            key={opt.tenureMonths}
-                            type="button"
-                            disabled={creatingPlan}
-                            onClick={() => void handleCreatePlan(opt.tenureMonths)}
-                            className="rounded-lg border border-slate-200 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50/40"
-                          >
-                            <p className="font-semibold">
-                              {opt.tenureMonths} month{opt.tenureMonths > 1 ? "s" : ""}
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              EMI ~ {formatInr(opt.emiAmountInr)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Interest {formatInr(opt.totalInterestInr)} · Total{" "}
-                              {formatInr(opt.totalPayableInr)}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : !showPayFullBill ? (
+                  ) : purchaseBills.length === 0 && !showLegacyMonthly ? (
                     <p className="text-sm text-muted-foreground">
-                      {planPreview?.unplannedPrincipalInr && planPreview.unplannedPrincipalInr > 0
-                        ? "No bill to convert yet. Keep using credit this month — your bill arrives on the 1st."
-                        : "No EMI due right now."}
+                      No open credit bills. Use Imagineering Credit at checkout and pick 1, 2, or 3 months to repay.
                     </p>
                   ) : null}
 
@@ -1567,9 +1659,7 @@ export default function ImagineeringCreditPage() {
                             type="number"
                             value={repayAmount}
                             onChange={(e) => setRepayAmount(e.target.value)}
-                            placeholder={String(
-                              openBill?.amountDueInr || account.outstanding
-                            )}
+                            placeholder={String(account.outstanding)}
                           />
                         </div>
                         <div className="space-y-2">
