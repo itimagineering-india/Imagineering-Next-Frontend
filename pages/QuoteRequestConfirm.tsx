@@ -470,6 +470,8 @@ export default function QuoteRequestConfirmPage() {
     creditTenureMonths,
     setCreditTenureMonths,
     chequeOnFile: imagineeringCreditChequeOnFile,
+    termsAccepted: imagineeringCreditTermsAccepted,
+    setTermsAccepted: setImagineeringCreditTermsAccepted,
     refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(displayTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
@@ -479,7 +481,8 @@ export default function QuoteRequestConfirmPage() {
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
-  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
+  const creditPayReady =
+    canUseImagineeringCredit && imagineeringCreditChequeOnFile && imagineeringCreditTermsAccepted;
   const isOfflineCheckout =
     paymentOption === "cod" ||
     paymentOption === "neft" ||
@@ -1232,6 +1235,8 @@ export default function QuoteRequestConfirmPage() {
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
                 onChequeSaved={refreshImagineeringCredit}
+                termsAccepted={imagineeringCreditTermsAccepted}
+                onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
               />
               {paymentOption === "partial" && !bookingId ? (
                 <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
