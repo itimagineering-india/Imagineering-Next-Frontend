@@ -1359,7 +1359,10 @@ export const api = {
         '/api/imagineering-credit/me/apply',
         { method: 'POST' }
       ),
-    uploadKycDocument: async (file: File, documentType: 'panCard' | 'aadhaar') => {
+    uploadKycDocument: async (
+      file: File,
+      documentType: 'panCard' | 'aadhaar' | 'aadhaarBack' | 'cheque'
+    ) => {
       const formData = new FormData();
       formData.append('document', file);
       formData.append('documentType', documentType);
@@ -1390,7 +1393,9 @@ export const api = {
       state?: string;
       documents: {
         panCard: { url: string };
-        aadhaar?: { url: string };
+        aadhaar: { url: string };
+        aadhaarBack: { url: string };
+        cheque: { url: string };
       };
     }) =>
       apiRequest('/api/imagineering-credit/me/kyc', {
@@ -1507,10 +1512,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
-    createBillOrder: () =>
+    createBillOrder: (payload?: { purchaseBillId?: string }) =>
       apiRequest('/api/imagineering-credit/me/bill/create-order', {
         method: 'POST',
-        body: JSON.stringify({}),
+        body: JSON.stringify(payload || {}),
       }),
     verifyBillRazorpay: (payload: {
       paymentId: string;
@@ -1691,6 +1696,7 @@ export const api = {
       buyerGST?: string;
       buyerPAN?: string;
       paymentMethod?: string;
+      creditTenureMonths?: number;
       receiptUrl?: string;
       couponUsageId?: string;
       creditsToApply?: number;
@@ -2389,6 +2395,7 @@ export const api = {
       couponUsageId?: string;
       creditsToApply?: number;
       imagineeringCreditToApply?: number;
+      creditTenureMonths?: number;
       date?: string;
       time?: string;
       location?: any;
