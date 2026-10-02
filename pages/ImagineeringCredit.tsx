@@ -20,6 +20,7 @@ import api from "@/lib/api-client";
 import {
   IMAGINEERING_CREDIT,
   IMAGINEERING_WALLET,
+  formatCreditInterestPercent,
 } from "@/lib/imagineering-product-labels";
 import { CreditKycDocumentUpload } from "@/components/imagineering-credit/CreditKycDocumentUpload";
 import {
@@ -113,7 +114,7 @@ const IMAGINEERING_CREDIT_FAQ = [
   {
     id: "how-apply",
     q: "How do I apply?",
-    a: "Complete at least 3 successful orders. Our team reviews your history and enables your application. Once approved, fill in your details, upload PAN, Aadhaar (front and back), and a cheque, then submit KYC for verification.",
+    a: "Complete at least 3 successful orders. Our team reviews your history and enables your application. Once approved, fill in your details, upload PAN and Aadhaar (front and back), then submit KYC for verification. A cheque is collected when you first use Imagineering Credit at checkout.",
   },
   {
     id: "trust-score",
@@ -505,8 +506,6 @@ export default function ImagineeringCreditPage() {
     aadhaarFilename: string | null;
     aadhaarBackUrl: string | null;
     aadhaarBackFilename: string | null;
-    chequeUrl: string | null;
-    chequeFilename: string | null;
   }>({
     panCardUrl: null,
     panCardFilename: null,
@@ -514,8 +513,6 @@ export default function ImagineeringCreditPage() {
     aadhaarFilename: null,
     aadhaarBackUrl: null,
     aadhaarBackFilename: null,
-    chequeUrl: null,
-    chequeFilename: null,
   });
   const [repayAmount, setRepayAmount] = useState("");
   const [repayReference, setRepayReference] = useState("");
@@ -744,14 +741,6 @@ export default function ImagineeringCreditPage() {
       });
       return;
     }
-    if (!kycDocuments.chequeUrl) {
-      toast({
-        title: "Upload cheque",
-        description: "Cheque is required for KYC.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     setSubmittingKyc(true);
     try {
@@ -768,7 +757,6 @@ export default function ImagineeringCreditPage() {
           panCard: { url: kycDocuments.panCardUrl },
           aadhaar: { url: kycDocuments.aadhaarUrl },
           aadhaarBack: { url: kycDocuments.aadhaarBackUrl },
-          cheque: { url: kycDocuments.chequeUrl },
         },
       });
       if (!res.success) throw new Error(res.error?.message || "KYC submission failed");
@@ -783,8 +771,6 @@ export default function ImagineeringCreditPage() {
         aadhaarFilename: null,
         aadhaarBackUrl: null,
         aadhaarBackFilename: null,
-        chequeUrl: null,
-        chequeFilename: null,
       });
       await loadData();
     } catch (err: unknown) {
@@ -1216,8 +1202,9 @@ export default function ImagineeringCreditPage() {
                   <div>
                     <p className="font-semibold">Application & KYC</p>
                     <p className="text-sm text-muted-foreground">
-                      Details must match your PAN. Upload clear photos or PDFs — PAN, Aadhaar
-                      (front & back), and cheque are all required.
+                      Details must match your PAN. Upload clear photos or PDFs — PAN and Aadhaar
+                      (front & back) are required. Cheque is collected later at checkout when you use
+                      credit.
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1335,22 +1322,6 @@ export default function ImagineeringCreditPage() {
                             aadhaarBackUrl: null,
                             aadhaarBackFilename: null,
                           }))
-                        }
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <CreditKycDocumentUpload
-                        label="Cheque"
-                        required
-                        documentType="cheque"
-                        url={kycDocuments.chequeUrl}
-                        filename={kycDocuments.chequeFilename}
-                        disabled={isSubmittingApplication}
-                        onUploaded={(url, name) =>
-                          setKycDocuments((prev) => ({ ...prev, chequeUrl: url, chequeFilename: name }))
-                        }
-                        onClear={() =>
-                          setKycDocuments((prev) => ({ ...prev, chequeUrl: null, chequeFilename: null }))
                         }
                       />
                     </div>
@@ -1528,7 +1499,7 @@ export default function ImagineeringCreditPage() {
                     })()}
                     {planPreview?.settings?.interestPercentByTenure
                       ? ` · Interest ${Object.entries(planPreview.settings.interestPercentByTenure)
-                          .map(([m, p]) => `${m}mo ${p}%`)
+                          .map(([m, p]) => `${m}mo ${formatCreditInterestPercent(Number(p))}%`)
                           .join(", ")}`
                       : planPreview?.settings
                         ? ` · Interest ${planPreview.settings.interestPercentPerMonth}%/mo (legacy)`
