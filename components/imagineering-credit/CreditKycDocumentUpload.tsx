@@ -58,7 +58,13 @@ export function CreditKycDocumentUpload({
         throw new Error("Upload failed");
       }
       onUploaded(uploadedUrl, file.name);
-      toast({ title: "Document uploaded", description: `${label} ready for submission.` });
+      toast({
+        title: "Document uploaded",
+        description:
+          documentType === "cheque"
+            ? "Cheque saved for Imagineering Credit checkout."
+            : `${label} ready for submission.`,
+      });
     } catch (err: unknown) {
       toast({
         title: "Upload failed",
