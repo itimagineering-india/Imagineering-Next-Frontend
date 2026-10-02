@@ -469,6 +469,8 @@ export default function QuoteRequestConfirmPage() {
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    chequeOnFile: imagineeringCreditChequeOnFile,
+    refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(displayTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
   const isCreditSplit =
@@ -477,6 +479,7 @@ export default function QuoteRequestConfirmPage() {
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
+  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
   const isOfflineCheckout =
     paymentOption === "cod" ||
     paymentOption === "neft" ||
@@ -1228,6 +1231,7 @@ export default function QuoteRequestConfirmPage() {
                 onSplitGatewayChange={setCreditSplitGateway}
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
+                onChequeSaved={refreshImagineeringCredit}
               />
               {paymentOption === "partial" && !bookingId ? (
                 <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
@@ -1489,7 +1493,7 @@ export default function QuoteRequestConfirmPage() {
               size="lg"
               onClick={onContinue}
               disabled={
-                submitting || (paymentOption === "imagineering_credit" && !canUseImagineeringCredit)
+                submitting || (paymentOption === "imagineering_credit" && !creditPayReady)
               }
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : checkoutCta}
@@ -1657,7 +1661,7 @@ export default function QuoteRequestConfirmPage() {
               className="h-11 min-w-[9.5rem] px-5"
               onClick={onContinue}
               disabled={
-                submitting || (paymentOption === "imagineering_credit" && !canUseImagineeringCredit)
+                submitting || (paymentOption === "imagineering_credit" && !creditPayReady)
               }
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : checkoutCta}
