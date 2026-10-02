@@ -193,6 +193,8 @@ export function DynamicBookingModal({
     creditTenureMonths,
     setCreditTenureMonths,
     chequeOnFile: imagineeringCreditChequeOnFile,
+    termsAccepted: imagineeringCreditTermsAccepted,
+    setTermsAccepted: setImagineeringCreditTermsAccepted,
     refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(orderTotalForPayment);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
@@ -202,7 +204,8 @@ export function DynamicBookingModal({
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
-  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
+  const creditPayReady =
+    canUseImagineeringCredit && imagineeringCreditChequeOnFile && imagineeringCreditTermsAccepted;
 
   const {
     register,
@@ -1284,6 +1287,8 @@ export function DynamicBookingModal({
                       creditTenureMonths={creditTenureMonths}
                       onCreditTenureChange={setCreditTenureMonths}
                       onChequeSaved={refreshImagineeringCredit}
+                      termsAccepted={imagineeringCreditTermsAccepted}
+                      onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
                     />
                   </div>
 
