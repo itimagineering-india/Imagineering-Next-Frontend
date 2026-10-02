@@ -190,6 +190,10 @@ export function DynamicBookingModal({
     show: showImagineeringCredit,
     creditToApply: imagineeringCreditToApply,
     gatewayRemaining: imagineeringCreditGatewayRemaining,
+    creditTenureMonths,
+    setCreditTenureMonths,
+    chequeOnFile: imagineeringCreditChequeOnFile,
+    refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(orderTotalForPayment);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
   const isCreditSplit =
@@ -198,6 +202,7 @@ export function DynamicBookingModal({
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
+  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
 
   const {
     register,
@@ -1276,6 +1281,9 @@ export function DynamicBookingModal({
                       selected={paymentMethod === "imagineering_credit"}
                       splitGateway={creditSplitGateway}
                       onSplitGatewayChange={setCreditSplitGateway}
+                      creditTenureMonths={creditTenureMonths}
+                      onCreditTenureChange={setCreditTenureMonths}
+                      onChequeSaved={refreshImagineeringCredit}
                     />
                   </div>
 
@@ -1298,7 +1306,7 @@ export function DynamicBookingModal({
                     <Button
                       type="button"
                       className="w-full"
-                      disabled={payingWithCredit || !canUseImagineeringCredit}
+                      disabled={payingWithCredit || !creditPayReady}
                       onClick={() => void handlePayWithImagineeringCredit()}
                     >
                       {payingWithCredit ? (
@@ -1310,6 +1318,12 @@ export function DynamicBookingModal({
                         `Pay ₹${paymentCalculation.totalPayable.toLocaleString()} with ${IMAGINEERING_CREDIT.name}`
                       )}
                     </Button>
+                  ) : paymentMethod === "imagineering_credit" &&
+                    isCreditSplit &&
+                    !imagineeringCreditChequeOnFile ? (
+                    <Button type="button" className="w-full" disabled>
+                      Upload cheque to continue
+                    </Button>
                   ) : isCreditSplit && creditSplitGateway === "razorpay" ? (
                     <RazorpayCheckout
                       bookingId={currentBookingId}
@@ -1317,6 +1331,7 @@ export function DynamicBookingModal({
                       amount={imagineeringCreditGatewayRemaining}
                       couponUsageId={couponUsageId ?? undefined}
                       imagineeringCreditToApply={imagineeringCreditToApply}
+                      creditTenureMonths={creditTenureMonths}
                       onAmountReceived={(amount) => {
                         setActualPaymentAmount(amount);
                       }}
@@ -1337,6 +1352,7 @@ export function DynamicBookingModal({
                       amount={imagineeringCreditGatewayRemaining}
                       couponUsageId={couponUsageId ?? undefined}
                       imagineeringCreditToApply={imagineeringCreditToApply}
+                      creditTenureMonths={creditTenureMonths}
                       onAmountReceived={(amount) => {
                         setActualPaymentAmount(amount);
                       }}
