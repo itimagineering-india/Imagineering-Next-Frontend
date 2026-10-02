@@ -324,6 +324,10 @@ export function MachineRentalCheckoutClient() {
     show: showImagineeringCredit,
     creditToApply: imagineeringCreditToApply,
     gatewayRemaining: imagineeringCreditGatewayRemaining,
+    creditTenureMonths,
+    setCreditTenureMonths,
+    chequeOnFile: imagineeringCreditChequeOnFile,
+    refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(payableTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
   const isCreditSplit =
@@ -332,6 +336,7 @@ export function MachineRentalCheckoutClient() {
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
+  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
 
   const addressLine = useMemo(
     () => (selectedAddress ? formatSavedAddressLine(selectedAddress) : ""),
@@ -673,6 +678,7 @@ export function MachineRentalCheckoutClient() {
                 : undefined
           }
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
           bookingDescription={
             isCreditSplit
               ? `Machine rental · ${serviceTitle} · Credit split`
@@ -715,6 +721,7 @@ export function MachineRentalCheckoutClient() {
                 : undefined
           }
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
           bookingDescription={
             isCreditSplit
               ? `Machine rental · ${serviceTitle} · Credit split`
@@ -750,7 +757,7 @@ export function MachineRentalCheckoutClient() {
           submitting ||
           !serviceId ||
           !paymentMethod ||
-          (paymentMethod === "imagineering_credit" && !canUseImagineeringCredit)
+          (paymentMethod === "imagineering_credit" && !creditPayReady)
         }
         className="h-11 w-full rounded-xl font-semibold text-white"
         style={{ backgroundColor: RENTAL_AMBER }}
@@ -1240,6 +1247,9 @@ export function MachineRentalCheckoutClient() {
                 selected={paymentMethod === "imagineering_credit"}
                 splitGateway={creditSplitGateway}
                 onSplitGatewayChange={setCreditSplitGateway}
+                creditTenureMonths={creditTenureMonths}
+                onCreditTenureChange={setCreditTenureMonths}
+                onChequeSaved={refreshImagineeringCredit}
               />
             </section>
 
