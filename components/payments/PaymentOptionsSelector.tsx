@@ -30,25 +30,34 @@ export interface PaymentOptionConfig {
 
 function RazorpayLogo() {
   return (
-    <div className="flex h-9 min-w-[76px] items-center justify-center rounded-md border border-slate-200 bg-white px-2.5">
-      <span className="text-[11px] font-bold tracking-tight text-[#072654]">razorpay</span>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/payments/razorpay-icon.png"
+      alt="Razorpay"
+      className="h-9 w-9 object-contain"
+    />
   );
 }
 
 function CashfreeLogo() {
   return (
-    <div className="flex h-9 min-w-[76px] items-center justify-center rounded-md border border-slate-200 bg-white px-2.5">
-      <span className="text-[11px] font-bold tracking-tight text-[#0F766E]">cashfree</span>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/payments/cashfree-icon.png"
+      alt="Cashfree"
+      className="h-9 w-9 object-contain"
+    />
   );
 }
 
 function SbiCollectLogo() {
   return (
-    <div className="flex h-9 min-w-[76px] items-center justify-center rounded-md border border-slate-200 bg-white px-2.5">
-      <span className="text-[11px] font-bold tracking-tight text-[#1D4ED8]">SBI</span>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/images/payments/sbi-logo.svg"
+      alt="SBI"
+      className="h-9 w-9 object-contain"
+    />
   );
 }
 
@@ -62,8 +71,8 @@ function CodLogo() {
 
 function ImagineeringCreditLogo() {
   return (
-    <div className="flex h-9 min-w-[76px] items-center justify-center rounded-md border border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 px-2.5">
-      <CreditCard className="h-4 w-4 text-indigo-700" strokeWidth={1.75} />
+    <div className="flex h-9 w-9 items-center justify-center rounded-md border border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50 text-indigo-700">
+      <CreditCard className="h-4 w-4" strokeWidth={1.75} aria-hidden />
     </div>
   );
 }
@@ -109,8 +118,8 @@ const PAYMENT_OPTIONS: PaymentOptionConfig[] = [
   {
     value: "imagineering_credit",
     label: IMAGINEERING_CREDIT.name,
-    description: `${IMAGINEERING_CREDIT.tagline} — full order from your credit line (not ${IMAGINEERING_WALLET.name})`,
-    tags: ["BNPL", "Credit"],
+    description: `${IMAGINEERING_CREDIT.tagline} — use your credit line; if limit is lower, pay the rest online (not ${IMAGINEERING_WALLET.name})`,
+    tags: ["BNPL", "Credit", "Split"],
     icon: <ImagineeringCreditLogo />,
     recommended: true,
   },
@@ -189,7 +198,11 @@ export function PaymentOptionsSelector({
   const visibleOptions = useMemo(
     () =>
       PAYMENT_OPTIONS.filter((opt) => {
-        if (opt.value === "imagineering_credit" && !showImagineeringCredit) return false;
+        if (opt.value === "imagineering_credit") {
+          if (!showImagineeringCredit) return false;
+          // Credit has its own available-limit check; only honor admin enable/disable here.
+          return rules.imagineering_credit?.enabled !== false;
+        }
         if (opt.value === "partial") return showPartialPayment && amountNum > 0;
         return isPaymentMethodAvailable(opt.value, amountNum, rules);
       }),
