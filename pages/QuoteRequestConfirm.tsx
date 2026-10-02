@@ -456,11 +456,30 @@ export default function QuoteRequestConfirmPage() {
   const partialMin = partialPreview?.minPartialAmount ?? 0;
   const partialAmount = partialPreview?.partialAmount ?? 0;
   const partialBalanceDue = partialPreview?.balanceDue ?? 0;
+  const shownProduct = preview?.productAmount ?? productAmount;
+  const shownSupplierGst = preview?.supplierGst ?? supplierGst;
+  const shownDelivery = preview?.deliveryCharge ?? effectiveDelivery;
+  const platformFee = preview?.platformFee ?? 0;
+  const platformFeeGst = preview?.platformFeeGst || preview?.gst || 0;
+  const {
+    canUse: canUseImagineeringCredit,
+    canPayFull: canPayFullImagineeringCredit,
+    show: showImagineeringCredit,
+    creditToApply: imagineeringCreditToApply,
+    gatewayRemaining: imagineeringCreditGatewayRemaining,
+  } = useImagineeringCreditAvailable(displayTotal);
+  const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
+  const isCreditSplit =
+    paymentOption === "imagineering_credit" &&
+    canUseImagineeringCredit &&
+    !canPayFullImagineeringCredit &&
+    imagineeringCreditToApply > 0 &&
+    imagineeringCreditGatewayRemaining > 0;
   const isOfflineCheckout =
     paymentOption === "cod" ||
     paymentOption === "neft" ||
     paymentOption === "sbicollect" ||
-    paymentOption === "imagineering_credit" ||
+    (paymentOption === "imagineering_credit" && canPayFullImagineeringCredit) ||
     (paymentOption === "partial" && partialAdvanceMethod === "sbicollect");
   const checkoutCta =
     paymentOption === "sbicollect" && !sbiCollectReceiptFile
@@ -469,15 +488,11 @@ export default function QuoteRequestConfirmPage() {
         ? `Pay via SBI Collect — ${formatINR(partialAmount)}`
         : paymentOption === "partial"
           ? `Pay ${formatINR(partialAmount)} now`
-          : isOfflineCheckout
-            ? "Place order"
-            : `Pay ${formatINR(payableTotal)}`;
-  const shownProduct = preview?.productAmount ?? productAmount;
-  const shownSupplierGst = preview?.supplierGst ?? supplierGst;
-  const shownDelivery = preview?.deliveryCharge ?? effectiveDelivery;
-  const platformFee = preview?.platformFee ?? 0;
-  const platformFeeGst = preview?.platformFeeGst || preview?.gst || 0;
-  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(displayTotal);
+          : isCreditSplit
+            ? `Pay ${formatINR(imagineeringCreditGatewayRemaining)} · Credit + ${creditSplitGateway === "cashfree" ? "Cashfree" : "Razorpay"}`
+            : isOfflineCheckout
+              ? "Place order"
+              : `Pay ${formatINR(payableTotal)}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -698,9 +713,10 @@ export default function QuoteRequestConfirmPage() {
       const res = await api.quoteRequests.payOffer(id, offerId, {
         gstNumber: gstNumber.trim() || undefined,
         transport,
-        paymentOption,
+        paymentOption: isCreditSplit ? creditSplitGateway : paymentOption,
         couponUsageId: couponUsageId || undefined,
         creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
+        ...(isCreditSplit ? { imagineeringCreditToApply } : {}),
         receiptUrl,
         ...(paymentOption === "partial"
           ? { partialAmount, partialPaymentMethod: partialAdvanceMethod }
@@ -739,7 +755,7 @@ export default function QuoteRequestConfirmPage() {
         paymentOption === "cod" ||
         paymentOption === "neft" ||
         paymentOption === "sbicollect" ||
-        paymentOption === "imagineering_credit" ||
+        (paymentOption === "imagineering_credit" && canPayFullImagineeringCredit) ||
         (paymentOption === "partial" && partialAdvanceMethod === "sbicollect");
 
       if (offlinePay) {
@@ -765,7 +781,8 @@ export default function QuoteRequestConfirmPage() {
       }
 
       if (
-        (paymentOption === "razorpay" ||
+        ((isCreditSplit && creditSplitGateway === "razorpay") ||
+          paymentOption === "razorpay" ||
           (paymentOption === "partial" && partialAdvanceMethod === "razorpay")) &&
         payload?.orderId &&
         payload?.paymentId &&
@@ -782,7 +799,9 @@ export default function QuoteRequestConfirmPage() {
             description:
               paymentOption === "partial"
                 ? `Partial payment for ${serviceTitle}`
-                : `Quote for ${serviceTitle}`,
+                : isCreditSplit
+                  ? `Credit split for ${serviceTitle}`
+                  : `Quote for ${serviceTitle}`,
             order_id: payload.orderId,
             prefill: {
               name: user?.name || "",
@@ -828,7 +847,8 @@ export default function QuoteRequestConfirmPage() {
       }
 
       if (
-        (paymentOption === "cashfree" ||
+        ((isCreditSplit && creditSplitGateway === "cashfree") ||
+          paymentOption === "cashfree" ||
           (paymentOption === "partial" && partialAdvanceMethod === "cashfree")) &&
         payload?.orderId &&
         payload?.paymentId &&
@@ -1147,13 +1167,15 @@ export default function QuoteRequestConfirmPage() {
                   }
                 }}
                 amount={paymentOption === "imagineering_credit" ? displayTotal : paymentAmount}
-                showImagineeringCredit={canUseImagineeringCredit}
+                showImagineeringCredit={showImagineeringCredit}
                 showPartialPayment
                 className={bookingId ? "pointer-events-none opacity-60" : undefined}
               />
               <ImagineeringCreditCheckoutPanel
                 orderTotal={displayTotal}
                 selected={paymentOption === "imagineering_credit"}
+                splitGateway={creditSplitGateway}
+                onSplitGatewayChange={setCreditSplitGateway}
               />
               {paymentOption === "partial" && !bookingId ? (
                 <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
@@ -1451,41 +1473,73 @@ export default function QuoteRequestConfirmPage() {
           </CheckoutSection>
 
           {!bookingId ? (
-            <Button className="hidden h-12 w-full text-base lg:inline-flex" size="lg" onClick={onContinue} disabled={submitting}>
+            <Button
+              className="hidden h-12 w-full text-base lg:inline-flex"
+              size="lg"
+              onClick={onContinue}
+              disabled={
+                submitting || (paymentOption === "imagineering_credit" && !canUseImagineeringCredit)
+              }
+            >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : checkoutCta}
             </Button>
           ) : (
             <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
-              <p className="text-sm font-medium">Complete payment · {formatINR(payableTotal)}</p>
+              <p className="text-sm font-medium">
+                Complete payment ·{" "}
+                {formatINR(isCreditSplit ? imagineeringCreditGatewayRemaining : payableTotal)}
+              </p>
               <div className="flex flex-wrap gap-2">
-                {paymentOption === "razorpay" && (
+                {(paymentOption === "razorpay" ||
+                  (isCreditSplit && creditSplitGateway === "razorpay")) && (
                   <RazorpayCheckout
                     bookingId={bookingId}
-                    bookingDescription={`Quote for ${serviceTitle}`}
-                    amount={payableTotal}
+                    bookingDescription={
+                      isCreditSplit
+                        ? `Credit split for ${serviceTitle}`
+                        : `Quote for ${serviceTitle}`
+                    }
+                    amount={isCreditSplit ? imagineeringCreditGatewayRemaining : payableTotal}
                     couponUsageId={couponUsageId || undefined}
-                    creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+                    creditsToApply={
+                      isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined
+                    }
+                    imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
                     onSuccess={() => {
                       toast({ title: "Payment successful", description: "Your order is placed." });
                       router.push("/buyer/orders");
                     }}
                   >
-                    <CreditCard className="h-4 w-4" /> Pay with Razorpay
+                    <CreditCard className="h-4 w-4" />{" "}
+                    {isCreditSplit
+                      ? `Pay ${formatINR(imagineeringCreditGatewayRemaining)} · Credit + Razorpay`
+                      : "Pay with Razorpay"}
                   </RazorpayCheckout>
                 )}
-                {paymentOption === "cashfree" && (
+                {(paymentOption === "cashfree" ||
+                  (isCreditSplit && creditSplitGateway === "cashfree")) && (
                   <CashfreeCheckout
                     bookingId={bookingId}
-                    bookingDescription={`Quote for ${serviceTitle}`}
-                    amount={payableTotal}
+                    bookingDescription={
+                      isCreditSplit
+                        ? `Credit split for ${serviceTitle}`
+                        : `Quote for ${serviceTitle}`
+                    }
+                    amount={isCreditSplit ? imagineeringCreditGatewayRemaining : payableTotal}
                     couponUsageId={couponUsageId || undefined}
-                    creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
+                    creditsToApply={
+                      isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined
+                    }
+                    imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
                     onSuccess={() => {
                       toast({ title: "Payment successful", description: "Your order is placed." });
                       router.push("/buyer/orders");
                     }}
                   >
-                    <CreditCard className="h-4 w-4" /> Pay with Cashfree
+                    <CreditCard className="h-4 w-4" />{" "}
+                    {isCreditSplit
+                      ? `Pay ${formatINR(imagineeringCreditGatewayRemaining)} · Credit + Cashfree`
+                      : "Pay with Cashfree"}
                   </CashfreeCheckout>
                 )}
               </div>
@@ -1585,7 +1639,14 @@ export default function QuoteRequestConfirmPage() {
               <p className="text-xs text-muted-foreground">To pay</p>
               <p className="truncate text-lg font-bold tabular-nums">{formatINR(payableTotal)}</p>
             </div>
-            <Button size="lg" className="h-11 min-w-[9.5rem] px-5" onClick={onContinue} disabled={submitting}>
+            <Button
+              size="lg"
+              className="h-11 min-w-[9.5rem] px-5"
+              onClick={onContinue}
+              disabled={
+                submitting || (paymentOption === "imagineering_credit" && !canUseImagineeringCredit)
+              }
+            >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : checkoutCta}
             </Button>
           </div>
