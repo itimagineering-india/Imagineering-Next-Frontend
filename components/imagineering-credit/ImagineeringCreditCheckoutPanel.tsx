@@ -5,6 +5,8 @@ import { Loader2, CreditCard } from "lucide-react";
 import { IMAGINEERING_CREDIT, formatCreditInterestPercent } from "@/lib/imagineering-product-labels";
 import api from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { CreditKycDocumentUpload } from "@/components/imagineering-credit/CreditKycDocumentUpload";
 
 type TenureOption = {
@@ -41,6 +43,8 @@ interface ImagineeringCreditCheckoutPanelProps {
   onCreditTenureChange?: (months: number) => void;
   /** Called after cheque is saved so checkout can re-enable pay. */
   onChequeSaved?: () => void;
+  termsAccepted?: boolean;
+  onTermsAcceptedChange?: (accepted: boolean) => void;
 }
 
 function formatInr(n: number) {
@@ -64,6 +68,8 @@ export function ImagineeringCreditCheckoutPanel({
   creditTenureMonths,
   onCreditTenureChange,
   onChequeSaved,
+  termsAccepted = false,
+  onTermsAcceptedChange,
 }: ImagineeringCreditCheckoutPanelProps) {
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<CreditPreview | null>(null);
@@ -254,6 +260,30 @@ export function ImagineeringCreditCheckoutPanel({
           </div>
         </div>
       ) : null}
+
+      <div className="flex items-start gap-2 rounded-md border border-indigo-200/70 bg-white/60 px-2 py-2 dark:border-indigo-900/40 dark:bg-slate-900/30">
+        <Checkbox
+          id="imagineering-credit-terms"
+          checked={termsAccepted}
+          onCheckedChange={(v) => onTermsAcceptedChange?.(v === true)}
+          className="mt-0.5"
+        />
+        <Label
+          htmlFor="imagineering-credit-terms"
+          className="cursor-pointer text-[11px] font-normal leading-snug text-slate-700 dark:text-slate-200"
+        >
+          I agree to the{" "}
+          <a
+            href={IMAGINEERING_CREDIT.termsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {IMAGINEERING_CREDIT.name} Terms &amp; Conditions
+          </a>
+        </Label>
+      </div>
     </div>
   );
 }
@@ -268,6 +298,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
   const [creditTenureMonths, setCreditTenureMonths] = useState(1);
   const [tenureOptions, setTenureOptions] = useState<TenureOption[]>([]);
   const [chequeOnFile, setChequeOnFile] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
   const refresh = () => setRefreshTick((t) => t + 1);
@@ -336,6 +367,8 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
     setCreditTenureMonths,
     tenureOptions,
     chequeOnFile,
+    termsAccepted,
+    setTermsAccepted,
     refresh,
   };
 }
