@@ -17,6 +17,7 @@ export const IMAGINEERING_CREDIT = {
   tagline: "Build Now. Pay Later.",
   oneLiner: "Pay for the full order now, repay Imagineering India later.",
   href: "/imagineering-credit",
+  termsHref: "/imagineering-credit/terms",
 } as const;
 
 export const IMAGINEERING_WALLET = {
