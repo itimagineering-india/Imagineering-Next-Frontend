@@ -1411,9 +1411,22 @@ export const api = {
     previewRepaymentPlans: () =>
       apiRequest<{
         unplannedPrincipalInr: number;
+        billPrincipalInr: number;
+        canConvertToEmi: boolean;
+        openBill: {
+          id: string;
+          periodMonth: number;
+          periodYear: number;
+          periodLabel: string;
+          amountDueInr: number;
+          dueDate?: string;
+          status: string;
+          canPayOrConvert: boolean;
+        } | null;
         settings: {
           interestPercentPerMonth: number;
           lateFeeInr: number;
+          processingFeeInr: number;
           overdueGraceDays: number;
           planChoiceDeadlineDays: number;
           allowedTenuresMonths: number[];
@@ -1434,6 +1447,23 @@ export const api = {
           }>;
         }>;
       }>('/api/imagineering-credit/me/repayment-plans/preview'),
+    getBilling: () =>
+      apiRequest<{
+        openBill: {
+          id: string;
+          periodLabel: string;
+          amountDueInr: number;
+          dueDate?: string;
+          status: string;
+          canPayOrConvert: boolean;
+        } | null;
+        unplannedPrincipalInr: number;
+        currentUsageMonth: {
+          label: string;
+          billGeneratesOn: string;
+          payOrConvertByDay: number;
+        };
+      }>('/api/imagineering-credit/me/billing'),
     createRepaymentPlan: (payload: { tenureMonths: number }) =>
       apiRequest('/api/imagineering-credit/me/repayment-plans', {
         method: 'POST',
@@ -1454,6 +1484,8 @@ export const api = {
             lateFeeInr: number;
             status: string;
           };
+          processingFeeInr?: number;
+          chargeTotalInr?: number;
         } | null;
       }>('/api/imagineering-credit/me/repayment-plans'),
     createEmiOrder: (payload: {
@@ -1472,6 +1504,21 @@ export const api = {
       razorpaySignature: string;
     }) =>
       apiRequest('/api/imagineering-credit/me/emi/verify', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    createBillOrder: () =>
+      apiRequest('/api/imagineering-credit/me/bill/create-order', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }),
+    verifyBillRazorpay: (payload: {
+      paymentId: string;
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+    }) =>
+      apiRequest('/api/imagineering-credit/me/bill/verify', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
