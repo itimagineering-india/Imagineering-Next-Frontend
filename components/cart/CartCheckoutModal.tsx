@@ -507,6 +507,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     creditTenureMonths,
     setCreditTenureMonths,
     chequeOnFile: imagineeringCreditChequeOnFile,
+    termsAccepted: imagineeringCreditTermsAccepted,
+    setTermsAccepted: setImagineeringCreditTermsAccepted,
     refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
@@ -516,7 +518,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
-  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
+  const creditPayReady =
+    canUseImagineeringCredit && imagineeringCreditChequeOnFile && imagineeringCreditTermsAccepted;
 
   useEffect(() => {
     if (paymentMethod !== "partial") return;
@@ -1118,6 +1121,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       creditTenureMonths={creditTenureMonths}
                       onCreditTenureChange={setCreditTenureMonths}
                       onChequeSaved={refreshImagineeringCredit}
+                      termsAccepted={imagineeringCreditTermsAccepted}
+                      onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
                     />
                     {paymentMethod === "partial" ? (
                       <PartialPaymentPanel
