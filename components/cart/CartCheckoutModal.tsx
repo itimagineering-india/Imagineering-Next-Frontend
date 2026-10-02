@@ -497,7 +497,20 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
   const partialAmount = partialBreakdown.partialAmount;
   const imagineeringCreditOrderTotal =
     paymentMethod === "imagineering_credit" ? amount : paymentAmount;
-  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
+  const {
+    canUse: canUseImagineeringCredit,
+    canPayFull: canPayFullImagineeringCredit,
+    show: showImagineeringCredit,
+    creditToApply: imagineeringCreditToApply,
+    gatewayRemaining: imagineeringCreditGatewayRemaining,
+  } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
+  const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
+  const isCreditSplit =
+    paymentMethod === "imagineering_credit" &&
+    canUseImagineeringCredit &&
+    !canPayFullImagineeringCredit &&
+    imagineeringCreditToApply > 0 &&
+    imagineeringCreditGatewayRemaining > 0;
 
   useEffect(() => {
     if (paymentMethod !== "partial") return;
@@ -1088,12 +1101,14 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                         }
                       }}
                       amount={paymentMethod === "imagineering_credit" ? amount : paymentAmount}
-                      showImagineeringCredit={canUseImagineeringCredit}
+                      showImagineeringCredit={showImagineeringCredit}
                       showPartialPayment
                     />
                     <ImagineeringCreditCheckoutPanel
                       orderTotal={amount}
                       selected={paymentMethod === "imagineering_credit"}
+                      splitGateway={creditSplitGateway}
+                      onSplitGatewayChange={setCreditSplitGateway}
                     />
                     {paymentMethod === "partial" ? (
                       <PartialPaymentPanel
@@ -1230,7 +1245,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              {paymentMethod === "imagineering_credit" ? (
+              {paymentMethod === "imagineering_credit" && canPayFullImagineeringCredit ? (
                 <Button
                   onClick={handleImagineeringCreditCheckout}
                   disabled={isPlacingOrder || !canUseImagineeringCredit}
@@ -1244,6 +1259,55 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   ) : (
                     `Confirm · ${IMAGINEERING_CREDIT.name} · ₹${amount.toLocaleString("en-IN")}`
                   )}
+                </Button>
+              ) : isCreditSplit && creditSplitGateway === "razorpay" ? (
+                <RazorpayCheckout
+                  cartId={cartId}
+                  amount={imagineeringCreditGatewayRemaining}
+                  couponUsageId={couponUsageId || undefined}
+                  imagineeringCreditToApply={imagineeringCreditToApply}
+                  bookingDescription="Cart Checkout · Credit split"
+                  bookingPayload={{
+                    date,
+                    time,
+                    location,
+                    requirementNote: notes,
+                    notes,
+                    buyerGST: buyerGST,
+                    buyerPAN: buyerPAN,
+                  }}
+                  onSuccess={onSuccess}
+                  className="h-12 w-full flex-1 rounded-xl bg-indigo-600 px-4 text-base font-semibold text-white shadow-md hover:bg-indigo-700 sm:min-w-[12rem]"
+                >
+                  Pay ₹{imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + Razorpay
+                </RazorpayCheckout>
+              ) : isCreditSplit && creditSplitGateway === "cashfree" ? (
+                <CashfreeCheckout
+                  cartId={cartId}
+                  amount={imagineeringCreditGatewayRemaining}
+                  couponUsageId={couponUsageId || undefined}
+                  imagineeringCreditToApply={imagineeringCreditToApply}
+                  bookingDescription="Cart Checkout · Credit split"
+                  bookingPayload={{
+                    date,
+                    time,
+                    location,
+                    requirementNote: notes,
+                    notes,
+                    buyerGST: buyerGST,
+                    buyerPAN: buyerPAN,
+                  }}
+                  onSuccess={onSuccess}
+                  className="h-12 w-full flex-1 rounded-xl bg-indigo-600 px-4 text-base font-semibold text-white shadow-md hover:bg-indigo-700 sm:min-w-[12rem]"
+                >
+                  Pay ₹{imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + Cashfree
+                </CashfreeCheckout>
+              ) : paymentMethod === "imagineering_credit" ? (
+                <Button
+                  disabled
+                  className="h-12 w-full flex-1 rounded-xl bg-indigo-600 text-base font-semibold text-white shadow-md disabled:opacity-50 sm:min-w-[12rem]"
+                >
+                  {IMAGINEERING_CREDIT.name} unavailable
                 </Button>
               ) : paymentMethod === "cod" ? (
                 <Button
