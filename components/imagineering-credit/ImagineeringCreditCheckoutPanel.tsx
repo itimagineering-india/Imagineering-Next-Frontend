@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, CreditCard } from "lucide-react";
-import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
+import { IMAGINEERING_CREDIT, formatCreditInterestPercent } from "@/lib/imagineering-product-labels";
 import api from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { CreditKycDocumentUpload } from "@/components/imagineering-credit/CreditKycDocumentUpload";
 
 type TenureOption = {
   tenureMonths: number;
@@ -26,6 +27,7 @@ type CreditPreview = {
   blockReason?: string;
   tenureOptions?: TenureOption[];
   processingFeeInr?: number;
+  chequeOnFile?: boolean;
 };
 
 export type CreditSplitGateway = "razorpay" | "cashfree";
@@ -37,12 +39,8 @@ interface ImagineeringCreditCheckoutPanelProps {
   onSplitGatewayChange?: (gateway: CreditSplitGateway) => void;
   creditTenureMonths?: number;
   onCreditTenureChange?: (months: number) => void;
-}
-
-function formatInterestPercent(n: number) {
-  const v = Number(n);
-  if (!Number.isFinite(v)) return "0";
-  return String(Math.round(v * 100) / 100);
+  /** Called after cheque is saved so checkout can re-enable pay. */
+  onChequeSaved?: () => void;
 }
 
 function formatInr(n: number) {
@@ -54,6 +52,10 @@ function formatDueDate(iso?: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function optInterest(opt: TenureOption) {
+  return `${formatCreditInterestPercent(opt.interestPercent)}% · ${formatInr(opt.interestInr)}`;
+}
+
 export function ImagineeringCreditCheckoutPanel({
   orderTotal,
   selected,
@@ -61,9 +63,12 @@ export function ImagineeringCreditCheckoutPanel({
   onSplitGatewayChange,
   creditTenureMonths,
   onCreditTenureChange,
+  onChequeSaved,
 }: ImagineeringCreditCheckoutPanelProps) {
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<CreditPreview | null>(null);
+  const [chequeUrl, setChequeUrl] = useState<string | null>(null);
+  const [chequeFilename, setChequeFilename] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +79,9 @@ export function ImagineeringCreditCheckoutPanel({
         if (cancelled || !res.success) return;
         const data = res.data as CreditPreview;
         setPreview(data);
+        if (data.chequeOnFile) {
+          setChequeUrl((prev) => prev || "on-file");
+        }
         const options = data.tenureOptions || [];
         if (options.length > 0 && onCreditTenureChange) {
           const current = creditTenureMonths;
@@ -109,6 +117,7 @@ export function ImagineeringCreditCheckoutPanel({
   const tenureOptions = preview?.tenureOptions || [];
   const selectedTenure =
     tenureOptions.find((o) => o.tenureMonths === creditTenureMonths) || tenureOptions[0];
+  const chequeOnFile = Boolean(preview?.chequeOnFile || (chequeUrl && chequeUrl !== "on-file") || chequeUrl === "on-file");
 
   if (blocked) {
     return (
@@ -154,6 +163,39 @@ export function ImagineeringCreditCheckoutPanel({
         </span>
       </div>
 
+      <div className="rounded-md border border-indigo-200/70 bg-white/60 p-2 dark:border-indigo-900/40 dark:bg-slate-900/30">
+        <CreditKycDocumentUpload
+          label="Cheque"
+          required
+          documentType="cheque"
+          url={chequeOnFile ? chequeUrl || "on-file" : null}
+          filename={chequeFilename || (chequeOnFile ? "Cheque on file" : null)}
+          onUploaded={async (url, filename) => {
+            try {
+              await api.imagineeringCredit.saveCheckoutCheque({ url });
+            } catch {
+              /* KYC upload endpoint already persists cheque when account exists */
+            }
+            setChequeUrl(url);
+            setChequeFilename(filename);
+            setPreview((prev) => (prev ? { ...prev, chequeOnFile: true } : prev));
+            onChequeSaved?.();
+          }}
+          onClear={() => {
+            /* Cheque stays on account once saved; clear only local re-upload UX before save */
+            if (preview?.chequeOnFile) return;
+            setChequeUrl(null);
+            setChequeFilename(null);
+          }}
+          disabled={Boolean(preview?.chequeOnFile)}
+        />
+        {!chequeOnFile ? (
+          <p className="mt-1.5 text-[11px] text-amber-800 dark:text-amber-200">
+            Upload a cheque to pay with {IMAGINEERING_CREDIT.name}.
+          </p>
+        ) : null}
+      </div>
+
       {tenureOptions.length > 0 && onCreditTenureChange ? (
         <div className="space-y-1.5">
           <p className="text-[11px] font-medium text-indigo-900/80 dark:text-indigo-100/80">
@@ -173,7 +215,7 @@ export function ImagineeringCreditCheckoutPanel({
                 )}
               >
                 <p className="text-[11px] font-semibold">
-                  {opt.tenureMonths} mo · {formatInterestPercent(opt.interestPercent)}%
+                  {opt.tenureMonths} mo · {formatCreditInterestPercent(opt.interestPercent)}%
                 </p>
                 <p className="text-[10px] opacity-90">
                   Due {formatDueDate(opt.dueDate)} · {formatInr(opt.amountDueInr)}
@@ -200,10 +242,10 @@ export function ImagineeringCreditCheckoutPanel({
                 type="button"
                 onClick={() => onSplitGatewayChange(g)}
                 className={cn(
-                  "rounded px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors",
+                  "rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors",
                   splitGateway === g
                     ? "bg-indigo-600 text-white"
-                    : "text-slate-600 hover:text-indigo-900 dark:text-slate-300 dark:hover:text-indigo-100"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300"
                 )}
               >
                 {g}
@@ -216,10 +258,6 @@ export function ImagineeringCreditCheckoutPanel({
   );
 }
 
-function optInterest(opt: TenureOption) {
-  return `${formatInterestPercent(opt.interestPercent)}% · ${formatInr(opt.interestInr)}`;
-}
-
 export function useImagineeringCreditAvailable(orderTotal: number) {
   const [canUse, setCanUse] = useState(false);
   const [canPayFull, setCanPayFull] = useState(false);
@@ -229,6 +267,10 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
   const [gatewayRemaining, setGatewayRemaining] = useState(0);
   const [creditTenureMonths, setCreditTenureMonths] = useState(1);
   const [tenureOptions, setTenureOptions] = useState<TenureOption[]>([]);
+  const [chequeOnFile, setChequeOnFile] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const refresh = () => setRefreshTick((t) => t + 1);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +285,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
           setCreditToApply(0);
           setGatewayRemaining(0);
           setTenureOptions([]);
+          setChequeOnFile(false);
           return;
         }
         const data = res.data as CreditPreview & { account?: { status?: string } | null };
@@ -252,8 +295,10 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
           Number(data?.gatewayRemaining ?? Math.max(0, orderTotal - amountToUse))
         );
         const options = Array.isArray(data?.tenureOptions) ? data.tenureOptions : [];
+        const hasCheque = Boolean(data?.chequeOnFile);
         setShow(Boolean(active));
         setCanPayFull(Boolean(data?.canPayFull));
+        setChequeOnFile(hasCheque);
         setCanUse(Boolean(active && amountToUse > 0 && !data?.blockReason));
         setCreditToApply(amountToUse);
         setGatewayRemaining(remaining);
@@ -270,6 +315,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
         setCreditToApply(0);
         setGatewayRemaining(0);
         setTenureOptions([]);
+        setChequeOnFile(false);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -277,7 +323,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
     return () => {
       cancelled = true;
     };
-  }, [orderTotal]);
+  }, [orderTotal, refreshTick]);
 
   return {
     canUse,
@@ -289,5 +335,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
     creditTenureMonths,
     setCreditTenureMonths,
     tenureOptions,
+    chequeOnFile,
+    refresh,
   };
 }
