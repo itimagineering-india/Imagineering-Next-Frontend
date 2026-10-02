@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- SBI keyhole mark -->
+  <circle cx="32" cy="24" r="16" fill="#1C69D4"/>
+  <circle cx="32" cy="24" r="4.25" fill="#fff"/>
+  <rect x="30.35" y="24" width="3.3" height="16" fill="#fff"/>
+  <!-- Wordmark -->
+  <text x="32" y="56" text-anchor="middle" font-family="Arial Black, Helvetica, Arial, sans-serif" font-size="14" font-weight="800" fill="#1C69D4" letter-spacing="1">SBI</text>
+</svg>
