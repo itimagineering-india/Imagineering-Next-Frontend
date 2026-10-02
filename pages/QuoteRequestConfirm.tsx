@@ -467,6 +467,8 @@ export default function QuoteRequestConfirmPage() {
     show: showImagineeringCredit,
     creditToApply: imagineeringCreditToApply,
     gatewayRemaining: imagineeringCreditGatewayRemaining,
+    creditTenureMonths,
+    setCreditTenureMonths,
   } = useImagineeringCreditAvailable(displayTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
   const isCreditSplit =
@@ -716,7 +718,14 @@ export default function QuoteRequestConfirmPage() {
         paymentOption: isCreditSplit ? creditSplitGateway : paymentOption,
         couponUsageId: couponUsageId || undefined,
         creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
-        ...(isCreditSplit ? { imagineeringCreditToApply } : {}),
+        ...(isCreditSplit || paymentOption === "imagineering_credit"
+          ? {
+              imagineeringCreditToApply: isCreditSplit
+                ? imagineeringCreditToApply
+                : undefined,
+              creditTenureMonths,
+            }
+          : {}),
         receiptUrl,
         ...(paymentOption === "partial"
           ? { partialAmount, partialPaymentMethod: partialAdvanceMethod }
@@ -1143,6 +1152,47 @@ export default function QuoteRequestConfirmPage() {
             ) : null}
           </CheckoutSection>
 
+          <CheckoutSection title="Delivery">
+            <RadioGroup
+              value={transport}
+              onValueChange={(v) => setTransport(v as Transport)}
+              disabled={Boolean(bookingId)}
+              className="gap-3"
+            >
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
+                  transport === "supplier" ? "border-primary bg-primary/5" : "border-border"
+                } ${deliveryUnavailable ? "cursor-not-allowed opacity-50" : ""}`}
+              >
+                <RadioGroupItem value="supplier" id="transport-supplier" disabled={deliveryUnavailable} className="mt-0.5" />
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-medium">
+                    <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                    Supplier delivery
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {deliveryUnavailable
+                      ? "Not available on this quote"
+                      : quotedDelivery > 0
+                        ? formatINR(quotedDelivery)
+                        : "Free"}
+                  </p>
+                </div>
+              </label>
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
+                  transport === "self_pickup" ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
+                <RadioGroupItem value="self_pickup" id="transport-self" className="mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Self pickup</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Pick up from supplier · No delivery charge</p>
+                </div>
+              </label>
+            </RadioGroup>
+          </CheckoutSection>
+
           <CheckoutSection title="Payment" description="Wallet discount and payment method">
             <div className="space-y-4">
               {!bookingId && paymentOption !== "imagineering_credit" && (
@@ -1176,6 +1226,8 @@ export default function QuoteRequestConfirmPage() {
                 selected={paymentOption === "imagineering_credit"}
                 splitGateway={creditSplitGateway}
                 onSplitGatewayChange={setCreditSplitGateway}
+                creditTenureMonths={creditTenureMonths}
+                onCreditTenureChange={setCreditTenureMonths}
               />
               {paymentOption === "partial" && !bookingId ? (
                 <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
@@ -1431,47 +1483,6 @@ export default function QuoteRequestConfirmPage() {
             </div>
           </CheckoutSection>
 
-          <CheckoutSection title="Delivery">
-            <RadioGroup
-              value={transport}
-              onValueChange={(v) => setTransport(v as Transport)}
-              disabled={Boolean(bookingId)}
-              className="gap-3"
-            >
-              <label
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
-                  transport === "supplier" ? "border-primary bg-primary/5" : "border-border"
-                } ${deliveryUnavailable ? "cursor-not-allowed opacity-50" : ""}`}
-              >
-                <RadioGroupItem value="supplier" id="transport-supplier" disabled={deliveryUnavailable} className="mt-0.5" />
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-sm font-medium">
-                    <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                    Supplier delivery
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {deliveryUnavailable
-                      ? "Not available on this quote"
-                      : quotedDelivery > 0
-                        ? formatINR(quotedDelivery)
-                        : "Free"}
-                  </p>
-                </div>
-              </label>
-              <label
-                className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 ${
-                  transport === "self_pickup" ? "border-primary bg-primary/5" : "border-border"
-                }`}
-              >
-                <RadioGroupItem value="self_pickup" id="transport-self" className="mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Self pickup</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Pick up from supplier · No delivery charge</p>
-                </div>
-              </label>
-            </RadioGroup>
-          </CheckoutSection>
-
           {!bookingId ? (
             <Button
               className="hidden h-12 w-full text-base lg:inline-flex"
@@ -1505,6 +1516,7 @@ export default function QuoteRequestConfirmPage() {
                       isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined
                     }
                     imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
                     onSuccess={() => {
                       toast({ title: "Payment successful", description: "Your order is placed." });
                       router.push("/buyer/orders");
@@ -1531,6 +1543,7 @@ export default function QuoteRequestConfirmPage() {
                       isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined
                     }
                     imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
                     onSuccess={() => {
                       toast({ title: "Payment successful", description: "Your order is placed." });
                       router.push("/buyer/orders");
