@@ -2,9 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, CreditCard } from "lucide-react";
-import { IMAGINEERING_CREDIT, IMAGINEERING_WALLET } from "@/lib/imagineering-product-labels";
+import { IMAGINEERING_CREDIT } from "@/lib/imagineering-product-labels";
 import api from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+type TenureOption = {
+  tenureMonths: number;
+  interestPercent: number;
+  interestInr: number;
+  amountDueInr: number;
+  principalInr: number;
+  dueDate: string;
+};
 
 type CreditPreview = {
   availableCredit: number;
@@ -15,6 +24,8 @@ type CreditPreview = {
   remainingCredit: number;
   repayBefore?: string;
   blockReason?: string;
+  tenureOptions?: TenureOption[];
+  processingFeeInr?: number;
 };
 
 export type CreditSplitGateway = "razorpay" | "cashfree";
@@ -22,9 +33,16 @@ export type CreditSplitGateway = "razorpay" | "cashfree";
 interface ImagineeringCreditCheckoutPanelProps {
   orderTotal: number;
   selected: boolean;
-  /** When credit only covers part of the order, user picks gateway for the remainder. */
   splitGateway?: CreditSplitGateway;
   onSplitGatewayChange?: (gateway: CreditSplitGateway) => void;
+  creditTenureMonths?: number;
+  onCreditTenureChange?: (months: number) => void;
+}
+
+function formatInterestPercent(n: number) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "0";
+  return String(Math.round(v * 100) / 100);
 }
 
 function formatInr(n: number) {
@@ -33,7 +51,7 @@ function formatInr(n: number) {
 
 function formatDueDate(iso?: string) {
   if (!iso) return null;
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function ImagineeringCreditCheckoutPanel({
@@ -41,6 +59,8 @@ export function ImagineeringCreditCheckoutPanel({
   selected,
   splitGateway = "razorpay",
   onSplitGatewayChange,
+  creditTenureMonths,
+  onCreditTenureChange,
 }: ImagineeringCreditCheckoutPanelProps) {
   const [loading, setLoading] = useState(true);
   const [preview, setPreview] = useState<CreditPreview | null>(null);
@@ -52,7 +72,14 @@ export function ImagineeringCreditCheckoutPanel({
       try {
         const res = await api.imagineeringCredit.checkoutPreview({ orderTotal });
         if (cancelled || !res.success) return;
-        setPreview(res.data as CreditPreview);
+        const data = res.data as CreditPreview;
+        setPreview(data);
+        const options = data.tenureOptions || [];
+        if (options.length > 0 && onCreditTenureChange) {
+          const current = creditTenureMonths;
+          const valid = options.some((o) => o.tenureMonths === current);
+          if (!valid) onCreditTenureChange(options[0].tenureMonths);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -60,7 +87,7 @@ export function ImagineeringCreditCheckoutPanel({
     return () => {
       cancelled = true;
     };
-  }, [orderTotal]);
+  }, [orderTotal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!selected) return null;
 
@@ -79,6 +106,9 @@ export function ImagineeringCreditCheckoutPanel({
   );
   const isSplit = Boolean(preview && amountToUse > 0 && gatewayRemaining > 0);
   const blocked = Boolean(preview?.blockReason) || amountToUse <= 0;
+  const tenureOptions = preview?.tenureOptions || [];
+  const selectedTenure =
+    tenureOptions.find((o) => o.tenureMonths === creditTenureMonths) || tenureOptions[0];
 
   if (blocked) {
     return (
@@ -101,9 +131,6 @@ export function ImagineeringCreditCheckoutPanel({
         </div>
         <p className="text-[11px] text-muted-foreground">
           Limit {formatInr(preview!.availableCredit)}
-          {!isSplit && preview!.repayBefore
-            ? ` · due ${formatDueDate(preview!.repayBefore)}`
-            : ""}
         </p>
       </div>
 
@@ -127,6 +154,42 @@ export function ImagineeringCreditCheckoutPanel({
         </span>
       </div>
 
+      {tenureOptions.length > 0 && onCreditTenureChange ? (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium text-indigo-900/80 dark:text-indigo-100/80">
+            Repay in one payment after
+          </p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {tenureOptions.map((opt) => (
+              <button
+                key={opt.tenureMonths}
+                type="button"
+                onClick={() => onCreditTenureChange(opt.tenureMonths)}
+                className={cn(
+                  "rounded-md border px-2 py-1.5 text-left transition-colors",
+                  selectedTenure?.tenureMonths === opt.tenureMonths
+                    ? "border-indigo-600 bg-indigo-600 text-white"
+                    : "border-indigo-200/80 bg-white/70 text-slate-700 hover:border-indigo-400 dark:border-indigo-900/50 dark:bg-slate-900/40 dark:text-slate-200"
+                )}
+              >
+                <p className="text-[11px] font-semibold">
+                  {opt.tenureMonths} mo · {formatInterestPercent(opt.interestPercent)}%
+                </p>
+                <p className="text-[10px] opacity-90">
+                  Due {formatDueDate(opt.dueDate)} · {formatInr(opt.amountDueInr)}
+                </p>
+              </button>
+            ))}
+          </div>
+          {selectedTenure ? (
+            <p className="text-[11px] text-muted-foreground">
+              One-time repay {formatInr(selectedTenure.amountDueInr)} by{" "}
+              {formatDueDate(selectedTenure.dueDate)} (includes {optInterest(selectedTenure)} interest).
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {isSplit && onSplitGatewayChange ? (
         <div className="flex items-center gap-2">
           <p className="shrink-0 text-[11px] text-muted-foreground">Pay online via</p>
@@ -148,13 +211,13 @@ export function ImagineeringCreditCheckoutPanel({
             ))}
           </div>
         </div>
-      ) : (
-        <p className="text-[11px] text-muted-foreground">
-          Paid via {IMAGINEERING_CREDIT.name} (not {IMAGINEERING_WALLET.name}).
-        </p>
-      )}
+      ) : null}
     </div>
   );
+}
+
+function optInterest(opt: TenureOption) {
+  return `${formatInterestPercent(opt.interestPercent)}% · ${formatInr(opt.interestInr)}`;
 }
 
 export function useImagineeringCreditAvailable(orderTotal: number) {
@@ -164,6 +227,8 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
   const [loading, setLoading] = useState(true);
   const [creditToApply, setCreditToApply] = useState(0);
   const [gatewayRemaining, setGatewayRemaining] = useState(0);
+  const [creditTenureMonths, setCreditTenureMonths] = useState(1);
+  const [tenureOptions, setTenureOptions] = useState<TenureOption[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,6 +242,7 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
           setCanPayFull(false);
           setCreditToApply(0);
           setGatewayRemaining(0);
+          setTenureOptions([]);
           return;
         }
         const data = res.data as CreditPreview & { account?: { status?: string } | null };
@@ -185,18 +251,25 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
         const remaining = Math.round(
           Number(data?.gatewayRemaining ?? Math.max(0, orderTotal - amountToUse))
         );
+        const options = Array.isArray(data?.tenureOptions) ? data.tenureOptions : [];
         setShow(Boolean(active));
         setCanPayFull(Boolean(data?.canPayFull));
-        // Usable when any credit can be applied (full or split).
         setCanUse(Boolean(active && amountToUse > 0 && !data?.blockReason));
         setCreditToApply(amountToUse);
         setGatewayRemaining(remaining);
+        setTenureOptions(options);
+        if (options.length > 0) {
+          setCreditTenureMonths((prev) =>
+            options.some((o) => o.tenureMonths === prev) ? prev : options[0].tenureMonths
+          );
+        }
       } catch {
         setShow(false);
         setCanUse(false);
         setCanPayFull(false);
         setCreditToApply(0);
         setGatewayRemaining(0);
+        setTenureOptions([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -206,5 +279,15 @@ export function useImagineeringCreditAvailable(orderTotal: number) {
     };
   }, [orderTotal]);
 
-  return { canUse, canPayFull, show, loading, creditToApply, gatewayRemaining };
+  return {
+    canUse,
+    canPayFull,
+    show,
+    loading,
+    creditToApply,
+    gatewayRemaining,
+    creditTenureMonths,
+    setCreditTenureMonths,
+    tenureOptions,
+  };
 }
