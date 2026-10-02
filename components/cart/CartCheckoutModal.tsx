@@ -338,6 +338,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         buyerPAN: buyerPAN,
         paymentMethod: "imagineering_credit",
         creditTenureMonths,
+        creditChequeUrl: imagineeringCreditChequeUrl || undefined,
         ...cartDiscountPayload,
       });
       if (!response.success) {
@@ -506,6 +507,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    creditChequeUrl: imagineeringCreditChequeUrl,
+    setCreditChequeUrl: setImagineeringCreditChequeUrl,
     chequeOnFile: imagineeringCreditChequeOnFile,
     termsAccepted: imagineeringCreditTermsAccepted,
     setTermsAccepted: setImagineeringCreditTermsAccepted,
@@ -1120,7 +1123,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       onSplitGatewayChange={setCreditSplitGateway}
                       creditTenureMonths={creditTenureMonths}
                       onCreditTenureChange={setCreditTenureMonths}
-                      onChequeSaved={refreshImagineeringCredit}
+                      creditChequeUrl={imagineeringCreditChequeUrl || undefined}
+                      onCreditChequeUrlChange={setImagineeringCreditChequeUrl}
                       termsAccepted={imagineeringCreditTermsAccepted}
                       onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
                     />
@@ -1288,6 +1292,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   couponUsageId={couponUsageId || undefined}
                   imagineeringCreditToApply={imagineeringCreditToApply}
                   creditTenureMonths={creditTenureMonths}
+                  creditChequeUrl={imagineeringCreditChequeUrl || undefined}
                   bookingDescription="Cart Checkout · Credit split"
                   bookingPayload={{
                     date,
@@ -1310,6 +1315,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   couponUsageId={couponUsageId || undefined}
                   imagineeringCreditToApply={imagineeringCreditToApply}
                   creditTenureMonths={creditTenureMonths}
+                  creditChequeUrl={imagineeringCreditChequeUrl || undefined}
                   bookingDescription="Cart Checkout · Credit split"
                   bookingPayload={{
                     date,
