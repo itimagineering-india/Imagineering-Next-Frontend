@@ -1329,6 +1329,7 @@ export const api = {
         remainingCredit: number;
         repayBefore?: string;
         blockReason?: string;
+        chequeOnFile?: boolean;
       }>('/api/imagineering-credit/checkout-preview', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -1395,10 +1396,14 @@ export const api = {
         panCard: { url: string };
         aadhaar: { url: string };
         aadhaarBack: { url: string };
-        cheque: { url: string };
       };
     }) =>
       apiRequest('/api/imagineering-credit/me/kyc', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    saveCheckoutCheque: (payload: { url: string }) =>
+      apiRequest<{ chequeOnFile: boolean }>('/api/imagineering-credit/me/cheque', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
