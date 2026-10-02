@@ -633,6 +633,31 @@ export default function ImagineeringCreditPage() {
     }
   };
 
+  const handleDeactivate = async () => {
+    const ok = window.confirm(
+      `Deactivate ${IMAGINEERING_CREDIT.name}? You will not be able to use it at checkout. Reactivation requires Imagineering India admin approval.`
+    );
+    if (!ok) return;
+    setActivating(true);
+    try {
+      const res = await api.imagineeringCredit.deactivate();
+      if (!res.success) throw new Error(res.error?.message || "Deactivation failed");
+      toast({
+        title: "Credit deactivated",
+        description: "Contact Imagineering India support if you want it reactivated.",
+      });
+      await loadData();
+    } catch (err: unknown) {
+      toast({
+        title: "Deactivation failed",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setActivating(false);
+    }
+  };
+
   const handleApply = async () => {
     setApplying(true);
     try {
@@ -1258,10 +1283,42 @@ export default function ImagineeringCreditPage() {
           </Card>
         ) : (
           <>
+            {account.status === "active" && (
+              <Card className="border-zinc-900/10 shadow-none">
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-6">
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Deactivate credit line</p>
+                    <p className="mt-0.5">
+                      Stops new checkout usage. Outstanding must still be repaid. Only Imagineering India
+                      can reactivate later.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleDeactivate()}
+                    disabled={activating}
+                  >
+                    {activating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Deactivate
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {account.status !== "active" && (
               <Card className="border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20">
                 <CardContent className="pt-6 text-sm text-amber-900 dark:text-amber-200">
-                  Your {IMAGINEERING_CREDIT.name} is currently <strong>{account.status}</strong>. Contact support for assistance.
+                  {account.status === "deactivated" ? (
+                    <>
+                      Your {IMAGINEERING_CREDIT.name} is <strong>deactivated</strong>. You cannot turn it
+                      back on yourself — contact Imagineering India support to request reactivation.
+                    </>
+                  ) : (
+                    <>
+                      Your {IMAGINEERING_CREDIT.name} is currently <strong>{account.status}</strong>. Contact
+                      support for assistance.
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -1292,7 +1349,7 @@ export default function ImagineeringCreditPage() {
               </Card>
             </div>
 
-            {account.outstanding > 0 && account.status === "active" && (
+            {account.outstanding > 0 && account.status !== "blocked" && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Repay with EMI</CardTitle>
