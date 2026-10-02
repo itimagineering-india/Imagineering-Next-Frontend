@@ -219,6 +219,8 @@ export function ManpowerCheckoutClient() {
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    creditChequeUrl: imagineeringCreditChequeUrl,
+    setCreditChequeUrl: setImagineeringCreditChequeUrl,
     chequeOnFile: imagineeringCreditChequeOnFile,
     termsAccepted: imagineeringCreditTermsAccepted,
     setTermsAccepted: setImagineeringCreditTermsAccepted,
@@ -350,6 +352,13 @@ export function ManpowerCheckoutClient() {
       receiptUrl: receiptUrl || undefined,
       couponUsageId: appliedCoupon?.usageId,
       notes: notes.trim() || undefined,
+      ...(paymentMethod === "imagineering_credit"
+        ? {
+            creditTenureMonths,
+            creditChequeUrl: imagineeringCreditChequeUrl || undefined,
+            ...(isCreditSplit ? { imagineeringCreditToApply } : {}),
+          }
+        : {}),
       location: {
         address: formatSavedAddressLine(selectedAddress),
         city: selectedAddress.city,
@@ -464,6 +473,7 @@ export function ManpowerCheckoutClient() {
           creditsToApply={isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined}
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
           bookingDescription={
             isCreditSplit ? `Manpower · ${tradeName} · Credit split` : `Manpower · ${tradeName}`
           }
@@ -488,6 +498,7 @@ export function ManpowerCheckoutClient() {
           creditsToApply={isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined}
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
           bookingDescription={
             isCreditSplit ? `Manpower · ${tradeName} · Credit split` : `Manpower · ${tradeName}`
           }
@@ -864,7 +875,8 @@ export function ManpowerCheckoutClient() {
                 onSplitGatewayChange={setCreditSplitGateway}
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
-                onChequeSaved={refreshImagineeringCredit}
+                creditChequeUrl={imagineeringCreditChequeUrl || undefined}
+                onCreditChequeUrlChange={setImagineeringCreditChequeUrl}
                 termsAccepted={imagineeringCreditTermsAccepted}
                 onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
               />
