@@ -326,6 +326,8 @@ export function MachineRentalCheckoutClient() {
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    creditChequeUrl: imagineeringCreditChequeUrl,
+    setCreditChequeUrl: setImagineeringCreditChequeUrl,
     chequeOnFile: imagineeringCreditChequeOnFile,
     termsAccepted: imagineeringCreditTermsAccepted,
     setTermsAccepted: setImagineeringCreditTermsAccepted,
@@ -492,6 +494,13 @@ export function MachineRentalCheckoutClient() {
       couponUsageId: appliedCoupon?.usageId,
       creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
       notes: notes.trim() || undefined,
+      ...(paymentMethod === "imagineering_credit"
+        ? {
+            creditTenureMonths,
+            creditChequeUrl: imagineeringCreditChequeUrl || undefined,
+            ...(isCreditSplit ? { imagineeringCreditToApply } : {}),
+          }
+        : {}),
       ...(effectivePaymentMethod === "partial"
         ? {
             partialAmount,
@@ -682,6 +691,7 @@ export function MachineRentalCheckoutClient() {
           }
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
           bookingDescription={
             isCreditSplit
               ? `Machine rental · ${serviceTitle} · Credit split`
@@ -725,6 +735,7 @@ export function MachineRentalCheckoutClient() {
           }
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
           bookingDescription={
             isCreditSplit
               ? `Machine rental · ${serviceTitle} · Credit split`
@@ -1252,7 +1263,8 @@ export function MachineRentalCheckoutClient() {
                 onSplitGatewayChange={setCreditSplitGateway}
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
-                onChequeSaved={refreshImagineeringCredit}
+                creditChequeUrl={imagineeringCreditChequeUrl || undefined}
+                onCreditChequeUrlChange={setImagineeringCreditChequeUrl}
                 termsAccepted={imagineeringCreditTermsAccepted}
                 onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
               />
