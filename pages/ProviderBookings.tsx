@@ -874,7 +874,6 @@ export default function ProviderBookings() {
             onRequestModification={handleOpenModificationDialog}
             actionLoading={actionLoading}
             getStatusBadge={getStatusBadge}
-            getPaymentBadge={getPaymentBadge}
           />
         </div>
 
@@ -1834,7 +1833,6 @@ interface BookingsTableProps {
   onRequestModification?: (booking: Booking) => void;
   actionLoading?: string | null;
   getStatusBadge: (status: string) => ReactElement;
-  getPaymentBadge: (status: string) => ReactElement;
 }
 
 function BookingsTable({
@@ -1847,7 +1845,6 @@ function BookingsTable({
   onRequestModification,
   actionLoading,
   getStatusBadge,
-  getPaymentBadge,
 }: BookingsTableProps) {
   if (isLoading) {
     return (
@@ -1882,7 +1879,6 @@ function BookingsTable({
               <TableHead>Booking ID</TableHead>
               <TableHead>Amounts</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Payment</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
@@ -1941,7 +1937,6 @@ function BookingsTable({
                   })()}
                 </TableCell>
                 <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                <TableCell>{getPaymentBadge(booking.paymentStatus)}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm">
                     <Calendar className="h-3 w-3 text-muted-foreground" />
