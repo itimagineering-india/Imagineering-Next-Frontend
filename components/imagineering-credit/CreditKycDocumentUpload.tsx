@@ -15,9 +15,11 @@ type Props = {
   documentType: DocType;
   url: string | null;
   filename?: string | null;
-  onUploaded: (url: string, filename: string) => void;
+  onUploaded: (url: string, filename: string) => void | Promise<void>;
   onClear: () => void;
   disabled?: boolean;
+  /** Show Replace instead of only Clear when a file is already on file. */
+  allowReplace?: boolean;
 };
 
 export function CreditKycDocumentUpload({
@@ -29,6 +31,7 @@ export function CreditKycDocumentUpload({
   onUploaded,
   onClear,
   disabled,
+  allowReplace,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -98,9 +101,31 @@ export function CreditKycDocumentUpload({
             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="truncate">{filename || "Document uploaded"}</span>
           </div>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClear} disabled={disabled}>
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            {allowReplace && !disabled ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                disabled={uploading}
+                onClick={() => inputRef.current?.click()}
+              >
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onClear}
+                disabled={disabled}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <Button
