@@ -1702,6 +1702,7 @@ export const api = {
       buyerPAN?: string;
       paymentMethod?: string;
       creditTenureMonths?: number;
+      creditChequeUrl?: string;
       receiptUrl?: string;
       couponUsageId?: string;
       creditsToApply?: number;
@@ -1712,9 +1713,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(bookingData),
       }),
-    payWithImagineeringCredit: (bookingId: string) =>
+    payWithImagineeringCredit: (
+      bookingId: string,
+      payload?: { creditTenureMonths?: number; creditChequeUrl?: string }
+    ) =>
       apiRequest(`/api/bookings/${bookingId}/pay-with-imagineering-credit`, {
         method: 'POST',
+        body: JSON.stringify(payload || {}),
       }),
     uploadNeftReceipt: (file: File) => {
       const formData = new FormData();
@@ -1828,6 +1833,9 @@ export const api = {
         coordinates?: { lat: number; lng: number };
       };
       notes?: string;
+      creditTenureMonths?: number;
+      creditChequeUrl?: string;
+      imagineeringCreditToApply?: number;
     }) =>
       apiRequest<{
         bookingId: string;
@@ -1899,6 +1907,9 @@ export const api = {
         coordinates?: { lat: number; lng: number };
       };
       notes?: string;
+      creditTenureMonths?: number;
+      creditChequeUrl?: string;
+      imagineeringCreditToApply?: number;
     }) =>
       apiRequest<{
         bookingId: string;
@@ -1996,6 +2007,9 @@ export const api = {
         coordinates?: { lat: number; lng: number };
       };
       notes?: string;
+      creditTenureMonths?: number;
+      creditChequeUrl?: string;
+      imagineeringCreditToApply?: number;
     }) =>
       apiRequest<{
         bookingId: string;
@@ -2401,6 +2415,7 @@ export const api = {
       creditsToApply?: number;
       imagineeringCreditToApply?: number;
       creditTenureMonths?: number;
+      creditChequeUrl?: string;
       date?: string;
       time?: string;
       location?: any;
@@ -3296,6 +3311,8 @@ export const api = {
         couponUsageId?: string;
         creditsToApply?: number;
         imagineeringCreditToApply?: number;
+        creditTenureMonths?: number;
+        creditChequeUrl?: string;
         receiptUrl?: string;
         partialAmount?: number;
         partialPaymentMethod?: 'razorpay' | 'cashfree' | 'sbicollect';
