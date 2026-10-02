@@ -318,7 +318,20 @@ export function MachineRentalCheckoutClient() {
     setCreditsDiscount(discount);
   }, []);
 
-  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(payableTotal);
+  const {
+    canUse: canUseImagineeringCredit,
+    canPayFull: canPayFullImagineeringCredit,
+    show: showImagineeringCredit,
+    creditToApply: imagineeringCreditToApply,
+    gatewayRemaining: imagineeringCreditGatewayRemaining,
+  } = useImagineeringCreditAvailable(payableTotal);
+  const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
+  const isCreditSplit =
+    paymentMethod === "imagineering_credit" &&
+    canUseImagineeringCredit &&
+    !canPayFullImagineeringCredit &&
+    imagineeringCreditToApply > 0 &&
+    imagineeringCreditGatewayRemaining > 0;
 
   const addressLine = useMemo(
     () => (selectedAddress ? formatSavedAddressLine(selectedAddress) : ""),
@@ -457,6 +470,7 @@ export function MachineRentalCheckoutClient() {
       coordinates = (await geocodeAddressToCoordinates(query)) || undefined;
     }
 
+    const effectivePaymentMethod = isCreditSplit ? creditSplitGateway : paymentMethod;
     const res = await api.bookings.createMachineRental({
       serviceId,
       machineCount,
@@ -465,12 +479,12 @@ export function MachineRentalCheckoutClient() {
       ...(needsWeight ? { weight } : {}),
       startDate: startDatePayload,
       startTime: startTime || undefined,
-      paymentMethod,
+      paymentMethod: effectivePaymentMethod,
       receiptUrl: receiptUrl || undefined,
       couponUsageId: appliedCoupon?.usageId,
       creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
       notes: notes.trim() || undefined,
-      ...(paymentMethod === "partial"
+      ...(effectivePaymentMethod === "partial"
         ? {
             partialAmount,
             partialPaymentMethod: partialAdvanceMethod,
@@ -495,8 +509,10 @@ export function MachineRentalCheckoutClient() {
     };
   }, [
     appliedCoupon?.usageId,
+    creditSplitGateway,
     creditsToApply,
     duration,
+    isCreditSplit,
     machineCount,
     needsDuration,
     needsWeight,
@@ -545,6 +561,7 @@ export function MachineRentalCheckoutClient() {
       const created = await createBooking(receiptUrl);
       if (!created) return;
       const onlineAdvance =
+        isCreditSplit ||
         paymentMethod === "razorpay" ||
         paymentMethod === "cashfree" ||
         (paymentMethod === "partial" &&
@@ -604,10 +621,13 @@ export function MachineRentalCheckoutClient() {
   const chargeNow =
     pendingPartialCharge != null && pendingPartialCharge > 0
       ? pendingPartialCharge
-      : total;
+      : isCreditSplit
+        ? imagineeringCreditGatewayRemaining
+        : total;
   const showOnlinePay =
     pendingPayBookingId &&
-    (paymentMethod === "razorpay" ||
+    (isCreditSplit ||
+      paymentMethod === "razorpay" ||
       paymentMethod === "cashfree" ||
       (paymentMethod === "partial" &&
         (partialAdvanceMethod === "razorpay" || partialAdvanceMethod === "cashfree")));
@@ -624,15 +644,21 @@ export function MachineRentalCheckoutClient() {
           : paymentMethod === "partial"
             ? `Pay via SBI Collect · ₹${partialAmount.toLocaleString("en-IN")}`
             : "Pay via SBI Collect"
-        : paymentMethod === "imagineering_credit"
-          ? `Confirm · ${IMAGINEERING_CREDIT.name}`
-          : paymentMethod === "partial"
-            ? `Pay ₹${partialAmount.toLocaleString("en-IN")} now`
-            : t("checkoutPay");
+        : isCreditSplit
+          ? `Pay ₹${imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + ${creditSplitGateway === "cashfree" ? "Cashfree" : "Razorpay"}`
+          : paymentMethod === "imagineering_credit"
+            ? `Confirm · ${IMAGINEERING_CREDIT.name}`
+            : paymentMethod === "partial"
+              ? `Pay ₹${partialAmount.toLocaleString("en-IN")} now`
+              : t("checkoutPay");
 
   const renderPayButton = () => {
     const onlineMethod =
-      paymentMethod === "partial" ? partialAdvanceMethod : paymentMethod;
+      paymentMethod === "partial"
+        ? partialAdvanceMethod
+        : isCreditSplit
+          ? creditSplitGateway
+          : paymentMethod;
     if (showOnlinePay && onlineMethod === "razorpay" && pendingPayBookingId) {
       return (
         <RazorpayCheckout
@@ -640,13 +666,18 @@ export function MachineRentalCheckoutClient() {
           amount={chargeNow}
           couponUsageId={appliedCoupon?.usageId}
           creditsToApply={
-            paymentMethod === "partial"
+            paymentMethod === "partial" || isCreditSplit
               ? undefined
               : creditsToApply > 0
                 ? creditsToApply
                 : undefined
           }
-          bookingDescription={`Machine rental · ${serviceTitle}`}
+          imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          bookingDescription={
+            isCreditSplit
+              ? `Machine rental · ${serviceTitle} · Credit split`
+              : `Machine rental · ${serviceTitle}`
+          }
           bookingPayload={
             paymentMethod === "partial"
               ? {
@@ -662,9 +693,11 @@ export function MachineRentalCheckoutClient() {
             toast({ title: t("checkoutError"), description: msg, variant: "destructive" })
           }
         >
-          {paymentMethod === "partial"
-            ? `Pay ₹${chargeNow.toLocaleString("en-IN")} now`
-            : t("checkoutPay")}
+          {isCreditSplit
+            ? `Pay ₹${imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + Razorpay`
+            : paymentMethod === "partial"
+              ? `Pay ₹${chargeNow.toLocaleString("en-IN")} now`
+              : t("checkoutPay")}
         </RazorpayCheckout>
       );
     }
@@ -675,13 +708,18 @@ export function MachineRentalCheckoutClient() {
           amount={chargeNow}
           couponUsageId={appliedCoupon?.usageId}
           creditsToApply={
-            paymentMethod === "partial"
+            paymentMethod === "partial" || isCreditSplit
               ? undefined
               : creditsToApply > 0
                 ? creditsToApply
                 : undefined
           }
-          bookingDescription={`Machine rental · ${serviceTitle}`}
+          imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          bookingDescription={
+            isCreditSplit
+              ? `Machine rental · ${serviceTitle} · Credit split`
+              : `Machine rental · ${serviceTitle}`
+          }
           bookingPayload={
             paymentMethod === "partial"
               ? {
@@ -697,9 +735,11 @@ export function MachineRentalCheckoutClient() {
             toast({ title: t("checkoutError"), description: msg, variant: "destructive" })
           }
         >
-          {paymentMethod === "partial"
-            ? `Pay ₹${chargeNow.toLocaleString("en-IN")} now`
-            : t("checkoutPay")}
+          {isCreditSplit
+            ? `Pay ₹${imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + Cashfree`
+            : paymentMethod === "partial"
+              ? `Pay ₹${chargeNow.toLocaleString("en-IN")} now`
+              : t("checkoutPay")}
         </CashfreeCheckout>
       );
     }
@@ -1151,7 +1191,7 @@ export function MachineRentalCheckoutClient() {
                   }
                 }}
                 amount={paymentMethod === "imagineering_credit" ? payableTotal : paymentAmount}
-                showImagineeringCredit={canUseImagineeringCredit}
+                showImagineeringCredit={showImagineeringCredit}
                 showPartialPayment
               />
               {paymentMethod === "partial" ? (
@@ -1198,6 +1238,8 @@ export function MachineRentalCheckoutClient() {
               <ImagineeringCreditCheckoutPanel
                 orderTotal={payableTotal}
                 selected={paymentMethod === "imagineering_credit"}
+                splitGateway={creditSplitGateway}
+                onSplitGatewayChange={setCreditSplitGateway}
               />
             </section>
 
