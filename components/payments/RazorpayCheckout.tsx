@@ -18,6 +18,7 @@ interface RazorpayCheckoutProps {
           bookingDescription?: string;
           couponUsageId?: string;
           creditsToApply?: number;
+          imagineeringCreditToApply?: number;
           bookingPayload?: Record<string, any>;
   bookingPaymentStage?: "initial" | "balance";
   requirementId?: string;
@@ -49,6 +50,7 @@ export function RazorpayCheckout({
           bookingDescription,
           couponUsageId,
           creditsToApply,
+          imagineeringCreditToApply,
         bookingPayload,
         bookingPaymentStage = "initial",
           requirementId,
@@ -240,6 +242,10 @@ export function RazorpayCheckout({
             cartId,
             couponUsageId: couponUsageId,
             creditsToApply: creditsToApply && creditsToApply > 0 ? creditsToApply : undefined,
+            imagineeringCreditToApply:
+              imagineeringCreditToApply && imagineeringCreditToApply > 0
+                ? imagineeringCreditToApply
+                : undefined,
             ...(bookingPayload || {}),
           });
         }
