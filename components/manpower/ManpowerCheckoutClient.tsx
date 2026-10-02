@@ -211,7 +211,20 @@ export function ManpowerCheckoutClient() {
     setCreditsDiscount(discount);
   }, []);
 
-  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(payableTotal);
+  const {
+    canUse: canUseImagineeringCredit,
+    canPayFull: canPayFullImagineeringCredit,
+    show: showImagineeringCredit,
+    creditToApply: imagineeringCreditToApply,
+    gatewayRemaining: imagineeringCreditGatewayRemaining,
+  } = useImagineeringCreditAvailable(payableTotal);
+  const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
+  const isCreditSplit =
+    paymentMethod === "imagineering_credit" &&
+    canUseImagineeringCredit &&
+    !canPayFullImagineeringCredit &&
+    imagineeringCreditToApply > 0 &&
+    imagineeringCreditGatewayRemaining > 0;
 
   const addressLine = useMemo(
     () => (selectedAddress ? formatSavedAddressLine(selectedAddress) : ""),
@@ -320,11 +333,12 @@ export function ManpowerCheckoutClient() {
       return null;
     }
 
+    const effectivePaymentMethod = isCreditSplit ? creditSplitGateway : paymentMethod;
     const res = await api.bookings.createManpowerDispatch({
       catalogProductId,
       hireMode,
       hours: needsHours ? hours : undefined,
-      paymentMethod,
+      paymentMethod: effectivePaymentMethod,
       receiptUrl: receiptUrl || undefined,
       couponUsageId: appliedCoupon?.usageId,
       notes: notes.trim() || undefined,
@@ -347,8 +361,10 @@ export function ManpowerCheckoutClient() {
   }, [
     appliedCoupon?.usageId,
     catalogProductId,
+    creditSplitGateway,
     hireMode,
     hours,
+    isCreditSplit,
     needsHours,
     notes,
     paymentMethod,
@@ -370,7 +386,8 @@ export function ManpowerCheckoutClient() {
       }
       const created = await createDispatch(receiptUrl);
       if (!created) return;
-      if (created.requiresPayment && (paymentMethod === "razorpay" || paymentMethod === "cashfree")) {
+      const onlineMethod = isCreditSplit ? creditSplitGateway : paymentMethod;
+      if (created.requiresPayment && (onlineMethod === "razorpay" || onlineMethod === "cashfree")) {
         setPendingPayBookingId(created.bookingId);
         return;
       }
@@ -411,8 +428,10 @@ export function ManpowerCheckoutClient() {
   }
 
   const total = paymentAmount;
+  const onlineMethod = isCreditSplit ? creditSplitGateway : paymentMethod;
   const showOnlinePay =
-    pendingPayBookingId && (paymentMethod === "razorpay" || paymentMethod === "cashfree");
+    pendingPayBookingId && (onlineMethod === "razorpay" || onlineMethod === "cashfree");
+  const gatewayPayAmount = isCreditSplit ? imagineeringCreditGatewayRemaining : total;
 
   const confirmLabel =
     paymentMethod === "cod"
@@ -421,44 +440,56 @@ export function ManpowerCheckoutClient() {
         ? sbi.hasReceipt
           ? "Place order (SBI Collect)"
           : "Pay via SBI Collect"
-        : paymentMethod === "imagineering_credit"
-          ? `Confirm · ${IMAGINEERING_CREDIT.name}`
-          : t("checkoutPay");
+        : isCreditSplit
+          ? `Pay ₹${imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + ${creditSplitGateway === "cashfree" ? "Cashfree" : "Razorpay"}`
+          : paymentMethod === "imagineering_credit"
+            ? `Confirm · ${IMAGINEERING_CREDIT.name}`
+            : t("checkoutPay");
 
   const renderPayButton = () => {
-    if (showOnlinePay && paymentMethod === "razorpay" && pendingPayBookingId) {
+    if (showOnlinePay && onlineMethod === "razorpay" && pendingPayBookingId) {
       return (
         <RazorpayCheckout
           bookingId={pendingPayBookingId}
-          amount={total}
+          amount={gatewayPayAmount}
           couponUsageId={appliedCoupon?.usageId}
-          creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
-          bookingDescription={`Manpower · ${tradeName}`}
+          creditsToApply={isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined}
+          imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          bookingDescription={
+            isCreditSplit ? `Manpower · ${tradeName} · Credit split` : `Manpower · ${tradeName}`
+          }
           className="h-11 w-full rounded-xl font-semibold"
           onSuccess={() => goWaiting(pendingPayBookingId)}
           onError={(msg) =>
             toast({ title: t("checkoutError"), description: msg, variant: "destructive" })
           }
         >
-          {t("checkoutPay")}
+          {isCreditSplit
+            ? `Pay ₹${imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + Razorpay`
+            : t("checkoutPay")}
         </RazorpayCheckout>
       );
     }
-    if (showOnlinePay && paymentMethod === "cashfree" && pendingPayBookingId) {
+    if (showOnlinePay && onlineMethod === "cashfree" && pendingPayBookingId) {
       return (
         <CashfreeCheckout
           bookingId={pendingPayBookingId}
-          amount={total}
+          amount={gatewayPayAmount}
           couponUsageId={appliedCoupon?.usageId}
-          creditsToApply={creditsToApply > 0 ? creditsToApply : undefined}
-          bookingDescription={`Manpower · ${tradeName}`}
+          creditsToApply={isCreditSplit ? undefined : creditsToApply > 0 ? creditsToApply : undefined}
+          imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
+          bookingDescription={
+            isCreditSplit ? `Manpower · ${tradeName} · Credit split` : `Manpower · ${tradeName}`
+          }
           className="h-11 w-full rounded-xl font-semibold"
           onSuccess={() => goWaiting(pendingPayBookingId)}
           onError={(msg) =>
             toast({ title: t("checkoutError"), description: msg, variant: "destructive" })
           }
         >
-          {t("checkoutPay")}
+          {isCreditSplit
+            ? `Pay ₹${imagineeringCreditGatewayRemaining.toLocaleString("en-IN")} · Credit + Cashfree`
+            : t("checkoutPay")}
         </CashfreeCheckout>
       );
     }
@@ -801,7 +832,7 @@ export function ManpowerCheckoutClient() {
                   if (v !== "sbicollect") sbi.clearReceipt();
                 }}
                 amount={paymentMethod === "imagineering_credit" ? payableTotal : paymentAmount}
-                showImagineeringCredit={canUseImagineeringCredit}
+                showImagineeringCredit={showImagineeringCredit}
               />
               {paymentMethod === "sbicollect" ? (
                 <div className="mt-4">
@@ -819,6 +850,8 @@ export function ManpowerCheckoutClient() {
               <ImagineeringCreditCheckoutPanel
                 orderTotal={payableTotal}
                 selected={paymentMethod === "imagineering_credit"}
+                splitGateway={creditSplitGateway}
+                onSplitGatewayChange={setCreditSplitGateway}
               />
             </section>
 
