@@ -25,6 +25,7 @@ import { CalendarIcon, Clock, MapPin, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RazorpayCheckout } from "@/components/payments/RazorpayCheckout";
+import { CashfreeCheckout } from "@/components/payments/CashfreeCheckout";
 import {
   PaymentOptionsSelector,
   type PaymentOption,
@@ -183,7 +184,20 @@ export function DynamicBookingModal({
     paymentMethod === "imagineering_credit"
       ? paymentCalculation.totalPayable
       : Math.max(0, paymentCalculation.totalPayable - creditsDiscount);
-  const { canUse: canUseImagineeringCredit } = useImagineeringCreditAvailable(orderTotalForPayment);
+  const {
+    canUse: canUseImagineeringCredit,
+    canPayFull: canPayFullImagineeringCredit,
+    show: showImagineeringCredit,
+    creditToApply: imagineeringCreditToApply,
+    gatewayRemaining: imagineeringCreditGatewayRemaining,
+  } = useImagineeringCreditAvailable(orderTotalForPayment);
+  const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
+  const isCreditSplit =
+    paymentMethod === "imagineering_credit" &&
+    canUseImagineeringCredit &&
+    !canPayFullImagineeringCredit &&
+    imagineeringCreditToApply > 0 &&
+    imagineeringCreditGatewayRemaining > 0;
 
   const {
     register,
@@ -744,7 +758,7 @@ export function DynamicBookingModal({
     setPaymentMethod("razorpay");
     onOpenChange(false);
     // Redirect to bookings page after successful payment
-    router.push("/dashboard/buyer/orders");
+    router.push("/buyer/orders");
     toast({
       title: "Booking Confirmed!",
       description: "Your booking has been confirmed. View it in My Bookings.",
@@ -1255,11 +1269,13 @@ export function DynamicBookingModal({
                       value={paymentMethod}
                       onChange={setPaymentMethod}
                       amount={paymentCalculation.totalPayable}
-                      showImagineeringCredit={canUseImagineeringCredit}
+                      showImagineeringCredit={showImagineeringCredit}
                     />
                     <ImagineeringCreditCheckoutPanel
                       orderTotal={paymentCalculation.totalPayable}
                       selected={paymentMethod === "imagineering_credit"}
+                      splitGateway={creditSplitGateway}
+                      onSplitGatewayChange={setCreditSplitGateway}
                     />
                   </div>
 
@@ -1278,7 +1294,7 @@ export function DynamicBookingModal({
                     )}
                   </div>
 
-                  {paymentMethod === "imagineering_credit" ? (
+                  {paymentMethod === "imagineering_credit" && canPayFullImagineeringCredit ? (
                     <Button
                       type="button"
                       className="w-full"
@@ -1293,6 +1309,50 @@ export function DynamicBookingModal({
                       ) : (
                         `Pay ₹${paymentCalculation.totalPayable.toLocaleString()} with ${IMAGINEERING_CREDIT.name}`
                       )}
+                    </Button>
+                  ) : isCreditSplit && creditSplitGateway === "razorpay" ? (
+                    <RazorpayCheckout
+                      bookingId={currentBookingId}
+                      bookingDescription={`${service.title} · Credit split`}
+                      amount={imagineeringCreditGatewayRemaining}
+                      couponUsageId={couponUsageId ?? undefined}
+                      imagineeringCreditToApply={imagineeringCreditToApply}
+                      onAmountReceived={(amount) => {
+                        setActualPaymentAmount(amount);
+                      }}
+                      onSuccess={handlePaymentSuccess}
+                      onBeforePayment={async () => {
+                        if (gstNumber.trim() || panNumber.trim()) {
+                          await updateBookingTaxDetails();
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Pay ₹{imagineeringCreditGatewayRemaining.toLocaleString()} · Credit + Razorpay
+                    </RazorpayCheckout>
+                  ) : isCreditSplit && creditSplitGateway === "cashfree" ? (
+                    <CashfreeCheckout
+                      bookingId={currentBookingId}
+                      bookingDescription={`${service.title} · Credit split`}
+                      amount={imagineeringCreditGatewayRemaining}
+                      couponUsageId={couponUsageId ?? undefined}
+                      imagineeringCreditToApply={imagineeringCreditToApply}
+                      onAmountReceived={(amount) => {
+                        setActualPaymentAmount(amount);
+                      }}
+                      onSuccess={handlePaymentSuccess}
+                      onBeforePayment={async () => {
+                        if (gstNumber.trim() || panNumber.trim()) {
+                          await updateBookingTaxDetails();
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Pay ₹{imagineeringCreditGatewayRemaining.toLocaleString()} · Credit + Cashfree
+                    </CashfreeCheckout>
+                  ) : paymentMethod === "imagineering_credit" ? (
+                    <Button type="button" className="w-full" disabled>
+                      {IMAGINEERING_CREDIT.name} unavailable
                     </Button>
                   ) : (
                     <RazorpayCheckout
