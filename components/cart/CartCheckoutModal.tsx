@@ -506,6 +506,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    chequeOnFile: imagineeringCreditChequeOnFile,
+    refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
   const isCreditSplit =
@@ -514,6 +516,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
+  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
 
   useEffect(() => {
     if (paymentMethod !== "partial") return;
@@ -1114,6 +1117,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       onSplitGatewayChange={setCreditSplitGateway}
                       creditTenureMonths={creditTenureMonths}
                       onCreditTenureChange={setCreditTenureMonths}
+                      onChequeSaved={refreshImagineeringCredit}
                     />
                     {paymentMethod === "partial" ? (
                       <PartialPaymentPanel
@@ -1253,7 +1257,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
               {paymentMethod === "imagineering_credit" && canPayFullImagineeringCredit ? (
                 <Button
                   onClick={handleImagineeringCreditCheckout}
-                  disabled={isPlacingOrder || !canUseImagineeringCredit}
+                  disabled={isPlacingOrder || !creditPayReady}
                   className="h-12 w-full flex-1 rounded-xl bg-indigo-600 text-base font-semibold text-white shadow-md transition-all hover:bg-indigo-700 disabled:opacity-50 sm:min-w-[12rem]"
                 >
                   {isPlacingOrder ? (
@@ -1264,6 +1268,13 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   ) : (
                     `Confirm · ${IMAGINEERING_CREDIT.name} · ₹${amount.toLocaleString("en-IN")}`
                   )}
+                </Button>
+              ) : paymentMethod === "imagineering_credit" && isCreditSplit && !imagineeringCreditChequeOnFile ? (
+                <Button
+                  disabled
+                  className="h-12 w-full flex-1 rounded-xl bg-indigo-600 text-base font-semibold text-white shadow-md disabled:opacity-50 sm:min-w-[12rem]"
+                >
+                  Upload cheque to continue
                 </Button>
               ) : isCreditSplit && creditSplitGateway === "razorpay" ? (
                 <RazorpayCheckout
