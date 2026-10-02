@@ -7,7 +7,7 @@ import api from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, FileText, Loader2, Upload, X } from "lucide-react";
 
-type DocType = "panCard" | "aadhaar";
+type DocType = "panCard" | "aadhaar" | "aadhaarBack" | "cheque";
 
 type Props = {
   label: string;
