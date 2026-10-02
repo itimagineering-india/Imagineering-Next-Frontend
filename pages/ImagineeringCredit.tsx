@@ -78,6 +78,8 @@ type Underwriting = {
 type RepaymentRequestRow = {
   _id: string;
   amount: number;
+  processingFeeInr?: number;
+  totalTransferredInr?: number;
   status: string;
   paymentReference?: string;
   createdAt: string;
@@ -126,7 +128,7 @@ const IMAGINEERING_CREDIT_FAQ = [
   {
     id: "repay",
     q: "How do repayments work?",
-    a: "Use credit anytime in the month. When you repay, choose a 1, 2, or 3 month EMI plan. Flat interest (set by Imagineering India) is added, then pay each EMI online via Razorpay/Cashfree. Missed EMIs may attract a fixed late fee.",
+    a: "Use credit anytime during the month. On the 1st of the next month we generate your bill for that month’s usage. Pay in full or convert to a 1/2/3 month EMI by the 5th. After that, unpaid bills block new credit use.",
   },
   {
     id: "limits",
@@ -166,8 +168,8 @@ const HOW_IT_WORKS = [
   },
   {
     step: 4,
-    title: "Choose EMI & repay online",
-    description: "Pick 1/2/3 months for your outstanding, then pay EMIs via Razorpay or Cashfree.",
+    title: "Monthly bill, then EMI if you need it",
+    description: "Bill generates on the 1st for last month’s usage. Pay or convert to EMI by the 5th.",
     icon: Clock,
   },
 ] as const;
@@ -514,7 +516,17 @@ export default function ImagineeringCreditPage() {
   const [repaymentRequests, setRepaymentRequests] = useState<RepaymentRequestRow[]>([]);
   const [planPreview, setPlanPreview] = useState<{
     unplannedPrincipalInr: number;
-    settings: { interestPercentPerMonth: number; lateFeeInr: number };
+    billPrincipalInr?: number;
+    canConvertToEmi?: boolean;
+    openBill?: {
+      id: string;
+      periodLabel: string;
+      amountDueInr: number;
+      dueDate?: string;
+      status: string;
+      canPayOrConvert: boolean;
+    } | null;
+    settings: { interestPercentPerMonth: number; lateFeeInr: number; processingFeeInr?: number };
     options: Array<{
       tenureMonths: number;
       totalInterestInr: number;
@@ -532,8 +544,11 @@ export default function ImagineeringCreditPage() {
       lateFeeInr: number;
       status: string;
     };
+    processingFeeInr?: number;
+    chargeTotalInr?: number;
   } | null>(null);
   const [payingEmi, setPayingEmi] = useState(false);
+  const [payingBill, setPayingBill] = useState(false);
   const [creatingPlan, setCreatingPlan] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -801,52 +816,15 @@ export default function ImagineeringCreditPage() {
         key?: string;
       };
 
-      await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
-        if (existing && (window as any).Razorpay) {
-          resolve();
-          return;
-        }
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Failed to load Razorpay"));
-        document.body.appendChild(script);
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        const rzp = new (window as any).Razorpay({
-          key: od.key,
-          amount: od.amount,
-          currency: od.currency || "INR",
-          name: "Imagineering India",
-          description: `Credit EMI #${nextPayable.installment.sequence}`,
-          order_id: od.orderId,
-          handler: async (response: {
-            razorpay_order_id: string;
-            razorpay_payment_id: string;
-            razorpay_signature: string;
-          }) => {
-            try {
-              const verifyRes = await api.imagineeringCredit.verifyEmiRazorpay({
-                paymentId: od.paymentId,
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-              });
-              if (!verifyRes.success) {
-                throw new Error(verifyRes.error?.message || "Verification failed");
-              }
-              toast({ title: "EMI paid successfully" });
-              await loadData();
-              resolve();
-            } catch (e) {
-              reject(e);
-            }
-          },
-          modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
-        });
-        rzp.open();
+      await openRazorpayCheckout({
+        key: od.key,
+        amount: od.amount,
+        currency: od.currency,
+        orderId: od.orderId,
+        paymentId: od.paymentId,
+        description: `Credit EMI #${nextPayable.installment.sequence}`,
+        verify: (payload) => api.imagineeringCredit.verifyEmiRazorpay(payload),
+        successTitle: "EMI paid successfully",
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Payment failed";
@@ -855,6 +833,108 @@ export default function ImagineeringCreditPage() {
       }
     } finally {
       setPayingEmi(false);
+    }
+  };
+
+  const openRazorpayCheckout = async (opts: {
+    key?: string;
+    amount: number;
+    currency?: string;
+    orderId: string;
+    description: string;
+    paymentId: string;
+    verify: (payload: {
+      paymentId: string;
+      razorpayOrderId: string;
+      razorpayPaymentId: string;
+      razorpaySignature: string;
+    }) => Promise<{ success: boolean; error?: { message?: string } }>;
+    successTitle: string;
+  }) => {
+    await new Promise<void>((resolve, reject) => {
+      const existing = document.querySelector(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+      );
+      if (existing && (window as any).Razorpay) {
+        resolve();
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Razorpay"));
+      document.body.appendChild(script);
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const rzp = new (window as any).Razorpay({
+        key: opts.key,
+        amount: opts.amount,
+        currency: opts.currency || "INR",
+        name: "Imagineering India",
+        description: opts.description,
+        order_id: opts.orderId,
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const verifyRes = await opts.verify({
+              paymentId: opts.paymentId,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            if (!verifyRes.success) {
+              throw new Error(verifyRes.error?.message || "Verification failed");
+            }
+            toast({ title: opts.successTitle });
+            await loadData();
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        },
+        modal: { ondismiss: () => reject(new Error("Payment cancelled")) },
+      });
+      rzp.open();
+    });
+  };
+
+  const handlePayFullBillRazorpay = async () => {
+    setPayingBill(true);
+    try {
+      const orderRes = await api.imagineeringCredit.createBillOrder();
+      if (!orderRes.success || !orderRes.data) {
+        throw new Error(orderRes.error?.message || "Could not create payment");
+      }
+      const od = orderRes.data as {
+        paymentId: string;
+        orderId: string;
+        amount: number;
+        currency: string;
+        key?: string;
+        amountDueInr?: number;
+        processingFeeInr?: number;
+      };
+      await openRazorpayCheckout({
+        key: od.key,
+        amount: od.amount,
+        currency: od.currency,
+        orderId: od.orderId,
+        paymentId: od.paymentId,
+        description: "Imagineering Credit bill payment",
+        verify: (payload) => api.imagineeringCredit.verifyBillRazorpay(payload),
+        successTitle: "Bill paid successfully",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Payment failed";
+      if (msg !== "Payment cancelled") {
+        toast({ title: "Bill payment failed", description: msg, variant: "destructive" });
+      }
+    } finally {
+      setPayingBill(false);
     }
   };
 
@@ -1352,15 +1432,55 @@ export default function ImagineeringCreditPage() {
             {account.outstanding > 0 && account.status !== "blocked" && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Repay with EMI</CardTitle>
+                  <CardTitle className="text-base">Repayment</CardTitle>
                   <CardDescription>
-                    Outstanding principal: {formatInr(account.outstanding)}. Choose 1 / 2 / 3 months
+                    {planPreview?.openBill?.canPayOrConvert
+                      ? `${planPreview.openBill.periodLabel} bill: ${formatInr(planPreview.openBill.amountDueInr)}. Pay or convert to EMI by ${
+                          planPreview.openBill.dueDate
+                            ? new Date(planPreview.openBill.dueDate).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                              })
+                            : "the 5th"
+                        }.`
+                      : planPreview?.openBill?.status === "overdue"
+                        ? `${planPreview.openBill.periodLabel} bill of ${formatInr(planPreview.openBill.amountDueInr)} is overdue. Pay via bank transfer to unblock credit.`
+                        : `Outstanding: ${formatInr(account.outstanding)}. Usage this month is billed on the 1st of next month — pay or convert to EMI by the 5th.`}
                     {planPreview?.settings
-                      ? ` · interest ${planPreview.settings.interestPercentPerMonth}%/mo · late fee ${formatInr(planPreview.settings.lateFeeInr)}`
+                      ? ` · EMI interest ${planPreview.settings.interestPercentPerMonth}%/mo`
                       : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {(() => {
+                    const processingFee = Math.max(
+                      0,
+                      Math.round(Number(planPreview?.settings?.processingFeeInr) || 0)
+                    );
+                    const openBill = planPreview?.openBill;
+                    const showPayFullBill =
+                      Boolean(openBill) &&
+                      (openBill?.status === "open" || openBill?.status === "overdue") &&
+                      Number(openBill?.amountDueInr) > 0 &&
+                      !nextPayable;
+                    return (
+                      <>
+                  {showPayFullBill && openBill ? (
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+                      <p className="text-sm font-medium text-indigo-950">
+                        Pay full bill: {formatInr(openBill.amountDueInr)}
+                        {processingFee > 0
+                          ? ` + processing fee ${formatInr(processingFee)} = ${formatInr(
+                              openBill.amountDueInr + processingFee
+                            )}`
+                          : ""}
+                      </p>
+                      <Button onClick={() => void handlePayFullBillRazorpay()} disabled={payingBill}>
+                        {payingBill ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Pay full bill with Razorpay
+                      </Button>
+                    </div>
+                  ) : null}
                   {nextPayable ? (
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 space-y-3">
                       <p className="text-sm font-medium text-emerald-900">
@@ -1370,6 +1490,16 @@ export default function ImagineeringCreditPage() {
                           ? ` (includes late fee ${formatInr(nextPayable.installment.lateFeeInr)})`
                           : ""}
                       </p>
+                      {(nextPayable.processingFeeInr ?? processingFee) > 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Processing fee {formatInr(nextPayable.processingFeeInr ?? processingFee)} · Pay{" "}
+                          {formatInr(
+                            nextPayable.chargeTotalInr ??
+                              nextPayable.installment.amountDueInr +
+                                (nextPayable.processingFeeInr ?? processingFee)
+                          )}
+                        </p>
+                      ) : null}
                       <p className="text-xs text-muted-foreground">
                         Due {new Date(nextPayable.installment.dueDate).toLocaleDateString("en-IN")} ·{" "}
                         {nextPayable.installment.status}
@@ -1379,44 +1509,67 @@ export default function ImagineeringCreditPage() {
                         Pay EMI with Razorpay
                       </Button>
                     </div>
-                  ) : planPreview && planPreview.unplannedPrincipalInr > 0 ? (
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {planPreview.options.map((opt) => (
-                        <button
-                          key={opt.tenureMonths}
-                          type="button"
-                          disabled={creatingPlan}
-                          onClick={() => void handleCreatePlan(opt.tenureMonths)}
-                          className="rounded-lg border border-slate-200 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50/40"
-                        >
-                          <p className="font-semibold">{opt.tenureMonths} month{opt.tenureMonths > 1 ? "s" : ""}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            EMI ~ {formatInr(opt.emiAmountInr)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Interest {formatInr(opt.totalInterestInr)} · Total {formatInr(opt.totalPayableInr)}
-                          </p>
-                        </button>
-                      ))}
+                  ) : planPreview?.canConvertToEmi && planPreview.options.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Or convert this month’s bill to EMI (not mid-month purchases — those wait for the next bill).
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {planPreview.options.map((opt) => (
+                          <button
+                            key={opt.tenureMonths}
+                            type="button"
+                            disabled={creatingPlan}
+                            onClick={() => void handleCreatePlan(opt.tenureMonths)}
+                            className="rounded-lg border border-slate-200 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50/40"
+                          >
+                            <p className="font-semibold">
+                              {opt.tenureMonths} month{opt.tenureMonths > 1 ? "s" : ""}
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              EMI ~ {formatInr(opt.emiAmountInr)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Interest {formatInr(opt.totalInterestInr)} · Total{" "}
+                              {formatInr(opt.totalPayableInr)}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No EMI due right now.</p>
-                  )}
+                  ) : !showPayFullBill ? (
+                    <p className="text-sm text-muted-foreground">
+                      {planPreview?.unplannedPrincipalInr && planPreview.unplannedPrincipalInr > 0
+                        ? "No bill to convert yet. Keep using credit this month — your bill arrives on the 1st."
+                        : "No EMI due right now."}
+                    </p>
+                  ) : null}
 
                   <details className="rounded-lg border border-dashed p-3">
                     <summary className="cursor-pointer text-sm font-medium">
                       Alternate: bank transfer + UTR (manual verify)
                     </summary>
                     <div className="mt-3 space-y-3">
+                      {processingFee > 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Transfer principal + flat processing fee {formatInr(processingFee)}. Enter only the
+                          principal below; fee is recorded automatically.
+                          {repayAmount && Number(repayAmount) > 0
+                            ? ` Total to transfer: ${formatInr(Number(repayAmount) + processingFee)}.`
+                            : ""}
+                        </p>
+                      ) : null}
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor="repay-amount">Amount (₹)</Label>
+                          <Label htmlFor="repay-amount">Principal amount (₹)</Label>
                           <Input
                             id="repay-amount"
                             type="number"
                             value={repayAmount}
                             onChange={(e) => setRepayAmount(e.target.value)}
-                            placeholder={String(account.outstanding)}
+                            placeholder={String(
+                              openBill?.amountDueInr || account.outstanding
+                            )}
                           />
                         </div>
                         <div className="space-y-2">
@@ -1439,6 +1592,12 @@ export default function ImagineeringCreditPage() {
                             <li key={req._id} className="flex justify-between py-2">
                               <span>
                                 {formatInr(req.amount)}
+                                {(req.processingFeeInr || 0) > 0
+                                  ? ` + fee ${formatInr(req.processingFeeInr || 0)} = ${formatInr(
+                                      req.totalTransferredInr ??
+                                        req.amount + (req.processingFeeInr || 0)
+                                    )}`
+                                  : ""}
                                 {req.paymentReference ? ` · ${req.paymentReference}` : ""}
                               </span>
                               <Badge variant="secondary">{req.status}</Badge>
@@ -1448,6 +1607,9 @@ export default function ImagineeringCreditPage() {
                       )}
                     </div>
                   </details>
+                      </>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
