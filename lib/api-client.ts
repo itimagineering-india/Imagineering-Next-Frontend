@@ -1270,6 +1270,10 @@ export const api = {
       apiRequest<{ account: Record<string, unknown> }>('/api/imagineering-credit/me/activate', {
         method: 'POST',
       }),
+    deactivate: () =>
+      apiRequest<{ account: Record<string, unknown> }>('/api/imagineering-credit/me/deactivate', {
+        method: 'POST',
+      }),
     getTransactions: (params?: { page?: number; limit?: number }) => {
       const query = new URLSearchParams();
       if (params?.page) query.set('page', String(params.page));
@@ -1319,9 +1323,12 @@ export const api = {
         orderTotal: number;
         availableCredit: number;
         canPayFull: boolean;
+        canPayPartial?: boolean;
         amountToUse: number;
+        gatewayRemaining?: number;
         remainingCredit: number;
         repayBefore?: string;
+        blockReason?: string;
       }>('/api/imagineering-credit/checkout-preview', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -2334,6 +2341,7 @@ export const api = {
       cartId?: string;
       couponUsageId?: string;
       creditsToApply?: number;
+      imagineeringCreditToApply?: number;
       date?: string;
       time?: string;
       location?: any;
@@ -3228,6 +3236,7 @@ export const api = {
         paymentOption?: string;
         couponUsageId?: string;
         creditsToApply?: number;
+        imagineeringCreditToApply?: number;
         receiptUrl?: string;
         partialAmount?: number;
         partialPaymentMethod?: 'razorpay' | 'cashfree' | 'sbicollect';
