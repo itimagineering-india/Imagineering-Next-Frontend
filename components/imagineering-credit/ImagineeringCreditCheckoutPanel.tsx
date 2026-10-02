@@ -175,27 +175,39 @@ export function ImagineeringCreditCheckoutPanel({
           required
           documentType="cheque"
           url={chequeOnFile ? chequeUrl || "on-file" : null}
-          filename={chequeFilename || (chequeOnFile ? "Cheque on file" : null)}
+          filename={
+            chequeFilename ||
+            (preview?.chequeOnFile
+              ? "Cheque on file (saved earlier)"
+              : chequeOnFile
+                ? "Cheque uploaded"
+                : null)
+          }
+          allowReplace
           onUploaded={async (url, filename) => {
             try {
               await api.imagineeringCredit.saveCheckoutCheque({ url });
-            } catch {
-              /* KYC upload endpoint already persists cheque when account exists */
+              setChequeUrl(url);
+              setChequeFilename(filename);
+              setPreview((prev) => (prev ? { ...prev, chequeOnFile: true } : prev));
+              onChequeSaved?.();
+            } catch (err) {
+              setChequeUrl(null);
+              setChequeFilename(null);
+              throw err;
             }
-            setChequeUrl(url);
-            setChequeFilename(filename);
-            setPreview((prev) => (prev ? { ...prev, chequeOnFile: true } : prev));
-            onChequeSaved?.();
           }}
           onClear={() => {
-            /* Cheque stays on account once saved; clear only local re-upload UX before save */
-            if (preview?.chequeOnFile) return;
             setChequeUrl(null);
             setChequeFilename(null);
           }}
-          disabled={Boolean(preview?.chequeOnFile)}
         />
-        {!chequeOnFile ? (
+        {preview?.chequeOnFile ? (
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            Already saved on your credit account from an earlier checkout. Use Replace only if you
+            need a different cheque.
+          </p>
+        ) : !chequeOnFile ? (
           <p className="mt-1.5 text-[11px] text-amber-800 dark:text-amber-200">
             Upload a cheque to pay with {IMAGINEERING_CREDIT.name}.
           </p>
