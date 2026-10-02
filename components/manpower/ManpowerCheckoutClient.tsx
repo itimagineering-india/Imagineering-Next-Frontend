@@ -220,6 +220,8 @@ export function ManpowerCheckoutClient() {
     creditTenureMonths,
     setCreditTenureMonths,
     chequeOnFile: imagineeringCreditChequeOnFile,
+    termsAccepted: imagineeringCreditTermsAccepted,
+    setTermsAccepted: setImagineeringCreditTermsAccepted,
     refresh: refreshImagineeringCredit,
   } = useImagineeringCreditAvailable(payableTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
@@ -229,7 +231,8 @@ export function ManpowerCheckoutClient() {
     !canPayFullImagineeringCredit &&
     imagineeringCreditToApply > 0 &&
     imagineeringCreditGatewayRemaining > 0;
-  const creditPayReady = canUseImagineeringCredit && imagineeringCreditChequeOnFile;
+  const creditPayReady =
+    canUseImagineeringCredit && imagineeringCreditChequeOnFile && imagineeringCreditTermsAccepted;
 
   const addressLine = useMemo(
     () => (selectedAddress ? formatSavedAddressLine(selectedAddress) : ""),
@@ -862,6 +865,8 @@ export function ManpowerCheckoutClient() {
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
                 onChequeSaved={refreshImagineeringCredit}
+                termsAccepted={imagineeringCreditTermsAccepted}
+                onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
               />
             </section>
 
