@@ -14,6 +14,7 @@ interface CashfreeCheckoutProps {
   couponUsageId?: string;
   creditsToApply?: number;
   imagineeringCreditToApply?: number;
+  creditTenureMonths?: number;
   bookingPayload?: Record<string, any>;
   bookingPaymentStage?: "initial" | "balance";
   requirementId?: string;
@@ -43,6 +44,7 @@ export function CashfreeCheckout({
   couponUsageId,
   creditsToApply,
   imagineeringCreditToApply,
+  creditTenureMonths,
   bookingPayload,
   bookingPaymentStage = "initial",
   requirementId,
@@ -154,6 +156,12 @@ export function CashfreeCheckout({
           imagineeringCreditToApply:
             imagineeringCreditToApply && imagineeringCreditToApply > 0
               ? imagineeringCreditToApply
+              : undefined,
+          creditTenureMonths:
+            imagineeringCreditToApply &&
+            imagineeringCreditToApply > 0 &&
+            creditTenureMonths
+              ? creditTenureMonths
               : undefined,
           ...(bookingPayload || {}),
           gateway: "cashfree",
