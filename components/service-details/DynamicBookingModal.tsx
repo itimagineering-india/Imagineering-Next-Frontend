@@ -192,6 +192,8 @@ export function DynamicBookingModal({
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    creditChequeUrl: imagineeringCreditChequeUrl,
+    setCreditChequeUrl: setImagineeringCreditChequeUrl,
     chequeOnFile: imagineeringCreditChequeOnFile,
     termsAccepted: imagineeringCreditTermsAccepted,
     setTermsAccepted: setImagineeringCreditTermsAccepted,
@@ -781,7 +783,10 @@ export function DynamicBookingModal({
       if (gstNumber.trim() || panNumber.trim()) {
         await updateBookingTaxDetails();
       }
-      const res = await api.bookings.payWithImagineeringCredit(currentBookingId);
+      const res = await api.bookings.payWithImagineeringCredit(currentBookingId, {
+        creditTenureMonths,
+        creditChequeUrl: imagineeringCreditChequeUrl || undefined,
+      });
       if (!res.success) {
         throw new Error(res.error?.message || `${IMAGINEERING_CREDIT.name} payment failed`);
       }
@@ -1286,7 +1291,8 @@ export function DynamicBookingModal({
                       onSplitGatewayChange={setCreditSplitGateway}
                       creditTenureMonths={creditTenureMonths}
                       onCreditTenureChange={setCreditTenureMonths}
-                      onChequeSaved={refreshImagineeringCredit}
+                      creditChequeUrl={imagineeringCreditChequeUrl || undefined}
+                      onCreditChequeUrlChange={setImagineeringCreditChequeUrl}
                       termsAccepted={imagineeringCreditTermsAccepted}
                       onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
                     />
@@ -1337,6 +1343,7 @@ export function DynamicBookingModal({
                       couponUsageId={couponUsageId ?? undefined}
                       imagineeringCreditToApply={imagineeringCreditToApply}
                       creditTenureMonths={creditTenureMonths}
+                      creditChequeUrl={imagineeringCreditChequeUrl || undefined}
                       onAmountReceived={(amount) => {
                         setActualPaymentAmount(amount);
                       }}
@@ -1358,6 +1365,7 @@ export function DynamicBookingModal({
                       couponUsageId={couponUsageId ?? undefined}
                       imagineeringCreditToApply={imagineeringCreditToApply}
                       creditTenureMonths={creditTenureMonths}
+                      creditChequeUrl={imagineeringCreditChequeUrl || undefined}
                       onAmountReceived={(amount) => {
                         setActualPaymentAmount(amount);
                       }}
