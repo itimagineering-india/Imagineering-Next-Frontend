@@ -1,5 +1,16 @@
 /** User-facing labels — Imagineering Credit (BNPL) vs Imagineering Wallet (rewards). */
 
+/** Flat tenure interest % from program settings (e.g. 0.99, 1.8). */
+export function formatCreditInterestPercent(n: number): string {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "0";
+  const rounded = Math.round(v * 100) / 100;
+  return rounded.toLocaleString("en-IN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
 export const IMAGINEERING_CREDIT = {
   name: "Imagineering Credit",
   formalName: "Imagineering Credit",
