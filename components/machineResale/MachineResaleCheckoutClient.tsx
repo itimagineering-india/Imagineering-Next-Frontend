@@ -244,6 +244,8 @@ export function MachineResaleCheckoutClient() {
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    creditChequeUrl: imagineeringCreditChequeUrl,
+    setCreditChequeUrl: setImagineeringCreditChequeUrl,
     chequeOnFile: imagineeringCreditChequeOnFile,
     termsAccepted: imagineeringCreditTermsAccepted,
     setTermsAccepted: setImagineeringCreditTermsAccepted,
@@ -382,6 +384,15 @@ export function MachineResaleCheckoutClient() {
       couponUsageId: appliedCoupon?.usageId,
       creditsToApply: creditsToApply > 0 ? creditsToApply : undefined,
       notes: notes.trim() || undefined,
+      ...(paymentMethod === "imagineering_credit"
+        ? {
+            creditTenureMonths,
+            creditChequeUrl: imagineeringCreditChequeUrl || undefined,
+            ...(isCreditSplit
+              ? { imagineeringCreditToApply }
+              : {}),
+          }
+        : {}),
       ...(effectivePaymentMethod === "partial"
         ? {
             partialAmount,
@@ -565,6 +576,7 @@ export function MachineResaleCheckoutClient() {
           }
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
           bookingDescription={
             isCreditSplit
               ? `Machine resale · ${serviceTitle} · Credit split`
@@ -608,6 +620,7 @@ export function MachineResaleCheckoutClient() {
           }
           imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
           bookingDescription={
             isCreditSplit
               ? `Machine resale · ${serviceTitle} · Credit split`
@@ -992,7 +1005,8 @@ export function MachineResaleCheckoutClient() {
                 onSplitGatewayChange={setCreditSplitGateway}
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
-                onChequeSaved={refreshImagineeringCredit}
+                creditChequeUrl={imagineeringCreditChequeUrl || undefined}
+                onCreditChequeUrlChange={setImagineeringCreditChequeUrl}
                 termsAccepted={imagineeringCreditTermsAccepted}
                 onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
               />
