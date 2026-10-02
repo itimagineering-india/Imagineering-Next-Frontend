@@ -69,7 +69,7 @@ export function ImagineeringCreditHomeCard({ alwaysShow = false }: { alwaysShow?
     return alwaysShow ? <ImagineeringCreditHomeCardSkeleton /> : null;
   }
   if (!alwaysShow && !hasAccount) return null;
-  if (status === "blocked" || status === "frozen") return null;
+  if (status === "blocked" || status === "frozen" || status === "deactivated") return null;
 
   const isInvited = status === "invited";
 
