@@ -337,6 +337,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
         buyerGST: buyerGST,
         buyerPAN: buyerPAN,
         paymentMethod: "imagineering_credit",
+        creditTenureMonths,
         ...cartDiscountPayload,
       });
       if (!response.success) {
@@ -503,6 +504,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
     show: showImagineeringCredit,
     creditToApply: imagineeringCreditToApply,
     gatewayRemaining: imagineeringCreditGatewayRemaining,
+    creditTenureMonths,
+    setCreditTenureMonths,
   } = useImagineeringCreditAvailable(imagineeringCreditOrderTotal);
   const [creditSplitGateway, setCreditSplitGateway] = useState<"razorpay" | "cashfree">("razorpay");
   const isCreditSplit =
@@ -1109,6 +1112,8 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                       selected={paymentMethod === "imagineering_credit"}
                       splitGateway={creditSplitGateway}
                       onSplitGatewayChange={setCreditSplitGateway}
+                      creditTenureMonths={creditTenureMonths}
+                      onCreditTenureChange={setCreditTenureMonths}
                     />
                     {paymentMethod === "partial" ? (
                       <PartialPaymentPanel
@@ -1266,6 +1271,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   amount={imagineeringCreditGatewayRemaining}
                   couponUsageId={couponUsageId || undefined}
                   imagineeringCreditToApply={imagineeringCreditToApply}
+                  creditTenureMonths={creditTenureMonths}
                   bookingDescription="Cart Checkout · Credit split"
                   bookingPayload={{
                     date,
@@ -1287,6 +1293,7 @@ export const CartCheckoutModal = ({ open, onOpenChange, cartId, amount, couponUs
                   amount={imagineeringCreditGatewayRemaining}
                   couponUsageId={couponUsageId || undefined}
                   imagineeringCreditToApply={imagineeringCreditToApply}
+                  creditTenureMonths={creditTenureMonths}
                   bookingDescription="Cart Checkout · Credit split"
                   bookingPayload={{
                     date,
