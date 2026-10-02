@@ -469,6 +469,8 @@ export default function QuoteRequestConfirmPage() {
     gatewayRemaining: imagineeringCreditGatewayRemaining,
     creditTenureMonths,
     setCreditTenureMonths,
+    creditChequeUrl: imagineeringCreditChequeUrl,
+    setCreditChequeUrl: setImagineeringCreditChequeUrl,
     chequeOnFile: imagineeringCreditChequeOnFile,
     termsAccepted: imagineeringCreditTermsAccepted,
     setTermsAccepted: setImagineeringCreditTermsAccepted,
@@ -730,6 +732,7 @@ export default function QuoteRequestConfirmPage() {
                 ? imagineeringCreditToApply
                 : undefined,
               creditTenureMonths,
+              creditChequeUrl: imagineeringCreditChequeUrl || undefined,
             }
           : {}),
         receiptUrl,
@@ -1234,7 +1237,8 @@ export default function QuoteRequestConfirmPage() {
                 onSplitGatewayChange={setCreditSplitGateway}
                 creditTenureMonths={creditTenureMonths}
                 onCreditTenureChange={setCreditTenureMonths}
-                onChequeSaved={refreshImagineeringCredit}
+                creditChequeUrl={imagineeringCreditChequeUrl || undefined}
+                onCreditChequeUrlChange={setImagineeringCreditChequeUrl}
                 termsAccepted={imagineeringCreditTermsAccepted}
                 onTermsAcceptedChange={setImagineeringCreditTermsAccepted}
               />
@@ -1526,6 +1530,7 @@ export default function QuoteRequestConfirmPage() {
                     }
                     imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
                     onSuccess={() => {
                       toast({ title: "Payment successful", description: "Your order is placed." });
                       router.push("/buyer/orders");
@@ -1553,6 +1558,7 @@ export default function QuoteRequestConfirmPage() {
                     }
                     imagineeringCreditToApply={isCreditSplit ? imagineeringCreditToApply : undefined}
           creditTenureMonths={isCreditSplit ? creditTenureMonths : undefined}
+          creditChequeUrl={isCreditSplit ? imagineeringCreditChequeUrl || undefined : undefined}
                     onSuccess={() => {
                       toast({ title: "Payment successful", description: "Your order is placed." });
                       router.push("/buyer/orders");
