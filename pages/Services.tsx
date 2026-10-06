@@ -1615,7 +1615,9 @@ export default function Services(props: ServicesProps = {}) {
         </div>
       </main>
 
-      {cityIntro ? <FeaturedCategoryCardsSection /> : null}
+      {cityIntro ? (
+        <FeaturedCategoryCardsSection cityName={fixedLocationText} />
+      ) : null}
 
       {seoContent && <CitySeoSections content={seoContent} />}
 
