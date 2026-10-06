@@ -76,10 +76,14 @@ export function providerSettlement(booking: ProviderSettlementBooking): {
 
   const paid = String(booking.paymentStatus || '').toLowerCase() === 'paid';
   const outstanding = Number(booking.outstandingAmount);
+  const isCredit =
+    normalizePaymentMethod(booking.paymentMethod) === 'imagineeringcredit';
+  // Imagineering Credit is already paid to the platform — never show cash collect.
   const needsCollect =
-    booking.requiresOfflinePaymentConfirmation === true ||
-    isOfflineCollectPaymentMethod(booking.paymentMethod) ||
-    (!paid && Number.isFinite(outstanding) && outstanding > 0);
+    !isCredit &&
+    (booking.requiresOfflinePaymentConfirmation === true ||
+      isOfflineCollectPaymentMethod(booking.paymentMethod) ||
+      (!paid && Number.isFinite(outstanding) && outstanding > 0));
 
   const total = Number(booking.totalAmount);
   let collectFromCustomer = 0;
