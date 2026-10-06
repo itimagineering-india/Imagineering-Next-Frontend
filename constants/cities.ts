@@ -29,6 +29,7 @@ export const CITIES: CityItem[] = [
   { slug: "coimbatore", name: "Coimbatore", lat: 11.0168, lng: 76.9558 },
   { slug: "nagpur", name: "Nagpur", lat: 21.1458, lng: 79.0882 },
   { slug: "thane", name: "Thane", lat: 19.2183, lng: 72.9781 },
+  { slug: "patna", name: "Patna", lat: 25.5941, lng: 85.1376 },
 ];
 
 const slugSet = new Set(CITIES.map((c) => c.slug.toLowerCase()));
