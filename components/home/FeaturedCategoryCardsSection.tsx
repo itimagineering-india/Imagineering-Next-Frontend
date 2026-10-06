@@ -48,13 +48,24 @@ const FEATURED_CARDS = [
   },
 ] as const;
 
-export function FeaturedCategoryCardsSection() {
+type Props = {
+  /** When set (city landing pages), shows “Construction Services in {city}”. Hidden on home. */
+  cityName?: string;
+};
+
+export function FeaturedCategoryCardsSection({ cityName }: Props) {
   const { ref, isVisible } = useScrollAnimation({ threshold: 0.1 });
   const { t } = useTranslation("home");
+  const city = String(cityName || "").trim();
 
   return (
     <section className="relative py-8 sm:py-10 lg:py-12 pb-4 sm:pb-5 lg:pb-6">
       <div className="home-shell">
+        {city ? (
+          <h2 className="mb-4 sm:mb-5 text-xl font-bold tracking-tight text-foreground sm:text-2xl lg:text-3xl">
+            {t("featuredCategories.sectionTitle", { city })}
+          </h2>
+        ) : null}
         <div
           ref={ref}
           className={`grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-5 transition-all duration-700 ${
