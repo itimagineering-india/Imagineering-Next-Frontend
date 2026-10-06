@@ -340,9 +340,9 @@ const ProviderBrowseCard = memo(function ProviderBrowseCard({
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug text-slate-900 transition group-hover:text-[#FF385C]">
+              <p className="line-clamp-1 text-[13px] font-semibold leading-snug text-slate-900 transition group-hover:text-[#FF385C]">
                 {name}
-              </h3>
+              </p>
               {distanceLabel ? (
                 <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-600">
                   {distanceLabel}
