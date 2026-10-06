@@ -1,5 +1,6 @@
 {
   "featuredCategories": {
+    "sectionTitle": "Construction Services in {{city}}",
     "manpower": {
       "title": "Hire Manpower",
       "description": "Skilled & unskilled labour for your site"
