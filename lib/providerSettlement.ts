@@ -13,6 +13,7 @@ function normalizePaymentMethod(method?: string | null): string {
     .replace(/[\s_-]+/g, '');
 }
 
+/** True only when the provider must collect cash from the buyer (COD / pay-on-delivery). */
 export function isOfflineCollectPaymentMethod(method?: string | null): boolean {
   const key = normalizePaymentMethod(method);
   if (!key) return false;
@@ -21,10 +22,7 @@ export function isOfflineCollectPaymentMethod(method?: string | null): boolean {
     key === 'cashondelivery' ||
     key === 'payondelivery' ||
     key.includes('payondelivery') ||
-    key.includes('cashondelivery') ||
-    key === 'neft' ||
-    key === 'sbicollect' ||
-    key.includes('imagineeringcredit')
+    key.includes('cashondelivery')
   );
 }
 
