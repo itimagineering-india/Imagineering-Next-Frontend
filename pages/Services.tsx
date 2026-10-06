@@ -18,6 +18,7 @@ import { ProvidersBrowseList } from "@/components/services/ProvidersList";
 
 import type { CitySeoContent } from "@/constants/citySeoContent";
 import { CitySeoSections } from "@/components/seo/CitySeoSections";
+import { FeaturedCategoryCardsSection } from "@/components/home/FeaturedCategoryCardsSection";
 import {
   getSubcategoryLabel,
   getSubcategorySlug,
@@ -1613,6 +1614,8 @@ export default function Services(props: ServicesProps = {}) {
             </div>
         </div>
       </main>
+
+      {cityIntro ? <FeaturedCategoryCardsSection /> : null}
 
       {seoContent && <CitySeoSections content={seoContent} />}
 
