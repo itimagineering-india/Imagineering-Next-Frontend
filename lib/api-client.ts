@@ -3177,6 +3177,65 @@ export const api = {
       ),
     distribution: () =>
       apiRequest<{ success: boolean; data: any }>('/api/workforce/assignments/distribution'),
+    report: (params: {
+      period: "daily" | "weekly" | "monthly";
+      date?: string;
+      month?: string;
+      workerId?: string;
+      siteId?: string;
+    }) => {
+      const q = new URLSearchParams();
+      q.set("period", params.period);
+      if (params.date) q.set("date", params.date);
+      if (params.month) q.set("month", params.month);
+      if (params.workerId) q.set("workerId", params.workerId);
+      if (params.siteId) q.set("siteId", params.siteId);
+      return apiRequest<{ success: boolean; data: any }>(`/api/workforce/reports?${q.toString()}`);
+    },
+    downloadReportPdf: async (params: {
+      period: "daily" | "weekly" | "monthly";
+      date?: string;
+      month?: string;
+      workerId?: string;
+      siteId?: string;
+      filename?: string;
+    }): Promise<void> => {
+      const q = new URLSearchParams();
+      q.set("period", params.period);
+      if (params.date) q.set("date", params.date);
+      if (params.month) q.set("month", params.month);
+      if (params.workerId) q.set("workerId", params.workerId);
+      if (params.siteId) q.set("siteId", params.siteId);
+      const token = getAuthToken();
+      const headers: HeadersInit = { ...bearerAuthHeaders(token) };
+      const response = await fetch(`${API_BASE_URL}/api/workforce/reports/pdf?${q.toString()}`, {
+        headers,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        let message = `Download failed (${response.status})`;
+        try {
+          const json = JSON.parse(text);
+          message = json?.error?.message || json?.message || message;
+        } catch {
+          if (text) message = text;
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition");
+      const name =
+        params.filename ||
+        (disposition && /filename="?([^";]+)"?/.exec(disposition)?.[1]) ||
+        `workforce-${params.period}-report.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
   },
 
   // Multi-provider Best Quotes RFQ
