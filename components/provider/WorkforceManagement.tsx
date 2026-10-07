@@ -1,12 +1,17 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   Activity,
+  ArrowLeft,
   Building2,
   CalendarCheck,
+  Check,
+  Download,
+  FileText,
   IndianRupee,
+  Info,
   Loader2,
   Plus,
   RefreshCcw,
@@ -29,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 
 const WORKER_ROLES = [
@@ -45,7 +51,12 @@ const WORKER_ROLES = [
 ];
 
 const ATTENDANCE_STATUSES = ["Present", "Absent", "Half Day"];
-const WORKFORCE_SECTIONS = ["workers", "sites", "attendance", "wages"] as const;
+const WORKFORCE_SECTIONS = ["workers", "sites", "attendance", "wages", "reports"] as const;
+const REPORT_PERIODS = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+] as const;
 const SITE_STATUSES = ["Active", "Completed", "On Hold"];
 const WAGE_ENTRY_TYPES = ["Advance", "Payment"];
 
@@ -230,12 +241,34 @@ export default function WorkforceManagement() {
     date: today,
     note: "",
   });
+  const [reportPeriod, setReportPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const [reportDate, setReportDate] = useState(today);
+  const [reportMonth, setReportMonth] = useState(currentMonth);
+  const [reportWorkerId, setReportWorkerId] = useState("");
+  const [reportSiteId, setReportSiteId] = useState("");
+  const [reportDownloading, setReportDownloading] = useState(false);
 
   const activeWorkers = useMemo(() => workers.filter((worker) => worker.status === "Active"), [workers]);
   const activeSites = useMemo(() => sites.filter((site) => site.status !== "Completed"), [sites]);
 
+  const hasLoadedOnce = useRef(false);
+
+  const applyAttendanceRows = (
+    rows: Array<{ worker?: string | { _id?: string }; status?: string }>,
+  ) => {
+    const nextAttendance: Record<string, string> = {};
+    for (const row of rows) {
+      const workerId =
+        typeof row.worker === "string" ? row.worker : String(row.worker?._id || "").trim();
+      const status = String(row.status || "").trim();
+      if (workerId && status) nextAttendance[workerId] = status;
+    }
+    setAttendance(nextAttendance);
+  };
+
   const loadData = useCallback(async () => {
-    setLoading(true);
+    const soft = hasLoadedOnce.current;
+    if (!soft) setLoading(true);
     try {
       const accessRes = await api.workforce.access();
       const accessData = (accessRes as ApiData<WorkforceAccess>).data || { eligible: false };
@@ -244,14 +277,16 @@ export default function WorkforceManagement() {
         return;
       }
 
-      const [dashboardRes, workersRes, sitesRes, wagesRes, costsRes, wageEntriesRes] = await Promise.all([
-        api.workforce.dashboard({ date: attendanceDate, month }),
-        api.workforce.listWorkers({ limit: 100, status: "Active" }),
-        api.workforce.listSites({ limit: 100 }),
-        api.workforce.monthlyWages(month),
-        api.workforce.siteCosts(month),
-        api.workforce.wageEntries({ month }),
-      ]);
+      const [dashboardRes, workersRes, sitesRes, wagesRes, costsRes, wageEntriesRes, attendanceRes] =
+        await Promise.all([
+          api.workforce.dashboard({ date: attendanceDate, month }),
+          api.workforce.listWorkers({ limit: 100, status: "Active" }),
+          api.workforce.listSites({ limit: 100 }),
+          api.workforce.monthlyWages(month),
+          api.workforce.siteCosts(month),
+          api.workforce.wageEntries({ month }),
+          api.workforce.attendanceToday(attendanceDate),
+        ]);
 
       setDashboard((dashboardRes as ApiData<DashboardData>).data || null);
       setWorkers(((workersRes as ApiData<{ workers?: Worker[] }>).data?.workers || []) as Worker[]);
@@ -259,15 +294,20 @@ export default function WorkforceManagement() {
       setWages(((wagesRes as ApiData<{ wages?: WageSummary[] }>).data?.wages || []) as WageSummary[]);
       setSiteCosts(((costsRes as ApiData<{ costs?: SiteCost[] }>).data?.costs || []) as SiteCost[]);
       setWageEntries(((wageEntriesRes as ApiData<{ entries?: WageEntry[] }>).data?.entries || []) as WageEntry[]);
+      applyAttendanceRows(
+        ((attendanceRes as ApiData<{ rows?: Array<{ worker?: string | { _id?: string }; status?: string }> }>).data
+          ?.rows || []) as Array<{ worker?: string | { _id?: string }; status?: string }>,
+      );
     } catch {
       toast({ title: "Could not load Workforce Management", variant: "destructive" });
     } finally {
-      setLoading(false);
+      if (!soft) setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [attendanceDate, month, toast]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   const searchImportCandidates = async () => {
@@ -484,7 +524,7 @@ export default function WorkforceManagement() {
 
   const saveAttendance = async () => {
     const entries = activeWorkers
-      .map((worker) => ({ workerId: worker._id, status: attendance[worker._id] || "Present", siteId: siteIdOf(worker) || undefined }))
+      .map((worker) => ({ workerId: worker._id, status: attendance[worker._id] || "Absent", siteId: siteIdOf(worker) || undefined }))
       .filter((entry) => entry.status);
     if (entries.length === 0) {
       toast({ title: "No active workers to mark", variant: "destructive" });
@@ -552,7 +592,7 @@ export default function WorkforceManagement() {
     {
       value: "attendance",
       label: "Attendance",
-      helper: "Mark Present, Absent, or Half Day for today",
+      helper: "View or edit attendance for any date",
       stat: "Daily entry",
       icon: CalendarCheck,
       image: "/Workforce/Attendance.png",
@@ -565,8 +605,38 @@ export default function WorkforceManagement() {
       icon: IndianRupee,
       image: "/Workforce/Wages.png",
     },
+    {
+      value: "reports",
+      label: "Reports",
+      helper: "Download daily, weekly, or monthly PDF reports",
+      stat: "PDF export",
+      icon: FileText,
+      image: "",
+    },
   ];
   const activeSectionCard = sectionCards.find((item) => item.value === activeSection);
+
+  const downloadReport = async () => {
+    setReportDownloading(true);
+    try {
+      await api.workforce.downloadReportPdf({
+        period: reportPeriod,
+        date: reportPeriod === "monthly" ? undefined : reportDate,
+        month: reportPeriod === "monthly" ? reportMonth : undefined,
+        workerId: reportWorkerId || undefined,
+        siteId: reportSiteId || undefined,
+      });
+      toast({ title: "Report downloaded" });
+    } catch (error) {
+      toast({
+        title: "Could not download report",
+        description: error instanceof Error ? error.message : "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setReportDownloading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -606,7 +676,7 @@ export default function WorkforceManagement() {
             <h1 className="text-2xl font-bold tracking-tight">Workforce Management</h1>
           </div>
           <p className="text-sm text-muted-foreground">
-            Manage workers, site assignments, simple attendance, and daily wage tracking.
+            Manage workers, site assignments, attendance, wages, and downloadable reports.
           </p>
         </div>
         <Button variant="outline" onClick={loadData} disabled={saving}>
@@ -654,11 +724,19 @@ export default function WorkforceManagement() {
                 <Card className="h-full overflow-hidden transition-all hover:border-primary/40 hover:shadow-md">
                   <CardContent className="flex h-full flex-col p-0">
                     <div className="overflow-hidden bg-muted/40">
-                      <img
-                        src={item.image}
-                        alt={`${item.label} illustration`}
-                        className="block h-auto w-full transition-transform duration-300 group-hover:scale-105"
-                      />
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={`${item.label} illustration`}
+                          className="block h-auto w-full transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex aspect-[16/10] flex-col items-center justify-center gap-2 p-6 text-center">
+                          <item.icon className="h-10 w-10 text-primary" />
+                          <p className="text-lg font-semibold">{item.label}</p>
+                          <p className="text-sm text-muted-foreground">{item.helper}</p>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -668,20 +746,27 @@ export default function WorkforceManagement() {
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-3 rounded-[14px] border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <Button variant="link" className="mb-2 h-auto p-0 text-sm" asChild>
-                <Link href="/dashboard/provider/workforce">Back to Workforce</Link>
-              </Button>
-              <h2 className="text-xl font-semibold">{activeSectionCard?.label}</h2>
-              <p className="text-sm text-muted-foreground">{activeSectionCard?.helper}</p>
-            </div>
-            {activeSectionCard && (
-              <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2 text-primary">
-                <activeSectionCard.icon className="h-5 w-5" />
-                <span className="text-sm font-semibold">{activeSectionCard.stat}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1.5 px-2 text-muted-foreground" asChild>
+              <Link href="/dashboard/provider/workforce">
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Link>
+            </Button>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold sm:text-lg">{activeSectionCard?.label}</h2>
+                {activeSectionCard ? (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    <activeSectionCard.icon className="h-3.5 w-3.5" />
+                    {activeSectionCard.stat}
+                  </span>
+                ) : null}
               </div>
-            )}
+              {activeSectionCard?.helper ? (
+                <p className="truncate text-xs text-muted-foreground">{activeSectionCard.helper}</p>
+              ) : null}
+            </div>
           </div>
 
           <Tabs value={activeSection} className="space-y-4">
@@ -1128,30 +1213,109 @@ export default function WorkforceManagement() {
 
         <TabsContent value="attendance" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Daily Attendance</CardTitle>
-              <CardDescription>Simple daily marking only. No GPS or biometric tracking.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="max-w-xs">
-                <Label>Date</Label>
-                <Input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} />
+            <CardContent className="space-y-4 pt-6">
+              <div className="max-w-xs space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="attendance-date">Date</Label>
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex rounded-full text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label="Attendance help"
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs leading-relaxed">
+                        Change the date to view or edit past attendance. Defaults to Absent until marked.
+                        No GPS or biometric tracking.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Input
+                  id="attendance-date"
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {attendanceDate === today
+                    ? "Showing today’s sheet. Pick an earlier date to review or correct it."
+                    : `Showing saved marks for ${attendanceDate}. Edit and save to update.`}
+                </p>
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {activeWorkers.map((worker) => (
-                  <div key={worker._id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{worker.fullName}</p>
-                      <p className="text-xs text-muted-foreground">{worker.role} · {siteNameOf(worker)}</p>
-                    </div>
-                    <Select value={attendance[worker._id] || "Present"} onValueChange={(status) => setAttendance((prev) => ({ ...prev, [worker._id]: status }))}>
-                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                      <SelectContent>{ATTENDANCE_STATUSES.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                ))}
+
+              {activeWorkers.length === 0 ? (
+                <p className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
+                  No active workers to mark attendance for.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[160px]">Worker</TableHead>
+                        <TableHead className="min-w-[120px]">Role / Site</TableHead>
+                        {ATTENDANCE_STATUSES.map((status) => (
+                          <TableHead key={status} className="w-[100px] text-center">
+                            {status}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeWorkers.map((worker) => {
+                        const selected = attendance[worker._id] || "Absent";
+                        return (
+                          <TableRow key={worker._id}>
+                            <TableCell className="font-medium">{worker.fullName}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {worker.role} · {siteNameOf(worker)}
+                            </TableCell>
+                            {ATTENDANCE_STATUSES.map((status) => {
+                              const active = selected === status;
+                              const tone =
+                                status === "Present"
+                                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                                  : status === "Absent"
+                                    ? "border-red-500 bg-red-50 text-red-700"
+                                    : "border-amber-500 bg-amber-50 text-amber-700";
+                              return (
+                                <TableCell key={status} className="p-2 text-center">
+                                  <button
+                                    type="button"
+                                    aria-pressed={active}
+                                    aria-label={`${worker.fullName}: ${status}`}
+                                    onClick={() =>
+                                      setAttendance((prev) => ({ ...prev, [worker._id]: status }))
+                                    }
+                                    className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full border-2 transition ${
+                                      active
+                                        ? tone
+                                        : "border-muted-foreground/25 text-muted-foreground hover:border-muted-foreground/50 hover:bg-muted/40"
+                                    }`}
+                                  >
+                                    {active ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                                  </button>
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <Button onClick={saveAttendance} disabled={saving || activeWorkers.length === 0}>
+                  {saving ? "Saving…" : "Save Attendance"}
+                </Button>
               </div>
-              <Button onClick={saveAttendance} disabled={saving || activeWorkers.length === 0}>Save Attendance</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1300,6 +1464,131 @@ export default function WorkforceManagement() {
                   </CardContent>
                 </Card>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Workforce reports</CardTitle>
+              <CardDescription>
+                Generate a daily, weekly, or monthly PDF with attendance, wages, advances, and site labour cost.
+                Optionally filter by one worker or one site.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Report type</Label>
+                  <Select
+                    value={reportPeriod}
+                    onValueChange={(value) =>
+                      setReportPeriod(value as "daily" | "weekly" | "monthly")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REPORT_PERIODS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {reportPeriod === "monthly" ? (
+                  <div className="space-y-1.5">
+                    <Label>Month</Label>
+                    <Input
+                      type="month"
+                      value={reportMonth}
+                      onChange={(event) => setReportMonth(event.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label>{reportPeriod === "weekly" ? "Any date in the week" : "Date"}</Label>
+                    <Input
+                      type="date"
+                      value={reportDate}
+                      onChange={(event) => setReportDate(event.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label>Worker (optional)</Label>
+                  <Select
+                    value={reportWorkerId || "all"}
+                    onValueChange={(value) => setReportWorkerId(value === "all" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All workers" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All workers</SelectItem>
+                      {workers.map((worker) => (
+                        <SelectItem key={worker._id} value={worker._id}>
+                          {worker.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Site (optional)</Label>
+                  <Select
+                    value={reportSiteId || "all"}
+                    onValueChange={(value) => setReportSiteId(value === "all" ? "" : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All sites" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All sites</SelectItem>
+                      {sites.map((site) => (
+                        <SelectItem key={site._id} value={site._id}>
+                          {site.siteName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+                {reportPeriod === "daily" && (
+                  <p>Daily report for <strong className="text-foreground">{reportDate}</strong> — attendance detail plus wage totals.</p>
+                )}
+                {reportPeriod === "weekly" && (
+                  <p>Weekly report for the Monday–Sunday week that includes <strong className="text-foreground">{reportDate}</strong>.</p>
+                )}
+                {reportPeriod === "monthly" && (
+                  <p>
+                    Monthly report for <strong className="text-foreground">{reportMonth}</strong> — wage
+                    summary, site cost, and a daily attendance sheet (P / A / H).
+                  </p>
+                )}
+              </div>
+
+              <Button onClick={() => void downloadReport()} disabled={reportDownloading}>
+                {reportDownloading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating PDF…
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download PDF
+                  </>
+                )}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
