@@ -26,6 +26,7 @@ import { useCart } from "@/contexts/CartContext";
 import {
   MATERIALS_CATEGORY_SLUG,
   MATERIALS_TRENDING_BRANDS,
+  filterMaterialsProducts,
   getMaterialsCategoryProductSections,
   type MaterialsProduct,
 } from "@/lib/materials/constructionMaterialsCatalog";
@@ -230,6 +231,15 @@ export function ConstructionMaterialsHub() {
     );
   }, [appliedSearch, data.providers]);
 
+  /** Instant hits from hub rails while catalog API search loads / as fallback. */
+  const clientSearchProducts = useMemo(() => {
+    if (!appliedSearch?.trim()) return [];
+    return filterMaterialsProducts(data.products, { query: appliedSearch });
+  }, [appliedSearch, data.products]);
+
+  const displayedSearchProducts =
+    searchProducts.length > 0 ? searchProducts : clientSearchProducts;
+
   const isSearching = Boolean(appliedSearch);
 
   const handleProductCta = useCallback(
@@ -294,57 +304,55 @@ export function ConstructionMaterialsHub() {
       />
 
       <div className="home-shell space-y-12 py-8 md:space-y-16 md:py-12">
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-20 text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            {t("loading")}
-          </div>
-        ) : (
-          <>
-            {isSearching ? (
-              <section id="materials-search-results" className="scroll-mt-24">
-                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900 md:text-2xl">
-                      {t("hubSearchResults")}
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {searchProducts.length + searchProviders.length > 0
-                        ? t("hubSearchResultsSub", {
-                            count: searchTotal > 0 ? searchTotal : searchProducts.length,
-                          })
-                        : searchLoading
-                          ? t("loading")
-                          : t("emptyProducts")}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 rounded-full"
-                    onClick={() => setAppliedSearch(null)}
-                  >
-                    {t("hubClearSearch")}
-                  </Button>
-                </div>
+        {isSearching ? (
+          <section id="materials-search-results" className="scroll-mt-24">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 md:text-2xl">
+                  {t("hubSearchResults")}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {displayedSearchProducts.length + searchProviders.length > 0
+                    ? t("hubSearchResultsSub", {
+                        count:
+                          searchTotal > 0 && searchProducts.length > 0
+                            ? searchTotal
+                            : displayedSearchProducts.length,
+                      })
+                    : searchLoading
+                      ? t("loading")
+                      : t("emptyProducts")}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-full"
+                onClick={() => setAppliedSearch(null)}
+              >
+                {t("hubClearSearch")}
+              </Button>
+            </div>
 
-                {searchLoading && searchProducts.length === 0 ? (
-                  <div className="flex items-center justify-center gap-2 py-14 text-slate-500">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    {t("loading")}
-                  </div>
-                ) : searchProducts.length > 0 ? (
+            {searchLoading && displayedSearchProducts.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-14 text-slate-500">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                {t("loading")}
+              </div>
+            ) : displayedSearchProducts.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {displayedSearchProducts.map((product) => (
+                    <MaterialsProductCard
+                      key={product.id}
+                      product={product}
+                      onCta={handleProductCta}
+                      ctaLoading={ctaLoadingId === product.id}
+                    />
+                  ))}
+                </div>
+                {searchProducts.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                      {searchProducts.map((product) => (
-                        <MaterialsProductCard
-                          key={product.id}
-                          product={product}
-                          onCta={handleProductCta}
-                          ctaLoading={ctaLoadingId === product.id}
-                        />
-                      ))}
-                    </div>
                     <div ref={searchSentinelRef} className="h-8" />
                     {searchLoadingMore ? (
                       <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
@@ -352,48 +360,57 @@ export function ConstructionMaterialsHub() {
                       </div>
                     ) : null}
                   </>
-                ) : searchProviders.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-slate-500">
-                    {t("emptyProducts")}
-                  </div>
                 ) : null}
-
-                {searchProviders.length > 0 ? (
-                  <div className="mt-8">
-                    <h3 className="mb-4 text-lg font-bold text-slate-900">{t("topProviders")}</h3>
-                    <ul className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-1">
-                      {searchProviders.map((provider) => (
-                        <li key={provider.id} className="w-[138px] shrink-0 sm:w-[148px]">
-                          <Link
-                            href={`/provider/${provider.id}`}
-                            className="group relative flex h-full flex-col items-center overflow-hidden rounded-2xl border border-slate-200/90 bg-white px-3 pb-3.5 pt-4 text-center shadow-[0_6px_18px_-12px_rgba(15,23,42,0.35)] transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_14px_28px_-16px_rgba(234,88,12,0.35)]"
-                          >
-                            <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-100">
-                              <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                              {provider.rating.toFixed(1)}
-                            </span>
-                            <span
-                              className="relative z-[1] flex h-14 w-14 items-center justify-center rounded-full text-sm font-extrabold text-slate-800 shadow-sm ring-2 ring-white"
-                              style={{ backgroundColor: provider.tint }}
-                            >
-                              {provider.mark}
-                              {provider.verified ? (
-                                <BadgeCheck className="absolute -bottom-0.5 -right-0.5 h-[18px] w-[18px] rounded-full bg-white text-emerald-500" />
-                              ) : null}
-                            </span>
-                            <p className="relative z-[1] mt-3 w-full truncate text-[13px] font-bold text-slate-900 group-hover:text-[hsl(var(--red-accent))]">
-                              {provider.name}
-                            </p>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </section>
+              </>
+            ) : searchProviders.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-slate-500">
+                {t("emptyProducts")}
+              </div>
             ) : null}
 
-            {!isSearching ? (
+            {searchProviders.length > 0 ? (
+              <div className="mt-8">
+                <h3 className="mb-4 text-lg font-bold text-slate-900">{t("topProviders")}</h3>
+                <ul className="flex gap-3 overflow-x-auto scrollbar-hide touch-pan-x pb-1">
+                  {searchProviders.map((provider) => (
+                    <li key={provider.id} className="w-[138px] shrink-0 sm:w-[148px]">
+                      <Link
+                        href={`/provider/${provider.id}`}
+                        className="group relative flex h-full flex-col items-center overflow-hidden rounded-2xl border border-slate-200/90 bg-white px-3 pb-3.5 pt-4 text-center shadow-[0_6px_18px_-12px_rgba(15,23,42,0.35)] transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_14px_28px_-16px_rgba(234,88,12,0.35)]"
+                      >
+                        <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-100">
+                          <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                          {provider.rating.toFixed(1)}
+                        </span>
+                        <span
+                          className="relative z-[1] flex h-14 w-14 items-center justify-center rounded-full text-sm font-extrabold text-slate-800 shadow-sm ring-2 ring-white"
+                          style={{ backgroundColor: provider.tint }}
+                        >
+                          {provider.mark}
+                          {provider.verified ? (
+                            <BadgeCheck className="absolute -bottom-0.5 -right-0.5 h-[18px] w-[18px] rounded-full bg-white text-emerald-500" />
+                          ) : null}
+                        </span>
+                        <p className="relative z-[1] mt-3 w-full truncate text-[13px] font-bold text-slate-900 group-hover:text-[hsl(var(--red-accent))]">
+                          {provider.name}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {loading && !isSearching ? (
+          <div className="flex items-center justify-center gap-2 py-20 text-slate-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            {t("loading")}
+          </div>
+        ) : null}
+
+        {!loading && !isSearching ? (
             <>
             {/* Category shop — circular tiles like major marketplaces */}
             <section id="materials-browse">
@@ -619,9 +636,7 @@ export function ConstructionMaterialsHub() {
               </div>
             </section>
             </>
-            ) : null}
-          </>
-        )}
+        ) : null}
       </div>
 
       {quoteService ? (
