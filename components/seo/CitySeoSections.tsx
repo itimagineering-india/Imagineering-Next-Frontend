@@ -64,7 +64,7 @@ export function CitySeoSections({ content }: CitySeoSectionsProps) {
           <Accordion type="single" collapsible defaultValue="faq-0" className="rounded-lg border">
             {content.faq.map((item, idx) => (
               <AccordionItem key={idx} value={`faq-${idx}`} className="px-4">
-                <AccordionTrigger className="text-left hover:no-underline">
+                <AccordionTrigger className="text-left text-sm md:text-base hover:no-underline">
                   {item.question}
                 </AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
