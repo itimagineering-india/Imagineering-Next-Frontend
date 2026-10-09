@@ -1448,6 +1448,11 @@ export default function Services(props: ServicesProps = {}) {
 
       <main className="flex-1">
         <div className="container px-4 md:px-6 lg:px-8 py-4 md:py-6 lg:py-8">
+          {fixedLocationText ? (
+            <h2 className="mb-3 md:mb-4 text-lg md:text-xl font-semibold text-foreground">
+              Find Construction Service Providers in {fixedLocationText}
+            </h2>
+          ) : null}
           <FilterToolbar
             className="mb-4 md:mb-5"
             value={filters}
