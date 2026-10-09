@@ -106,6 +106,14 @@ export function isB2bTradersProfileCategory(cat: {
   return n.includes("trader");
 }
 
+/** Nationwide (no km) quote matching — B2B Traders hub only. CM / Tools use 50 km. */
+export function isNationwideB2bQuoteCategory(cat: {
+  slug?: string;
+  name?: string;
+} | null | undefined): boolean {
+  return isB2bTradersProfileCategory(cat);
+}
+
 export function usesB2bCatalogOrManualListing(
   cat: { slug?: string; name?: string; interactionType?: string } | null | undefined
 ): boolean {
