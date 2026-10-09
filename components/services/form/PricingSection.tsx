@@ -10,7 +10,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Clock } from "lucide-react";
 
-type PricingType = "fixed" | "hourly" | "daily" | "per_minute" | "per_article" | "monthly" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip" | "per_cuft" | "per_cum" | "per_metre" | "per_bag" | "lumpsum" | "per_project" | "negotiable";
+type PricingType = "fixed" | "hourly" | "daily" | "per_minute" | "per_article" | "monthly" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip" | "per_cuft" | "per_cum" | "per_metre" | "per_bag" | "per_box" | "lumpsum" | "per_project" | "negotiable";
 
 interface PricingSectionProps {
   priceMode: "exact" | "range";
@@ -175,6 +175,7 @@ export function PricingSection({
             <SelectItem value="per_cum">Per Cubic Meter</SelectItem>
             <SelectItem value="per_metre">Per Metre</SelectItem>
             <SelectItem value="per_bag">Per Bag</SelectItem>
+            <SelectItem value="per_box">Per Box</SelectItem>
             <SelectItem value="lumpsum">Lumsum</SelectItem>
             <SelectItem value="per_project">Per Project</SelectItem>
             <SelectItem value="negotiable">Negotiable</SelectItem>
