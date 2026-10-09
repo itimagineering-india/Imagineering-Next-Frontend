@@ -79,27 +79,47 @@ export const BHOPAL_CONSTRUCTION_SEO: CitySeoContent = {
     {
       question: "How can I find a reliable construction company in Bhopal?",
       answer:
-        "You can explore verified construction company listings on Imagineering India and compare services before contacting them.",
+        "Imagineering India helps you find construction contractors, material suppliers and other service providers in Bhopal based on your project requirements. Post your requirement on the platform, receive quotations from relevant providers, compare the available options and assign the work order to the provider you choose.",
     },
     {
       question: "What is the average construction cost in Bhopal?",
       answer:
-        "Construction cost depends on project type, material quality, and contractor charges. It is recommended to compare quotations from multiple civil contractors.",
+        "Construction costs in Bhopal vary depending on the project type, built-up area, design, materials, labour rates and finishing requirements. The final cost depends on your specific project specifications, so a single rate may not apply to every project.On Imagineering India, you can post your requirement and receive quotations from relevant providers. Compare their rates and proposed work before choosing an option that suits your budget.",
     },
     {
-      question: "Are there verified civil contractors in Bhopal on your platform?",
+      question: "Can I find civil contractors in Bhopal on Imagineering India?",
       answer:
-        "Yes, you can find verified civil contractors and building contractors through Imagineering India.",
+        "Yes. Imagineering India connects customers with civil contractors and other construction service providers in Bhopal. You can explore available provider profiles and, where platform information is available, review their activity and completed-order history. Verification may depend on the provider and the applicable verification process. For eligible users, additional profile or on-site verification may be conducted as part of certain platform or financing-related processes.",
     },
     {
-      question: "Can I find material suppliers and architects in Bhopal?",
+      question: "Can I find construction material suppliers and architects in Bhopal?",
       answer:
-        "Yes, the platform includes construction material vendors, architects, and designers in Bhopal.",
+        "Yes. You can explore available construction material suppliers and construction professionals in Bhopal through Imagineering India. These may include suppliers of cement, steel, sand, bricks and aggregates, along with architects and other construction-related service providers.Post your material or professional service requirement to receive quotations from relevant providers. You can compare the available rates and options before assigning the order..",
     },
     {
-      question: "Do construction companies handle both residential and commercial projects?",
+      question: "Do construction service providers handle residential and commercial projects?",
       answer:
-        "Many construction companies in Bhopal provide services for residential houses as well as commercial and industrial projects.",
+        "Depending on their expertise and service offerings, providers on Imagineering India may cater to residential, commercial and infrastructure-related projects. Share your project type and specific requirements on the platform so that relevant providers can respond. Review their quotations, scope of work and other available details before assigning the work order.",
+    },
+    {
+      question:"How does Imagineering India work?",
+      answer:"Imagineering India helps customers connect with relevant construction service providers through a requirement-based marketplace. The process is simple: Post Requirement → Receive Quotations → Compare Options → Assign Work Order → Get the Work Done After you post your requirement, relevant providers can submit their rates or quotations. You can review the available options and assign the work order to the provider you select."
+    },
+    {
+      question:"Can I hire construction workers on an hourly or daily basis?",
+      answer:"Yes, Imagineering India supports manpower requirements based on the type of work and duration needed, including: Job-specific work — workers for a particular construction task. Daily work — workers required for a day or multiple days. Hourly work — workers required for a specified number of hours. Post your manpower requirement to connect with suitable workers, subject to availability in your area."
+    },
+    {
+      question:"How can Imagineering India help reduce construction costs?",
+      answer:"Imagineering India aims to connect customers with suitable local workers, contractors, suppliers and machinery providers. Finding a suitable provider closer to the project site may help reduce unnecessary transportation and mobilisation expenses. For example, when suitable machinery is available near a job site, arranging it locally may help avoid the additional cost of transporting equipment over a longer distance. Actual savings depend on availability, distance, rates and project requirements."
+    },
+    {
+      question:"Can I get financing through Imagineering India?",
+      answer:"Imagineering India facilitates access to financing through third-party financial partners for eligible users. Eligibility may depend on factors such as your platform activity, profile information and completed orders, along with the financial partner's criteria. Additional profile review or on-site verification may be required in eligible cases. Financing approval, amount, interest rate, repayment terms and disbursement are subject to the financial partner's assessment and applicable terms"
+    },
+    {
+      question:"Is insurance support available for workers through Imagineering India?",
+      answer:"Imagineering India provides insurance support for eligible workers engaged through the platform, subject to the applicable insurance arrangement and policy conditions. Coverage, eligibility, exclusions, claim procedures and any applicable limits depend on the relevant policy. Workers should review the applicable terms to understand the protection available to them."
     },
   ],
   cta: {
