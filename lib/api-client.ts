@@ -3725,38 +3725,7 @@ export const api = {
       };
       message: string;
     }>(`/api/invoices/${invoiceId}/download`),
-    /** Download invoice as PDF from backend. Triggers browser download. */
-    downloadPdf: async (invoiceId: string, filename?: string): Promise<void> => {
-      const token = getAuthToken();
-      const headers: HeadersInit = { ...bearerAuthHeaders(token) };
-      const response = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/download`, {
-        headers,
-        credentials: "include",
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        let message = `Download failed (${response.status})`;
-        try {
-          const json = JSON.parse(text);
-          message = json?.error?.message || json?.message || message;
-        } catch {
-          if (text) message = text;
-        }
-        throw new Error(message);
-      }
-      const blob = await response.blob();
-      const disposition = response.headers.get('Content-Disposition');
-      const name =
-        filename ||
-        (disposition && /filename="?([^";]+)"?/.exec(disposition)?.[1]) ||
-        `invoice-${invoiceId}.pdf`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
-    },
+    /** Only remote HTTPS CDN/storage URLs — never blob: or local paths. */
     resolveOpenUrl: (invoice?: {
       pdfUrl?: string;
       providerInvoiceFileUrl?: string;
@@ -3764,39 +3733,41 @@ export const api = {
       if (!invoice) return null;
       const raw = String(invoice.providerInvoiceFileUrl || invoice.pdfUrl || "").trim();
       if (!raw || /^blob:/i.test(raw)) return null;
-      if (/^https?:\/\//i.test(raw)) return raw;
-      if (raw.startsWith("/")) return `${API_BASE_URL.replace(/\/$/, "")}${raw}`;
-      return null;
+      if (!/^https?:\/\//i.test(raw)) return null;
+      if (/\/api\/invoices\//i.test(raw)) return null;
+      return raw;
     },
-    /** Open invoice file in a new tab (S3 URL, or generate via download when pdfUrl missing). */
+    /** Resolve CDN pdfUrl (fetch invoice if needed). No blob: fallback. */
+    ensureCdnPdfUrl: async (invoice: {
+      _id?: string;
+      pdfUrl?: string;
+      providerInvoiceFileUrl?: string;
+    }): Promise<string> => {
+      let url = api.invoices.resolveOpenUrl(invoice);
+      if (url) return url;
+      if (!invoice._id || String(invoice._id).startsWith("provider-upload")) {
+        throw new Error("Invoice CDN URL is not available");
+      }
+      const res = await apiRequest<{ invoice?: { pdfUrl?: string } }>(
+        `/api/invoices/${invoice._id}`
+      );
+      const payload = (res as { data?: { invoice?: { pdfUrl?: string } } })?.data;
+      const fetched = payload?.invoice ?? payload;
+      url = api.invoices.resolveOpenUrl(fetched as { pdfUrl?: string });
+      if (url) return url;
+      throw new Error("Invoice is not on CDN yet. Please try again shortly.");
+    },
+    /** Open CDN invoice URL in a new tab (no blob:). */
+    downloadPdf: async (invoiceId: string, _filename?: string): Promise<void> => {
+      const url = await api.invoices.ensureCdnPdfUrl({ _id: invoiceId });
+      window.open(url, "_blank", "noopener,noreferrer");
+    },
     viewPdf: async (invoice: {
       _id?: string;
       pdfUrl?: string;
       providerInvoiceFileUrl?: string;
     }): Promise<void> => {
-      let url = api.invoices.resolveOpenUrl(invoice);
-      if (!url && invoice._id && !String(invoice._id).startsWith("provider-upload")) {
-        const res = await apiRequest<{ invoice?: { pdfUrl?: string } }>(
-          `/api/invoices/${invoice._id}`
-        );
-        const payload = (res as { data?: { invoice?: { pdfUrl?: string } } })?.data;
-        const fetched = payload?.invoice ?? payload;
-        url = api.invoices.resolveOpenUrl(fetched as { pdfUrl?: string });
-      }
-      if (!url && invoice._id && !String(invoice._id).startsWith("provider-upload")) {
-        const token = getAuthToken();
-        const response = await fetch(`${API_BASE_URL}/api/invoices/${invoice._id}/download`, {
-          headers: { ...bearerAuthHeaders(token) },
-          credentials: "include",
-        });
-        if (!response.ok) {
-          throw new Error(`Invoice file URL is not available (${response.status})`);
-        }
-        const blob = await response.blob();
-        window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
-        return;
-      }
-      if (!url) throw new Error("Invoice file URL is not available");
+      const url = await api.invoices.ensureCdnPdfUrl(invoice);
       window.open(url, "_blank", "noopener,noreferrer");
     },
   },
