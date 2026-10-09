@@ -71,7 +71,7 @@ export function Footer() {
   const { toast } = useToast();
 
   useEffect(() => {
-    api.categories.getAll().then((res) => {
+    api.categories.getAll(false, { includeSubcategories: true }).then((res) => {
       if (res.success && (res.data as any)?.categories) {
         const list = (res.data as any).categories as CategoryItem[];
         setCategories(list.slice(0, 16));
