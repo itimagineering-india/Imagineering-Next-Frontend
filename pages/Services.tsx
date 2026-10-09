@@ -518,16 +518,15 @@ export default function Services(props: ServicesProps = {}) {
   ]);
 
 
-  // Use services hook - with debounce for map movements (600ms)
-  // Don't wait for map initialization - fetch immediately
+  // Providers-only browse: skip /api/services (map + list use providers endpoints)
   const { 
     services, 
     isLoading, 
     error: servicesError,
     pagination: servicesPagination 
-  } = useServices(servicesParams, {
-    debounceMs: 0, // No debounce for initial load - fetch immediately
-    immediate: true, // Fetch immediately, don't wait for map
+  } = useServices(browseMode === "providers" ? null : servicesParams, {
+    debounceMs: 0,
+    immediate: browseMode !== "providers",
   });
 
   const servicesLoading = !locationGateReady || isLoading;
