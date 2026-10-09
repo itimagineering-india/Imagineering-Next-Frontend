@@ -1469,37 +1469,40 @@ export default function WorkforceManagement() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workforce reports</CardTitle>
+          <Card className="overflow-hidden border-slate-200/90 shadow-sm">
+            <CardHeader className="border-b border-slate-100 bg-[linear-gradient(180deg,#fff8f5_0%,#ffffff_100%)] pb-4">
+              <CardTitle className="text-xl">Workforce reports</CardTitle>
               <CardDescription>
-                Generate a daily, weekly, or monthly PDF with attendance, wages, advances, and site labour cost.
-                Optionally filter by one worker or one site.
+                Pick a period, optionally filter by worker or site, then download the PDF.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label>Report type</Label>
-                  <Select
-                    value={reportPeriod}
-                    onValueChange={(value) =>
-                      setReportPeriod(value as "daily" | "weekly" | "monthly")
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select period" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REPORT_PERIODS.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <CardContent className="space-y-5 pt-5">
+              <div className="space-y-2">
+                <Label>Report type</Label>
+                <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-slate-100 p-1">
+                  {REPORT_PERIODS.map((item) => {
+                    const active = reportPeriod === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() =>
+                          setReportPeriod(item.value as "daily" | "weekly" | "monthly")
+                        }
+                        className={
+                          active
+                            ? "rounded-xl bg-[hsl(var(--red-accent))] px-3 py-2.5 text-sm font-semibold text-white shadow-sm"
+                            : "rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-white/70"
+                        }
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
 
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {reportPeriod === "monthly" ? (
                   <div className="space-y-1.5">
                     <Label>Month</Label>
@@ -1561,22 +1564,37 @@ export default function WorkforceManagement() {
                 </div>
               </div>
 
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-                {reportPeriod === "daily" && (
-                  <p>Daily report for <strong className="text-foreground">{reportDate}</strong> — attendance detail plus wage totals.</p>
-                )}
-                {reportPeriod === "weekly" && (
-                  <p>Weekly report for the Monday–Sunday week that includes <strong className="text-foreground">{reportDate}</strong>.</p>
-                )}
-                {reportPeriod === "monthly" && (
-                  <p>
-                    Monthly report for <strong className="text-foreground">{reportMonth}</strong> — wage
-                    summary, site cost, and a daily attendance sheet (P / A / H).
-                  </p>
-                )}
+              <div className="rounded-2xl bg-slate-950 px-4 py-3.5 text-sm text-white">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+                  This PDF includes
+                </p>
+                <p className="mt-1.5 font-medium leading-relaxed text-white/95">
+                  {reportPeriod === "daily" && (
+                    <>
+                      Attendance detail and wage totals for{" "}
+                      <span className="text-orange-200">{reportDate}</span>.
+                    </>
+                  )}
+                  {reportPeriod === "weekly" && (
+                    <>
+                      Monday–Sunday week of{" "}
+                      <span className="text-orange-200">{reportDate}</span>, with attendance and wages.
+                    </>
+                  )}
+                  {reportPeriod === "monthly" && (
+                    <>
+                      Wage summary, site cost, and daily attendance sheet (P / A / H) for{" "}
+                      <span className="text-orange-200">{reportMonth}</span>.
+                    </>
+                  )}
+                </p>
               </div>
 
-              <Button onClick={() => void downloadReport()} disabled={reportDownloading}>
+              <Button
+                className="h-11 rounded-xl px-5 font-semibold"
+                onClick={() => void downloadReport()}
+                disabled={reportDownloading}
+              >
                 {reportDownloading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
