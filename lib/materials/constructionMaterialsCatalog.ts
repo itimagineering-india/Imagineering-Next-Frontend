@@ -455,6 +455,7 @@ export function formatMaterialsUnitLabel(unitType?: string | null): string {
 
   const labels: Record<string, string> = {
     per_bag: 'bag',
+    per_box: 'box',
     per_kg: 'kg',
     per_litre: 'litre',
     per_load: 'load',
