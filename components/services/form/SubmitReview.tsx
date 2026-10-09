@@ -46,7 +46,7 @@ interface SubmitReviewProps {
     categorySlug?: string;
     subcategory: string;
     priceMode: "exact" | "range";
-    pricingType: "fixed" | "hourly" | "daily" | "per_minute" | "per_article" | "monthly" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip" | "per_cuft" | "per_cum" | "per_metre" | "per_bag" | "lumpsum" | "per_project" | "negotiable";
+    pricingType: "fixed" | "hourly" | "daily" | "per_minute" | "per_article" | "monthly" | "per_kg" | "per_litre" | "per_unit" | "metric_ton" | "per_sqft" | "per_sqm" | "per_load" | "per_trip" | "per_cuft" | "per_cum" | "per_metre" | "per_bag" | "per_box" | "lumpsum" | "per_project" | "negotiable";
     startingPrice: string;
     priceMin: string;
     priceMax: string;
