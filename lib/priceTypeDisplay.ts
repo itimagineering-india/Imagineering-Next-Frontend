@@ -1,72 +1,14 @@
-/** Suffix shown after ₹ price (aligned with ServiceCard). */
-const PRICE_TYPE_SUFFIX: Record<string, string> = {
-  fixed: "",
-  hourly: "/hr",
-  daily: "/day",
-  per_minute: "/min",
-  per_article: "/article",
-  monthly: "/mo",
-  per_kg: "/kg",
-  per_litre: "/litre",
-  per_unit: "/unit",
-  metric_ton: "/metric ton",
-  per_sqft: "/sqft",
-  per_sqm: "/sqm",
-  per_load: "/load",
-  per_trip: "/trip",
-  per_km: "/km",
-  per_km_weight: "/km/ton",
-  per_km_weight_slab: "/km by weight",
-  per_cuft: "/cuft",
-  per_cum: "/cum",
-  per_metre: "/metre",
-  per_bag: "/bag",
-  lumpsum: "",
-  per_project: "/project",
-  negotiable: "",
-};
+import {
+  getPriceTypeLabel,
+  getPriceTypeSuffix,
+} from "@/lib/constants/servicePriceTypes";
 
-/** Human-readable label for filters / tooltips. */
-const PRICE_TYPE_LABEL: Record<string, string> = {
-  fixed: "Fixed price",
-  hourly: "Per hour",
-  daily: "Per day",
-  per_minute: "Per minute",
-  per_article: "Per article",
-  monthly: "Per month",
-  per_kg: "Per kg",
-  per_litre: "Per litre",
-  per_unit: "Per unit",
-  metric_ton: "Per metric ton",
-  per_sqft: "Per sq ft",
-  per_sqm: "Per sq m",
-  per_load: "Per load",
-  per_trip: "Per trip",
-  per_km: "Per km",
-  per_km_weight: "Per km × weight",
-  per_km_weight_slab: "Per km + weight slab",
-  per_cuft: "Per cu ft",
-  per_cum: "Per cum",
-  per_metre: "Per metre",
-  per_bag: "Per bag",
-  lumpsum: "Lumpsum",
-  per_project: "Per project",
-  negotiable: "Negotiable",
-};
-
-export function getPriceTypeSuffix(priceType: string | null | undefined): string {
-  if (!priceType) return "";
-  return PRICE_TYPE_SUFFIX[priceType] ?? priceType.replace(/_/g, " ");
-}
-
-export function getPriceTypeLabel(priceType: string | null | undefined): string {
-  if (!priceType) return "";
-  return PRICE_TYPE_LABEL[priceType] ?? priceType.replace(/_/g, " ");
-}
+export { getPriceTypeLabel, getPriceTypeSuffix };
 
 /** Short unit noun for quantity fields (e.g. bag, kg, MT). */
 const QUANTITY_UNIT_NOUN: Record<string, string> = {
   per_bag: "bag",
+  per_box: "box",
   per_kg: "kg",
   per_litre: "litre",
   per_load: "load",
