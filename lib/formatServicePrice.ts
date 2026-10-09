@@ -6,29 +6,7 @@ export type ServicePriceInput = {
   priceType?: string | null;
 };
 
-const priceTypeLabels: Record<string, string> = {
-  fixed: "",
-  hourly: "/hr",
-  daily: "/day",
-  per_minute: "/min",
-  per_article: "/article",
-  monthly: "/mo",
-  per_kg: "/kg",
-  per_litre: "/litre",
-  per_unit: "/unit",
-  metric_ton: "/metric ton",
-  per_sqft: "/sqft",
-  per_sqm: "/sqm",
-  per_load: "/load",
-  per_trip: "/trip",
-  per_cuft: "/cuft",
-  per_cum: "/cum",
-  per_metre: "/metre",
-  per_bag: "/bag",
-  lumpsum: "",
-  per_project: "/project",
-  negotiable: "",
-};
+import { getPriceTypeSuffix } from "@/lib/constants/servicePriceTypes";
 
 function toPositiveNumber(value: ServicePriceInput["price"]): number | null {
   if (value === undefined || value === null || value === "") return null;
@@ -41,7 +19,7 @@ function formatRupees(value: number): string {
 }
 
 export function getServicePriceUnit(priceType?: string | null): string {
-  return priceType ? priceTypeLabels[priceType] || "" : "";
+  return getPriceTypeSuffix(priceType);
 }
 
 export function isRangePricedService(service: ServicePriceInput): boolean {
