@@ -47,7 +47,7 @@ export function CitySeoSections({ content }: CitySeoSectionsProps) {
           <div className="flex flex-wrap gap-2">
             {content.internalLinks.map((link, idx) => (
               <Link key={idx} href={link.href}>
-                <Button variant="outline" size="sm" className="gap-1.5">
+                <Button variant="outline" size="sm" className="gap-2">
                   {link.label}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Button>
@@ -58,7 +58,7 @@ export function CitySeoSections({ content }: CitySeoSectionsProps) {
 
         {/* FAQ */}
         <section className="space-y-4">
-          <h2 className="text-xl md:text-2xl font-semibold text-foreground">
+          <h2 className="text-base md:text-lg font-semibold text-foreground">
             Frequently Asked Questions (FAQs)
           </h2>
           <Accordion type="single" collapsible defaultValue="faq-0" className="rounded-lg border">
