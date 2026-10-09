@@ -171,7 +171,7 @@ export function Header() {
  // Fetch categories from backend (with subcategories)
  useEffect(() => {
   let mounted = true;
-  api.categories.getAll(false, { includeSubcategories: true, admin: true }).then((res) => {
+  api.categories.getAll(false, { includeSubcategories: true }).then((res) => {
    if (!mounted) return;
    if (res.success && res.data) {
     const cats = (res.data as { categories?: any[] }).categories || [];
