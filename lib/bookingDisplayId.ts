@@ -5,7 +5,7 @@ export function formatLegacyBookingDisplayId(bookingId: string | undefined): str
   if (!id) return "—";
   const cleanHex = id.replace(/[^a-fA-F0-9]/g, "").slice(-12);
   if (cleanHex) {
-    const numeric = (BigInt(`0x${cleanHex}`) % 10000000000n).toString();
+    const numeric = (BigInt(`0x${cleanHex}`) % BigInt(10000000000)).toString();
     return numeric.padStart(10, "0");
   }
   const digits = id.replace(/\D/g, "");
