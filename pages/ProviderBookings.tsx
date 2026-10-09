@@ -67,6 +67,7 @@ import {
 } from "@/lib/priceTypeDisplay";
 import { quoteLineDisplayParts } from "@/lib/b2b/quoteRequestDisplay";
 import { openLocationOnGoogleMaps } from "@/lib/geocodeAddress";
+import { resolveBookingDisplayId } from "@/lib/bookingDisplayId";
 
 export async function getServerSideProps() { return { props: {} }; }
 
@@ -398,8 +399,11 @@ export default function ProviderBookings() {
     })}`;
 
   const bookingDisplayId = (booking: Booking) =>
-    String(booking.displayId || booking.bookingNumber || '').trim() ||
-    (booking.id ? `#${String(booking.id).slice(-8).toUpperCase()}` : '—');
+    resolveBookingDisplayId({
+      id: booking.id,
+      bookingNumber: booking.bookingNumber,
+      displayId: booking.displayId,
+    });
 
   const copyId = async (label: string, value: string) => {
     if (!value) return;
@@ -1889,7 +1893,11 @@ function BookingsTable({
                 <TableCell>
                   <div>
                     <p className="text-xs font-mono font-semibold">
-                      {booking.displayId || booking.bookingNumber || `#${booking.id.slice(-8).toUpperCase()}`}
+                      {resolveBookingDisplayId({
+                        id: booking.id,
+                        bookingNumber: booking.bookingNumber,
+                        displayId: booking.displayId,
+                      })}
                     </p>
                     {booking.id ? (
                       <p className="text-[10px] font-mono text-muted-foreground break-all">
