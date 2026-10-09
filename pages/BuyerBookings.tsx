@@ -47,11 +47,14 @@ import {
   formatQuoteLineDetailRows,
   quoteLineDisplayParts,
 } from "@/lib/b2b/quoteRequestDisplay";
+import { resolveBookingDisplayId } from "@/lib/bookingDisplayId";
 
 export async function getServerSideProps() { return { props: {} }; }
 
 interface Booking {
   _id: string;
+  bookingNumber?: string;
+  displayId?: string;
   rawStatus?: string;
   amount?: number;
   buyerFee?: number;
@@ -402,7 +405,7 @@ export default function BuyerBookings() {
       providerId: String(providerId),
       name: String(providerName),
       ...(serviceId ? { serviceId: String(serviceId) } : {}),
-      message: `Hi, regarding booking ${formatBookingId(booking._id)}.`,
+      message: `Hi, regarding booking ${formatBookingId(booking)}.`,
     });
     router.push(`/chat?${params.toString()}`);
   };
@@ -472,14 +475,21 @@ export default function BuyerBookings() {
 
   const openSupportPage = (booking: Booking) => {
     const subject = `Booking Support: ${booking.service?.title || "Service"} (${formatBookingId(
-      booking._id
+      booking
     )})`;
     router.push(`/buyer/tickets?orderId=${encodeURIComponent(booking._id)}&subject=${encodeURIComponent(subject)}`);
   };
 
-  const formatBookingId = (id?: string) => {
-    if (!id) return "N/A";
-    return `#${id.slice(-8).toUpperCase()}`;
+  const formatBookingId = (booking?: Pick<Booking, "_id" | "bookingNumber" | "displayId"> | string | null) => {
+    if (!booking) return "—";
+    if (typeof booking === "string") {
+      return resolveBookingDisplayId({ _id: booking });
+    }
+    return resolveBookingDisplayId({
+      _id: booking._id,
+      bookingNumber: booking.bookingNumber,
+      displayId: booking.displayId,
+    });
   };
 
   const getServiceItems = (booking: Booking) => {
@@ -813,6 +823,12 @@ export default function BuyerBookings() {
 
     return {
       _id: booking._id?.toString() || "",
+      bookingNumber: booking.bookingNumber ? String(booking.bookingNumber) : undefined,
+      displayId: booking.displayId
+        ? String(booking.displayId)
+        : booking.bookingNumber
+          ? String(booking.bookingNumber)
+          : undefined,
       rawStatus: String(booking.status || ""),
       service: {
         _id: booking.service?._id?.toString() || "",
@@ -1082,7 +1098,7 @@ export default function BuyerBookings() {
           }
         }
 
-        setBookings(bookingsList);
+        setBookings(bookingsList.map((b: any) => normalizeBookingDetail(b)));
       } else if (lastBookingId) {
         const bookingResponse = await api.bookings.getById(lastBookingId);
         if (bookingResponse.success && bookingResponse.data) {
@@ -1391,7 +1407,7 @@ export default function BuyerBookings() {
                             )}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {formatBookingId(booking._id)}
+                            {formatBookingId(booking)}
                           </div>
                         </div>
                         <div className="text-right">
@@ -1506,7 +1522,7 @@ export default function BuyerBookings() {
                               </span>
                             )}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">{formatBookingId(booking._id)}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{formatBookingId(booking)}</p>
                         </div>
                         <Button
                           variant="ghost"
@@ -1634,7 +1650,7 @@ export default function BuyerBookings() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Booking ID</p>
-                      <p className="font-medium">{formatBookingId(selectedBooking._id)}</p>
+                      <p className="font-medium">{formatBookingId(selectedBooking)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Provider</p>
