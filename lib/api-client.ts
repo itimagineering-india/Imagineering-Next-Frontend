@@ -16,6 +16,8 @@ const API_BASE_URL =
 // Simple in-memory cache for API responses
 const apiCache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+/** Share one in-flight GET across Header/Footer/Services mount storms */
+const inFlightCategories = new Map<string, Promise<ApiResponse<any>>>();
 
 const SEARCH_SUGGESTIONS_TTL_MS = 60_000;
 const searchSuggestionsCache = new Map<string, { ts: number; data: any[] }>();
@@ -41,6 +43,7 @@ const setCachedResponse = <T>(key: string, data: ApiResponse<T>): void => {
 /** Clear all API response cache (call on logout to avoid stale user-specific data) */
 export const clearApiCache = (): void => {
   apiCache.clear();
+  inFlightCategories.clear();
 };
 
 export interface ApiResponse<T> {
@@ -685,25 +688,34 @@ export const api = {
         if (cached) {
           return cached;
         }
+        const inFlight = inFlightCategories.get(cacheKey);
+        if (inFlight) return inFlight;
       } else {
         // Clear cache if forcing refresh
         apiCache.delete(cacheKey);
+        inFlightCategories.delete(cacheKey);
       }
-      
-      const response = await apiRequest(
-        `/api/categories${queryString ? `?${queryString}` : ''}`
-      );
-      if (response.success) {
-        // Use shorter cache time for categories (1 minute instead of 5)
-        const categoryCache = { data: response, timestamp: Date.now() };
-        apiCache.set(cacheKey, categoryCache);
-        
-        // Auto-expire after 1 minute
-        setTimeout(() => {
-          apiCache.delete(cacheKey);
-        }, 60 * 1000);
-      }
-      return response;
+
+      const request = (async (): Promise<ApiResponse<any>> => {
+        try {
+          const response = await apiRequest(
+            `/api/categories${queryString ? `?${queryString}` : ''}`
+          );
+          if (response.success) {
+            // Use shorter cache time for categories (1 minute instead of 5)
+            apiCache.set(cacheKey, { data: response, timestamp: Date.now() });
+            setTimeout(() => {
+              apiCache.delete(cacheKey);
+            }, 60 * 1000);
+          }
+          return response;
+        } finally {
+          inFlightCategories.delete(cacheKey);
+        }
+      })();
+
+      inFlightCategories.set(cacheKey, request);
+      return request;
     },
     getById: (id: string) => apiRequest(`/api/categories/${id}`),
     getBySlug: (slug: string) => apiRequest(`/api/categories/slug/${slug}`),
