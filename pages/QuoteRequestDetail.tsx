@@ -15,6 +15,12 @@ import { formatOfferTotalQtyLabel, quoteLineKey, quoteOfferItems, quoteOfferIsRe
 import { formatQuoteQtyLabel } from "@/lib/priceTypeDisplay";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CheckoutAddressPickerModal } from "@/components/cart/CheckoutAddressPickerModal";
+import {
+  formatSavedAddressLine,
+  loadSavedAddresses,
+  type SavedAddress,
+} from "@/lib/savedAddresses";
 
 function formatINR(n: number) {
   return `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -568,6 +574,9 @@ export default function QuoteRequestPage() {
   const [draftQty, setDraftQty] = useState<Record<string, string>>({});
   const [removedIds, setRemovedIds] = useState<Record<string, true>>({});
   const [savingQty, setSavingQty] = useState(false);
+  const [addressPickerOpen, setAddressPickerOpen] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [savingAddress, setSavingAddress] = useState(false);
   const prevOfferCount = useRef(0);
   const prevRecommended = useRef<string | null>(null);
 
@@ -674,6 +683,54 @@ export default function QuoteRequestPage() {
 
   const isOrdered = data?.status === "ordered" || Boolean(data?.booking);
   const canEditQty = Boolean(data?.status === "open" && !isOrdered && materials.some((m) => m.serviceId));
+  const canEditAddress = Boolean(data?.status === "open" && !isOrdered && data?.windowOpen !== false);
+
+  const openAddressPicker = async () => {
+    try {
+      const rows = await loadSavedAddresses();
+      setSavedAddresses(rows);
+    } catch {
+      setSavedAddresses([]);
+    }
+    setAddressPickerOpen(true);
+  };
+
+  const handleSelectDeliveryAddress = async (addr: SavedAddress) => {
+    if (!id || savingAddress) return;
+    const line = formatSavedAddressLine(addr);
+    if (!line || !addr.city?.trim() || !addr.state?.trim()) {
+      toast({
+        title: "Incomplete address",
+        description: "City and state are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSavingAddress(true);
+    try {
+      const res = await api.quoteRequests.updateAddress(id, {
+        address: line,
+        city: addr.city.trim(),
+        state: addr.state.trim(),
+        zipCode: addr.zipCode?.trim() || undefined,
+        coordinates: addr.coordinates,
+      });
+      if (!res.success) {
+        throw new Error((res as any)?.error?.message || "Could not update address");
+      }
+      applyRow((res as any).data);
+      setAddressPickerOpen(false);
+      toast({ title: "Delivery address updated" });
+    } catch (err: any) {
+      toast({
+        title: "Could not update address",
+        description: err?.message || "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
   const startEditQty = () => {
     const next: Record<string, string> = {};
@@ -878,10 +935,21 @@ export default function QuoteRequestPage() {
             <h1 className="mt-1.5 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
               {serviceTitle}
             </h1>
-            <p className="mt-2 text-sm text-stone-600">
-              {shortLocation(data)}
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-600">
+              <span>{shortLocation(data)}</span>
               {data.createdAt ? (
                 <span className="text-stone-400"> · Requested {formatCreatedAt(data.createdAt)}</span>
+              ) : null}
+              {canEditAddress ? (
+                <button
+                  type="button"
+                  onClick={() => void openAddressPicker()}
+                  disabled={savingAddress}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-teal-800 hover:text-teal-900 disabled:opacity-60"
+                >
+                  <Pencil className="h-3 w-3" aria-hidden />
+                  {savingAddress ? "Updating…" : "Change address"}
+                </button>
               ) : null}
             </p>
           </div>
@@ -1131,6 +1199,15 @@ export default function QuoteRequestPage() {
           </section>
         </div>
       </div>
+
+      <CheckoutAddressPickerModal
+        open={addressPickerOpen}
+        onOpenChange={setAddressPickerOpen}
+        addresses={savedAddresses}
+        selectedId={null}
+        onAddressesChange={setSavedAddresses}
+        onSelect={(addr) => void handleSelectDeliveryAddress(addr)}
+      />
     </main>
   );
 }
