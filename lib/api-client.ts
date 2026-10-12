@@ -3297,6 +3297,20 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    updateAddress: (
+      id: string,
+      data: {
+        address: string;
+        city: string;
+        state: string;
+        zipCode?: string;
+        coordinates?: { lat: number; lng: number };
+      }
+    ) =>
+      apiRequest<{ data: any }>(`/api/quote-requests/${id}/address`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     providerInbox: () => apiRequest<{ data: any[] }>('/api/quote-requests/provider/inbox'),
     providerGetById: (id: string) =>
       apiRequest<{ data: any }>(`/api/quote-requests/provider/${id}`),
