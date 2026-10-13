@@ -6,6 +6,7 @@ import { BASE_URL } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Manpower checkout | Imagineering India",
   alternates: { canonical: `${BASE_URL}/manpower/checkout` },
+  robots: { index: false, follow: false },
 };
 
 export default function ManpowerCheckoutPage() {
