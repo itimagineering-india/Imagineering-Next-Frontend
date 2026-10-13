@@ -9,6 +9,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: "Finding worker | Imagineering India",
     alternates: { canonical: `${BASE_URL}/manpower/dispatch/${bookingId}` },
+    robots: { index: false, follow: false },
   };
 }
 
