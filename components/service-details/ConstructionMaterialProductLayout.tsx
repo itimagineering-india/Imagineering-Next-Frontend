@@ -13,7 +13,6 @@ import {
   Share2,
   ShieldCheck,
   Star,
-  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -234,12 +233,6 @@ export function ConstructionMaterialProductLayout({
                   <p className="text-3xl font-bold tabular-nums text-blue-900">
                     {showPricing ? formattedPrice : "Contact for quote"}
                   </p>
-                  {isRangePrice && (
-                    <Badge variant="outline" className="mb-1 border-emerald-200 bg-emerald-50 text-emerald-700">
-                      <TrendingUp className="mr-1 h-3 w-3" />
-                      Stable
-                    </Badge>
-                  )}
                 </div>
               </div>
 
