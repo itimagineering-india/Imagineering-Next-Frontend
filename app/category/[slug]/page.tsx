@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getCategories, getCategoryBySlug, searchServices } from "@/lib/api";
 import { BASE_URL } from "@/lib/constants";
-import { getCategoryTitle, getCategoryCityTitle, getCategoryCityDescription } from "@/lib/seo";
+import { getCategoryTitle, getCategoryCityTitle } from "@/lib/seo";
 import { BreadcrumbJsonLd } from "@/components/seo/BreadcrumbJsonLd";
 
 type Params = { slug: string };
@@ -12,7 +12,9 @@ export const dynamicParams = true;
 
 export async function generateStaticParams() {
   const categories = await getCategories();
-  return categories.map((c) => ({ slug: c.slug }));
+  return categories
+    .filter((c) => Boolean(c.slug?.trim()))
+    .map((c) => ({ slug: c.slug }));
 }
 
 export async function generateMetadata(
@@ -21,7 +23,7 @@ export async function generateMetadata(
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
   if (!category) {
-    return { robots: { index: false, follow: true } };
+    return { robots: { index: false, follow: false } };
   }
 
   const title = getCategoryTitle(category);
@@ -51,14 +53,7 @@ export async function generateMetadata(
 export default async function CategoryPage({ params }: { params: Promise<Params> }) {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
-  if (!category) {
-    return (
-      <main className="min-h-screen px-4 py-10">
-        <h1 className="text-2xl font-semibold mb-4">Category not found</h1>
-        <p className="text-gray-600">The requested category does not exist.</p>
-      </main>
-    );
-  }
+  if (!category) notFound();
 
   // For now, show a generic listing (nationwide) and hints to city pages.
   const { services } = await searchServices({
@@ -71,7 +66,7 @@ export default async function CategoryPage({ params }: { params: Promise<Params>
   const baseUrl = BASE_URL;
 
   return (
-    <main className="min-h-screen px-4 py-10">
+    <main className="min-h-screen px-4 py-12">
       <h1 className="text-3xl font-bold mb-4">
         Best {category.name} Services
       </h1>
@@ -80,7 +75,7 @@ export default async function CategoryPage({ params }: { params: Promise<Params>
         Choose your city to see more accurate local results.
       </p>
 
-      <section className="mb-10">
+      <section className="mb-12">
         <h2 className="text-xl font-semibold mb-3">Popular listings</h2>
         {services.length === 0 && (
           <p className="text-gray-500">No services available yet.</p>
