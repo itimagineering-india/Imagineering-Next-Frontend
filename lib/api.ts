@@ -125,13 +125,20 @@ export async function getCategories(): Promise<Category[]> {
   }));
 }
 
-/** Get a single category by slug. */
+/** Get a single category by slug. Returns null on 404; rethrows other API errors. */
 export async function getCategoryBySlug(slug: string): Promise<Category | null> {
-  const json = await fetchJson<
-    BackendResponse<{ category: { _id: string; name: string; slug: string } }>
-  >(`/api/categories/slug/${encodeURIComponent(slug)}`, {
+  const res = await fetch(`${API_BASE_URL}/api/categories/slug/${encodeURIComponent(slug)}`, {
     next: { revalidate: 60 * 60 },
   });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  }
+
+  const json = (await res.json()) as BackendResponse<{
+    category: { _id: string; name: string; slug: string };
+  }>;
 
   if (!json?.data?.category) return null;
 
@@ -305,14 +312,14 @@ export async function getHomeBanners(placement = "home"): Promise<CmsBanner[]> {
   return normalizeCmsBanners(json.data);
 }
 
-/** Homepage category rows with nested services (nationwide default). */
+/** Homepage category rows with nested catalog products (no provider listing duplicates). */
 export async function getHomeCategorySections(params?: {
   limit?: number;
 }): Promise<HomeCategorySection[]> {
   const limit = params?.limit ?? 9;
   const json = await fetchJsonMaybe<
     BackendResponse<{ categories?: Array<Record<string, unknown>> }>
-  >(`/api/services/by-categories?limit=${limit}`, {
+  >(`/api/product-catalog/by-categories?limit=${limit}`, {
     next: { revalidate: 300 },
   });
   if (!json?.success) return [];
