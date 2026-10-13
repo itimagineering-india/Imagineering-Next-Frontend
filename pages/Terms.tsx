@@ -39,6 +39,17 @@ const sections = [
     ],
   },
   {
+    title: "Auto-Renewable Subscriptions (iOS / Apple)",
+    points: [
+      "Imagineering India may offer auto-renewable Buyer Premium subscriptions (for example monthly or yearly plans) that unlock marketplace features such as contacting suppliers.",
+      "On the iOS App Store, subscription title, length, and price are shown in the app before purchase and are charged to your Apple ID account at confirmation of purchase.",
+      "Subscriptions renew automatically at the end of each period unless you cancel at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.",
+      "You can manage or cancel an active subscription in Settings → Apple ID → Subscriptions (or Account → Subscriptions) on your Apple device. Deleting the app does not cancel a subscription.",
+      "Any unused portion of a free trial, if offered, is forfeited when you purchase a subscription. Refunds for Apple In-App Purchases are handled by Apple under Apple’s terms.",
+      "Optional account registration may be used to sync subscription benefits across your devices; purchasing via Apple In-App Purchase does not require creating an Imagineering India account first.",
+    ],
+  },
+  {
     title: "Content & IP",
     points: [
       "You retain rights to your content but grant us a license to host, display, and operate the service.",
@@ -118,7 +129,7 @@ export default function Terms() {
                 These Terms explain your rights, responsibilities, and the rules for using our platform.
               </p>
               <p className="text-sm text-muted-foreground">
-                Last updated: {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                Last updated: October 13, 2026
               </p>
             </div>
           </div>
@@ -160,7 +171,7 @@ export default function Terms() {
         <Separator />
 
         {/* Detailed Terms */}
-        <section className="py-14 bg-secondary/30">
+        <section className="py-16 bg-secondary/30">
           <div className="container max-w-6xl space-y-8">
             {sections.map((section) => (
               <Card key={section.title} className="border-0 shadow-sm">
@@ -183,7 +194,7 @@ export default function Terms() {
         <Separator />
 
         {/* Contact */}
-        <section className="py-14 bg-gradient-to-br from-primary/5 via-background to-primary/5">
+        <section className="py-16 bg-gradient-to-br from-primary/5 via-background to-primary/5">
           <div className="container max-w-4xl text-center space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
               <Globe2 className="h-4 w-4" />
@@ -200,7 +211,7 @@ export default function Terms() {
               </div>
               <div className="flex items-center gap-2 justify-center">
                 <Phone className="h-4 w-4 text-primary" />
-                +91 98765 43210
+                +91 99935 78006
               </div>
             </div>
           </div>
