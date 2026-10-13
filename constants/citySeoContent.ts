@@ -19,7 +19,7 @@ export interface CitySeoContent {
 export const BHOPAL_CONSTRUCTION_SEO: CitySeoContent = {
   h1: "Construction Company in Bhopal",
   h2: "Civil Contractors & Building Services in Bhopal",
-  metaTitle: "Construction Company in Bhopal | Imagineering India",
+  metaTitle: "Construction Company in Bhopal",
   metaDescription:
     "One-stop solution for construction in Bhopal. We provide technical manpower, civil contractors, materials, and logistics for industrial & residential projects.",
   metaKeywords:
@@ -130,8 +130,112 @@ export const BHOPAL_CONSTRUCTION_SEO: CitySeoContent = {
   },
 };
 
+export const INDORE_CONSTRUCTION_SEO: CitySeoContent = {
+  h1: "Construction Company in Indore",
+  h2: "Civil Contractors & Building Services in Indore",
+  metaTitle: "Construction Company in Indore",
+  metaDescription:
+    "Find verified contractors, construction materials, manpower and machinery in Indore. Compare quotes and start residential or commercial projects on Imagineering India.",
+  metaKeywords:
+    "construction company in indore, civil contractor indore, building materials indore, cement dealer indore, contractors in indore, Imagineering India",
+  intro:
+    "Looking for trusted construction services in Indore? Imagineering India connects you with verified civil contractors, material suppliers, manpower and equipment providers for residential and commercial projects.",
+  staticContent: [
+    {
+      heading: "Construction Services Available in Indore",
+      content: [
+        "Browse civil contractors, material suppliers, manpower and machinery providers serving Indore.",
+        "Post your requirement, compare quotations, and assign work to the provider that fits your project.",
+      ],
+    },
+    {
+      heading: "Why Use Imagineering India in Indore?",
+      content: [
+        "Verified provider listings, transparent profiles, and a construction-focused marketplace — not a general directory.",
+      ],
+    },
+  ],
+  internalLinks: [
+    { label: "Civil Contractors in Indore", href: "/indore?category=contractors" },
+    { label: "Construction Materials in Indore", href: "/indore?category=construction-materials" },
+    { label: "Manpower in Indore", href: "/indore?category=manpower" },
+    { label: "Equipment Rental in Indore", href: "/indore?category=rental-services" },
+  ],
+  faq: [
+    {
+      question: "How can I find a construction company in Indore?",
+      answer:
+        "Post your project requirement on Imagineering India, receive quotations from relevant Indore-area providers, compare options and assign the work order to the provider you choose.",
+    },
+    {
+      question: "Can I buy construction materials in Indore through Imagineering India?",
+      answer:
+        "Yes. You can explore material suppliers and request quotes for cement, steel, sand, bricks, tiles and related products, subject to local availability.",
+    },
+  ],
+  cta: {
+    heading: "Start Your Construction Project in Indore",
+    description:
+      "Compare verified contractors and suppliers in Indore and connect directly to move your project forward.",
+    buttonText: "Browse listings above to find construction experts in Indore",
+  },
+};
+
+export const JABALPUR_CONSTRUCTION_SEO: CitySeoContent = {
+  h1: "Construction Company in Jabalpur",
+  h2: "Civil Contractors & Building Services in Jabalpur",
+  metaTitle: "Construction Company in Jabalpur",
+  metaDescription:
+    "Connect with verified contractors, material suppliers, manpower and machinery in Jabalpur. Compare quotes for residential and commercial construction on Imagineering India.",
+  metaKeywords:
+    "construction company in jabalpur, civil contractor jabalpur, building materials jabalpur, contractors in jabalpur, Imagineering India",
+  intro:
+    "Need construction help in Jabalpur? Imagineering India helps you find verified contractors, suppliers and service providers for residential, commercial and infrastructure work.",
+  staticContent: [
+    {
+      heading: "Construction Services Available in Jabalpur",
+      content: [
+        "Explore civil contractors, material suppliers, manpower and equipment options available for projects in Jabalpur.",
+        "Share your requirement, review quotations and assign work through the platform.",
+      ],
+    },
+    {
+      heading: "Why Use Imagineering India in Jabalpur?",
+      content: [
+        "A construction marketplace with verified listings and clear inquiry flow so you can shortlist providers faster.",
+      ],
+    },
+  ],
+  internalLinks: [
+    { label: "Civil Contractors in Jabalpur", href: "/jabalpur?category=contractors" },
+    { label: "Construction Materials in Jabalpur", href: "/jabalpur?category=construction-materials" },
+    { label: "Manpower in Jabalpur", href: "/jabalpur?category=manpower" },
+    { label: "Equipment Rental in Jabalpur", href: "/jabalpur?category=rental-services" },
+  ],
+  faq: [
+    {
+      question: "How do I hire a contractor in Jabalpur?",
+      answer:
+        "Post your requirement on Imagineering India, receive quotations from relevant providers, compare scope and rates, then assign the work order to the provider you select.",
+    },
+    {
+      question: "Are material suppliers available in Jabalpur on Imagineering India?",
+      answer:
+        "Yes. You can request quotes from construction material suppliers serving Jabalpur, depending on product availability and provider coverage.",
+    },
+  ],
+  cta: {
+    heading: "Start Your Construction Project in Jabalpur",
+    description:
+      "Find verified construction service providers in Jabalpur and compare options before you assign work.",
+    buttonText: "Browse listings above to find construction experts in Jabalpur",
+  },
+};
+
 export function getCitySeoContent(citySlug: string): CitySeoContent | null {
   const lower = citySlug.toLowerCase();
   if (lower === "bhopal") return BHOPAL_CONSTRUCTION_SEO;
+  if (lower === "indore") return INDORE_CONSTRUCTION_SEO;
+  if (lower === "jabalpur") return JABALPUR_CONSTRUCTION_SEO;
   return null;
 }
