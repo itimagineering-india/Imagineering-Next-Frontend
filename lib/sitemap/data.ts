@@ -1,4 +1,4 @@
-import type { SitemapCategory, SitemapProduct } from "./types";
+import type { SitemapCategory, SitemapProduct, SitemapProvider } from "./types";
 
 function getApiBaseUrl(): string {
   const raw =
@@ -130,6 +130,74 @@ export async function getAllProducts(options?: {
 
     page += 1;
   } while (page <= totalPages && page <= MAX_SEARCH_PAGES);
+
+  return out;
+}
+
+const MAX_PROVIDER_PAGES = 50;
+
+/**
+ * Public provider profile IDs for sitemap (`/provider/[id]`).
+ * Paginates GET /api/providers (no auth). Caps pages to keep sitemap bounded.
+ */
+export async function getPublicProvidersForSitemap(): Promise<SitemapProvider[]> {
+  const base = getApiBaseUrl();
+  const out: SitemapProvider[] = [];
+  const seen = new Set<string>();
+  let page = 1;
+  const limit = 100;
+  let totalPages = 1;
+
+  do {
+    const url = new URL(`${base}/api/providers`);
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("limit", String(limit));
+
+    const res = await fetch(url.toString(), { cache: "no-store" });
+    if (!res.ok) break;
+
+    const json = (await res.json()) as {
+      success?: boolean;
+      data?: {
+        providers?: Array<{
+          _id?: string;
+          id?: string;
+          slug?: string;
+          businessName?: string;
+          isFallbackProfile?: boolean;
+          updatedAt?: string | Date;
+        }>;
+      };
+      pagination?: { pages?: number };
+    };
+    totalPages = Math.max(1, json.pagination?.pages ?? 1);
+    const list = json.data?.providers ?? [];
+    if (!Array.isArray(list) || list.length === 0) break;
+
+    for (const p of list) {
+      // Skip synthetic user-only fallbacks (not real Provider profiles).
+      if (p.isFallbackProfile) continue;
+
+      const oid = String(p._id || p.id || "").trim();
+      const slug = String(p.slug || "").trim();
+      const businessName = String(p.businessName || "").trim();
+
+      // Prefer canonical slug URL; require a display name or slug (skip empty shells).
+      if (!slug && !businessName) continue;
+      const id = slug || oid;
+      if (!id) continue;
+
+      // Dedupe by both slug and ObjectId so the same provider is not listed twice.
+      if (seen.has(id) || (oid && seen.has(oid)) || (slug && seen.has(slug))) continue;
+      seen.add(id);
+      if (oid) seen.add(oid);
+      if (slug) seen.add(slug);
+
+      out.push({ id, updatedAt: toIso(p.updatedAt) });
+    }
+
+    page += 1;
+  } while (page <= totalPages && page <= MAX_PROVIDER_PAGES);
 
   return out;
 }
