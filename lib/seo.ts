@@ -1,7 +1,5 @@
 import type { Category } from "./api";
 
-const SITE_NAME = "Imagineering India";
-
 function toTitleCase(value: string): string {
   return value
     .split(/[-_ ]+/)
@@ -10,14 +8,15 @@ function toTitleCase(value: string): string {
     .join(" ");
 }
 
+/** Titles omit site name — root layout `title.template` appends `| Imagineering India`. */
 export function getCategoryTitle(category: Category): string {
   const name = category.name || toTitleCase(category.slug);
-  return `Best ${name} Services | ${SITE_NAME}`;
+  return `Best ${name} Services`;
 }
 
 export function getCategoryCityTitle(categoryName: string, citySlug: string): string {
   const city = toTitleCase(citySlug);
-  return `Best ${categoryName} in ${city} | ${SITE_NAME}`;
+  return `Best ${categoryName} in ${city}`;
 }
 
 export function getCategoryCityLocalityTitle(
@@ -27,7 +26,7 @@ export function getCategoryCityLocalityTitle(
 ): string {
   const city = toTitleCase(citySlug);
   const locality = toTitleCase(localitySlug);
-  return `Best ${categoryName} in ${locality}, ${city} | ${SITE_NAME}`;
+  return `Best ${categoryName} in ${locality}, ${city}`;
 }
 
 export function getCategoryCityDescription(categoryName: string, citySlug: string): string {
@@ -48,9 +47,9 @@ export function getCategoryCityLocalityDescription(
 export function getServiceTitle(serviceTitle: string, categoryName?: string, city?: string): string {
   if (categoryName && city) {
     const cityName = toTitleCase(city);
-    return `${serviceTitle} | ${categoryName} in ${cityName} | ${SITE_NAME}`;
+    return `${serviceTitle} | ${categoryName} in ${cityName}`;
   }
-  return `${serviceTitle} | ${SITE_NAME}`;
+  return serviceTitle;
 }
 
 export function getServiceDescription(
