@@ -13,6 +13,12 @@ export type SitemapCategory = {
   updatedAt: string;
 };
 
+export type SitemapProvider = {
+  /** Public profile path segment (`/provider/[id]`). */
+  id: string;
+  updatedAt: string;
+};
+
 export type SitemapUrlEntry = {
   loc: string;
   lastmod: string;
