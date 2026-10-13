@@ -6,6 +6,7 @@ import { BASE_URL } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Machine rental checkout | Imagineering India",
   alternates: { canonical: `${BASE_URL}/machine-rental/checkout` },
+  robots: { index: false, follow: false },
 };
 
 export default function MachineRentalCheckoutPage() {
