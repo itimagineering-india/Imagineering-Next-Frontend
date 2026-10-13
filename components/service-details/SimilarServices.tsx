@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin, ChevronRight } from "lucide-react";
+import { MapPin, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { formatServicePrice } from "@/lib/formatServicePrice";
 import {
@@ -89,11 +89,6 @@ export function SimilarServices({
                       </div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    <div className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/35 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
-                      <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-                      <span>{service.rating}</span>
-                      <span className="text-white/80">({service.reviewCount})</span>
-                    </div>
                   </div>
                   <CardContent className="space-y-3 p-3">
                     <h3 className="truncate text-sm font-semibold leading-tight lg:text-[15px]">
