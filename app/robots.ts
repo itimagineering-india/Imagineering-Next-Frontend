@@ -13,6 +13,7 @@ export default function robots(): MetadataRoute.Robots {
           "/admin/",
           "/_next/",
           "/dashboard/",
+          "/buyer/",
           "/login",
           "/signup",
           "/forgot-password",
@@ -21,6 +22,11 @@ export default function robots(): MetadataRoute.Robots {
           "/notifications",
           "/cart",
           "/checkout",
+          "/manpower/checkout",
+          "/machine-rental/checkout",
+          "/machine-resale/checkout",
+          "/manpower/dispatch/",
+          "/quote-requests/",
           "/profile",
         ],
       },
@@ -28,4 +34,3 @@ export default function robots(): MetadataRoute.Robots {
     sitemap: `${origin}/sitemap.xml`,
   };
 }
-
