@@ -19,7 +19,8 @@ export async function generateMetadata(
   }
 
   const cityName = city.replace(/-/g, " ");
-  const title = `${category.name} in ${cityName} | Imagineering India`;
+  // Layout title.template appends `| Imagineering India`
+  const title = `${category.name} in ${cityName}`;
   const description = `Find verified ${category.name.toLowerCase()} providers in ${cityName}. Compare ratings, prices and book online.`;
   const url = `${BASE_URL}/services/${service}/${city}`;
 
