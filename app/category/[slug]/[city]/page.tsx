@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getCategoryBySlug, searchServices } from "@/lib/api";
 import { BASE_URL } from "@/lib/constants";
 import {
@@ -19,7 +20,7 @@ export async function generateMetadata(
   const { slug, city } = await params;
   const category = await getCategoryBySlug(slug);
   if (!category) {
-    return { robots: { index: false, follow: true } };
+    return { robots: { index: false, follow: false } };
   }
 
   const title = getCategoryCityTitle(category.name, city);
@@ -53,13 +54,7 @@ export async function generateMetadata(
 export default async function CategoryCityPage({ params }: { params: Promise<Params> }) {
   const { slug, city: citySlug } = await params;
   const category = await getCategoryBySlug(slug);
-  if (!category) {
-    return (
-      <main className="min-h-screen px-4 py-10">
-        <h1 className="text-2xl font-semibold mb-4">Category not found</h1>
-      </main>
-    );
-  }
+  if (!category) notFound();
 
   const { services } = await searchServices({
     categorySlug: category.slug,
@@ -86,7 +81,7 @@ export default async function CategoryCityPage({ params }: { params: Promise<Par
     .reduce((acc, v) => acc + v, 0);
 
   return (
-    <main className="min-h-screen px-4 py-10">
+    <main className="min-h-screen px-4 py-12">
       <h1 className="text-3xl font-bold mb-4">
         {category.name} in {citySlug}
       </h1>
