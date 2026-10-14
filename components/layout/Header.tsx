@@ -1195,177 +1195,169 @@ export function Header() {
       <SheetTitle className="sr-only">
        Imagineering India — {t("header:exploreServices")} and account menu
       </SheetTitle>
-      <div className="flex-1 overflow-y-auto overscroll-y-contain px-6 pb-6 pt-14 [-webkit-overflow-scrolling:touch]">
-      <nav className="flex flex-col gap-4">
-       <LanguageSwitcher compact />
-       <Link href="/services" className="subtitle" onClick={() => setIsOpen(false)}>
-        {t("header:exploreServices")}
-       </Link>
-       {cartCount > 0 ? (
-       <Link href="/cart" className="subtitle flex items-center gap-2" onClick={() => setIsOpen(false)}>
-        <ShoppingCart className="h-4 w-4 shrink-0" />
-        Cart ({cartCount > 99 ? "99+" : cartCount})
-       </Link>
-       ) : null}
-       <div className="space-y-2">
-        {userLocation && (
-         <Link
-          href={`/services?lat=${userLocation.lat}&lng=${userLocation.lng}`}
-          className="subtitle flex items-center gap-2"
-          onClick={() => setIsOpen(false)}
-         >
-          <MapPin className="h-4 w-4 shrink-0" />
-          <span className="truncate">
-           {userLocation.city || (userLocation.address?.split(",")[0]) || t("services:servicesNearYou")}
-          </span>
-         </Link>
-        )}
-        {isOpen ? (
-         <LocationSearchInline onClose={() => setIsOpen(false)} className="p-0" />
-        ) : null}
-       </div>
-       <Link href="/b2b-services" className="subtitle" onClick={() => setIsOpen(false)}>
-        {t("services:b2bServices")}
-       </Link>
-       <Link href="/about" className="subtitle" onClick={() => setIsOpen(false)}>
-        {t("common:about")}
-       </Link>
-       <Link href="/contact" className="subtitle" onClick={() => setIsOpen(false)}>
-        {t("common:contact")}
-       </Link>
-       <Link href="/help" className="subtitle" onClick={() => setIsOpen(false)}>
-        {t("common:help")}
-       </Link>
-       <hr className="my-4" />
+      <div className="flex-1 overflow-y-auto overscroll-y-contain px-5 pb-6 pt-14 sm:px-6 [-webkit-overflow-scrolling:touch]">
+      <nav className="flex flex-col gap-6">
+       {/* 1. Account identity — users look for themselves first */}
        {!isAuthLoading && (
-        <>
+        <div className="flex flex-col gap-3">
          {isAuthenticated && user ? (
-          <>
-           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted">
-            <Avatar className="h-10 w-10">
-             <AvatarImage src={typeof user.avatar === "string" ? user.avatar : undefined} alt={typeof user.name === "string" ? user.name : "User"} />
-             <AvatarFallback>{getUserInitials()}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1">
-             <p className="body">{user.name}</p>
-             <p className="caption">{user.email || (user as { phone?: string }).phone || '—'}</p>
-            </div>
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/60 p-3">
+           <Avatar className="h-10 w-10 shrink-0">
+            <AvatarImage src={typeof user.avatar === "string" ? user.avatar : undefined} alt={typeof user.name === "string" ? user.name : "User"} />
+            <AvatarFallback>{getUserInitials()}</AvatarFallback>
+           </Avatar>
+           <div className="min-w-0 flex-1">
+            <p className="body truncate">{user.name}</p>
+            <p className="caption truncate">{user.email || (user as { phone?: string }).phone || "—"}</p>
            </div>
-           <Link
-            href="/profile"
-            className="subtitle"
-            onClick={() => setIsOpen(false)}
-           >
-            {t("header:myProfile")}
-           </Link>
-           <Link
-            href="/chat"
-            className="subtitle"
-            onClick={() => setIsOpen(false)}
-           >
-            {t("services:messages")}
-           </Link>
-           <Link
-            href="/requirement/submit"
-            className="subtitle"
-            onClick={() => setIsOpen(false)}
-           >
-            {t("services:getQuote")}
-           </Link>
-           {user.role === "buyer" && (
-            <>
-             <Link
-              href="/buyer/orders"
-              className="subtitle"
-              onClick={() => setIsOpen(false)}
-             >
-              {t("services:myOrders")}
-             </Link>
-             <Link
-              href="/buyer/requirements"
-              className="subtitle"
-              onClick={() => setIsOpen(false)}
-             >
-              {t("services:myRequirements")}
-             </Link>
-             <Link
-              href="/buyer/job-posts/new"
-              className="subtitle"
-              onClick={() => setIsOpen(false)}
-             >
-              {t("services:postJob")}
-             </Link>
-             <Link
-              href="/buyer/job-posts"
-              className="subtitle"
-              onClick={() => setIsOpen(false)}
-             >
-              {t("services:myJobPosts")}
-             </Link>
-             <Link
-              href="/buyer/tickets"
-              className="subtitle"
-              onClick={() => setIsOpen(false)}
-             >
-              {t("services:myTickets")}
-             </Link>
-            </>
-           )}
-           {(user.role === "admin" || user.role === "provider") && (
-            <>
-             {user.role === "provider" && (
-              <Link
-               href="/jobs"
-               className="subtitle"
-               onClick={() => setIsOpen(false)}
-              >
-               {t("services:browseJobs")}
-              </Link>
-             )}
-             {user.role === "provider" && (
-              <Link
-               href="/dashboard/provider/manpower-crew"
-               className="subtitle"
-               onClick={() => setIsOpen(false)}
-              >
-               {t("services:hireLabour")}
-              </Link>
-             )}
-             <Link
-              href={getDashboardPath()}
-              className="subtitle"
-              onClick={() => setIsOpen(false)}
-             >
-              {t("header:dashboard")}
-             </Link>
-            </>
-           )}
-           <Button
-            variant="outline"
-            className="mt-2 w-full"
-            onClick={() => {
-             handleLogout();
-             setIsOpen(false);
-            }}
-           >
-            <LogOut className="mr-2 h-4 w-4" />
-            {t("header:logout")}
-           </Button>
-          </>
+          </div>
          ) : (
-          <>
-           <Link href="/login" className="subtitle" onClick={() => setIsOpen(false)}>
-            {t("header:login")}
-           </Link>
-           <Button asChild className="mt-2">
+          <div className="flex flex-col gap-2">
+           <Button asChild className="w-full">
             <Link href="/signup" onClick={() => setIsOpen(false)}>
              {t("header:signUp")}
             </Link>
            </Button>
-          </>
+           <Button variant="outline" asChild className="w-full">
+            <Link href="/login" onClick={() => setIsOpen(false)}>
+             {t("header:login")}
+            </Link>
+           </Button>
+          </div>
          )}
-        </>
+        </div>
        )}
+
+       {/* 2. Browse + location — primary discovery */}
+       <div className="flex flex-col gap-3">
+        <p className="caption font-semibold uppercase tracking-wide text-muted-foreground">
+         {t("header:menuBrowse")}
+        </p>
+        <div className="flex flex-col gap-3">
+         <Link href="/services" className="subtitle" onClick={() => setIsOpen(false)}>
+          {t("header:exploreServices")}
+         </Link>
+         <Link href="/b2b-services" className="subtitle" onClick={() => setIsOpen(false)}>
+          {t("services:b2bServices")}
+         </Link>
+         {cartCount > 0 ? (
+          <Link href="/cart" className="subtitle flex items-center gap-2" onClick={() => setIsOpen(false)}>
+           <ShoppingCart className="h-4 w-4 shrink-0" />
+           Cart ({cartCount > 99 ? "99+" : cartCount})
+          </Link>
+         ) : null}
+         <div className="space-y-2 rounded-xl border border-border bg-muted/40 p-3">
+          <p className="caption font-medium text-muted-foreground">{t("header:location")}</p>
+          {userLocation && (
+           <Link
+            href={`/services?lat=${userLocation.lat}&lng=${userLocation.lng}`}
+            className="subtitle flex items-center gap-2"
+            onClick={() => setIsOpen(false)}
+           >
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+             {userLocation.city || (userLocation.address?.split(",")[0]) || t("services:servicesNearYou")}
+            </span>
+           </Link>
+          )}
+          {isOpen ? (
+           <LocationSearchInline onClose={() => setIsOpen(false)} className="p-0" />
+          ) : null}
+         </div>
+        </div>
+       </div>
+
+       {/* 3. Account shortcuts — only when signed in */}
+       {!isAuthLoading && isAuthenticated && user ? (
+        <div className="flex flex-col gap-3">
+         <p className="caption font-semibold uppercase tracking-wide text-muted-foreground">
+          {t("header:menuAccount")}
+         </p>
+         <div className="flex flex-col gap-3">
+          <Link href="/profile" className="subtitle" onClick={() => setIsOpen(false)}>
+           {t("header:myProfile")}
+          </Link>
+          <Link href="/chat" className="subtitle" onClick={() => setIsOpen(false)}>
+           {t("services:messages")}
+          </Link>
+          <Link href="/requirement/submit" className="subtitle" onClick={() => setIsOpen(false)}>
+           {t("services:getQuote")}
+          </Link>
+          {user.role === "buyer" && (
+           <>
+            <Link href="/buyer/orders" className="subtitle" onClick={() => setIsOpen(false)}>
+             {t("services:myOrders")}
+            </Link>
+            <Link href="/buyer/requirements" className="subtitle" onClick={() => setIsOpen(false)}>
+             {t("services:myRequirements")}
+            </Link>
+            <Link href="/buyer/job-posts/new" className="subtitle" onClick={() => setIsOpen(false)}>
+             {t("services:postJob")}
+            </Link>
+            <Link href="/buyer/job-posts" className="subtitle" onClick={() => setIsOpen(false)}>
+             {t("services:myJobPosts")}
+            </Link>
+            <Link href="/buyer/tickets" className="subtitle" onClick={() => setIsOpen(false)}>
+             {t("services:myTickets")}
+            </Link>
+           </>
+          )}
+          {(user.role === "admin" || user.role === "provider") && (
+           <>
+            {user.role === "provider" && (
+             <Link href="/jobs" className="subtitle" onClick={() => setIsOpen(false)}>
+              {t("services:browseJobs")}
+             </Link>
+            )}
+            {user.role === "provider" && (
+             <Link href="/dashboard/provider/manpower-crew" className="subtitle" onClick={() => setIsOpen(false)}>
+              {t("services:hireLabour")}
+             </Link>
+            )}
+            <Link href={getDashboardPath()} className="subtitle" onClick={() => setIsOpen(false)}>
+             {t("header:dashboard")}
+            </Link>
+           </>
+          )}
+         </div>
+        </div>
+       ) : null}
+
+       {/* 4. Support links */}
+       <div className="flex flex-col gap-3">
+        <p className="caption font-semibold uppercase tracking-wide text-muted-foreground">
+         {t("header:menuSupport")}
+        </p>
+        <div className="flex flex-col gap-3">
+         <Link href="/about" className="subtitle" onClick={() => setIsOpen(false)}>
+          {t("common:about")}
+         </Link>
+         <Link href="/contact" className="subtitle" onClick={() => setIsOpen(false)}>
+          {t("common:contact")}
+         </Link>
+         <Link href="/help" className="subtitle" onClick={() => setIsOpen(false)}>
+          {t("common:help")}
+         </Link>
+        </div>
+       </div>
+
+       {/* 5. Preferences + logout — footer of the sheet */}
+       <div className="mt-1 flex flex-col gap-3 border-t border-border pt-5">
+        <LanguageSwitcher compact />
+        {!isAuthLoading && isAuthenticated && user ? (
+         <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+           handleLogout();
+           setIsOpen(false);
+          }}
+         >
+          <LogOut className="mr-2 h-4 w-4" />
+          {t("header:logout")}
+         </Button>
+        ) : null}
+       </div>
       </nav>
       </div>
      </SheetContent>
