@@ -16,6 +16,22 @@ export const EMPTY_TOOLS_FIELDS: ToolsServiceFieldsValue = {
   technicalDetails: [],
 };
 
+/** Home Tools row — set `logoUrl` to a direct image URL (Google/CDN) to show logo. */
+export const TOOLS_TRENDING_BRANDS = [
+  { id: "bosch", name: "Bosch", mark: "BO", logoUrl: "https://logos-world.net/wp-content/uploads/2020/08/Bosch-Emblem.png" },
+  { id: "dewalt", name: "DeWalt", mark: "DW", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRAOspKlby35t3rTMmL5aTl_Ll1Tqz2KaT4NGCMzsDDTQ&s=10" },
+  { id: "stanley", name: "Stanley", mark: "ST", logoUrl: "https://crystalpng.com/wp-content/uploads/2024/08/stanley-logo-png.png" },
+  { id: "panasonic", name: "Panasonic", mark: "PA", logoUrl: "https://yt3.googleusercontent.com/Scdyo8xTWjhdwPZPPlpF1JzJYKg480Udf5gVAZkkeoyfkxk3dHydkbpVY2Z6sTc3wnEubQ6ZnQ=s900-c-k-c0x00ffffff-no-rj" },
+  { id: "makita", name: "Makita", mark: "MK", logoUrl: "https://cdn.shopify.com/s/files/1/0700/0090/2449/t/2/assets/makita_logo_png6-1672746767923_1200x.png?v=1672746769" },
+  { id: "hilti", name: "Hilti", mark: "HI", logoUrl: "" },
+  { id: "hillgrove", name: "Hillgrove", mark: "HG", logoUrl: "" },
+  { id: "godrej", name: "Godrej", mark: "GO", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTSmmoU-H9C5kyU3LMiNzRS0INSCZTG3jbR1NbRbUbUp_yvY1Yzux0iwNzR&s=10" },
+  { id: "black-decker", name: "Black+Decker", mark: "BD", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSFcztbR-yEsCkKMi-tHbVATSglX6skaM-Nc5dK_CNbdg&s=10" },
+  { id: "total", name: "Total", mark: "TO", logoUrl: "https://assets.simon.com/tenantlogos/38749.png" },
+  { id: "ingco", name: "Ingco", mark: "IN", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTTS7Pnl1pYE_7LFkLjzUDv-snIzVUy_1QokAFpxnOugMYOFy6YDPUhga7o&s=10" },
+  { id: "metabo", name: "Metabo", mark: "ME", logoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTS3zmEKzbHU2axhKPnyyCnHLeNFqi0BX12lOKili_1QkjcKq8h521gO30&s=10" },
+] as const;
+
 export function isToolsCategory(category: { slug?: string; name?: string } | null | undefined): boolean {
   const slug = String(category?.slug || "").toLowerCase().trim();
   const name = String(category?.name || "").toLowerCase().trim();
