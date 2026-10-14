@@ -142,11 +142,26 @@ function printLiveQuotesSummary(opts: {
             ? formatINR(delivery)
             : "Free";
 
+      const printRatingRaw =
+        offer.rating != null
+          ? Number(offer.rating)
+          : offer.provider?.rating != null
+            ? Number(offer.provider.rating)
+            : null;
+      const printRating =
+        printRatingRaw != null && Number.isFinite(printRatingRaw) && printRatingRaw > 0
+          ? printRatingRaw
+          : null;
+      const printReviewCount =
+        offer.reviewCount != null && Number(offer.reviewCount) > 0
+          ? Math.round(Number(offer.reviewCount))
+          : null;
       const trustBits = [
         offer.verified ? "Verified" : "",
-        offer.rating != null ? `★ ${Number(offer.rating).toFixed(1)}` : "",
+        printRating != null
+          ? `★ ${printRating.toFixed(1)}${printReviewCount != null ? ` (${printReviewCount})` : ""}`
+          : "",
         offer.successfulDeliveries != null ? `${offer.successfulDeliveries} deliveries` : "",
-        offer.onTimePercent != null ? `${offer.onTimePercent}% on-time` : "",
         offer.gstLabel ? String(offer.gstLabel) : "",
       ]
         .filter(Boolean)
@@ -342,6 +357,26 @@ function OfferCard({
   const lineItems = quoteOfferItems(offer);
   const totalQty = quoteOfferTotalQuantity(offer);
   const totalQtyLabel = formatOfferTotalQtyLabel(totalQty);
+  const providerRatingRaw =
+    offer.rating != null
+      ? Number(offer.rating)
+      : offer.provider?.rating != null
+        ? Number(offer.provider.rating)
+        : null;
+  const providerRating =
+    providerRatingRaw != null && Number.isFinite(providerRatingRaw) && providerRatingRaw > 0
+      ? providerRatingRaw
+      : null;
+  const reviewCountRaw =
+    offer.reviewCount != null
+      ? Number(offer.reviewCount)
+      : offer.provider?.reviewCount != null
+        ? Number(offer.provider.reviewCount)
+        : null;
+  const reviewCount =
+    reviewCountRaw != null && Number.isFinite(reviewCountRaw) && reviewCountRaw > 0
+      ? Math.round(reviewCountRaw)
+      : null;
 
   return (
     <article
@@ -405,19 +440,17 @@ function OfferCard({
               Verified
             </span>
           ) : null}
-          {offer.rating != null ? (
-            <span className="text-xs font-medium text-stone-500">
-              ★ {Number(offer.rating).toFixed(1)}
+          {providerRating != null ? (
+            <span className="text-xs font-medium text-stone-700">
+              ★ {providerRating.toFixed(1)}
+              {reviewCount != null ? (
+                <span className="text-stone-500"> ({reviewCount})</span>
+              ) : null}
             </span>
           ) : null}
           {offer.successfulDeliveries != null ? (
             <span className="text-xs font-medium text-stone-500">
               {offer.successfulDeliveries} deliveries
-            </span>
-          ) : null}
-          {offer.onTimePercent != null ? (
-            <span className="text-xs font-medium text-stone-500">
-              {offer.onTimePercent}% on-time
             </span>
           ) : null}
           {offer.gstLabel ? (
