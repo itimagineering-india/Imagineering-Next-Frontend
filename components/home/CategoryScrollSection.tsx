@@ -1,15 +1,22 @@
 "use client";
-import { useCallback, useRef, useMemo, memo } from "react";
+import { useCallback, useRef, useMemo, memo, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServicesList, type ServicesListHandle } from "./ServicesList";
-import { catalogCategoryBrowseHref } from "@/lib/home-data";
-import { MATERIALS_TRENDING_BRANDS } from "@/lib/materials/constructionMaterialsCatalog";
+import { catalogCategoryBrowseHref, normalizeHomeService } from "@/lib/home-data";
+import {
+  MATERIALS_CATEGORY_SLUG,
+  MATERIALS_HOME_SUBCATEGORY_TABS,
+  MATERIALS_TRENDING_BRANDS,
+} from "@/lib/materials/constructionMaterialsCatalog";
 import { getMaterialsBrandArt } from "@/lib/materials/materialsBrandArt";
-import { TOOLS_TRENDING_BRANDS } from "@/lib/toolsService";
+import { TOOLS_HOME_SUBCATEGORY_TABS, TOOLS_TRENDING_BRANDS } from "@/lib/toolsService";
+import api from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+
+const TOOLS_CATEGORY_SLUG = "tools";
 
 interface Service {
   id: string;
@@ -56,16 +63,20 @@ function CategoryScrollSectionComponent({
     [categorySlug, title]
   );
 
+  const slug = String(categorySlug || "").toLowerCase().trim();
+  const isMaterialsSection =
+    slug === "construction-materials" || slug === "construction-material";
+  const isToolsSection = slug === "tools" || slug.startsWith("tools-");
+
   const topBrandsConfig = useMemo(() => {
-    const slug = String(categorySlug || "").toLowerCase().trim();
-    if (slug === "construction-materials" || slug === "construction-material") {
+    if (isMaterialsSection) {
       return {
         brands: MATERIALS_TRENDING_BRANDS,
         href: "/construction-materials",
         resolveLogo: getMaterialsBrandArt,
       };
     }
-    if (slug === "tools" || slug.startsWith("tools-")) {
+    if (isToolsSection) {
       return {
         brands: TOOLS_TRENDING_BRANDS,
         href: "/tools",
@@ -73,19 +84,121 @@ function CategoryScrollSectionComponent({
       };
     }
     return null;
-  }, [categorySlug]);
+  }, [isMaterialsSection, isToolsSection]);
 
-  const redTitleAccent = useMemo(() => {
-    const slug = String(categorySlug || "").toLowerCase().trim();
-    return (
-      slug === "construction-materials" ||
-      slug === "construction-material" ||
-      slug === "tools" ||
-      slug.startsWith("tools-") ||
-      slug === "manpower" ||
-      slug.startsWith("manpower-")
-    );
-  }, [categorySlug]);
+  const redTitleAccent =
+    isMaterialsSection ||
+    isToolsSection ||
+    slug === "manpower" ||
+    slug.startsWith("manpower-");
+
+  const subcategoryTabs = isMaterialsSection
+    ? MATERIALS_HOME_SUBCATEGORY_TABS
+    : isToolsSection
+      ? TOOLS_HOME_SUBCATEGORY_TABS
+      : null;
+  const tabCatalogSlug = isMaterialsSection
+    ? MATERIALS_CATEGORY_SLUG
+    : isToolsSection
+      ? TOOLS_CATEGORY_SLUG
+      : "";
+
+  const [activeSubTab, setActiveSubTab] = useState("all");
+  const [tabServices, setTabServices] = useState<Service[] | null>(null);
+  const [tabLoading, setTabLoading] = useState(false);
+  const tabCacheRef = useRef<Record<string, Service[]>>({});
+
+  useEffect(() => {
+    setActiveSubTab("all");
+    setTabServices(null);
+    setTabLoading(false);
+    tabCacheRef.current = {};
+  }, [tabCatalogSlug]);
+
+  useEffect(() => {
+    if (!subcategoryTabs || !tabCatalogSlug || activeSubTab === "all") {
+      setTabServices(null);
+      setTabLoading(false);
+      return;
+    }
+    const cacheKey = `${tabCatalogSlug}:${activeSubTab}`;
+    const cached = tabCacheRef.current[cacheKey];
+    if (cached) {
+      setTabServices(cached);
+      setTabLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTabLoading(true);
+    void api.productCatalog
+      .list({
+        categorySlug: tabCatalogSlug,
+        ...(isMaterialsSection
+          ? { materialTypeKey: activeSubTab }
+          : { subcategory: activeSubTab }),
+        limit: 9,
+        page: 1,
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const raw =
+          (res?.data as { products?: unknown[] } | undefined)?.products ?? [];
+        const mapped = (Array.isArray(raw) ? raw : []).map((row) => {
+          const p = row as Record<string, unknown>;
+          const min = p.suggestedPriceMin != null ? Number(p.suggestedPriceMin) : null;
+          const max = p.suggestedPriceMax != null ? Number(p.suggestedPriceMax) : null;
+          const hasRange =
+            min != null &&
+            max != null &&
+            Number.isFinite(min) &&
+            Number.isFinite(max) &&
+            max > 0;
+          const image =
+            Array.isArray(p.images) && p.images.length > 0
+              ? String(p.images[0])
+              : undefined;
+          return normalizeHomeService(
+            {
+              id: String(p._id || p.id || ""),
+              _id: String(p._id || p.id || ""),
+              title: String(p.name || "Product"),
+              name: String(p.name || "Product"),
+              images: image ? [image] : [],
+              image,
+              priceMode: hasRange ? "range" : "exact",
+              priceMin: hasRange ? min ?? undefined : undefined,
+              priceMax: hasRange ? max ?? undefined : undefined,
+              price: hasRange ? min || 0 : Number(min || max || 0) || 0,
+              priceType: typeof p.suggestedPriceType === "string" ? p.suggestedPriceType : undefined,
+              priceLabel: "",
+              rating: 0,
+              reviewCount: 0,
+              source: "catalog",
+              categorySlug: tabCatalogSlug,
+            },
+            tabCatalogSlug,
+          );
+        });
+        tabCacheRef.current[cacheKey] = mapped;
+        setTabServices(mapped);
+        setTabLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTabServices([]);
+        setTabLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [subcategoryTabs, tabCatalogSlug, activeSubTab, isMaterialsSection]);
+
+  const displayServices =
+    subcategoryTabs && activeSubTab !== "all" && tabServices != null
+      ? tabServices
+      : services;
 
   /* =======================
      SCROLL HANDLER
@@ -201,14 +314,46 @@ function CategoryScrollSectionComponent({
         </div>
       ) : null}
 
+      {subcategoryTabs ? (
+        <div
+          className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1 md:mb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="tablist"
+          aria-label={`${title} subcategories`}
+        >
+          {subcategoryTabs.map((tab) => {
+            const active = activeSubTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveSubTab(tab.id)}
+                className={cn(
+                  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition sm:text-sm",
+                  active
+                    ? "border-red-500 bg-red-500 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-red-300 hover:text-red-600",
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {/* Scroll Area - horizontal only, no vertical scroll */}
-      {services.length === 0 ? (
-        <div className="py-8 text-muted-foreground">No services available</div>
+      {tabLoading ? (
+        <div className="py-6 text-sm text-muted-foreground">Loading products…</div>
+      ) : displayServices.length === 0 ? (
+        <div className="py-6 text-sm text-muted-foreground">No products in this category yet</div>
       ) : (
         <div>
           <ServicesList
+            key={subcategoryTabs ? `${tabCatalogSlug}:${activeSubTab}` : "default"}
             ref={listHandleRef}
-            services={services}
+            services={displayServices}
             prioritizeImages={prioritizeImages}
             favoritesById={favoritesById}
             favoritesVersion={favoritesVersion}
