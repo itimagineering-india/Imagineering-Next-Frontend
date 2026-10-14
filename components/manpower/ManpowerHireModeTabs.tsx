@@ -8,9 +8,9 @@ export const MANPOWER_TEAL = "#0F766E";
 export const MANPOWER_CANVAS = "#F7FAF9";
 
 const TABS: { id: ManpowerHireMode; labelKey: string }[] = [
-  { id: "custom_duration", labelKey: "tabHourly" },
-  { id: "one_day", labelKey: "tabDaily" },
   { id: "specific_work", labelKey: "tabSpecific" },
+  { id: "one_day", labelKey: "tabDaily" },
+  { id: "custom_duration", labelKey: "tabHourly" },
 ];
 
 type Props = {
