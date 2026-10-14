@@ -16,6 +16,19 @@ export const EMPTY_TOOLS_FIELDS: ToolsServiceFieldsValue = {
   technicalDetails: [],
 };
 
+/** Home Tools row — subcategory tabs under brands (matches catalog fallback types). */
+export const TOOLS_HOME_SUBCATEGORY_TABS = [
+  { id: "all", label: "All" },
+  { id: "Hand Tools", label: "Hand Tools" },
+  { id: "Power Tools", label: "Power Tools" },
+  { id: "Cutting Tools", label: "Cutting Tools" },
+  { id: "Measuring Tools", label: "Measuring Tools" },
+  { id: "Welding Tools", label: "Welding Tools" },
+  { id: "Safety Equipment", label: "Safety" },
+  { id: "Garden Tools", label: "Garden" },
+  { id: "Fasteners & Hardware", label: "Fasteners" },
+] as const;
+
 /** Home Tools row — set `logoUrl` to a direct image URL (Google/CDN) to show logo. */
 export const TOOLS_TRENDING_BRANDS = [
   { id: "bosch", name: "Bosch", mark: "BO", logoUrl: "https://logos-world.net/wp-content/uploads/2020/08/Bosch-Emblem.png" },
