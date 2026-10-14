@@ -3,12 +3,10 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { CategoryScrollSection } from "./CategoryScrollSection";
 import api from "@/lib/api-client";
-import { useUserLocation } from "@/contexts/UserLocationContext";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CategorySectionsSkeleton } from "./CategoryScrollSkeleton";
 import {
   normalizeHomeCategorySections,
-  normalizeHomeService,
   type HomeCategorySection,
   type HomeService,
 } from "@/lib/home-data";
@@ -23,9 +21,6 @@ type CategorySectionsProps = {
 
 export function CategorySections({ initialSections }: CategorySectionsProps) {
   const hasServerData = initialSections !== undefined;
-  const { userLocation } = useUserLocation();
-  const userLat = userLocation?.lat;
-  const userLng = userLocation?.lng;
   const [sections, setSections] = useState<CategorySection[]>(initialSections ?? []);
   const [initialLoad, setInitialLoad] = useState(!hasServerData);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,19 +28,20 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const viewTriggeredRef = useRef(hasServerData);
 
-  const allServiceIds = useMemo(() => {
+  // Catalog cards are not Service favorites — skip favorites API for home rows.
+  const favoritableIds = useMemo(() => {
     const ids = new Set<string>();
     for (const s of sections) {
       for (const item of s.services) {
-        if (item?.id) ids.add(item.id);
+        if (item?.id && !item.hideFavorite) ids.add(item.id);
       }
     }
     return Array.from(ids);
   }, [sections]);
 
   const { favorites, toggleFavorite } = useFavorites({
-    serviceIds: allServiceIds,
-    enabled: allServiceIds.length > 0,
+    serviceIds: favoritableIds,
+    enabled: favoritableIds.length > 0,
   });
 
   const favoritesById = useMemo<Record<string, boolean>>(() => {
@@ -62,23 +58,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
 
   const loadData = useCallback(async () => {
     try {
-      const params: {
-        limit: number;
-        location?: string;
-        tile?: string;
-        lat?: number;
-        lng?: number;
-        radiusKm?: number;
-      } = { limit: 9 };
-      const hasCoords =
-        userLat != null &&
-        userLng != null &&
-        Number.isFinite(userLat) &&
-        Number.isFinite(userLng);
-      if (hasCoords) {
-        params.tile = `${Math.floor(userLat)}_${Math.floor(userLng)}`;
-      }
-      const res = await api.services.getByCategories(params);
+      const res = await api.productCatalog.getByCategories({ limit: 9 });
       if (!res?.success) {
         const msg =
           (res as { error?: { message?: string } })?.error?.message ||
@@ -101,7 +81,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
       );
       setInitialLoad(false);
     }
-  }, [userLat, userLng]);
+  }, []);
 
   useEffect(() => {
     if (hasServerData) return;
@@ -123,9 +103,9 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
 
   if (!hasEnteredView) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-label="Categories">
+      <section ref={sectionRef} className="py-4 md:py-6 bg-white" aria-label="Categories">
         <div className="home-shell">
-          <div className="min-h-[240px] flex items-center justify-center text-slate-500 text-sm" aria-hidden="true">
+          <div className="min-h-[160px] flex items-center justify-center text-slate-500 text-sm" aria-hidden="true">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full max-w-2xl mx-auto">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="h-24 rounded-xl bg-slate-100 border border-dashed border-slate-300" />
@@ -139,7 +119,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
 
   if (initialLoad && sections.length === 0 && !loadError) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-12 bg-white" aria-busy="true" aria-label="Loading categories">
+      <section ref={sectionRef} className="py-4 md:py-6 bg-white" aria-busy="true" aria-label="Loading categories">
         <div className="home-shell space-y-6">
           <CategorySectionsSkeleton rows={2} />
         </div>
@@ -149,7 +129,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
 
   if (loadError) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-12 bg-white">
+      <section ref={sectionRef} className="py-4 md:py-6 bg-white">
         <div className="home-shell text-center">
           <p className="text-slate-600 mb-4">{loadError}</p>
           <button
@@ -169,7 +149,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
 
   if (!initialLoad && sections.length === 0) {
     return (
-      <section ref={sectionRef} className="py-8 md:py-12 bg-white">
+      <section ref={sectionRef} className="py-4 md:py-6 bg-white">
         <div className="home-shell text-center text-slate-600">
           No categories available
         </div>
@@ -178,8 +158,8 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
   }
 
   return (
-    <section ref={sectionRef} className="py-8 md:py-12 bg-white">
-      <div className="home-shell space-y-6">
+    <section ref={sectionRef} className="py-4 md:py-6 bg-white">
+      <div className="home-shell space-y-5">
         {sections.map((section, sectionIndex) => (
           <CategoryScrollSection
             key={section.categorySlug}
