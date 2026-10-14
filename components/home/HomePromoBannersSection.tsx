@@ -66,7 +66,7 @@ function PromoBannerLink({
 
 export function HomePromoBannersSection() {
   return (
-    <section className="relative overflow-hidden py-8 md:py-12">
+    <section className="relative overflow-hidden py-4 md:py-6">
       <div className="home-shell">
         <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
           {PROMO_BANNERS.map((banner) => (
