@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   },
 };
 
-/** Home layout: Hero → Search → Featured categories → Services → Top providers → Categories → Imagineering Credit */
+/** Home layout: Hero → Search → Featured → Services → Categories → Calculator → … */
 export default async function Home() {
   const [banners, categorySections, topProviders, globeMarkers] = await Promise.all([
     getHomeBanners("home"),
@@ -49,10 +49,11 @@ export default async function Home() {
         <FeaturedCategoryCardsSection />
         {/* <TrustStatsSection globeMarkers={globeMarkers} /> */}
         <ServicesSection />
-        <ConstructionCalculatorBannerSection />
-        <HomePromoBannersSection />
-        <TopProvidersSection initialProviders={topProviders} />
         <CategorySections initialSections={categorySections} />
+        <HomePromoBannersSection />
+        <ConstructionCalculatorBannerSection />
+       
+        <TopProvidersSection initialProviders={topProviders} />
         <ImagineeringCreditHomeSection />
         <PlatformAudienceSection />
       </main>
