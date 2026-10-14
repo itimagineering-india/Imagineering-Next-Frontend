@@ -534,30 +534,37 @@ export default function BuyerBookings() {
     setReviewRating(0);
     setReviewComment("");
 
+    const buyerOwnsReview = (r: {
+      buyer?: { _id?: string; id?: string } | string;
+      rating?: number;
+      content?: string;
+    }) => {
+      const buyer = r.buyer;
+      const bid =
+        typeof buyer === "object" && buyer !== null ? buyer._id || buyer.id : buyer;
+      return Boolean(bid && String(bid) === String(buyerUserId));
+    };
+
     const checkReviewed = async () => {
       const providerId = getBookingProviderId(selectedBooking);
+      const serviceId = getPrimaryServiceIdForReview(selectedBooking);
+      let providerHas = false;
       if (providerId) {
         try {
           const res = await api.reviews.getByProvider(providerId);
           const list =
             (res.data as { reviews?: Array<{ buyer?: { _id?: string; id?: string } | string }> })
               ?.reviews || [];
-          const hasReviewed = list.some((r) => {
-            const buyer = r.buyer;
-            const bid =
-              typeof buyer === "object" && buyer !== null
-                ? buyer._id || buyer.id
-                : buyer;
-            return bid && String(bid) === String(buyerUserId);
-          });
-          setHasReviewedProvider(hasReviewed);
-          return;
+          providerHas = list.some(buyerOwnsReview);
+          if (providerHas) {
+            setHasReviewedProvider(true);
+            return;
+          }
         } catch {
           /* fall through to service check */
         }
       }
 
-      const serviceId = getPrimaryServiceIdForReview(selectedBooking);
       if (!serviceId) {
         setHasReviewedProvider(false);
         return;
@@ -565,17 +572,30 @@ export default function BuyerBookings() {
       try {
         const res = await api.reviews.getByService(serviceId);
         const list =
-          (res.data as { reviews?: Array<{ buyer?: { _id?: string; id?: string } | string }> })
-            ?.reviews || [];
-        const hasReviewed = list.some((r) => {
-          const buyer = r.buyer;
-          const bid =
-            typeof buyer === "object" && buyer !== null
-              ? buyer._id || buyer.id
-              : buyer;
-          return bid && String(bid) === String(buyerUserId);
-        });
-        setHasReviewedProvider(hasReviewed);
+          (res.data as {
+            reviews?: Array<{
+              buyer?: { _id?: string; id?: string } | string;
+              rating?: number;
+              content?: string;
+            }>;
+          })?.reviews || [];
+        const mine = list.find(buyerOwnsReview);
+        if (mine) {
+          setHasReviewedProvider(true);
+          // Repair reviews stamped on catalog Service.provider instead of booking supplier
+          if (!providerHas && selectedBooking._id) {
+            void api.reviews
+              .create({
+                service: serviceId,
+                bookingId: String(selectedBooking._id),
+                rating: Number(mine.rating) || 5,
+                content: String(mine.content || " ").trim() || "Reviewed",
+              })
+              .catch(() => {});
+          }
+          return;
+        }
+        setHasReviewedProvider(false);
       } catch {
         setHasReviewedProvider(false);
       }
@@ -607,6 +627,7 @@ export default function BuyerBookings() {
     try {
       const res = await api.reviews.create({
         service: serviceId,
+        bookingId: String(selectedBooking._id || ""),
         rating: reviewRating,
         content: reviewComment.trim(),
       });
