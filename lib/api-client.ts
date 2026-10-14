@@ -1622,7 +1622,12 @@ export const api = {
     getById: (id: string) => apiRequest(`/api/reviews/${id}`),
     getByService: (serviceId: string) => apiRequest(`/api/reviews/service/${serviceId}`),
     getByProvider: (providerId: string) => apiRequest(`/api/reviews/provider/${providerId}`),
-    create: (reviewData: { service: string; rating: number; content: string }) =>
+    create: (reviewData: {
+      service: string;
+      rating: number;
+      content: string;
+      bookingId?: string;
+    }) =>
       apiRequest('/api/reviews', {
         method: 'POST',
         body: JSON.stringify(reviewData),
