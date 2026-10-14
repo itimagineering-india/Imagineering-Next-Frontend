@@ -64,6 +64,8 @@ export type MaterialsBrand = {
   id: string;
   name: string;
   mark: string;
+  /** Direct image URL (paste from Google/CDN). Empty = bundled art or initials. */
+  logoUrl?: string;
 };
 
 export type MaterialsTopProvider = {
@@ -123,16 +125,30 @@ export const MATERIALS_SEARCH_PLACEHOLDERS = [
   'Search Paint',
 ] as const;
 
-/** Default trending brands (UI chrome — logos in materialsBrandArt) */
+/** Default trending brands (UI chrome — set `logoUrl` to a direct image URL to show logo) */
 export const MATERIALS_TRENDING_BRANDS: readonly MaterialsBrand[] = [
-  { id: 'ultratech', name: 'UltraTech', mark: 'UT' },
-  { id: 'acc', name: 'ACC', mark: 'AC' },
-  { id: 'ambuja', name: 'Ambuja', mark: 'AM' },
-  { id: 'jk', name: 'JK Cement', mark: 'JK' },
-  { id: 'tata', name: 'Tata Steel', mark: 'TS' },
-  { id: 'dalmia', name: 'Dalmia', mark: 'DA' },
-  { id: 'moira', name: 'Moira', mark: 'MO' },
-] as const;
+  // Cement / steel — bundled PNGs exist; logoUrl overrides when set
+  { id: 'ultratech', name: 'UltraTech', mark: 'UT', logoUrl: '' },
+  { id: 'acc', name: 'ACC', mark: 'AC', logoUrl: '' },
+  { id: 'ambuja', name: 'Ambuja', mark: 'AM', logoUrl: '' },
+  { id: 'jk', name: 'JK Cement', mark: 'JK', logoUrl: '' },
+  { id: 'tata', name: 'Tata Steel', mark: 'TS', logoUrl: '' },
+  { id: 'dalmia', name: 'Dalmia', mark: 'DA', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRTU_XErGu6MGcYKBm9zpwB5KYluiypAhVjucHTdRe4C-BQVHdEOQp-WnE&s=10' },
+  // Tiles / flooring
+  { id: 'kajaria', name: 'Kajaria', mark: 'KJ', logoUrl: 'https://images.dhan.co/symbol/KAJARIACER.png' },
+  { id: 'somany', name: 'Somany', mark: 'SO', logoUrl: 'https://s3-symbol-logo.tradingview.com/somany-ceramics--600.png' },
+  { id: 'orientbell', name: 'Orientbell', mark: 'OB', logoUrl: 'https://www.logoshape.com/wp-content/uploads/2024/11/orientbell-vector-logo_logoshape.png' },
+  { id: 'nitco', name: 'Nitco', mark: 'NT', logoUrl: 'https://www.nitco.in/images/nitco-logo.png?v=yvxrpr1DD_oG7IeJPVXmPEGsy1c76iuWbDtqrP8WFtE' },
+  // Sanitary
+  { id: 'moira', name: 'Moira', mark: 'MO', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZWMmNOJC3-Opb-WBJoPeunb2fsHb7NCSbZARh0HinHNJ2gGHkl7j4COU&s=10' },
+  { id: 'jaquar', name: 'Jaquar', mark: 'JQ', logoUrl: 'https://morbiceramic.in/wp-content/uploads/jaquar-sanitary-ware-logo.webp' },
+  { id: 'hindware', name: 'Hindware', mark: 'HW', logoUrl: 'https://vectorseek.com/wp-content/uploads/2023/09/Hindware-Logo-Vector.svg-.png' },
+  { id: 'cera', name: 'Cera', mark: 'CE', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRGk9c2Px57D90g4shOedEB5gd8fBHIiR-XbLv-SaIcVA&s=10' },
+  // Hardware
+  { id: 'godrej', name: 'Godrej', mark: 'GO', logoUrl: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Godrej_Logo.svg/3840px-Godrej_Logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail' },
+  { id: 'hafele', name: 'Hafele', mark: 'HF', logoUrl: '' },
+  { id: 'pidilite', name: 'Pidilite', mark: 'PI', logoUrl: 'https://scoffco.com/cdn/shop/files/PEDILITE_LOGO.webp?v=1730272918&width=1445' },
+];
 
 export const MATERIALS_CATEGORY_TINTS = [
   '#FFF7ED',
