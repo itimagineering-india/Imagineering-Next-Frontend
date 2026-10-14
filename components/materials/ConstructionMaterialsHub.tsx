@@ -605,7 +605,8 @@ export function ConstructionMaterialsHub() {
               </h2>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-6 sm:gap-x-12">
                 {MATERIALS_TRENDING_BRANDS.map((brand) => {
-                  const logo = getMaterialsBrandArt(brand.id);
+                  const logoUrl = String(brand.logoUrl || "").trim();
+                  const logo = logoUrl ? null : getMaterialsBrandArt(brand.id);
                   return (
                     <div
                       key={brand.id}
@@ -613,7 +614,16 @@ export function ConstructionMaterialsHub() {
                       title={brand.name}
                     >
                       <span className="relative h-12 w-24 grayscale transition group-hover:grayscale-0 sm:h-14 sm:w-28">
-                        {logo ? (
+                        {logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- external Google/CDN URLs via logoUrl placeholder
+                          <img
+                            src={logoUrl}
+                            alt={brand.name}
+                            className="h-full w-full object-contain opacity-70 transition group-hover:opacity-100"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : logo ? (
                           <Image
                             src={logo}
                             alt={brand.name}
