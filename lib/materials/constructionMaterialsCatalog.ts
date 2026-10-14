@@ -118,6 +118,24 @@ export type MaterialsCategoryProductSection = {
 
 export const MATERIALS_CATEGORY_SLUG = 'construction-materials';
 
+/** Home Construction Materials row — subcategory tabs under brands. */
+export const MATERIALS_HOME_SUBCATEGORY_TABS = [
+  { id: 'all', label: 'All' },
+  { id: 'cement', label: 'Cement' },
+  { id: 'sand', label: 'Sand' },
+  { id: 'steel', label: 'Steel' },
+  { id: 'aggregate', label: 'Aggregate' },
+  { id: 'bricks', label: 'Bricks' },
+  { id: 'tiles_flooring', label: 'Tiles' },
+  { id: 'sanitary', label: 'Sanitary' },
+  { id: 'paint', label: 'Paint' },
+  { id: 'concrete', label: 'Concrete' },
+  { id: 'hardware', label: 'Hardware' },
+  { id: 'admixture', label: 'Admixture' },
+  { id: 'gsb', label: 'GSB' },
+  { id: 'fencing_poles', label: 'Fencing' },
+] as const;
+
 export const MATERIALS_SEARCH_PLACEHOLDERS = [
   'Search Cement',
   'Search Steel',
