@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { memo, useState, useRef, type CSSProperties } from "react";
-import { Heart, Star } from "lucide-react";
+import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatServicePrice, isRangePricedService } from "@/lib/formatServicePrice";
@@ -128,8 +128,6 @@ function CategoryProviderCardComponent({
   priceMax,
   priceType,
   mrp,
-  rating,
-  reviewCount,
   href,
   hideFavorite = false,
   className,
@@ -208,25 +206,19 @@ function CategoryProviderCardComponent({
 
       <div className="flex shrink-0 flex-col p-2 md:p-3">
         <h3
-          className="min-h-[2.5rem] text-xs font-semibold leading-[1.35] text-foreground transition-colors line-clamp-2 [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] group-hover:text-primary md:min-h-[2.75rem] md:text-sm md:leading-snug"
+          className="truncate text-xs font-semibold leading-snug text-foreground transition-colors group-hover:text-primary md:text-sm"
           title={name}
         >
           {name}
         </h3>
 
-        <div className="mt-2 flex min-h-9 shrink-0 min-w-0 items-center justify-between gap-2">
-          <div className="min-w-0 flex-1 truncate text-xs font-bold leading-tight text-foreground md:text-sm">
-            {!isRangePrice && mrp != null && mrp > 0 && (
-              <span className="mr-1 text-[10px] font-normal text-muted-foreground line-through md:text-xs">
-                ₹{mrp.toLocaleString("en-IN")}
-              </span>
-            )}
-            <span>{formattedPrice}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Star className="h-3 w-3 fill-foreground text-foreground md:h-3.5 md:w-3.5" />
-            <span className="text-[10px] font-medium md:text-xs">{rating}</span>
-          </div>
+        <div className="mt-2 min-w-0 truncate text-xs font-bold leading-tight text-foreground md:text-sm">
+          {!isRangePrice && mrp != null && mrp > 0 && (
+            <span className="mr-1 text-[10px] font-normal text-muted-foreground line-through md:text-xs">
+              ₹{mrp.toLocaleString("en-IN")}
+            </span>
+          )}
+          <span>{formattedPrice}</span>
         </div>
       </div>
     </Link>
