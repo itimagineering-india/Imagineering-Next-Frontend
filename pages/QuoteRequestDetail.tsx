@@ -152,15 +152,25 @@ function printLiveQuotesSummary(opts: {
         printRatingRaw != null && Number.isFinite(printRatingRaw) && printRatingRaw > 0
           ? printRatingRaw
           : null;
+      const printReviewCountRaw =
+        offer.reviewCount != null
+          ? Number(offer.reviewCount)
+          : offer.provider?.reviewCount != null
+            ? Number(offer.provider.reviewCount)
+            : null;
       const printReviewCount =
-        offer.reviewCount != null && Number(offer.reviewCount) > 0
-          ? Math.round(Number(offer.reviewCount))
+        printReviewCountRaw != null &&
+        Number.isFinite(printReviewCountRaw) &&
+        printReviewCountRaw > 0
+          ? Math.round(printReviewCountRaw)
+          : null;
+      const printRatingLabel =
+        printRating != null
+          ? `★ ${printRating.toFixed(1)}${printReviewCount != null ? ` (${printReviewCount})` : ""}`
           : null;
       const trustBits = [
         offer.verified ? "Verified" : "",
-        printRating != null
-          ? `★ ${printRating.toFixed(1)}${printReviewCount != null ? ` (${printReviewCount})` : ""}`
-          : "",
+        printRatingLabel || "",
         offer.successfulDeliveries != null ? `${offer.successfulDeliveries} deliveries` : "",
         offer.gstLabel ? String(offer.gstLabel) : "",
       ]
@@ -193,6 +203,7 @@ function printLiveQuotesSummary(opts: {
           <tr><td>GST${offer.gstPercent != null && Number(offer.gstPercent) > 0 ? ` (${escapeHtml(offer.gstPercent)}%)` : ""}</td><td class="num">${escapeHtml(
             gst > 0 ? formatINR(gst) : offer.gstLabel || "—"
           )}</td></tr>
+          <tr><td>Rating</td><td class="num">${escapeHtml(printRatingLabel || "—")}</td></tr>
           <tr><td>Transport</td><td class="num">${escapeHtml(offer.transportLabel || "Supplier transport")}</td></tr>
           <tr><td>ETA</td><td class="num">${escapeHtml(offer.estimatedDelivery || "Confirm on select")}</td></tr>
         </table>
