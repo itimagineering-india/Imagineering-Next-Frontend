@@ -38,11 +38,11 @@ export const CATEGORY_PROVIDER_CARD_MIN_WIDTH = 140;
 export const CATEGORY_PROVIDER_CARD_WIDTH = CATEGORY_PROVIDER_CARD_MAX_WIDTH;
 /** @deprecated Use scroll metrics from container width; kept for fallbacks. */
 export const CATEGORY_PROVIDER_CARD_HEIGHT = 248;
-/** Fixed text block under the 4:3 image (title + price). */
+/** Fixed text block under the 4:3 image (single-line title + price). */
 function getCategoryProviderBodyHeight(cardWidth: number): number {
   const padding = cardWidth >= 168 ? 24 : 16;
-  const titleBlock = cardWidth >= 168 ? 42 : 40;
-  const priceBlock = 38;
+  const titleBlock = cardWidth >= 168 ? 22 : 20;
+  const priceBlock = cardWidth >= 168 ? 22 : 20;
   const spacing = 8;
   return padding + titleBlock + priceBlock + spacing;
 }
