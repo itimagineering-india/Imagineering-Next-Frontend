@@ -13,6 +13,11 @@ import {
 } from "@/lib/materials/constructionMaterialsCatalog";
 import { getMaterialsBrandArt } from "@/lib/materials/materialsBrandArt";
 import { TOOLS_HOME_SUBCATEGORY_TABS, TOOLS_TRENDING_BRANDS } from "@/lib/toolsService";
+import {
+  FURNITURE_CATEGORY_SLUG,
+  FURNITURE_HOME_SUBCATEGORY_TABS,
+  FURNITURE_TRENDING_BRANDS,
+} from "@/lib/furnitureCatalog";
 import api from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +72,7 @@ function CategoryScrollSectionComponent({
   const isMaterialsSection =
     slug === "construction-materials" || slug === "construction-material";
   const isToolsSection = slug === "tools" || slug.startsWith("tools-");
+  const isFurnitureSection = slug === "furniture" || slug.startsWith("furniture-");
 
   const topBrandsConfig = useMemo(() => {
     if (isMaterialsSection) {
@@ -83,12 +89,20 @@ function CategoryScrollSectionComponent({
         resolveLogo: () => null as ReturnType<typeof getMaterialsBrandArt>,
       };
     }
+    if (isFurnitureSection) {
+      return {
+        brands: FURNITURE_TRENDING_BRANDS,
+        href: "/b2b-services?category=furniture",
+        resolveLogo: () => null as ReturnType<typeof getMaterialsBrandArt>,
+      };
+    }
     return null;
-  }, [isMaterialsSection, isToolsSection]);
+  }, [isMaterialsSection, isToolsSection, isFurnitureSection]);
 
   const redTitleAccent =
     isMaterialsSection ||
     isToolsSection ||
+    isFurnitureSection ||
     slug === "manpower" ||
     slug.startsWith("manpower-");
 
@@ -96,12 +110,16 @@ function CategoryScrollSectionComponent({
     ? MATERIALS_HOME_SUBCATEGORY_TABS
     : isToolsSection
       ? TOOLS_HOME_SUBCATEGORY_TABS
-      : null;
+      : isFurnitureSection
+        ? FURNITURE_HOME_SUBCATEGORY_TABS
+        : null;
   const tabCatalogSlug = isMaterialsSection
     ? MATERIALS_CATEGORY_SLUG
     : isToolsSection
       ? TOOLS_CATEGORY_SLUG
-      : "";
+      : isFurnitureSection
+        ? FURNITURE_CATEGORY_SLUG
+        : "";
 
   const [activeSubTab, setActiveSubTab] = useState("all");
   const [tabServices, setTabServices] = useState<Service[] | null>(null);
