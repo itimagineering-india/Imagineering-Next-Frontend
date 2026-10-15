@@ -8,8 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import api, { type ApiResponse } from "@/lib/api-client";
-import Link from "next/link";
-import { Briefcase, MapPin, Search, IndianRupee, Clock, LayoutDashboard } from "lucide-react";
+import { Briefcase, MapPin, Search, IndianRupee, Clock } from "lucide-react";
 import { formatJobLocation, formatUserJobBudget, getUserJobPostedByLabel } from "@/lib/utils";
 
 interface UserJobPost {
@@ -86,15 +85,6 @@ export default function UserJobList() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <div className="border-b bg-card/90 px-4 py-2 flex items-center justify-between gap-2 shrink-0">
-        <span className="text-sm font-medium text-foreground">Jobs</span>
-        <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-          <Link href="/dashboard/provider" className="inline-flex items-center gap-1">
-            <LayoutDashboard className="h-3.5 w-3.5" />
-            Dashboard
-          </Link>
-        </Button>
-      </div>
       <div className="bg-gradient-to-b from-background via-muted/30 to-background flex-1">
       <div className="container px-2 md:px-6 py-8 md:py-12 lg:py-6 space-y-6 md:space-y-8">
         <section className="space-y-2 md:space-y-3">
