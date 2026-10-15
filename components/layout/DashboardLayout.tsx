@@ -28,7 +28,7 @@ import {
   Store,
   Scale,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardLayoutProps {
@@ -75,11 +75,37 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
 
   const navItems = type === "admin" ? adminNavItems : providerNavItems;
   const dashboardTitle = type === "admin" ? "Admin Dashboard" : "Provider Dashboard";
+  const loginRedirect = `/login?redirect=${encodeURIComponent(pathname || `/dashboard/${type}`)}`;
+  const role = typeof user?.role === "string" ? user.role : "";
+  const roleAllowed =
+    type === "provider" ? role === "provider" : type === "admin" ? role === "admin" : false;
+
+  // Hard gate: never render dashboard chrome/content for signed-out or wrong-role users.
+  useEffect(() => {
+    if (isLoadingUser) return;
+    if (!isAuthenticated || !user) {
+      router.replace(loginRedirect);
+      return;
+    }
+    if (!roleAllowed) {
+      if (role === "provider") router.replace("/dashboard/provider");
+      else if (role === "admin") router.replace("/dashboard/admin");
+      else router.replace("/");
+    }
+  }, [isLoadingUser, isAuthenticated, user, roleAllowed, role, router, loginRedirect]);
 
   const handleSignOut = () => {
     logout();
     router.push("/");
   };
+
+  if (isLoadingUser || !isAuthenticated || !user || !roleAllowed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        {isLoadingUser ? "Checking sign-in…" : "Redirecting to sign in…"}
+      </div>
+    );
+  }
 
   const SidebarContent = () => (
     <div className="flex h-full flex-col">
