@@ -72,6 +72,10 @@ const POPULAR_B2B_SEARCHES = ["Cement", "TMT", "Cables", "Plywood", "Furniture",
 const POPULAR_TOOLS_SEARCHES = ["Welding", "Drill", "Grinder", "Hand Tools", "Power Tools", "Cutter"] as const;
 const SUBCATEGORY_ALL = "__all__";
 
+/** Tools hero background — replace with CDN/CMS URL (same pattern as MaterialsHero). No overlay. */
+const TOOLS_HERO_BG_URL =
+  "https://i.postimg.cc/3xBPZYjf/Industrial-Tool-Workshop-Banner.png";
+
 export type B2BServicesHubProps = {
   /** Public Tools hub: lock to Tools and use /tools URLs (not B2B-gated later). */
   lockedCategorySlug?: string;
@@ -623,94 +627,119 @@ export function B2BServicesHub({
 
   return (
     <div className={`min-h-screen bg-[linear-gradient(180deg,#fff8f5_0%,#ffffff_28%,#f8fafc_100%)] ${quoteCart.length ? "pb-24" : ""}`}>
-      <section className="relative overflow-hidden border-b border-slate-800/70 bg-[linear-gradient(135deg,#0b1220_0%,#111827_52%,#1a1524_100%)] text-white">
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <div className="absolute -left-16 top-0 h-56 w-56 rounded-full bg-orange-500/15 blur-[90px]" />
-          <div className="absolute right-0 bottom-0 h-48 w-48 rounded-full bg-[hsl(var(--red-accent))]/15 blur-[80px]" />
-        </div>
-        <div className="relative home-shell py-8 md:py-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-100/90">
-              {isToolsSurface ? "Tools marketplace" : "Wholesale & trade"}
-            </span>
+      <section
+        className={`relative overflow-hidden border-b border-slate-800/70 text-white bg-[linear-gradient(135deg,#0b1220_0%,#111827_52%,#1a1524_100%)] ${
+          isToolsSurface ? "min-h-[480px] md:min-h-[500px] md:max-h-[600px]" : ""
+        }`}
+      >
+        {isToolsSurface && TOOLS_HERO_BG_URL ? (
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            {/* eslint-disable-next-line @next/next/no-img-element -- external tools hero background URL */}
+            <img
+              src={TOOLS_HERO_BG_URL}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              loading="eager"
+              decoding="async"
+            />
           </div>
-          <h1 className="mt-4 max-w-[18ch] text-[1.85rem] font-extrabold leading-[1.12] tracking-tight text-white sm:text-[2.35rem]">
-            {isToolsSurface ? (
-              <>
-                Find tools <span className="text-orange-300">for every site</span>
-              </>
-            ) : (
-              <>
-                Source products <span className="text-orange-300">nationwide</span>
-              </>
-            )}
-          </h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
-            {isToolsSurface
-              ? "Browse welding, power and hand tools. Add products of the same item type to your quote list, then get one combined quote from listed suppliers."
-              : "Construction materials, tools, electrical, furniture and hardware. Add products of the same item type to your quote list, then get one combined quote from listed suppliers."}
-          </p>
-
-          <form
-            role="search"
-            aria-label={isToolsSurface ? "Search tools" : "Search B2B products"}
-            className="mt-6 max-w-2xl rounded-2xl border border-white/10 bg-white p-1.5 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.7)] sm:p-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearch(search.trim());
-            }}
-          >
-            <div className="flex items-center gap-1.5">
-              <div className="relative min-w-0 flex-1">
-                <Search
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-                  aria-hidden
-                />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={
-                    isToolsSurface
-                      ? "Search welding tools, drills, grinders…"
-                      : "Search cement, cables, plywood, furniture…"
-                  }
-                  className="h-11 border-0 bg-transparent pl-10 pr-10 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-0 sm:h-12"
-                  aria-label="Search products on this page"
-                />
-                {search ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    aria-label="Clear search"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
-              <Button type="submit" className="h-11 shrink-0 px-5 sm:h-12">
-                Search
-              </Button>
+        ) : (
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            <div className="absolute -left-16 top-0 h-56 w-56 rounded-full bg-orange-500/15 blur-[90px]" />
+            <div className="absolute right-0 bottom-0 h-48 w-48 rounded-full bg-[hsl(var(--red-accent))]/15 blur-[80px]" />
+          </div>
+        )}
+        <div
+          className={`relative home-shell ${
+            isToolsSurface
+              ? "flex h-full min-h-[480px] items-center py-8 md:min-h-[500px] md:max-h-[600px] md:py-10"
+              : "py-8 md:py-10"
+          }`}
+        >
+          <div className="w-full max-w-2xl min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-100/90">
+                {isToolsSurface ? "Tools marketplace" : "Wholesale & trade"}
+              </span>
             </div>
-          </form>
+            <h1 className="mt-4 max-w-[18ch] text-[1.85rem] font-extrabold leading-[1.12] tracking-tight text-white sm:text-[2.35rem]">
+              {isToolsSurface ? (
+                <>
+                  Find tools <span className="text-orange-300">for every site</span>
+                </>
+              ) : (
+                <>
+                  Source products <span className="text-orange-300">nationwide</span>
+                </>
+              )}
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-[15px]">
+              {isToolsSurface
+                ? "Browse welding, power and hand tools. Add products of the same item type to your quote list, then get one combined quote from listed suppliers."
+                : "Construction materials, tools, electrical, furniture and hardware. Add products of the same item type to your quote list, then get one combined quote from listed suppliers."}
+            </p>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Popular</span>
-            {popularSearches.map((term) => (
-              <button
-                key={term}
-                type="button"
-                onClick={() => setSearch(term)}
-                className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                  search.trim().toLowerCase() === term.toLowerCase()
-                    ? "border-orange-300 bg-orange-300/20 text-orange-100"
-                    : "border-white/15 bg-white/5 text-slate-200 hover:border-white/30 hover:bg-white/10"
-                }`}
-              >
-                {term}
-              </button>
-            ))}
+            <form
+              role="search"
+              aria-label={isToolsSurface ? "Search tools" : "Search B2B products"}
+              className="mt-6 rounded-2xl border border-white/10 bg-white p-1.5 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.7)] sm:p-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setSearch(search.trim());
+              }}
+            >
+              <div className="flex items-center gap-1.5">
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    aria-hidden
+                  />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={
+                      isToolsSurface
+                        ? "Search welding tools, drills, grinders…"
+                        : "Search cement, cables, plywood, furniture…"
+                    }
+                    className="h-11 border-0 bg-transparent pl-10 pr-10 text-sm text-slate-900 shadow-none placeholder:text-slate-400 focus-visible:ring-0 sm:h-12"
+                    aria-label="Search products on this page"
+                  />
+                  {search ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
+                <Button type="submit" className="h-11 shrink-0 px-5 sm:h-12">
+                  Search
+                </Button>
+              </div>
+            </form>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Popular</span>
+              {popularSearches.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onClick={() => setSearch(term)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    search.trim().toLowerCase() === term.toLowerCase()
+                      ? "border-orange-300 bg-orange-300/20 text-orange-100"
+                      : "border-white/15 bg-white/5 text-slate-200 hover:border-white/30 hover:bg-white/10"
+                  }`}
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
