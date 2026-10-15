@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { buildServicesBrowseQuery } from "@/lib/buildServicesBrowseUrl";
+import { b2bPurchaseBrowseHref } from "@/lib/b2b/b2bCategories";
 import {
   ContractorsIcon,
   MachinesIcon,
@@ -26,10 +27,13 @@ import {
   MaintenanceIcon,
 } from "./CategoryIcons";
 import toolsCategoryImg from "@/assets/services/tools.png";
+import furnitureCategoryImg from "@/assets/services/furniture.png";
 import tradersCategoryImg from "@/assets/services/b2b Traders.png";
 
 const toolsCategorySrc =
   typeof toolsCategoryImg === "string" ? toolsCategoryImg : toolsCategoryImg.src;
+const furnitureCategorySrc =
+  typeof furnitureCategoryImg === "string" ? furnitureCategoryImg : furnitureCategoryImg.src;
 const tradersCategorySrc =
   typeof tradersCategoryImg === "string" ? tradersCategoryImg : tradersCategoryImg.src;
 
@@ -45,7 +49,7 @@ const categoryImages: Record<string, string> = {
   "traders": tradersCategorySrc,
   "rental-services": "/category%20images/machine%20rental%20image.png",
   "machine-rental": "/category%20images/machine%20rental%20image.png",
-  "furniture": "https://img.icons8.com/color/96/furniture.png",
+  furniture: furnitureCategorySrc,
   "construction-materials": "/category%20images/construction%20material%20Image.png",
   "manpower": "/category%20images/manpower%20image.png",
   "technical-manpower": "/category%20images/technical%20manpower%20image.png",
@@ -65,6 +69,7 @@ const IMAGE_ONLY_TILES: Record<string, string> = {
   "consultants": "https://dwkazjggpovin.cloudfront.net/category%20images/consultants%20image.png",
   "real-estate": "https://dwkazjggpovin.cloudfront.net/category%20images/real%20estate%20image.png",
   "tools": toolsCategorySrc,
+  furniture: furnitureCategorySrc,
   "manufacturer": "https://dwkazjggpovin.cloudfront.net/category%20images/Manufacturer%20image.png",
   "logistics": "https://dwkazjggpovin.cloudfront.net/category%20images/logistics%20image.png",
   "traders": tradersCategorySrc,
@@ -84,8 +89,7 @@ const serviceCategories = [
   { name: "Logistics", icon: LogisticsIcon, slug: "logistics", useCustomIcon: true },
   { name: "Traders", icon: VendorsIcon, slug: "traders", useCustomIcon: true },
   { name: "Machine Rental", icon: RentalServicesIcon, slug: "machine-rental", useCustomIcon: true },
-  //{ name: "Furniture", icon: ConstructionIcon, slug: "furniture", useCustomIcon: true },
- 
+  { name: "Furniture", icon: ConstructionIcon, slug: "furniture", useCustomIcon: true },
   { name: "Manpower", icon: ManpowerIcon, slug: "manpower", useCustomIcon: true },
   { name: "Technical Manpower", icon: TechnicalManpowerIcon, slug: "technical-manpower", useCustomIcon: true },
   { name: "Finance & Insurance", icon: FinancingIcon, slug: "finance", useCustomIcon: true },
@@ -110,6 +114,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
   const servicesHref = useMemo(() => {
     if (category?.slug === "construction-materials") return "/construction-materials";
     if (category?.slug === "tools") return "/tools";
+    if (category?.slug === "furniture") return b2bPurchaseBrowseHref("furniture");
     if (category?.slug === "manpower") return "/manpower";
     return `/services?${buildServicesBrowseQuery(category?.slug ?? "")}`;
   }, [category?.slug]);
