@@ -6,6 +6,7 @@ import api from "@/lib/api-client";
 import { useFavorites } from "@/hooks/useFavorites";
 import { CategorySectionsSkeleton } from "./CategoryScrollSkeleton";
 import {
+  ensureHomeCategorySections,
   normalizeHomeCategorySections,
   type HomeCategorySection,
   type HomeService,
@@ -21,23 +22,36 @@ type CategorySectionsProps = {
 
 export function CategorySections({ initialSections }: CategorySectionsProps) {
   const hasServerData = initialSections !== undefined;
-  const [sections, setSections] = useState<CategorySection[]>(initialSections ?? []);
+  const [sections, setSections] = useState<CategorySection[]>(() =>
+    ensureHomeCategorySections(initialSections ?? []),
+  );
   const [initialLoad, setInitialLoad] = useState(!hasServerData);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasEnteredView, setHasEnteredView] = useState(hasServerData);
   const sectionRef = useRef<HTMLElement>(null);
   const viewTriggeredRef = useRef(hasServerData);
 
+  // Keep Furniture row even if SSR payload was cached without it.
+  const displaySections = useMemo(
+    () => ensureHomeCategorySections(sections),
+    [sections],
+  );
+
+  useEffect(() => {
+    if (initialSections === undefined) return;
+    setSections(ensureHomeCategorySections(initialSections));
+  }, [initialSections]);
+
   // Catalog cards are not Service favorites — skip favorites API for home rows.
   const favoritableIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const s of sections) {
+    for (const s of displaySections) {
       for (const item of s.services) {
         if (item?.id && !item.hideFavorite) ids.add(item.id);
       }
     }
     return Array.from(ids);
-  }, [sections]);
+  }, [displaySections]);
 
   const { favorites, toggleFavorite } = useFavorites({
     serviceIds: favoritableIds,
@@ -147,7 +161,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
     );
   }
 
-  if (!initialLoad && sections.length === 0) {
+  if (!initialLoad && displaySections.length === 0) {
     return (
       <section ref={sectionRef} className="py-4 md:py-6 bg-white">
         <div className="home-shell text-center text-slate-600">
@@ -160,7 +174,7 @@ export function CategorySections({ initialSections }: CategorySectionsProps) {
   return (
     <section ref={sectionRef} className="py-4 md:py-6 bg-white">
       <div className="home-shell space-y-5">
-        {sections.map((section, sectionIndex) => (
+        {displaySections.map((section, sectionIndex) => (
           <CategoryScrollSection
             key={section.categorySlug}
             title={section.title}
