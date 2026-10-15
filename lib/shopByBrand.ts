@@ -94,31 +94,29 @@ type CmsShopByBrandDoc = {
 
 export function normalizeShopByBrandRows(raw: unknown[]): ShopByBrandRow[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
-  return raw
-    .map((item) => {
-      const r = item as CmsShopByBrandDoc;
-      const name = String(r.name || "").trim();
-      const search = String(r.search || name).trim();
-      const categorySlug = String(r.categorySlug || "construction-materials").trim();
-      const logoText = String(r.logoText || name).trim();
-      const bannerBg = String(r.bannerBg || "").trim();
-      const bannerImage = String(r.bannerImage || "").trim();
-      if (!name || !search || !bannerBg || !bannerImage) return null;
-      const href =
-        String(r.href || "").trim() || deriveBrandHref(categorySlug, search);
-      return {
-        id: String(r._id || r.id || search.toLowerCase().replace(/\s+/g, "-")),
-        name,
-        search,
-        categorySlug,
-        tagline: String(r.tagline || "").trim(),
-        href,
-        bannerBg,
-        logoText,
-        logoSub: r.logoSub ? String(r.logoSub).trim() : undefined,
-        logoColor: String(r.logoColor || "#1a1a1a").trim(),
-        bannerImage,
-      } satisfies ShopByBrandRow;
-    })
-    .filter((r): r is ShopByBrandRow => r != null);
+  const rows: ShopByBrandRow[] = [];
+  for (const item of raw) {
+    const r = item as CmsShopByBrandDoc;
+    const name = String(r.name || "").trim();
+    const search = String(r.search || name).trim();
+    const categorySlug = String(r.categorySlug || "construction-materials").trim();
+    const logoText = String(r.logoText || name).trim();
+    const bannerBg = String(r.bannerBg || "").trim();
+    const bannerImage = String(r.bannerImage || "").trim();
+    if (!name || !search || !bannerBg || !bannerImage) continue;
+    rows.push({
+      id: String(r._id || r.id || search.toLowerCase().replace(/\s+/g, "-")),
+      name,
+      search,
+      categorySlug,
+      tagline: String(r.tagline || "").trim(),
+      href: String(r.href || "").trim() || deriveBrandHref(categorySlug, search),
+      bannerBg,
+      logoText,
+      logoSub: r.logoSub ? String(r.logoSub).trim() : undefined,
+      logoColor: String(r.logoColor || "#1a1a1a").trim(),
+      bannerImage,
+    });
+  }
+  return rows;
 }
