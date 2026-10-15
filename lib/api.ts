@@ -7,6 +7,11 @@ import {
   type HomeCategorySection,
   type HomeTopProvider,
 } from "@/lib/home-data";
+import {
+  normalizeShopByBrandRows,
+  SHOP_BY_BRAND_FALLBACK,
+  type ShopByBrandRow,
+} from "@/lib/shopByBrand";
 
 function getApiBaseUrl(): string {
   const raw =
@@ -310,6 +315,18 @@ export async function getHomeBanners(placement = "home"): Promise<CmsBanner[]> {
   );
   if (!json?.success || !Array.isArray(json.data)) return [];
   return normalizeCmsBanners(json.data);
+}
+
+/** Home Shop by Brand rows from CMS (active only). Falls back if API unreachable. */
+export async function getShopByBrandRows(): Promise<ShopByBrandRow[]> {
+  const json = await fetchJsonMaybe<BackendResponse<unknown[]>>(
+    `/api/cms/shop-by-brands?active=1`,
+    { next: { revalidate: 300 } },
+  );
+  if (!json?.success || !Array.isArray(json.data)) {
+    return [...SHOP_BY_BRAND_FALLBACK];
+  }
+  return normalizeShopByBrandRows(json.data);
 }
 
 /** Homepage category rows with nested catalog products (no provider listing duplicates). */
