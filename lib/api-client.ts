@@ -3863,6 +3863,10 @@ export const api = {
       const q = placement ? `?placement=${encodeURIComponent(placement)}` : '';
       return apiRequest(`/api/cms/banners${q}`);
     },
+    getShopByBrands: (activeOnly = true) => {
+      const q = activeOnly ? '?active=1' : '';
+      return apiRequest(`/api/cms/shop-by-brands${q}`);
+    },
   },
 
   // Careers / Jobs (public)
