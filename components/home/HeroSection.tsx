@@ -10,22 +10,27 @@ type HeroSectionProps = {
 
 export function HeroSection({ initialBanners = [] }: HeroSectionProps) {
   const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
   const cmsBanners = initialBanners;
 
   useEffect(() => {
     const totalSlides = cmsBanners.length;
-    if (totalSlides <= 1) return;
+    if (totalSlides <= 1 || paused) return;
 
     const interval = setInterval(() => {
       setActive((prev) => (prev + 1) % totalSlides);
     }, 2000);
     return () => clearInterval(interval);
-  }, [cmsBanners.length]);
+  }, [cmsBanners.length, paused]);
 
   return (
     <section className="relative pt-6 sm:pt-8 md:pt-12 lg:pt-12 pb-6 sm:pb-8 md:pb-12 lg:pb-12">
       {cmsBanners.length > 0 && (
-        <div className="home-shell relative w-full aspect-[4/1] rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden">
+        <div
+          className="home-shell relative w-full aspect-[4/1] rounded-xl md:rounded-2xl lg:rounded-3xl overflow-hidden"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
           {cmsBanners.map((banner, index) => (
             <div
               key={banner._id}
