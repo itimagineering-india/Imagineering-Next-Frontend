@@ -65,38 +65,21 @@ function BrandBanner({ row }: { row: ShopByBrandRow }) {
   return (
     <Link
       href={row.href}
-      className="group relative flex h-full w-[160px] shrink-0 flex-col overflow-hidden sm:w-[180px] md:w-[200px]"
+      aria-label={row.name}
+      title={row.name}
+      className="group relative block h-full w-[160px] shrink-0 overflow-hidden sm:w-[180px] md:w-[200px]"
       style={{ background: row.bannerBg }}
     >
-      <div className="relative z-10 shrink-0 px-3 pt-3 sm:px-4 sm:pt-4">
-        <p
-          className="truncate text-sm font-extrabold leading-none tracking-tight sm:text-base"
-          style={{ color: row.logoColor }}
-        >
-          {row.logoText}
-        </p>
-        {row.logoSub ? (
-          <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.18em] text-black/70">
-            {row.logoSub}
-          </p>
-        ) : null}
-        <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-snug text-black/55 sm:text-[11px]">
-          {row.tagline}
-        </p>
-      </div>
-      <div className="relative mt-2 min-h-0 flex-1 overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element -- CMS brand art URLs */}
-        <img
-          src={row.bannerImage}
-          alt=""
-          width={200}
-          height={160}
-          className="pointer-events-none absolute inset-0 h-full w-full max-h-full max-w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- CMS brand art URLs */}
+      <img
+        src={row.bannerImage}
+        alt={row.name}
+        width={200}
+        height={272}
+        className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+        loading="lazy"
+        decoding="async"
+      />
     </Link>
   );
 }
