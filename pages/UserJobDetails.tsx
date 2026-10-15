@@ -225,27 +225,14 @@ export default function UserJobDetails() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <div className="border-b bg-card/90 px-4 py-2 flex items-center justify-between gap-2 shrink-0">
-        <Button variant="ghost" size="sm" className="h-8 -ml-2" asChild>
-          <Link href="/jobs">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            All jobs
-          </Link>
-        </Button>
-        <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-          <Link href="/dashboard/provider">Dashboard</Link>
-        </Button>
-      </div>
       <div className="flex-1 bg-gradient-to-b from-background to-muted/40">
         <div className="container mx-auto px-4 md:px-6 py-8 md:py-12 max-w-4xl">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="mb-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-3 w-3" />
-            Back
-          </button>
+          <Button variant="ghost" size="sm" className="mb-4 h-8 -ml-2" asChild>
+            <Link href="/jobs">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              All jobs
+            </Link>
+          </Button>
 
           {isLoading && !job && <p className="text-sm text-muted-foreground">Loading job details...</p>}
 
