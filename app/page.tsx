@@ -8,6 +8,7 @@ import { ServicesSection } from "@/components/home/ServicesSection";
 import { HomePromoBannersSection } from "@/components/home/HomePromoBannersSection";
 import { ConstructionCalculatorBannerSection } from "@/components/home/ConstructionCalculatorBannerSection";
 import { TopProvidersSection } from "@/components/home/TopProvidersSection";
+import { ShopByBrandSection } from "@/components/home/ShopByBrandSection";
 import { CategorySections } from "@/components/home/CategorySections";
 import { PlatformAudienceSection } from "@/components/home/PlatformAudienceSection";
 import { ImagineeringCreditHomeSection } from "@/components/home/ImagineeringCreditHomeSection";
@@ -17,6 +18,7 @@ import {
   getHomeCategorySections,
   getHomeProviderGlobeMarkers,
   getHomeTopProviders,
+  getShopByBrandRows,
 } from "@/lib/api";
 
 export const revalidate = 300;
@@ -33,12 +35,14 @@ export const metadata: Metadata = {
 
 /** Home layout: Hero → Search → Featured → Services → Categories → Calculator → … */
 export default async function Home() {
-  const [banners, categorySections, topProviders, globeMarkers] = await Promise.all([
-    getHomeBanners("home"),
-    getHomeCategorySections({ limit: 9 }),
-    getHomeTopProviders(10),
-    getHomeProviderGlobeMarkers(),
-  ]);
+  const [banners, categorySections, topProviders, globeMarkers, shopByBrandRows] =
+    await Promise.all([
+      getHomeBanners("home"),
+      getHomeCategorySections({ limit: 9 }),
+      getHomeTopProviders(10),
+      getHomeProviderGlobeMarkers(),
+      getShopByBrandRows(),
+    ]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -54,6 +58,7 @@ export default async function Home() {
         <ConstructionCalculatorBannerSection />
        
         <TopProvidersSection initialProviders={topProviders} />
+        <ShopByBrandSection initialRows={shopByBrandRows} />
         <ImagineeringCreditHomeSection />
         <PlatformAudienceSection />
       </main>
