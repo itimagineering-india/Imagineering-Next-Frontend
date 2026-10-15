@@ -113,6 +113,9 @@ export function catalogProductDetailHref(categorySlug: string | undefined, id: s
   if (slug === "tools" || slug.startsWith("tools-")) {
     return `/tools/products/${id}`;
   }
+  if (slug === "furniture" || slug.startsWith("furniture-")) {
+    return `/b2b-services/products/${id}`;
+  }
   if (slug === "b2b-services" || slug === "b2b") {
     return `/b2b-services/products/${id}`;
   }
@@ -136,6 +139,9 @@ export function catalogCategoryBrowseHref(categorySlug: string | undefined, titl
   }
   if (slug === "tools" || slug.startsWith("tools-")) {
     return "/tools";
+  }
+  if (slug === "furniture" || slug.startsWith("furniture-")) {
+    return "/b2b-services?category=furniture";
   }
   if (slug === "b2b-services" || slug === "b2b") {
     return "/b2b-services";
@@ -186,10 +192,57 @@ export function normalizeHomeService(s: ApiService, categorySlug?: string): Home
   };
 }
 
+/** Home catalog row order: CM → Tools → Manpower → Furniture → rest. */
+const HOME_CATEGORY_ORDER = [
+  "construction-materials",
+  "construction-material",
+  "tools",
+  "manpower",
+  "furniture",
+] as const;
+
+function homeCategoryRank(slug: string): number {
+  const s = String(slug || "")
+    .toLowerCase()
+    .trim();
+  const exact = HOME_CATEGORY_ORDER.indexOf(s as (typeof HOME_CATEGORY_ORDER)[number]);
+  if (exact >= 0) return exact;
+  if (s.startsWith("tools-")) return HOME_CATEGORY_ORDER.indexOf("tools");
+  if (s.startsWith("manpower-")) return HOME_CATEGORY_ORDER.indexOf("manpower");
+  if (s.startsWith("furniture-")) return HOME_CATEGORY_ORDER.indexOf("furniture");
+  return 100;
+}
+
+function isFurnitureCategorySlug(slug: string): boolean {
+  const s = String(slug || "")
+    .toLowerCase()
+    .trim();
+  return s === "furniture" || s.startsWith("furniture-");
+}
+
+/** Ensure Furniture row exists and home category order is stable (CM → Tools → Manpower → Furniture). */
+export function ensureHomeCategorySections(
+  sections: HomeCategorySection[],
+): HomeCategorySection[] {
+  const next = [...sections];
+  if (!next.some((s) => isFurnitureCategorySlug(s.categorySlug))) {
+    next.push({
+      title: "Furniture",
+      categorySlug: "furniture",
+      services: [],
+    });
+  }
+  return next.sort((a, b) => {
+    const rankDiff = homeCategoryRank(a.categorySlug) - homeCategoryRank(b.categorySlug);
+    if (rankDiff !== 0) return rankDiff;
+    return String(a.title).localeCompare(String(b.title));
+  });
+}
+
 export function normalizeHomeCategorySections(
   rawCategories: ApiCategoryGroup[],
 ): HomeCategorySection[] {
-  return rawCategories.map((cat) => {
+  const sections = rawCategories.map((cat) => {
     const categorySlug = cat.category?.slug ?? "";
     return {
       title: cat.category?.name ?? "Unknown",
@@ -197,6 +250,7 @@ export function normalizeHomeCategorySections(
       services: (cat.services ?? []).map((row) => normalizeHomeService(row, categorySlug)),
     };
   });
+  return ensureHomeCategorySections(sections);
 }
 
 export function normalizeHomeTopProviders(
