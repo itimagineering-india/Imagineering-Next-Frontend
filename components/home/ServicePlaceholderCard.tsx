@@ -115,6 +115,7 @@ export function ServicePlaceholderCard({ index, size = "default" }: ServicePlace
     if (category?.slug === "construction-materials") return "/construction-materials";
     if (category?.slug === "tools") return "/tools";
     if (category?.slug === "furniture") return b2bPurchaseBrowseHref("furniture");
+    if (category?.slug === "traders") return "/b2b-services";
     if (category?.slug === "manpower") return "/manpower";
     return `/services?${buildServicesBrowseQuery(category?.slug ?? "")}`;
   }, [category?.slug]);
